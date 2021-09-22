@@ -49,14 +49,10 @@ A file in the EXTM3U format is a text file with the extension m3u or m3u8.
 An example of the contents of the file in the EXTM3U format
 ```
 #EXTM3U
-#PLAYLIST:Playlist1
-#EXTINF:-1 tvg-name="Channel 1" tvg-logo="http://site.domain / channel1_logo.png", Channel 1
-#EXTGRP:Group1
+#EXTINF:-1 tvg-name="Channel 1" tvg-logo="http://site.domain / channel1_logo.png" group-title="Group 1",Channel 1
 http://site.domain/channel1
-#EXTINF:-1 tvg-name="Channel 2" tvg-logo="http://site.domain / channel2_logo.png", Channel 2
-#EXTGRP:Group1
+#EXTINF:-1 tvg-name="Channel 2" tvg-logo="http://site.domain / channel2_logo.png"  group-title="Group 2",Channel 2
 http://site.domain/channel2
-#EXTINF:-1 tvg-name="Channel 3" tvg-logo="http://site.domain / channel3_logo.png", Channel 3
-#EXTGRP:Group2
+#EXTINF:-1 tvg-name="Channel 3" tvg-logo="http://site.domain / channel3_logo.png"  group-title="Group 2",Channel 3
 http://site.domain/channel3 -- reports and targets
 ```
