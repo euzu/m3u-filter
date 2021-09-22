@@ -54,5 +54,5 @@ http://site.domain/channel1
 #EXTINF:-1 tvg-name="Channel 2" tvg-logo="http://site.domain/channel2_logo.png"  group-title="Group 2",Channel 2
 http://site.domain/channel2
 #EXTINF:-1 tvg-name="Channel 3" tvg-logo="http://site.domain/channel3_logo.png"  group-title="Group 2",Channel 3
-http://site.domain/channel3 -- reports and targets
+http://site.domain/channel3
 ```
