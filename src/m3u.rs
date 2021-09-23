@@ -188,7 +188,8 @@ fn decode_header(content: &String) -> PlaylistItemHeader {
     };
 
     let mut it = content.chars();
-    if token_till(&mut it, ':') == Some(String::from("#EXTINF")) {
+    let line_token = token_till(&mut it, ':');
+    if line_token == Some(String::from("#EXTINF")) {
         let mut c = skip_digit(&mut it);
         loop {
             if !c.is_some() {
@@ -217,6 +218,9 @@ fn decode_header(content: &String) -> PlaylistItemHeader {
             }
             c = it.next();
         }
+    // } else if line_token == Some(String::from("#EXTGRP")) {
+    //     if plih
+    //     let group = get_value(&mut it);
     }
     plih
 }
@@ -225,14 +229,25 @@ pub fn decode(lines: &Vec<String>) -> Vec<PlaylistGroup> {
     let mut groups: HashMap<String, Vec<PlaylistItem>> = HashMap::new();
     let mut sort_order: Vec<String> = vec![];
     let mut header: Option<String> = None;
+    let mut group: Option<String> = None;
 
     for line in lines {
         if line.starts_with("#EXTINF") {
             header = Some(String::from(line));
             continue;
         }
+        if line.starts_with("#EXTGRP") {
+            group = Some(String::from(&line[8..]));
+            continue;
+        }
+        if line.starts_with("#") {
+            continue;
+        }
         if header.is_some() {
-            let item = PlaylistItem { header: decode_header(&header.unwrap()), url: String::from(line) };
+            let mut item = PlaylistItem { header: decode_header(&header.unwrap()), url: String::from(line) };
+            if group.is_some() && item.header.group.is_empty() {
+                item.header.group = String::from(group.unwrap());
+            }
             let key = String::from(&item.header.group);
             let key2 = String::from(&item.header.group);
             match groups.entry(key) {
@@ -244,6 +259,7 @@ pub fn decode(lines: &Vec<String>) -> Vec<PlaylistGroup> {
             }
         }
         header = None;
+        group = None;
     }
 
     let mut result: Vec<PlaylistGroup> = vec![];
