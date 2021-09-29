@@ -1,7 +1,7 @@
 # m3u-filter
 
 m3u-filter is a simple application which can filter entries out of a playlist in EXTM3U format.
-If you have a playlist which contains unwanted entries, you can create filter which Include or Discard entries
+If you have a playlist which contains unwanted entries, you can create filter which include or discard entries
 based on the header information of the playlist entries.
 Currently filter and rename operations support group, name and title fields.
 
@@ -15,7 +15,8 @@ If given as argument, it overrides the config file entry.
 the config.yml looks like:
 ```yaml
 ***REMOVED***
-  filename: playlist.m3u
+***REMOVED***
+***REMOVED***
 ***REMOVED***
 ***REMOVED***
 ***REMOVED***
@@ -30,6 +31,13 @@ the config.yml looks like:
 ***REMOVED***
 ***REMOVED***
 ```
+The input *url* can be an url or filename. If you have a local file you can simply write the name of the file as url:
+```yaml
+***REMOVED***
+  url: playlist.m3u
+```
+The input *persist* configuration is for storing the input content. The {} is replaced by a date time tag. If you don't
+want to persist the input content, then let it empty.
 
 The filter is either Include mode or Discard mode.
 The regular expression syntax is similar to Perl-style regular expressions,

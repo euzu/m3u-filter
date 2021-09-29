@@ -1,19 +1,8 @@
-use std::io::BufRead;
-
+use std::path::{PathBuf};
 mod m3u;
 mod config;
 mod processor;
-
-fn open_file(file_name: &str) -> std::fs::File {
-    let file = match std::fs::File::open(file_name) {
-        Ok(file) => file,
-        Err(_) => {
-            println!("cant open file: {}", file_name);
-            std::process::exit(1);
-        }
-    };
-    file
-}
+mod utils;
 
 fn main() {
     let matches = clap::App::new("m3u-filter")
@@ -30,12 +19,17 @@ fn main() {
             .long("input")
             .takes_value(true)
             .help("Input filename, overrides config input"))
+        .arg(clap::Arg::with_name("persist")
+            .short("p")
+            .long("persist")
+            .takes_value(false)
+            .help("Persists the input file on disk, if the input parameter is missing it will be ignored!"))
         .get_matches();
 
-    let default_path = get_default_config_path();
+    let default_path = utils::get_default_config_path();
     let config_file = matches.value_of("config").unwrap_or(default_path.as_str());
 
-    let mut cfg: config::Config = match serde_yaml::from_reader(open_file(config_file)) {
+    let mut cfg: config::Config = match serde_yaml::from_reader(utils::open_file(config_file)) {
         Ok(result) => result,
         Err(e) => {
             println!("cant read config file: {}", e);
@@ -43,25 +37,20 @@ fn main() {
         }
     };
     cfg.prepare();
-    let file_name = matches.value_of("input").unwrap_or(if cfg.input.filename.is_empty() { "playlist.m3u" } else { cfg.input.filename.as_str() });
-    let reader: Vec<String> = std::io::BufReader::new(open_file(file_name)).lines().map(|l| l.expect("Could not parse line")).collect();
-    let result = m3u::decode(&reader);
-
+    let input_arg = matches.value_of("input");
+    let url_str = input_arg.unwrap_or(if cfg.input.url.is_empty() { "playlist.m3u" } else { cfg.input.url.as_str() });
+    let persist_file = match input_arg {
+        Some(_) => matches.value_of("persist").map_or(None, |p|prepare_persist_path(p)),
+        None => if cfg.input.persist.is_empty() {None} else { prepare_persist_path(cfg.input.persist.as_str())},
+    };
+    let lines: Vec<String> = utils::get_input_content(url_str, persist_file);
+    let result = m3u::decode(&lines);
     processor::write_m3u(&result, &cfg);
 }
 
-fn get_default_config_path() -> String {
-    let default_path = std::path::Path::new("./");
-    let current_exe = std::env::current_exe();
-    let path: &std::path::Path = match current_exe {
-        Ok(ref exe) => exe.parent().unwrap_or(default_path),
-        Err(_) => default_path
-    };
-    let config_path = path.join("config.yml");
-    String::from(if config_path.exists() {
-        config_path.to_str().unwrap_or("./config.yml")
-    } else {
-        "./config.yml"
-    })
+fn prepare_persist_path(file_name: &str) -> Option<PathBuf> {
+    let now = chrono::Local::now();
+    let filename = file_name.replace("{}", now.format("%Y%m%d_%H%M%S").to_string().as_str());
+    Some(PathBuf::from(filename))
 }
 

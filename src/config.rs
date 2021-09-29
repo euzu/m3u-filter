@@ -86,7 +86,8 @@ pub struct ConfigTarget {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConfigInput {
-    pub filename: String,
+    pub url: String,
+    pub persist: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

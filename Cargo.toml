@@ -10,3 +10,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 regex = "1"
 clap = "2"
+url = "2"
+http = "0"
+reqwest = { version = "0", features = ["blocking"] }
+chrono = "0"
