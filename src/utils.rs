@@ -79,12 +79,13 @@ fn download_content(url: Url, persist_file: Option<PathBuf>) -> Result<Vec<Strin
 fn persists_playlist(persist_file: Option<PathBuf>, text: &String) {
         match persist_file {
             Some(path_buf) => {
-                match std::fs::File::create(path_buf) {
+                let filename = &path_buf.to_str().unwrap_or("?");
+                match std::fs::File::create(&path_buf) {
                     Ok(mut file) => match file.write_all(text.as_bytes()) {
-                        Ok(_) => {},
-                        Err(e) => println!("failed to persist file  {}", e)
+                        Ok(_) => println!("persisted: {}", filename),
+                        Err(e) => println!("failed to persist file {}, {}", filename, e)
                     },
-                    Err(e) => println!("failed to persist file {}", e)
+                    Err(e) => println!("failed to persist file {}, {}", filename, e)
                 }
             },
             None => {}

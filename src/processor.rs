@@ -64,7 +64,7 @@ fn exec_rename(pli: &m3u::PlaylistItem, rename: &Vec<config::ConfigRename>) -> O
     if rename.len() > 0 {
         let mut result = pli.clone();
         for r in rename {
-            let value = get_field_value(pli, &r.field);
+            let value = get_field_value(&result, &r.field);
             let cap = r.re.as_ref().unwrap().replace_all(value, &r.new_name);
             let value = cap.into_owned();
             set_field_value(&mut result, &r.field, value);
