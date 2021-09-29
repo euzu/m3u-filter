@@ -14,26 +14,26 @@ If given as argument, it overrides the config file entry.
 
 the config.yml looks like:
 ```yaml
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
+input:
+  url: http://myserver.net/playlist.m3u
+  persist: ./playlist_{}.m3u
+targets:
+  - filename: playlist_1.m3u
+    filter:
+        mode: Include
+        rules:
+          - field: Group
+            pattern: ^DE\s.*
+          - field: Group
+            pattern: ^AU\s.*
+    rename:
+      - field: Group
+        pattern: ^DE(.*)
+        new_name: 1. DE$1
 ```
 The input *url* can be an url or filename. If you have a local file you can simply write the name of the file as url:
 ```yaml
-***REMOVED***
+input:
   url: playlist.m3u
 ```
 The input *persist* configuration is for storing the input content. The {} is replaced by a date time tag. If you don't

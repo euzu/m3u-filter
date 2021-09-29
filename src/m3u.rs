@@ -218,9 +218,6 @@ fn decode_header(content: &String) -> PlaylistItemHeader {
             }
             c = it.next();
         }
-    // } else if line_token == Some(String::from("#EXTGRP")) {
-    //     if plih
-    //     let group = get_value(&mut it);
     }
     plih
 }

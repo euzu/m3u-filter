@@ -92,8 +92,8 @@ pub struct ConfigInput {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-    pub ***REMOVED*** ConfigInput,
-    pub ***REMOVED*** Vec<ConfigTarget>,
+    pub input: ConfigInput,
+    pub targets: Vec<ConfigTarget>,
 }
 
 impl Config {
