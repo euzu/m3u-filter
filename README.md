@@ -64,3 +64,22 @@ http://site.domain/channel2
 #EXTINF:-1 tvg-name="Channel 3" tvg-logo="http://site.domain/channel3_logo.png"  group-title="Group 2",Channel 3
 http://site.domain/channel3
 ```
+
+## Cross compile for windows on linux
+If you want to compile this project on linux for windows, you need to do the following steps.
+
+### Install mingw packages for your distribution
+For ubuntu type:
+```shell
+sudo apt-get install gcc-mingw-w64
+```
+### Install mingw support for rust
+```shell
+rustup target add x86_64-pc-windows-gnu
+rustup toolchain install stable-x86_64-pc-windows-gnu
+```
+
+Compile it with:
+```sh
+cargo build --release --target x86_64-pc-windows-gnu
+```
