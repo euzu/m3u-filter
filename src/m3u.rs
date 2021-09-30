@@ -1,6 +1,7 @@
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
+#[derive(Debug, Clone)]
 pub struct PlaylistItemHeader {
     pub id: String,
     pub name: String,
@@ -15,74 +16,10 @@ pub struct PlaylistItemHeader {
     pub source: String,
 }
 
-impl Clone for PlaylistItemHeader {
-    fn clone(&self) -> PlaylistItemHeader {
-        PlaylistItemHeader {
-            id: String::from(&self.id),
-            name: String::from(&self.name),
-            logo: String::from(&self.logo),
-            logo_small: String::from(&self.logo_small),
-            group: String::from(&self.group),
-            title: String::from(&self.title),
-            parent_code: String::from(&self.parent_code),
-            audio_track: String::from(&self.audio_track),
-            time_shift: String::from(&self.time_shift),
-            rec: String::from(&self.rec),
-            source: String::from(&self.source),
-        }
-    }
-}
-
-impl std::fmt::Display for PlaylistItemHeader {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fmt.write_str("id:")?;
-        fmt.write_str(&self.id)?;
-        fmt.write_str(", name:")?;
-        fmt.write_str(&self.name)?;
-        fmt.write_str(", logo:")?;
-        fmt.write_str(&self.logo)?;
-        fmt.write_str(", logo-small:")?;
-        fmt.write_str(&self.logo_small)?;
-        fmt.write_str(", group:")?;
-        fmt.write_str(&self.group)?;
-        fmt.write_str(", title:")?;
-        fmt.write_str(&self.title)?;
-        fmt.write_str(", parent-code:")?;
-        fmt.write_str(&self.parent_code)?;
-        fmt.write_str(", audio-track:")?;
-        fmt.write_str(&self.audio_track)?;
-        fmt.write_str(", timeshift:")?;
-        fmt.write_str(&self.time_shift)?;
-        fmt.write_str(", rec:")?;
-        fmt.write_str(&self.rec)?;
-        fmt.write_str(", source:")?;
-        fmt.write_str(&self.source)?;
-        Ok(())
-    }
-}
-
+#[derive(Debug, Clone)]
 pub struct PlaylistItem {
     pub header: PlaylistItemHeader,
     pub url: String,
-}
-
-impl Clone for PlaylistItem {
-    fn clone(&self) -> PlaylistItem {
-        PlaylistItem {
-            header: self.header.clone(),
-            url: String::from(&self.url),
-        }
-    }
-}
-
-impl std::fmt::Display for PlaylistItem {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fmt.write_str("header:")?;
-        fmt.write_str(&self.header.to_string())?;
-        fmt.write_str(", url:")?;
-        fmt.write_str(&self.url)?;
-        Ok(())
-    }
 }
 
 impl PlaylistItem {
@@ -108,19 +45,10 @@ impl PlaylistItem {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PlaylistGroup {
     pub title: String,
     pub channels: Vec<PlaylistItem>,
-}
-
-impl std::fmt::Display for PlaylistGroup {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fmt.write_str("title:")?;
-        fmt.write_str(&self.title.to_string())?;
-        fmt.write_str(", channels:")?;
-        fmt.write_str(&self.channels.len().to_string())?;
-        Ok(())
-    }
 }
 
 fn token_value<'a>(it: &'a mut std::str::Chars) -> String {
