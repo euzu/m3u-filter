@@ -51,20 +51,22 @@ pub struct PlaylistGroup {
     pub channels: Vec<PlaylistItem>,
 }
 
-fn token_value<'a>(it: &'a mut std::str::Chars) -> String {
-    let oc = it.next();
-    if oc.is_some() && oc.unwrap() == '"' {
-        return get_value(it);
+fn token_value(it: &mut std::str::Chars) -> String {
+    if let Some(oc) = it.next() {
+        if oc == '"' {
+            return get_value(it);
+        }
     }
     return String::from("");
 }
 
-fn get_value<'a>(it: &'a mut std::str::Chars) -> String {
+fn get_value(it: &mut std::str::Chars) -> String {
     let mut result: Vec<char> = vec![];
-    let mut oc = it.next();
-    while oc.is_some() && oc.unwrap() != '"' {
-        result.push(oc.unwrap());
-        oc = it.next();
+    while let Some(oc) = it.next() {
+        if oc == '"' {
+            break;
+        }
+        result.push(oc);
     }
     return String::from(result.iter().collect::<String>());
 }
@@ -72,27 +74,33 @@ fn get_value<'a>(it: &'a mut std::str::Chars) -> String {
 fn token_till(it: &mut std::str::Chars, stop_char: char) -> Option<String> {
     let mut result: Vec<char> = vec![];
     loop {
-        let c = it.next();
-        if !c.is_some() || c.unwrap() == stop_char {
-            break;
+        match it.next() {
+            Some(ch) => {
+                if ch == stop_char {
+                    break;
+                } else if ch.is_whitespace() && result.is_empty() {
+                    continue;
+                } else {
+                    result.push(ch);
+                }
+            }
+            None => break,
         }
-        if result.len() == 0 && c.unwrap().is_whitespace() {
-            continue;
-        }
-        result.push(c.unwrap())
     }
-    if result.len() > 0 { Some(String::from(result.iter().collect::<String>())) } else { None }
+    if !result.is_empty() { Some(String::from(result.iter().collect::<String>())) } else { None }
 }
 
 fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
-    let mut c: Option<char>;
     loop {
-        c = it.next();
-        if !c.is_some() || !(c.unwrap() == '-' || c.unwrap() == '+' || c.unwrap().is_digit(10)) {
-            break;
+        match it.next() {
+            Some(c) => {
+                if !(c == '-' || c == '+' || c.is_digit(10)) {
+                    return Some(c);
+                }
+            },
+            None => return None,
         }
     }
-    c
 }
 
 fn decode_header(content: &String) -> PlaylistItemHeader {
@@ -169,11 +177,11 @@ pub(crate) fn decode(lines: &Vec<String>) -> Vec<PlaylistGroup> {
                 item.header.group = String::from(group.unwrap());
             }
             let key = String::from(&item.header.group);
-            let key2 = String::from(&item.header.group);
-            match groups.entry(key) {
+            // let key2 = String::from(&item.header.group);
+            match groups.entry(key.clone()) {
                 std::collections::hash_map::Entry::Vacant(e) => {
                     e.insert(vec![item]);
-                    sort_order.push(key2);
+                    sort_order.push(key);
                 }
                 std::collections::hash_map::Entry::Occupied(mut e) => { e.get_mut().push(item); }
             }
