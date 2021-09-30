@@ -11,6 +11,6 @@ serde_yaml = "0.8"
 regex = "1"
 clap = "2"
 url = "2"
-http = "0"
+http = "0.2"
 reqwest = { version = "0", features = ["blocking"] }
-chrono = "0"
+chrono = "0.4"
