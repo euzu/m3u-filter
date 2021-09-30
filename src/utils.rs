@@ -1,8 +1,6 @@
-use url::{Url};
 use std::io::{BufRead, Write};
-use std::path::{PathBuf};
 
-pub fn get_default_config_path() -> String {
+pub(crate) fn get_default_config_path() -> String {
     let default_path = std::path::Path::new("./");
     let current_exe = std::env::current_exe();
     let path: &std::path::Path = match current_exe {
@@ -17,7 +15,7 @@ pub fn get_default_config_path() -> String {
     })
 }
 
-pub fn open_file(file_name: &str) -> std::fs::File {
+pub(crate) fn open_file(file_name: &str) -> std::fs::File {
     let file = match std::fs::File::open(file_name) {
         Ok(file) => file,
         Err(_) => {
@@ -28,8 +26,8 @@ pub fn open_file(file_name: &str) -> std::fs::File {
     file
 }
 
-pub fn get_input_content(url_str: &str, persist_file: Option<PathBuf>) -> Vec<String> {
-    match url_str.parse::<Url>() {
+pub(crate) fn get_input_content(url_str: &str, persist_file: Option<std::path::PathBuf>) -> Vec<String> {
+    match url_str.parse::<url::Url>() {
         Ok(url) => match download_content(url, persist_file) {
             Ok(content) => content,
             Err(e) => {
@@ -43,11 +41,11 @@ pub fn get_input_content(url_str: &str, persist_file: Option<PathBuf>) -> Vec<St
                 if persist_file.is_some() {
                     let to_file = &persist_file.unwrap();
                     match std::fs::copy(file, to_file) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(e) => println!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e),
                     }
-                } ;
-                std::io::BufReader::new(open_file(url_str)).lines(). map(|l| l.unwrap()).collect()
+                };
+                std::io::BufReader::new(open_file(url_str)).lines().map(|l| l.unwrap()).collect()
             } else {
                 println!("cant read input url: {}  => {}", url_str, e);
                 std::process::exit(1);
@@ -56,38 +54,45 @@ pub fn get_input_content(url_str: &str, persist_file: Option<PathBuf>) -> Vec<St
     }
 }
 
-fn download_content(url: Url, persist_file: Option<PathBuf>) -> Result<Vec<String>, String> {
+fn download_content(url: url::Url, persist_file: Option<std::path::PathBuf>) -> Result<Vec<String>, String> {
     match reqwest::blocking::get(url) {
         Ok(response) => {
             if response.status().is_success() {
                 match response.text_with_charset("utf8") {
                     Ok(text) => {
                         persists_playlist(persist_file, &text);
-                        let result= text.lines().map(|l| String::from(l)).collect();
+                        let result = text.lines().map(|l| String::from(l)).collect();
                         Ok(result)
-                    },
+                    }
                     Err(e) => Err(e.to_string())
                 }
             } else {
                 Err(format!("Request failed: {}", response.status()))
             }
-        },
+        }
         Err(e) => Err(e.to_string())
     }
 }
 
-fn persists_playlist(persist_file: Option<PathBuf>, text: &String) {
-        match persist_file {
-            Some(path_buf) => {
-                let filename = &path_buf.to_str().unwrap_or("?");
-                match std::fs::File::create(&path_buf) {
-                    Ok(mut file) => match file.write_all(text.as_bytes()) {
-                        Ok(_) => println!("persisted: {}", filename),
-                        Err(e) => println!("failed to persist file {}, {}", filename, e)
-                    },
+fn persists_playlist(persist_file: Option<std::path::PathBuf>, text: &String) {
+    match persist_file {
+        Some(path_buf) => {
+            let filename = &path_buf.to_str().unwrap_or("?");
+            match std::fs::File::create(&path_buf) {
+                Ok(mut file) => match file.write_all(text.as_bytes()) {
+                    Ok(_) => println!("persisted: {}", filename),
                     Err(e) => println!("failed to persist file {}, {}", filename, e)
-                }
-            },
-            None => {}
+                },
+                Err(e) => println!("failed to persist file {}, {}", filename, e)
+            }
+        }
+        None => {}
     }
 }
+
+pub(crate) fn prepare_persist_path(file_name: &str) -> Option<std::path::PathBuf> {
+    let now = chrono::Local::now();
+    let filename = file_name.replace("{}", now.format("%Y%m%d_%H%M%S").to_string().as_str());
+    Some(std::path::PathBuf::from(filename))
+}
+

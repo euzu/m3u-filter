@@ -1,12 +1,11 @@
-use std::fs::File;
 use std::io::Write;
 
 use crate::{config, m3u};
 use crate::m3u::PlaylistItem;
 
-pub fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, cfg: &config::Config) {
+pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, cfg: &config::Config) {
     for t in &cfg.targets {
-        let mut file = match File::create(&t.filename) {
+        let mut file = match std::fs::File::create(&t.filename) {
             Ok(file) => file,
             Err(_) => {
                 println!("cant open file: {}", t.filename);

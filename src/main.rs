@@ -1,7 +1,6 @@
-use std::path::{PathBuf};
 mod m3u;
 mod config;
-mod processor;
+mod m3u_processing;
 mod utils;
 
 fn main() {
@@ -40,17 +39,11 @@ fn main() {
     let input_arg = matches.value_of("input");
     let url_str = input_arg.unwrap_or(if cfg.input.url.is_empty() { "playlist.m3u" } else { cfg.input.url.as_str() });
     let persist_file = match input_arg {
-        Some(_) => matches.value_of("persist").map_or(None, |p|prepare_persist_path(p)),
-        None => if cfg.input.persist.is_empty() {None} else { prepare_persist_path(cfg.input.persist.as_str())},
+        Some(_) => matches.value_of("persist").map_or(None, |p| utils::prepare_persist_path(p)),
+        None => if cfg.input.persist.is_empty() { None } else { utils::prepare_persist_path(cfg.input.persist.as_str()) },
     };
     let lines: Vec<String> = utils::get_input_content(url_str, persist_file);
     let result = m3u::decode(&lines);
-    processor::write_m3u(&result, &cfg);
-}
-
-fn prepare_persist_path(file_name: &str) -> Option<PathBuf> {
-    let now = chrono::Local::now();
-    let filename = file_name.replace("{}", now.format("%Y%m%d_%H%M%S").to_string().as_str());
-    Some(PathBuf::from(filename))
+    m3u_processing::write_m3u(&result, &cfg);
 }
 

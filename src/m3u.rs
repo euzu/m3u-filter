@@ -1,11 +1,6 @@
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::fmt;
-use std::str::Chars;
-
 pub struct PlaylistItemHeader {
     pub id: String,
     pub name: String,
@@ -38,8 +33,8 @@ impl Clone for PlaylistItemHeader {
     }
 }
 
-impl fmt::Display for PlaylistItemHeader {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for PlaylistItemHeader {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         fmt.write_str("id:")?;
         fmt.write_str(&self.id)?;
         fmt.write_str(", name:")?;
@@ -80,8 +75,8 @@ impl Clone for PlaylistItem {
     }
 }
 
-impl fmt::Display for PlaylistItem {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for PlaylistItem {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         fmt.write_str("header:")?;
         fmt.write_str(&self.header.to_string())?;
         fmt.write_str(", url:")?;
@@ -91,7 +86,7 @@ impl fmt::Display for PlaylistItem {
 }
 
 impl PlaylistItem {
-    pub fn to_m3u(&self) -> String {
+    pub(crate) fn to_m3u(&self) -> String {
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" tvg-logo=\"{}\" group-title=\"{}\"", self.header.id, self.header.name, self.header.logo, self.header.group);
         if !self.header.logo_small.is_empty() {
             line = format!("{} tvg-logo-small=\"!{}\"", line, self.header.logo_small);
@@ -118,8 +113,8 @@ pub struct PlaylistGroup {
     pub channels: Vec<PlaylistItem>,
 }
 
-impl fmt::Display for PlaylistGroup {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for PlaylistGroup {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         fmt.write_str("title:")?;
         fmt.write_str(&self.title.to_string())?;
         fmt.write_str(", channels:")?;
@@ -128,7 +123,7 @@ impl fmt::Display for PlaylistGroup {
     }
 }
 
-fn token_value<'a>(it: &'a mut Chars) -> String {
+fn token_value<'a>(it: &'a mut std::str::Chars) -> String {
     let oc = it.next();
     if oc.is_some() && oc.unwrap() == '"' {
         return get_value(it);
@@ -136,7 +131,7 @@ fn token_value<'a>(it: &'a mut Chars) -> String {
     return String::from("");
 }
 
-fn get_value<'a>(it: &'a mut Chars) -> String {
+fn get_value<'a>(it: &'a mut std::str::Chars) -> String {
     let mut result: Vec<char> = vec![];
     let mut oc = it.next();
     while oc.is_some() && oc.unwrap() != '"' {
@@ -146,7 +141,7 @@ fn get_value<'a>(it: &'a mut Chars) -> String {
     return String::from(result.iter().collect::<String>());
 }
 
-fn token_till(it: &mut Chars, stop_char: char) -> Option<String> {
+fn token_till(it: &mut std::str::Chars, stop_char: char) -> Option<String> {
     let mut result: Vec<char> = vec![];
     loop {
         let c = it.next();
@@ -161,7 +156,7 @@ fn token_till(it: &mut Chars, stop_char: char) -> Option<String> {
     if result.len() > 0 { Some(String::from(result.iter().collect::<String>())) } else { None }
 }
 
-fn skip_digit(it: &mut Chars) -> Option<char> {
+fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     let mut c: Option<char>;
     loop {
         c = it.next();
@@ -222,8 +217,8 @@ fn decode_header(content: &String) -> PlaylistItemHeader {
     plih
 }
 
-pub fn decode(lines: &Vec<String>) -> Vec<PlaylistGroup> {
-    let mut groups: HashMap<String, Vec<PlaylistItem>> = HashMap::new();
+pub(crate) fn decode(lines: &Vec<String>) -> Vec<PlaylistGroup> {
+    let mut groups: std::collections::HashMap<String, Vec<PlaylistItem>> = std::collections::HashMap::new();
     let mut sort_order: Vec<String> = vec![];
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
@@ -248,11 +243,11 @@ pub fn decode(lines: &Vec<String>) -> Vec<PlaylistGroup> {
             let key = String::from(&item.header.group);
             let key2 = String::from(&item.header.group);
             match groups.entry(key) {
-                Entry::Vacant(e) => {
+                std::collections::hash_map::Entry::Vacant(e) => {
                     e.insert(vec![item]);
                     sort_order.push(key2);
                 }
-                Entry::Occupied(mut e) => { e.get_mut().push(item); }
+                std::collections::hash_map::Entry::Occupied(mut e) => { e.get_mut().push(item); }
             }
         }
         header = None;
