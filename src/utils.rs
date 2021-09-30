@@ -60,7 +60,7 @@ fn download_content(url: url::Url, persist_file: Option<std::path::PathBuf>) -> 
             if response.status().is_success() {
                 match response.text_with_charset("utf8") {
                     Ok(text) => {
-                        persists_playlist(persist_file, &text);
+                        persist_playlist(persist_file, &text);
                         let result = text.lines().map(|l| String::from(l)).collect();
                         Ok(result)
                     }
@@ -74,7 +74,7 @@ fn download_content(url: url::Url, persist_file: Option<std::path::PathBuf>) -> 
     }
 }
 
-fn persists_playlist(persist_file: Option<std::path::PathBuf>, text: &String) {
+fn persist_playlist(persist_file: Option<std::path::PathBuf>, text: &String) {
     match persist_file {
         Some(path_buf) => {
             let filename = &path_buf.to_str().unwrap_or("?");

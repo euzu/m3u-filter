@@ -40,8 +40,7 @@ impl PlaylistItem {
         if !self.header.rec.is_empty() {
             line = format!("{} rec=\"!{}\"", line, self.header.rec);
         }
-        line = format!("{},{}\n{}", line, self.header.title, self.url);
-        line
+        format!("{},{}\n{}", line, self.header.title, self.url)
     }
 }
 
@@ -57,7 +56,7 @@ fn token_value(it: &mut std::str::Chars) -> String {
             return get_value(it);
         }
     }
-    return String::from("");
+    String::from("")
 }
 
 fn get_value(it: &mut std::str::Chars) -> String {
@@ -68,7 +67,7 @@ fn get_value(it: &mut std::str::Chars) -> String {
         }
         result.push(oc);
     }
-    return String::from(result.iter().collect::<String>());
+    String::from(result.iter().collect::<String>())
 }
 
 fn token_till(it: &mut std::str::Chars, stop_char: char) -> Option<String> {
@@ -97,7 +96,7 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
                 if !(c == '-' || c == '+' || c.is_digit(10)) {
                     return Some(c);
                 }
-            },
+            }
             None => return None,
         }
     }
