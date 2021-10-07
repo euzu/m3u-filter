@@ -1,4 +1,4 @@
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ItemField {
     Group,
     Name,
@@ -15,13 +15,13 @@ impl std::fmt::Display for ItemField {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum FilterMode {
     Discard,
     Include,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigFilter {
     pub field: ItemField,
     pub pattern: String,
@@ -72,7 +72,6 @@ impl ConfigRename {
     }
 }
 
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigTarget {
     pub filename: String,
@@ -80,20 +79,38 @@ pub struct ConfigTarget {
     pub rename: Vec<ConfigRename>,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigInput {
     pub url: String,
     pub persist: String,
 }
 
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ConfigApi {
+    pub host: String,
+    pub port: u16,
+    pub web_root: String,
+}
+
+impl ConfigApi {
+    pub(crate) fn prepare(&mut self) {
+        if self.web_root.is_empty() {
+            self.web_root = String::from("./web");
+        }
+    }
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Config {
+    pub api: ConfigApi,
     pub input: ConfigInput,
     pub targets: Vec<ConfigTarget>,
 }
 
 impl Config {
     pub(crate) fn prepare(&mut self) {
+        self.api.prepare();
         for t in &mut self.targets {
             for f in &mut t.filter.rules {
                 f.prepare();
@@ -101,6 +118,46 @@ impl Config {
             for r in &mut t.rename {
                 r.prepare();
             }
+        }
+    }
+}
+
+impl Clone for Config {
+    fn clone(&self) -> Self {
+        Config{
+            api: self.api.clone(),
+            input: self.input.clone(),
+            targets: self.targets.clone()
+        }
+    }
+}
+
+impl Clone for ConfigTarget {
+    fn clone(&self) -> Self {
+        ConfigTarget{
+            filename: self.filename.clone(),
+            filter: self.filter.clone(),
+            rename: self.rename.clone()
+        }
+    }
+}
+
+impl Clone for ConfigFilters {
+    fn clone(&self) -> Self {
+        ConfigFilters{
+            mode: self.mode.clone(),
+            rules: self.rules.clone()
+        }
+    }
+}
+
+impl Clone for ConfigRename {
+    fn clone(&self) -> Self {
+        ConfigRename{
+            field: self.field.clone(),
+            pattern: self.pattern.clone(),
+            new_name: self.new_name.clone(),
+            re: None
         }
     }
 }

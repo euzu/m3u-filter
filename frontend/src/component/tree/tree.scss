@@ -1,0 +1,51 @@
+.tree {
+  font-size: 12px;
+
+  .tree-expander {
+    cursor: pointer;
+    margin-right: 6px;
+
+    * {
+      pointer-events: none;
+    }
+  }
+
+  .tree-group {
+    .tree-group-header {
+      display: flex;
+      flex-flow: row;
+      height: 1.3em;
+
+      input[type='checkbox'] {
+        cursor: pointer;
+      }
+
+      .tree-group-count {
+        margin-left: 10px;
+        color: var(--tree-count-color);
+      }
+    }
+
+    .tree-group-childs {
+      .tree-channel {
+        display: flex;
+        flex-flow: row;
+        margin-left: 50px;
+        height: 1.3em;
+
+        .tree-channel-nr {
+          width: 20px;
+          font-size: 0.8em;
+          margin-right: 8px;
+          text-align: right;
+          color: var(--tree-count-color);
+
+          &:after {
+            content: ')';
+          }
+        }
+      }
+    }
+  }
+
+}

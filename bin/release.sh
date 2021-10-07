@@ -13,6 +13,7 @@ WIN_ARC=${WIN_DIR}.zip
 
 ./bin/build_lin.sh && \
 ./bin/build_win.sh && \
+./bin/build_fe.sh && \
 cd target && \
 rm -rf $LIN_DIR $WIN_DIR $LIN_ARC $WIN_ARC release_${VERSION} && \
 mkdir $LIN_DIR && \
@@ -21,6 +22,8 @@ cp release/m3u-filter $LIN_DIR && \
 cp x86_64-pc-windows-gnu/release/m3u-filter.exe $WIN_DIR && \
 cp ../config.yml $LIN_DIR && \
 cp ../config.yml $WIN_DIR && \
+cp -rf ../frontend/build $LIN_DIR/web && \
+cp -rf ../frontend/build $WIN_DIR/web && \
 tar cvzf $LIN_ARC $LIN_DIR && \
 zip -r $WIN_ARC $WIN_DIR && \
 shasum -a 256 $LIN_ARC > checksum.txt && \

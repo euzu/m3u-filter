@@ -1,4 +1,5 @@
 /target
+/frontend/build
 # Default ignored files
 /shelf/
 /workspace.xml
@@ -12,3 +13,6 @@
 
 .idea
 *.iml
+
+node_modules
+yarn.lock

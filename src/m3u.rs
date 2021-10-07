@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistItemHeader {
     pub id: String,
     pub name: String,
@@ -16,7 +17,7 @@ pub struct PlaylistItemHeader {
     pub source: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistItem {
     pub header: PlaylistItemHeader,
     pub url: String,
@@ -44,7 +45,7 @@ impl PlaylistItem {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistGroup {
     pub title: String,
     pub channels: Vec<PlaylistItem>,

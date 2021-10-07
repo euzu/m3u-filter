@@ -1,0 +1,16 @@
+.app {
+  display: flex;
+  flex-flow: column;
+  justify-content: center;
+  flex-grow: 1;
+  overflow: hidden;
+  height: 100%;
+
+  .app-header {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--app-header-color);
+    text-align:center;
+    padding: 10px;
+  }
+}

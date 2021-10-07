@@ -1,3 +1,7 @@
+api:
+  host: 127.0.0.1
+  port: 8901
+  web_root: ./web
 input:
   url: http://myserver.net/playlist.m3u
   persist: ./playlist_{}.m3u

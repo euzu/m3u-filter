@@ -1,0 +1,15 @@
+### playlist request
+POST http://localhost:5901/api/v1/playlist
+Content-Type: application/json
+
+{
+  "url": "iptv.m3u"
+}
+
+###
+
+### config request
+GET http://localhost:5901/api/v1/config
+Content-Type: application/json
+
+###

@@ -65,6 +65,13 @@ http://site.domain/channel2
 http://site.domain/channel3
 ```
 
+## Starting in server mode for Web-UI
+If you want to see the contents of a playlist, you can simply start with the -s (--server)
+argument. Other arguments are ignored. A server is started. You can open a browser to view the Web-UI.
+According to your configuration, use the printed url on console.
+The UI allows you to download a list. You can download the list with the Save Button.
+The downloaded list only contains *non-selected* entries.
+
 ## Cross compile for windows on linux
 If you want to compile this project on linux for windows, you need to do the following steps.
 

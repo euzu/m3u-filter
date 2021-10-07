@@ -1,0 +1,55 @@
+{
+  "name": "m3u-filter",
+  "description": "m3u-filter",
+  "author": "euzu",
+  "version": "0.2.0",
+  "private": true,
+  "dependencies": {
+    "@material-ui/core": "^4.11.0",
+    "@material-ui/icons": "^4.9.1",
+    "@material-ui/lab": "^4.0.0-alpha.56",
+    "cross-env": "6.0.3",
+    "file-saver": "^2.0.2",
+    "notistack": "^1.0.0",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "rxjs": "^6.6.3"
+  },
+  "devDependencies": {
+    "@types/file-saver": "^2.0.1",
+    "@types/react": "^16.9.50",
+    "@types/react-dom": "^16.9.8",
+    "concurrently": "4.1.2",
+    "node-sass": "^4.14.1",
+    "prettier": "^2.1.2",
+    "react-scripts": "^3.4.3",
+    "typescript": "^4.0.3",
+    "wait-on": "^5.2.0"
+  },
+  "build": {
+    "publish": null
+  },
+  "main": "public/electron.js",
+  "homepage": "./",
+  "scripts": {
+    "react-start": "react-scripts start",
+    "react-build": "react-scripts build",
+    "react-test": "react-scripts test --env=jsdom",
+    "react-eject": "react-scripts eject",
+    "release": "yarn react-build",
+    "build": "cross-env REACT_APP_STAGE=production PUBLIC_URL= yarn react-build",
+    "start": "yarn react-start"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

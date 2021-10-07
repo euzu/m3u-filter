@@ -1,0 +1,26 @@
+.source-selector {
+  display: flex;
+  flex-flow: row nowrap;
+  padding: 10px;
+
+  .source-selector-input {
+    flex-grow: 1;
+
+    .MuiFormLabel-root {
+      color: var(--playlist-color);
+      font-size: 1.2em;
+    }
+
+    .MuiOutlinedInput-notchedOutline {
+      border-color: var(--playlist-color);
+    }
+
+    .MuiInputBase-input {
+      color: var(--playlist-color);
+    }
+  }
+
+  .icon-button {
+    color: var(--playlist-color);
+  }
+}
