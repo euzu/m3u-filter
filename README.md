@@ -14,6 +14,10 @@ If given as argument, it overrides the config file entry.
 
 the config.yml looks like:
 ```yaml
+api:
+  host: localhost
+  port: 8901
+  web_root: ./web
 input:
   url: http://myserver.net/playlist.m3u
   persist: ./playlist_{}.m3u
