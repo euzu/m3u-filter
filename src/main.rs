@@ -33,7 +33,9 @@ fn main() {
             None => if cfg.input.persist.is_empty() { None } else { utils::prepare_persist_path(cfg.input.persist.as_str()) },
         };
         let result = get_playlist(url_str, persist_file);
-        m3u_processing::write_m3u(&result, &cfg);
+        if result.is_some() {
+            m3u_processing::write_m3u(&result.unwrap(), &cfg);
+        }
     }
 }
 
@@ -48,7 +50,7 @@ fn read_config(config_file: &str) -> Config {
 
 fn get_arguments<'a>() -> ArgMatches<'a> {
     clap::App::new("m3u-filter")
-        .version("0.3.0")
+        .version("0.4.0")
         .author("euzu")
         .about("Extended M3U playlist filter")
         .arg(clap::Arg::with_name("config")

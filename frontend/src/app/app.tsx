@@ -28,6 +28,7 @@ export default function App(props: AppProps) {
                 setPlaylist(playlist);
             },
             error: (err) => {
+                setProgress(false);
                 enqueueSnackbar('Failed to download playlist!', {variant: 'error'});
             },
             complete: () => setProgress(false),

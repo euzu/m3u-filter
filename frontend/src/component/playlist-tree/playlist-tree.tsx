@@ -1,20 +1,25 @@
 import React, {useCallback, useState, useRef} from 'react';
-import './tree.scss';
+import './playlist-tree.scss';
 import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
-import {ExpandMore, ChevronRight} from "@material-ui/icons";
+import {ExpandMore, ChevronRight, LinkRounded} from "@material-ui/icons";
+import copyToClipboard from "../../utils/clipboard";
+import {first} from "rxjs/operators";
+import {noop} from "rxjs";
+import {useSnackbar} from "notistack";
 
-export type TreeState = { [key: number]: boolean };
+export type PlaylistTreeState = { [key: number]: boolean };
 
-interface TreeProps {
+interface PlaylistTreeProps {
     data: PlaylistGroup[];
-    state: TreeState;
+    state: PlaylistTreeState;
 }
 
-export default function Tree(props: TreeProps) {
+export default function PlaylistTree(props: PlaylistTreeProps) {
 
     const [, setForceUpdate] = useState(null);
     const {state, data} = props;
-    const expanded = useRef<TreeState>({});
+    const expanded = useRef<PlaylistTreeState>({});
+    const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
 
     const handleChange = useCallback((event: any) => {
         const key = event.target.dataset.group;
@@ -28,8 +33,25 @@ export default function Tree(props: TreeProps) {
         setForceUpdate({});
     }, []);
 
+    const handleClipboardUrl = useCallback((e: any) => {
+        const url = e.target.dataset.url;
+        if (url) {
+            copyToClipboard(url).pipe(first()).subscribe({
+                next: value => enqueueSnackbar(value ? "URL copied to clipboard" : "Copy to clipboard failed!", {variant: value ? 'success' : 'error'}),
+                error: err => enqueueSnackbar("Copy to clipboard failed!", {variant: 'error'}),
+                complete: noop,
+            });
+        }
+    }, [data, enqueueSnackbar]);
+
+
     const renderEntry = useCallback((entry: PlaylistItem, index: number): React.ReactNode => {
         return <div key={entry.id} className={'tree-channel'}>
+            <div className={'tree-channel-tools'}>
+                <div className={'tool-button'} data-item={entry.id} data-url={entry.url} onClick={handleClipboardUrl}>
+                    <LinkRounded/>
+                </div>
+            </div>
             <div className={'tree-channel-content'}>
                 <div className={'tree-channel-nr'}>{index + 1}</div>
                 {entry.header.name}</div>
@@ -63,5 +85,5 @@ export default function Tree(props: TreeProps) {
         </React.Fragment>;
     }, [data, renderGroup]);
 
-    return <div className={'tree'}>{renderPlaylist()}</div>;
+    return <div className={'playlist-tree'}>{renderPlaylist()}</div>;
 } 

@@ -26,13 +26,13 @@ pub(crate) fn open_file(file_name: &str) -> std::fs::File {
     file
 }
 
-pub(crate) fn get_input_content(url_str: &str, persist_file: Option<std::path::PathBuf>) -> Vec<String> {
+pub(crate) fn get_input_content(url_str: &str, persist_file: Option<std::path::PathBuf>) -> Option<Vec<String>> {
     match url_str.parse::<url::Url>() {
         Ok(url) => match download_content(url, persist_file) {
-            Ok(content) => content,
+            Ok(content) => Some(content),
             Err(e) => {
                 println!("cant download input url: {}  => {}", url_str, e);
-                std::process::exit(1);
+                None
             }
         }
         Err(e) => {
@@ -45,10 +45,10 @@ pub(crate) fn get_input_content(url_str: &str, persist_file: Option<std::path::P
                         Err(e) => println!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e),
                     }
                 };
-                std::io::BufReader::new(open_file(url_str)).lines().map(|l| l.unwrap()).collect()
+                Some(std::io::BufReader::new(open_file(url_str)).lines().map(|l| l.unwrap()).collect())
             } else {
                 println!("cant read input url: {}  => {}", url_str, e);
-                std::process::exit(1);
+                None
             }
         }
     }

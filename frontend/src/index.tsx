@@ -6,7 +6,7 @@ import {SnackbarProvider} from 'notistack';
 import {ServiceProvider} from "./provider/service-provider";
 
 ReactDOM.render(
-    <SnackbarProvider maxSnack={3}>
+    <SnackbarProvider maxSnack={3} autoHideDuration={1500}>
         <ServiceProvider>
             <App/>
         </ServiceProvider>

@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.4.0(2021-10-08)
+* Fixed server exit on poaylist not found
+* Added copy link to clipboard in playlist tree
+
 ## v0.3.0(2021-10-08)
 * Updated frontend packages
 * Added linter for code checking

@@ -2,7 +2,7 @@ import React, {forwardRef, useImperativeHandle, useMemo, useCallback} from "reac
 import './playlist-viewer.scss';
 import {PlaylistGroup} from "../../model/playlist";
 import PlaylistFilter from "../playlist-filter/playlist-filter";
-import Tree, {TreeState} from "../tree/tree";
+import PlaylistTree, {PlaylistTreeState} from "../playlist-tree/playlist-tree";
 
 function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: boolean }): PlaylistGroup[] {
     if (playlist) {
@@ -21,7 +21,7 @@ interface PlaylistViewerProps {
 
 const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: PlaylistViewerProps, ref: any) => {
     const {playlist} = props;
-    const checked = useMemo((): TreeState => ({}), []);
+    const checked = useMemo((): PlaylistTreeState => ({}), []);
     const reference = useMemo(() => (
         {
             getFilteredPlaylist: () => filterPlaylist(playlist, checked)
@@ -35,7 +35,7 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
 
     return <div className={'playlist-viewer'}>
         <PlaylistFilter onFilter={handleFilter}/>
-        <Tree data={playlist} state={checked}/>
+        <PlaylistTree data={playlist} state={checked}/>
     </div>
 });
 

@@ -1,14 +1,16 @@
-.tree {
+.playlist-tree {
   font-size: 12px;
 
   .tree-expander {
-    cursor: pointer;
     margin-right: 6px;
 
     &:hover {
-       color: var(--tree-expander-hover-color);
+      color: var(--tree-expander-hover-color);
     }
+  }
 
+  .tree-expander, .tool-button {
+    cursor: pointer;
     * {
       pointer-events: none;
     }
@@ -45,6 +47,32 @@
         margin-left: 50px;
         height: 1.3em;
 
+        .tree-channel-tools {
+          display: flex;
+          flex-flow: row;
+          align-items: center;
+
+          .tool-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 1em;
+            width: 1em;
+            border-radius: 2px;
+            background-color: var(--tool-button-background-color);
+            color: var(--tool-button-color);
+            svg {
+              width: 0.5em;
+              height: 0.5em;
+            }
+
+            &:hover {
+              color: var(--tool-button-hover-color);
+              background-color: var(--tool-button-hover-background-color);
+            }
+          }
+        }
+
         .tree-channel-content {
           display: flex;
           flex-flow: row;
@@ -67,12 +95,14 @@
 
     .tree-group-header-content, .tree-channel-content {
       cursor: pointer;
+
       &:hover {
-         background-color: var(--tree-hover-background-color);
-         color: var(--tree-hover-color);
-          .tree-group-count {
-            color: var(--tree-hover-color);
-          }
+        background-color: var(--tree-hover-background-color);
+        color: var(--tree-hover-color);
+
+        .tree-group-count {
+          color: var(--tree-hover-color);
+        }
       }
     }
   }
