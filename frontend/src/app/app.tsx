@@ -9,6 +9,7 @@ import {useServices} from "../provider/service-provider";
 import {first} from "rxjs/operators";
 import Progress from '../component/progress/progress';
 
+/* eslint-disable @typescript-eslint/no-empty-interface */
 interface AppProps {
 
 }

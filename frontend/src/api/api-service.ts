@@ -30,20 +30,20 @@ export class DefaultApiService implements ApiService {
 
     private static getOption(options: any, key: any, defaultValue: any): string {
         if (options) {
-            if (options.hasOwnProperty(key)) {
+            if (Object.prototype.hasOwnProperty.call(options, key)) {
                 return options[key];
             }
         }
         return defaultValue;
     }
 
-    protected getHeaders(options?: {}): any {
-        let headers: any = {};
-        let language = DefaultApiService.getLanguage();
+    protected getHeaders(options?: unknown): any {
+        const headers: any = {};
+        const language = DefaultApiService.getLanguage();
         if (language) {
             headers[HEADER_LANGUAGE] = language;
         }
-        let value = DefaultApiService.getOption(options, HEADER_CONTENT_TYPE, 'application/json; charset=utf-8');
+        const value = DefaultApiService.getOption(options, HEADER_CONTENT_TYPE, 'application/json; charset=utf-8');
         if (value) {
             headers[HEADER_CONTENT_TYPE] = value;
         }
@@ -100,7 +100,7 @@ export class DefaultApiService implements ApiService {
     }
 
     postFile<T>(query: string, fileName: string, file: any, url?: string): Observable<T> {
-        let fd = new FormData();
+        const fd = new FormData();
         fd.append("fileName", fileName);
         fd.append("file", file, fileName);
 

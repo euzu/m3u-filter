@@ -4,32 +4,6 @@
   "author": "euzu",
   "version": "0.2.0",
   "private": true,
-  "dependencies": {
-    "@material-ui/core": "^4.11.0",
-    "@material-ui/icons": "^4.9.1",
-    "@material-ui/lab": "^4.0.0-alpha.56",
-    "cross-env": "6.0.3",
-    "file-saver": "^2.0.2",
-    "notistack": "^1.0.0",
-    "react": "^16.13.1",
-    "react-dom": "^16.13.1",
-    "rxjs": "^6.6.3"
-  },
-  "devDependencies": {
-    "@types/file-saver": "^2.0.1",
-    "@types/react": "^16.9.50",
-    "@types/react-dom": "^16.9.8",
-    "concurrently": "4.1.2",
-    "node-sass": "^4.14.1",
-    "prettier": "^2.1.2",
-    "react-scripts": "^3.4.3",
-    "typescript": "^4.0.3",
-    "wait-on": "^5.2.0"
-  },
-  "build": {
-    "publish": null
-  },
-  "main": "public/electron.js",
   "homepage": "./",
   "scripts": {
     "react-start": "react-scripts start",
@@ -38,7 +12,41 @@
     "react-eject": "react-scripts eject",
     "release": "yarn react-build",
     "build": "cross-env REACT_APP_STAGE=production PUBLIC_URL= yarn react-build",
-    "start": "yarn react-start"
+    "start": "yarn react-start",
+    "lint": "eslint --config eslintrc.json src/** --no-error-on-unmatched-pattern --quiet"
+  },
+  "dependencies": {
+    "@material-ui/core": "^4.12.3",
+    "@material-ui/icons": "^4.11.2",
+    "cross-env": "7.0.3",
+    "file-saver": "^2.0.5",
+    "notistack": "^1.0.10",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "rxjs": "^7.4.0"
+  },
+  "devDependencies": {
+    "@types/file-saver": "^2.0.3",
+    "@types/react": "^17.0.27",
+    "@types/react-dom": "^17.0.9",
+    "concurrently": "6.3.0",
+    "node-sass": "^6.0.1",
+    "prettier": "^2.4.1",
+    "react-scripts": "^4.0.3",
+    "typescript": "^4.3.5",
+    "wait-on": "^6.0.0",
+    "eslint": "7.21.0",
+    "@typescript-eslint/eslint-plugin": "4.16.1",
+    "@typescript-eslint/parser": "4.16.1",
+    "babel-eslint": "10.1.0",
+    "eslint-config-prettier": "8.1.0",
+    "eslint-config-react-app": "6.0.0",
+    "eslint-plugin-flowtype": "5.3.1",
+    "eslint-plugin-import": "2.22.1",
+    "eslint-plugin-jsx-a11y": "6.4.1",
+    "eslint-plugin-node": "11.1.0",
+    "eslint-plugin-react": "7.22.0",
+    "eslint-plugin-react-hooks": "4.2.0"
   },
   "browserslist": {
     "production": [
@@ -50,6 +58,12 @@
       "last 1 chrome version",
       "last 1 firefox version",
       "last 1 safari version"
+    ]
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
     ]
   }
 }

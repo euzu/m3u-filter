@@ -1,0 +1,52 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "extends": [
+    "react-app",
+    "react-app/jest",
+    "eslint:recommended",
+    "eslint-config-prettier",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended"
+  ],
+  "settings": {
+    "react": {
+      "createClass": "createReactClass",
+      "pragma": "React",
+      "fragment": "Fragment",
+      "version": "detect",
+      "flowVersion": "detect"
+    }
+  },
+  "parserOptions": {
+    "ecmaVersion": 2018,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "plugins": [
+    "import",
+    "node",
+    "react"
+  ],
+  "rules": {
+    "consistent-this": [
+      "error",
+      "self"
+    ],
+    "@typescript-eslint/no-this-alias": [
+      "error",
+      {
+        "allowDestructuring": false,
+        "allowedNames": [
+          "self"
+        ]
+      }
+    ],
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/ban-ts-comment": "off",
+    "react/display-name": "off",
+    "react/prop-types": "off"
+  },
+  "ignorePatterns": [ "*.test.tsc", "*.scss", "*.css" ]
+}

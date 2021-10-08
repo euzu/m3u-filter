@@ -5,6 +5,10 @@
     cursor: pointer;
     margin-right: 6px;
 
+    &:hover {
+       color: var(--tree-expander-hover-color);
+    }
+
     * {
       pointer-events: none;
     }
@@ -14,7 +18,14 @@
     .tree-group-header {
       display: flex;
       flex-flow: row;
+      align-items: center;
       height: 1.3em;
+
+      .tree-group-header-content {
+        display: flex;
+        flex-flow: row;
+        align-items: center;
+      }
 
       input[type='checkbox'] {
         cursor: pointer;
@@ -30,8 +41,15 @@
       .tree-channel {
         display: flex;
         flex-flow: row;
+        align-items: center;
         margin-left: 50px;
         height: 1.3em;
+
+        .tree-channel-content {
+          display: flex;
+          flex-flow: row;
+          align-items: center;
+        }
 
         .tree-channel-nr {
           width: 20px;
@@ -44,6 +62,17 @@
             content: ')';
           }
         }
+      }
+    }
+
+    .tree-group-header-content, .tree-channel-content {
+      cursor: pointer;
+      &:hover {
+         background-color: var(--tree-hover-background-color);
+         color: var(--tree-hover-color);
+          .tree-group-count {
+            color: var(--tree-hover-color);
+          }
       }
     }
   }

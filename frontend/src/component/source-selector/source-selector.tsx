@@ -19,27 +19,18 @@ export default function SourceSelector(props: SourceSelectorProps) {
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [openSourceDropDown, setOpenSourceDropDown] = useState(false);
     const [sources, setSources] = useState<Source[]>([]);
-    const [source, setSource] = useState<Source>(null);
 
     const {onDownload} = props;
 
     const addNewSource = useCallback((url: string) => {
-        const src: Source = {
-            url,
-            ts: Date.now()
+        if (sources.filter(s => s.url === url).length === 0) {
+            const src: Source = {
+                url,
+                ts: Date.now()
+            };
+            setSources((s) => [].concat(s, [src]))
         }
-        if (source) {
-            if (source?.url !== url) {
-                setSources((s) => [].concat(s, [src]))
-            }
-        } else {
-            setSources([src]);
-        }
-    }, [source]);
-
-    const inputAddNewSource = useCallback((evt: any) => {
-        addNewSource(evt.target.value);
-    }, [addNewSource])
+    }, [sources]);
 
     const handleDownload = useCallback(() => {
         const value = textField.current.value;
@@ -49,10 +40,14 @@ export default function SourceSelector(props: SourceSelectorProps) {
         }
     }, [addNewSource, onDownload]);
 
-    const selectSource = useCallback((src: Source) => {
-        if (src) {
-            setSource(src);
+    const handleKeyPress = useCallback((event) => {
+        if (event.key === 'Enter') {
+            handleDownload();
         }
+    }, [handleDownload]);
+
+    const selectSource = useCallback((url: string) => {
+        textField.current.value = url;
     }, []);
 
     const closeSourceDropDown = useCallback(() => {
@@ -66,7 +61,7 @@ export default function SourceSelector(props: SourceSelectorProps) {
     const selectSourceDropDown = useCallback((e: any) => {
         setOpenSourceDropDown(false);
         const url = e.target.dataset.url;
-        selectSource({url} as Source);
+        selectSource(url);
     }, [selectSource]);
 
     useEffect(() => {
@@ -88,8 +83,6 @@ export default function SourceSelector(props: SourceSelectorProps) {
 
     const inputProps = useMemo(() => (
         {
-            value: source?.url,
-            onChange: inputAddNewSource,
             endAdornment: <InputAdornment position="end">
                 <IconButton
                     className={"icon-button"}
@@ -107,12 +100,13 @@ export default function SourceSelector(props: SourceSelectorProps) {
                 </IconButton>
             </InputAdornment>
         }
-    ), [handleDownload, openSourcesDropDown, inputAddNewSource, source]);
+    ), [handleDownload, openSourcesDropDown]);
 
     return <div className={'source-selector'}>
         <TextField className={'source-selector-input'} inputRef={textField} label="Url" variant="outlined"
                    InputLabelProps={inputLabelProps}
                    InputProps={inputProps}
+                   onKeyUp={handleKeyPress}
         />
         <Menu
             id="source-menu"
