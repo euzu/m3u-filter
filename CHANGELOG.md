@@ -1,6 +1,6 @@
 # Changelog
 
-## 2021-10-08
+## v0.3.0(2021-10-08)
 * Updated frontend packages
 * Added linter for code checking
 * Updated tree layout and added hover coloring

@@ -2,7 +2,7 @@
   "name": "m3u-filter",
   "description": "m3u-filter",
   "author": "euzu",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "homepage": "./",
   "scripts": {
