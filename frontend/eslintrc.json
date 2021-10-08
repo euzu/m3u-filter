@@ -1,4 +1,7 @@
 {
+  "env": {
+    "jest/globals": true
+  },
   "parser": "@typescript-eslint/parser",
   "extends": [
     "react-app",
@@ -27,7 +30,8 @@
   "plugins": [
     "import",
     "node",
-    "react"
+    "react",
+    "jest"
   ],
   "rules": {
     "consistent-this": [
