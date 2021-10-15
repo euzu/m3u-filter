@@ -1,7 +1,12 @@
 # Changelog
 
+## v0.5.0(2021-10-15)
+* Fixed: config input persistence filename was ignored 
+* Added working_dir to configuration
+* relative web_root is now checked for existence in current path and working_dir. 
+
 ## v0.4.0(2021-10-08)
-* Fixed server exit on poaylist not found
+* Fixed server exit on playlist not found
 * Added copy link to clipboard in playlist tree
 
 ## v0.3.0(2021-10-08)

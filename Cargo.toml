@@ -1,6 +1,6 @@
 [package]
 name = "m3u-filter"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,3 +19,4 @@ actix-server = "1"
 actix-files = "0"
 actix-cors = "0"
 futures = "0.3"
+path-absolutize = "3.0.11"

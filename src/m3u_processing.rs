@@ -1,28 +1,51 @@
-use std::io::Write;
+use std::io::{ Write};
 
-use crate::{config, m3u};
+use crate::{config, m3u, utils};
 use crate::m3u::PlaylistItem;
 
-pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, cfg: &config::Config) {
+fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
+    match res {
+        Ok(_) => Ok(()),
+        Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Unable to write file")),
+    }
+}
+
+pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, cfg: &config::Config) -> Result<(), std::io::Error> {
     for t in &cfg.targets {
-        let mut file = match std::fs::File::create(&t.filename) {
-            Ok(file) => file,
-            Err(_) => {
-                println!("cant open file: {}", t.filename);
-                std::process::exit(1);
-            }
-        };
-        file.write(b"#EXTM3U\n").expect("Unable to write file");
-        for pg in playlist {
-            for pli in &pg.channels {
-                if is_valid(&pli, &t.filter) {
-                    let content = exec_rename(&pli, &t.rename).map_or_else(|| pli.to_m3u(), |p| p.to_m3u());
-                    file.write(content.as_bytes()).expect("Unable to write file");
-                    file.write(b"\n").expect("Unable to write file");
+        match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&t.filename))) {
+            Some(path) => {
+                let mut file = match std::fs::File::create(&path) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        println!("cant open file: {:?}", &path);
+                        return Err(e);
+                    }
+                };
+
+                match check_write(file.write(b"#EXTM3U\n")) {
+                    Ok(_) => (),
+                    Err(e) => return Err(e),
                 }
-            }
+                for pg in playlist {
+                    for pli in &pg.channels {
+                        if is_valid(&pli, &t.filter) {
+                            let content = exec_rename(&pli, &t.rename).map_or_else(|| pli.to_m3u(), |p| p.to_m3u());
+                            match check_write(file.write(content.as_bytes())) {
+                                Ok(_) => (),
+                                Err(e) => return Err(e),
+                            }
+                            match check_write(file.write(b"\n")) {
+                                Ok(_) => (),
+                                Err(e) => return Err(e),
+                            }
+                        }
+                    }
+                }
+            },
+            None => (),
         }
     }
+    Ok(())
 }
 
 fn get_field_value<'a>(pli: &'a m3u::PlaylistItem, field: &config::ItemField) -> &'a str {

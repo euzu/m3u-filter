@@ -1,3 +1,7 @@
+use crate::utils::get_working_path;
+use path_absolutize::*;
+use crate::utils;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ItemField {
     Group,
@@ -106,17 +110,48 @@ pub struct Config {
     pub api: ConfigApi,
     pub input: ConfigInput,
     pub targets: Vec<ConfigTarget>,
+    pub working_dir: String,
 }
 
 impl Config {
     pub(crate) fn prepare(&mut self) {
+        self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
+        self.prepare_api_web_root();
         for t in &mut self.targets {
             for f in &mut t.filter.rules {
                 f.prepare();
             }
             for r in &mut t.rename {
                 r.prepare();
+            }
+        }
+    }
+
+    fn prepare_api_web_root(&mut self) {
+        if !self.api.web_root.is_empty() {
+            let wrpb = std::path::PathBuf::from(&self.api.web_root);
+            if wrpb.is_relative() {
+                let mut wrpb2 = std::path::PathBuf::from(&self.working_dir).join(&self.api.web_root);
+                if !wrpb2.exists() {
+                    wrpb2 = utils::get_exe_path().join(&self.api.web_root);
+                }
+                if !wrpb2.exists() {
+                    let cwd = std::env::current_dir();
+                    if cwd.is_ok() {
+                        wrpb2 = cwd.unwrap().join(&self.api.web_root);
+                    }
+                }
+                if wrpb2.exists() {
+                    match wrpb2.absolutize() {
+                        Ok(os) => self.api.web_root = String::from(os.to_str().unwrap()),
+                        Err(e) => {
+                            println!("failed to absolutize web_root {:?}", e);
+                        }
+                    }
+                    // } else {
+                    //     println!("web_root directory does not exists {:?}", wrpb2)
+                }
             }
         }
     }
@@ -127,7 +162,8 @@ impl Clone for Config {
         Config{
             api: self.api.clone(),
             input: self.input.clone(),
-            targets: self.targets.clone()
+            targets: self.targets.clone(),
+            working_dir: self.working_dir.clone(),
         }
     }
 }

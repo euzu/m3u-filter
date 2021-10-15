@@ -1,10 +1,11 @@
+working_dir: /home/m3u-filter/data
 api:
   host: 127.0.0.1
   port: 8901
-  web_root: ./web
+  web_root: /home/m3u-filter/web
 input:
   url: http://myserver.net/playlist.m3u
-  persist: ./playlist_{}.m3u
+  persist: playlist_{}.m3u
 targets:
   - filename: playlist_1.m3u
     filter:

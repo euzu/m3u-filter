@@ -21,7 +21,7 @@ pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let result = get_playlist(&req.url.as_str(), None);
+    let result = get_playlist(&_app_state.config.working_dir,&req.url.as_str(), None);
     HttpResponse::Ok().json(result)
 }
 
@@ -40,6 +40,10 @@ pub(crate) async fn start_server(cfg: Config) -> futures::io::Result<()> {
     let host = cfg.api.host.clone();
     let port = cfg.api.port;
     let web_dir = cfg.api.web_root.clone();
+    let web_dir_path = PathBuf::from(&web_dir);
+    if !web_dir_path.exists() || !web_dir_path.is_dir() {
+        panic!("web_root does not exists or is not an directory: {:?}", &web_dir_path)
+    }
 
     let shared_data = web::Data::new(AppState {
         config: cfg,
