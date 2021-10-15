@@ -14,6 +14,7 @@ If given as argument, it overrides the config file entry.
 
 the config.yml looks like:
 ```yaml
+working_dir: ./data
 api:
   host: localhost
   port: 8901
