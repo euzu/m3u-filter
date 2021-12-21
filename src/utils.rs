@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use path_absolutize::*;
@@ -5,11 +6,15 @@ use path_absolutize::*;
 pub(crate) fn get_exe_path() -> std::path::PathBuf {
     let default_path = std::path::PathBuf::from("./");
     let current_exe = std::env::current_exe();
-    let path: std::path::PathBuf = match current_exe {
-        Ok(exe) => exe.parent().map_or(default_path, |p| p.to_path_buf()),
+    match current_exe {
+        Ok(exe) => {
+            match fs::read_link(&exe) {
+                Ok(f) => f.parent().map_or(default_path, |p| p.to_path_buf()),
+                Err(_) => return exe.parent().map_or(default_path, |p| p.to_path_buf())
+            }
+        },
         Err(_) => default_path
-    };
-    path
+    }
 }
 
 pub(crate) fn get_default_config_path() -> String {
@@ -57,14 +62,13 @@ pub(crate) fn get_working_path(wd: &String) -> String {
 }
 
 pub(crate) fn open_file(file_name: &PathBuf) -> std::fs::File {
-    let file = match std::fs::File::open(file_name) {
-        Ok(file) => file,
+    match std::fs::File::open(file_name) {
+        Ok(file) => return file,
         Err(_) => {
             println!("cant open file: {:?}", file_name);
             std::process::exit(1);
         }
     };
-    file
 }
 
 pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<std::path::PathBuf>) -> Option<Vec<String>> {
