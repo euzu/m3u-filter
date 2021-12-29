@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::config::ConfigOptions;
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
@@ -24,22 +25,26 @@ pub struct PlaylistItem {
 }
 
 impl PlaylistItem {
-    pub(crate) fn to_m3u(&self) -> String {
-        let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" tvg-logo=\"{}\" group-title=\"{}\"", self.header.id, self.header.name, self.header.logo, self.header.group);
-        if !self.header.logo_small.is_empty() {
-            line = format!("{} tvg-logo-small=\"!{}\"", line, self.header.logo_small);
+    pub(crate) fn to_m3u(&self, options: &Option<ConfigOptions>) -> String {
+        let ignore_logo = options.as_ref().map_or(false, |o| o.ignore_logo);
+        let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"", self.header.id, self.header.name, self.header.group);
+        if !ignore_logo {
+            line = format!("{} tvg-logo=\"{}\"", line, self.header.logo);
+            if !self.header.logo_small.is_empty() {
+                line = format!("{} tvg-logo-small=\"{}\"", line, self.header.logo_small);
+            }
         }
         if !self.header.parent_code.is_empty() {
-            line = format!("{} parent-code=\"!{}\"", line, self.header.parent_code);
+            line = format!("{} parent-code=\"{}\"", line, self.header.parent_code);
         }
         if !self.header.audio_track.is_empty() {
-            line = format!("{} audio-track=\"!{}\"", line, self.header.audio_track);
+            line = format!("{} audio-track=\"{}\"", line, self.header.audio_track);
         }
         if !self.header.time_shift.is_empty() {
-            line = format!("{} timeschift=\"!{}\"", line, self.header.time_shift);
+            line = format!("{} timeschift=\"{}\"", line, self.header.time_shift);
         }
         if !self.header.rec.is_empty() {
-            line = format!("{} rec=\"!{}\"", line, self.header.rec);
+            line = format!("{} rec=\"{}\"", line, self.header.rec);
         }
         format!("{},{}\n{}", line, self.header.title, self.url)
     }

@@ -1,6 +1,8 @@
 use std::io::{ Write};
 
 use crate::{config, m3u, utils};
+use crate::config::ItemField::Group;
+use crate::config::SortOrder::{Asc, Desc};
 use crate::m3u::PlaylistItem;
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
@@ -12,6 +14,32 @@ fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
 
 pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, cfg: &config::Config) -> Result<(), std::io::Error> {
     for t in &cfg.targets {
+        let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
+        for g in playlist {
+            let mut grp = g.clone();
+            if t.rename.len() > 0 {
+                for r in &t.rename {
+                    match r.field {
+                        Group => {
+                            let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
+                            grp.title = cap.into_owned();
+                        },
+                        _ => {}
+                    }
+                }
+            }
+            new_playlist.push(grp);
+        }
+
+        if let Some(sort) = &t.sort {
+            new_playlist.sort_by(|a, b| {
+                let ordering = a.title.partial_cmp(&b.title).unwrap();
+                match sort.order {
+                    Asc => ordering,
+                    Desc => ordering.reverse()
+                }
+            });
+        }
         match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&t.filename))) {
             Some(path) => {
                 let mut file = match std::fs::File::create(&path) {
@@ -26,10 +54,10 @@ pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, cfg: &config::Config
                     Ok(_) => (),
                     Err(e) => return Err(e),
                 }
-                for pg in playlist {
+                for pg in &new_playlist {
                     for pli in &pg.channels {
                         if is_valid(&pli, &t.filter) {
-                            let content = exec_rename(&pli, &t.rename).map_or_else(|| pli.to_m3u(), |p| p.to_m3u());
+                            let content = exec_rename(&pli, &t.rename).map_or_else(|| pli.to_m3u(&t.options), |p| p.to_m3u(&t.options));
                             match check_write(file.write(content.as_bytes())) {
                                 Ok(_) => (),
                                 Err(e) => return Err(e),

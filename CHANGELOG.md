@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.0(2021-12-29)
+* Added options to target, currently only ignore_logo
+* Added sorting to groups
+
 ## v0.5.0(2021-10-15)
 * Fixed: config input persistence filename was ignored 
 * Added working_dir to configuration

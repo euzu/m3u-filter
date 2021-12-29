@@ -44,6 +44,23 @@ impl ConfigFilter {
     }
 }
 
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ConfigOptions {
+    pub ignore_logo: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum SortOrder {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ConfigSort {
+    pub order: SortOrder,
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigFilters {
     pub mode: FilterMode,
@@ -79,6 +96,8 @@ impl ConfigRename {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigTarget {
     pub filename: String,
+    pub options: Option<ConfigOptions>,
+    pub sort: Option<ConfigSort>,
     pub filter: ConfigFilters,
     pub rename: Vec<ConfigRename>,
 }
@@ -172,8 +191,26 @@ impl Clone for ConfigTarget {
     fn clone(&self) -> Self {
         ConfigTarget{
             filename: self.filename.clone(),
+            options:  self.options.as_ref().map(|o| o.clone()),
+            sort:  self.sort.as_ref().map(|s| s.clone()),
             filter: self.filter.clone(),
             rename: self.rename.clone()
+        }
+    }
+}
+
+impl Clone for ConfigOptions {
+    fn clone(&self) -> Self {
+        ConfigOptions{
+            ignore_logo: self.ignore_logo,
+        }
+    }
+}
+
+impl Clone for ConfigSort {
+    fn clone(&self) -> Self {
+        ConfigSort{
+            order: self.order.clone(),
         }
     }
 }

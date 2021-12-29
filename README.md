@@ -24,6 +24,10 @@ input:
   persist: ./playlist_{}.m3u
 targets:
   - filename: playlist_1.m3u
+    options:
+      ignore_logo: true
+    sort:
+      order: Asc
     filter:
         mode: Include
         rules:
