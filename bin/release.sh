@@ -5,7 +5,7 @@ if [[ -z "$1" ]]; then
     exit 1
 fi
 
-VERSION=$1
+VERSION=v$1
 LIN_DIR=m3u-filter_${VERSION}_linux_x86_64
 WIN_DIR=m3u-filter_${VERSION}_windows_x86_64
 DARWIN_DIR=m3u-filter_${VERSION}_darwin_x86_64
