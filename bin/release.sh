@@ -58,6 +58,7 @@ mv $LIN_ARC release_${VERSION} && \
 mv $WIN_ARC  release_${VERSION} && \
 mv checksum.txt release_${VERSION} && \
 rm -rf $LIN_DIR $DARWIN_DIR $WIN_DIR && \
+git tag -a $VERSION -m "$VERSION" && \
 echo "done!"
 
 
