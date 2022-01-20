@@ -2,7 +2,7 @@
 
 ## v0.7.0(2022-01-20)
 * Updated frontend libraries
-* Added Search input
+* Added Search, currently only plain text search
 
 ## v0.6.0(2021-12-29)
 * Added options to target, currently only ignore_logo
