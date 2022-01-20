@@ -1,6 +1,6 @@
 import React from "react";
 import './toolbar.scss';
-import {Button} from "@material-ui/core";
+import {Button} from "@mui/material";
 
 interface ToolbarProps {
   onDownload: () => void;

@@ -1,8 +1,10 @@
-import React, {forwardRef, useImperativeHandle, useMemo, useCallback} from "react";
+import React, {forwardRef, useImperativeHandle, useMemo, useEffect, useState} from "react";
 import './playlist-viewer.scss';
-import {PlaylistGroup} from "../../model/playlist";
-import PlaylistFilter from "../playlist-filter/playlist-filter";
+import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
 import PlaylistTree, {PlaylistTreeState} from "../playlist-tree/playlist-tree";
+import {Observable, noop, tap, finalize} from "rxjs";
+import {useSnackbar} from "notistack";
+import {first} from "rxjs/operators";
 
 function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: boolean }): PlaylistGroup[] {
     if (playlist) {
@@ -11,16 +13,60 @@ function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: bool
     return null;
 }
 
+function textMatch(text: string, criteria: string): boolean {
+    return (text.toLowerCase().indexOf(criteria) > -1);
+}
+
+function filterMatchingChannels(grp: PlaylistGroup, criteria: string): PlaylistGroup {
+    let channels: PlaylistItem[] = [];
+    for (const c of grp.channels) {
+        if (textMatch(c.header.name, criteria)) {
+            channels.push(c);
+        }
+    }
+    if (channels.length) {
+        return {
+            id: grp.id,
+            title: grp.title,
+            channels
+        } as PlaylistGroup;
+    }
+    return undefined;
+}
+
+function filterMatchingGroups(gl: PlaylistGroup[], criteria: string): Observable<PlaylistGroup[]> {
+    return new Observable<PlaylistGroup[]>((observer) => {
+        const lcrit = criteria.toLowerCase();
+        const result: PlaylistGroup[] = [];
+        for (const g of gl) {
+            if (textMatch(g.title, lcrit)) {
+                result.push(g);
+            } else {
+                const matches = filterMatchingChannels(g, lcrit);
+                if (matches) {
+                    result.push(matches);
+                }
+            }
+        }
+        observer.next(result);
+        observer.complete();
+    })
+}
+
 export interface IPlaylistViewer {
     getFilteredPlaylist: () => PlaylistGroup[];
 }
 
 interface PlaylistViewerProps {
     playlist: PlaylistGroup[];
+    searchChannel: Observable<string>;
+    onProgress: (value: boolean) => void;
 }
 
 const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: PlaylistViewerProps, ref: any) => {
-    const {playlist} = props;
+    const {playlist, searchChannel, onProgress} = props;
+    const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
+    const [data, setData] = useState<PlaylistGroup[]>([]);
     const checked = useMemo((): PlaylistTreeState => ({}), []);
     const reference = useMemo(() => (
         {
@@ -29,13 +75,39 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
 
     useImperativeHandle(ref, () => reference);
 
-    const handleFilter = useCallback((filter: string): void => {
-        console.log(filter);
-    }, []);
+    useEffect(() => {
+        setData(playlist);
+        return noop;
+    }, [playlist]);
+
+    useEffect(() => {
+        const sub = searchChannel.subscribe((criteria: string) => {
+            if (criteria == null || !criteria.length || !criteria.trim().length) {
+                setData(playlist);
+            } else {
+                const trimmedCrit = criteria.trim();
+                if (trimmedCrit.length < 2) {
+                    enqueueSnackbar("Minimum search criteria length is 2", {variant: 'info'});
+                } else {
+                    filterMatchingGroups(playlist, trimmedCrit).pipe(
+                        tap(() => onProgress && onProgress(true)),
+                        finalize(() => onProgress && onProgress(false)),
+                        first())
+                        .subscribe((matches: PlaylistGroup[]) => {
+                            if (matches.length) {
+                                setData(matches);
+                            } else {
+                                enqueueSnackbar("Nothing found!", {variant: 'info'});
+                            }
+                        });
+                }
+            }
+        });
+        return () => sub.unsubscribe();
+    }, [searchChannel, playlist, enqueueSnackbar]);
 
     return <div className={'playlist-viewer'}>
-        <PlaylistFilter onFilter={handleFilter}/>
-        <PlaylistTree data={playlist} state={checked}/>
+        <PlaylistTree data={data} state={checked}/>
     </div>
 });
 

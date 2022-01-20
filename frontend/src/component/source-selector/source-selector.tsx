@@ -1,8 +1,8 @@
 import React, {useRef, useState, useEffect, useCallback, useMemo} from "react";
 
 import './source-selector.scss';
-import {IconButton, InputAdornment, Menu, MenuItem, TextField} from "@material-ui/core";
-import {CloudDownload, ArrowDropDown} from "@material-ui/icons";
+import {IconButton, InputAdornment, Menu, MenuItem, TextField} from "@mui/material";
+import {CloudDownload, ArrowDropDown} from "@mui/icons-material";
 import Source from "../../model/source";
 import {useServices} from "../../provider/service-provider";
 import {first} from "rxjs/operators";
@@ -103,7 +103,7 @@ export default function SourceSelector(props: SourceSelectorProps) {
     ), [handleDownload, openSourcesDropDown]);
 
     return <div className={'source-selector'}>
-        <TextField className={'source-selector-input'} inputRef={textField} label="Url" variant="outlined"
+        <TextField className={'text-input'} inputRef={textField} label="Url" variant="outlined"
                    InputLabelProps={inputLabelProps}
                    InputProps={inputProps}
                    onKeyUp={handleKeyPress}

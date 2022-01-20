@@ -1,7 +1,7 @@
 import React, {useCallback, useState, useRef} from 'react';
 import './playlist-tree.scss';
 import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
-import {ExpandMore, ChevronRight, LinkRounded} from "@material-ui/icons";
+import {ExpandMore, ChevronRight, LinkRounded} from "@mui/icons-material";
 import copyToClipboard from "../../utils/clipboard";
 import {first} from "rxjs/operators";
 import {noop} from "rxjs";
@@ -15,9 +15,9 @@ interface PlaylistTreeProps {
 }
 
 export default function PlaylistTree(props: PlaylistTreeProps) {
+    const {state, data} = props;
 
     const [, setForceUpdate] = useState(null);
-    const {state, data} = props;
     const expanded = useRef<PlaylistTreeState>({});
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
 
@@ -42,8 +42,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 complete: noop,
             });
         }
-    }, [data, enqueueSnackbar]);
-
+    }, [enqueueSnackbar]);
 
     const renderEntry = useCallback((entry: PlaylistItem, index: number): React.ReactNode => {
         return <div key={entry.id} className={'tree-channel'}>
@@ -56,7 +55,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 <div className={'tree-channel-nr'}>{index + 1}</div>
                 {entry.header.name}</div>
         </div>
-    }, []);
+    }, [handleClipboardUrl]);
 
     const renderGroup = useCallback((group: PlaylistGroup): React.ReactNode => {
         return <div className={'tree-group'} key={group.id}>
@@ -78,7 +77,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
 
     const renderPlaylist = useCallback((): React.ReactNode => {
         if (!data) {
-            return null;
+            return <React.Fragment/>;
         }
         return <React.Fragment>
             {data.map(renderGroup)}

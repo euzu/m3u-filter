@@ -6,9 +6,7 @@
   "extends": [
     "react-app",
     "react-app/jest",
-    "eslint:recommended",
     "eslint-config-prettier",
-    "plugin:@typescript-eslint/recommended",
     "plugin:react/recommended"
   ],
   "settings": {
@@ -31,7 +29,8 @@
     "import",
     "node",
     "react",
-    "jest"
+    "jest",
+    "@typescript-eslint"
   ],
   "rules": {
     "consistent-this": [
