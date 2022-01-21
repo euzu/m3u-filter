@@ -5,6 +5,9 @@ If you have a playlist which contains unwanted entries, you can create filter wh
 based on the header information of the playlist entries.
 Currently filter and rename operations support group, name and title fields.
 
+You can run m3u-filter as command line application to update your playlists (manually or as cron job), or you can 
+run it in server mode and open the web-ui to see the contents of the playlist, filter/search content and save the filtered groups as a new playlist.
+
 You can define multiple targets for filtering if you want to create multiple playlists from a big playlist.
 
 The config.yml file contains the filter and rename definitions. It should be located next to the exe file or in the current working directory.
