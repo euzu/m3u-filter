@@ -29,24 +29,7 @@ fn main() {
             Err(e) => panic!("cant start server: {}", e)
         };
     } else {
-        let input_arg = args.value_of("input");
-        let url_str = input_arg.unwrap_or(if cfg.input.url.is_empty() { "playlist.m3u" } else { cfg.input.url.as_str() });
-        let input_perists = || -> Option<std::path::PathBuf> {
-            if cfg.input.persist.is_empty() { None } else { utils::prepare_persist_path(cfg.input.persist.as_str()) }
-        };
-        let persist_file = match input_arg {
-            Some(_) => if args.is_present("persist") { utils::prepare_persist_path("playlist_{}.m3u") } else { input_perists() },
-            None => input_perists(),
-        };
-        let file_path = utils::get_file_path(&cfg.working_dir, persist_file);
-        if verbose { println!("persist file: {:?}", &file_path); }
-        let result = get_playlist(&cfg.working_dir, url_str, file_path);
-        if result.is_some() {
-            match m3u_processing::write_m3u(&result.unwrap(), &cfg) {
-                Ok(_) => (),
-                Err(e) => println!("Failed to write file: {}", e)
-            }
-        }
+        m3u_processing::process_targets(&cfg, verbose)
     }
 }
 
@@ -69,16 +52,6 @@ fn get_arguments<'a>() -> ArgMatches<'a> {
             .long("config")
             .takes_value(true)
             .help("The config file"))
-        .arg(clap::Arg::with_name("input")
-            .short("i")
-            .long("input")
-            .takes_value(true)
-            .help("Input filename, overrides config input"))
-        .arg(clap::Arg::with_name("persist")
-            .short("p")
-            .long("persist")
-            .takes_value(false)
-            .help("Persists the input file on disk, if the input parameter is missing it will be ignored!"))
         .arg(clap::Arg::with_name("server")
             .short("s")
             .long("server")

@@ -1,6 +1,7 @@
-use crate::utils::get_working_path;
 use path_absolutize::*;
+
 use crate::utils;
+use crate::utils::get_working_path;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ItemField {
@@ -43,7 +44,6 @@ impl ConfigFilter {
         self.re = Some(re.unwrap());
     }
 }
-
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigOptions {
@@ -102,6 +102,14 @@ pub struct ConfigTarget {
     pub rename: Vec<ConfigRename>,
 }
 
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ConfigSources {
+    pub input: ConfigInput,
+    pub targets: Vec<ConfigTarget>,
+
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigInput {
     pub url: String,
@@ -127,8 +135,7 @@ impl ConfigApi {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Config {
     pub api: ConfigApi,
-    pub input: ConfigInput,
-    pub targets: Vec<ConfigTarget>,
+    pub sources: Vec<ConfigSources>,
     pub working_dir: String,
 }
 
@@ -137,12 +144,14 @@ impl Config {
         self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
         self.prepare_api_web_root();
-        for t in &mut self.targets {
-            for f in &mut t.filter.rules {
-                f.prepare();
-            }
-            for r in &mut t.rename {
-                r.prepare();
+        for source in &mut self.sources {
+            for target in &mut source.targets {
+                for f in &mut target.filter.rules {
+                    f.prepare();
+                }
+                for r in &mut target.rename {
+                    r.prepare();
+                }
             }
         }
     }
@@ -178,10 +187,9 @@ impl Config {
 
 impl Clone for Config {
     fn clone(&self) -> Self {
-        Config{
+        Config {
             api: self.api.clone(),
-            input: self.input.clone(),
-            targets: self.targets.clone(),
+            sources: self.sources.clone(),
             working_dir: self.working_dir.clone(),
         }
     }
@@ -189,19 +197,28 @@ impl Clone for Config {
 
 impl Clone for ConfigTarget {
     fn clone(&self) -> Self {
-        ConfigTarget{
+        ConfigTarget {
             filename: self.filename.clone(),
-            options:  self.options.as_ref().map(|o| o.clone()),
-            sort:  self.sort.as_ref().map(|s| s.clone()),
+            options: self.options.as_ref().map(|o| o.clone()),
+            sort: self.sort.as_ref().map(|s| s.clone()),
             filter: self.filter.clone(),
-            rename: self.rename.clone()
+            rename: self.rename.clone(),
+        }
+    }
+}
+
+impl Clone for ConfigSources {
+    fn clone(&self) -> Self {
+        ConfigSources {
+            input: self.input.clone(),
+            targets: self.targets.clone(),
         }
     }
 }
 
 impl Clone for ConfigOptions {
     fn clone(&self) -> Self {
-        ConfigOptions{
+        ConfigOptions {
             ignore_logo: self.ignore_logo,
         }
     }
@@ -209,7 +226,7 @@ impl Clone for ConfigOptions {
 
 impl Clone for ConfigSort {
     fn clone(&self) -> Self {
-        ConfigSort{
+        ConfigSort {
             order: self.order.clone(),
         }
     }
@@ -217,20 +234,20 @@ impl Clone for ConfigSort {
 
 impl Clone for ConfigFilters {
     fn clone(&self) -> Self {
-        ConfigFilters{
+        ConfigFilters {
             mode: self.mode.clone(),
-            rules: self.rules.clone()
+            rules: self.rules.clone(),
         }
     }
 }
 
 impl Clone for ConfigRename {
     fn clone(&self) -> Self {
-        ConfigRename{
+        ConfigRename {
             field: self.field.clone(),
             pattern: self.pattern.clone(),
             new_name: self.new_name.clone(),
-            re: None
+            re: None,
         }
     }
 }

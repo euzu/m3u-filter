@@ -21,14 +21,14 @@ pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let result = get_playlist(&_app_state.config.working_dir,&req.url.as_str(), None);
+    let result = get_playlist(&_app_state.config.working_dir, &req.url.as_str(), None);
     HttpResponse::Ok().json(result)
 }
 
 pub(crate) async fn config(
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let sources = vec![_app_state.config.input.url.clone()];
+    let sources: Vec<String> = _app_state.config.sources.iter().map(|t| t.input.url.clone()).collect();
     let result = ServerConfig {
         sources
     };
