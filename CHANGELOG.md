@@ -1,4 +1,6 @@
 # Changelog
+## v0.8.0(2022-03-24)
+* Changed configuration. It is now possible to handle multiple sources. Each input has its own targets.
 
 ## v0.7.0(2022-01-20)
 * Updated frontend libraries
