@@ -19,14 +19,14 @@ DARWIN_ARC=${DARWIN_DIR}.tgz
 ./bin/build_win.sh && \
 ./bin/build_fe.sh && \
 cd target && \
-rm -rf $LIN_DIR $DARWIN_DIR $WIN_DIR $LIN_ARC $DARWIN_ARC $WIN_ARC release_${VERSION} && \
-mkdir $LIN_DIR && \
-mkdir $WIN_DIR && \
+rm -rf "$LIN_DIR" "$DARWIN_DIR" "$WIN_DIR" "$LIN_ARC" "$DARWIN_ARC" "$WIN_ARC" release_"${VERSION}" && \
+mkdir "$LIN_DIR" && \
+mkdir "$WIN_DIR" && \
 #mkdir $DARWIN_DIR
 if [ "$(uname)" != "Linux" ]; then
-    cp x86_64-unknown-linux-gnu/release/m3u-filter $LIN_DIR
+    cp x86_64-unknown-linux-gnu/release/m3u-filter "$LIN_DIR"
 else
-    cp release/m3u-filter $LIN_DIR
+    cp release/m3u-filter "$LIN_DIR"
 fi
 if [ $? -ne 0 ]; then
   exit $?
@@ -39,26 +39,26 @@ fi
 #if [ $? -ne 0 ]; then
 #  exit $?
 #fi
-cp x86_64-pc-windows-gnu/release/m3u-filter.exe $WIN_DIR && \
-cp ../config.yml $LIN_DIR && \
-cp ../config.yml $WIN_DIR && \
+cp x86_64-pc-windows-gnu/release/m3u-filter.exe "$WIN_DIR" && \
+cp ../config.yml "$LIN_DIR" && \
+cp ../config.yml "$WIN_DIR" && \
 #cp ../config.yml $DARWIN_DIR && \
-cp -rf ../frontend/build $LIN_DIR/web && \
-cp -rf ../frontend/build $WIN_DIR/web && \
-#cp -rf ../frontend/build $DARWIN_DIR/web && \
-tar cvzf $LIN_ARC $LIN_DIR && \
-#tar cvzf $DARWIN_ARC $DARWIN_DIR && \
-zip -r $WIN_ARC $WIN_DIR && \
-shasum -a 256 $LIN_ARC > checksum.txt && \
+cp -rf ../frontend/build "$LIN_DIR"/web && \
+cp -rf ../frontend/build "$WIN_DIR"/web && \
+#cp -rf ../frontend/build "$DARWIN_DIR/web" && \
+tar cvzf "$LIN_ARC" "$LIN_DIR" && \
+#tar cvzf "$DARWIN_ARC" "$DARWIN_DIR" && \
+zip -r "$WIN_ARC" "$WIN_DIR" && \
+shasum -a 256 "$LIN_ARC" > checksum.txt && \
 #shasum -a 256 $DARWIN_ARC > checksum.txt && \
-shasum -a 256 $WIN_ARC >> checksum.txt && \
-mkdir release_${VERSION} && \
-mv $LIN_ARC release_${VERSION} && \
-#mv $DARWIN_ARC release_${VERSION} && \
-mv $WIN_ARC  release_${VERSION} && \
-mv checksum.txt release_${VERSION} && \
-rm -rf $LIN_DIR $DARWIN_DIR $WIN_DIR && \
-git tag -a $VERSION -m "$VERSION" && \
+shasum -a 256 "$WIN_ARC" >> checksum.txt && \
+mkdir "release_${VERSION}" && \
+mv "$LIN_ARC" "release_${VERSION}" && \
+#mv $DARWIN_ARC "release_${VERSION}" && \
+mv "$WIN_ARC"  "release_${VERSION}" && \
+mv checksum.txt "release_${VERSION}" && \
+rm -rf "$LIN_DIR" "$DARWIN_DIR" "$WIN_DIR" && \
+git tag -a "$VERSION" -m "$VERSION" && \
 echo "done!"
 
 
