@@ -9,6 +9,7 @@ pub enum ItemField {
     Group,
     Name,
     Title,
+    Url
 }
 
 impl std::fmt::Display for ItemField {
@@ -17,6 +18,7 @@ impl std::fmt::Display for ItemField {
             ItemField::Group => write!(f, "Group"),
             ItemField::Name => write!(f, "Name"),
             ItemField::Title => write!(f, "Title"),
+            ItemField::Url => write!(f, "Url"),
         }
     }
 }

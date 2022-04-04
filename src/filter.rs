@@ -16,12 +16,13 @@ impl<'a> ValueProvider<'a> {
             config::ItemField::Group => &*self.pli.header.group.as_str(),
             config::ItemField::Name => &*self.pli.header.name.as_str(),
             config::ItemField::Title => &*self.pli.header.title.as_str(),
+            config::ItemField::Url => &*self.pli.url.as_str(),
         }
     }
 }
 
 #[derive(Parser)]
-#[grammar_inline = "field = { \"Group\" | \"Title\" | \"Name\" }\nand = {\"AND\" | \"and\"}\nor = {\"OR\" | \"or\"}\nnot = { \"NOT\" | \"not\" }\nlparen = { \"(\" }\nrparen = { \")\" }\nregexp_op = _{ \"~\" }\nregexp = @{ \"\\\"\" ~ ( \"\\\\\\\"\" | (!\"\\\"\" ~ ANY) )* ~ \"\\\"\" }\nvalue = _{ regexp }\n\noperator = _{ regexp_op }\nmatch_comparison = _{ field ~ operator ~ value }\npredicate = _{ match_comparison }\nbool_test = _{ predicate | lparen ~ condition ~ rparen }\nbool_factor = _{ not? ~ bool_test }\nbool_term = _{ bool_factor ~ (and ~ bool_factor)* }\ncondition = _{ bool_term ~ (or ~ bool_term)* }\nmain = _{ SOI ~ condition ~ EOI }\nWHITESPACE = _{ \" \" | \"\\t\" }"]
+#[grammar_inline = "field = { \"Group\" | \"Title\" | \"Name\" | \"Url\"}\nand = {\"AND\" | \"and\"}\nor = {\"OR\" | \"or\"}\nnot = { \"NOT\" | \"not\" }\nlparen = { \"(\" }\nrparen = { \")\" }\nregexp_op = _{ \"~\" }\nregexp = @{ \"\\\"\" ~ ( \"\\\\\\\"\" | (!\"\\\"\" ~ ANY) )* ~ \"\\\"\" }\nvalue = _{ regexp }\n\noperator = _{ regexp_op }\nmatch_comparison = _{ field ~ operator ~ value }\npredicate = _{ match_comparison }\nbool_test = _{ predicate | lparen ~ condition ~ rparen }\nbool_factor = _{ not? ~ bool_test }\nbool_term = _{ bool_factor ~ (and ~ bool_factor)* }\ncondition = _{ bool_term ~ (or ~ bool_term)* }\nmain = _{ SOI ~ condition ~ EOI }\nWHITESPACE = _{ \" \" | \"\\t\" }"]
 struct FilterParser;
 
 #[derive(Debug, Clone)]

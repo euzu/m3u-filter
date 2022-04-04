@@ -81,6 +81,7 @@ fn get_field_value<'a>(pli: &'a m3u::PlaylistItem, field: &config::ItemField) ->
         config::ItemField::Group => pli.header.group.as_str(),
         config::ItemField::Name => pli.header.name.as_str(),
         config::ItemField::Title => pli.header.title.as_str(),
+        config::ItemField::Url => pli.url.as_str(),
     };
     value
 }
@@ -91,6 +92,7 @@ fn set_field_value(pli: &mut m3u::PlaylistItem, field: &config::ItemField, value
         config::ItemField::Group => header.group = value,
         config::ItemField::Name => header.name = value,
         config::ItemField::Title => header.title = value,
+        config::ItemField::Url => {},
     };
 }
 

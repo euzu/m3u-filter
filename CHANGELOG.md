@@ -1,6 +1,6 @@
 # Changelog
 ## v0.9.0(2022-04-04)
-* Changed filter. Filter are now defined as filter statements.
+* Changed filter. Filter are now defined as filter statements. Url added to filter fields.
 
 ## v0.8.0(2022-03-24)
 * Changed configuration. It is now possible to handle multiple sources. Each input has its own targets.

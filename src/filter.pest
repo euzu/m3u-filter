@@ -1,4 +1,4 @@
-field = { "Group" | "Title" | "Name" }
+field = { "Group" | "Title" | "Name" | "Url" }
 and = {"AND" | "and"}
 or = {"OR" | "or"}
 not = { "NOT" | "not" }
