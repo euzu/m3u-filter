@@ -31,13 +31,7 @@ targets:
       ignore_logo: true
     sort:
       order: Asc
-    filter:
-        mode: Include
-        rules:
-          - field: Group
-            pattern: ^DE\s.*
-          - field: Group
-            pattern: ^AU\s.*
+    filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*" 
     rename:
       - field: Group
         pattern: ^DE(.*)
@@ -51,7 +45,10 @@ input:
 The input *persist* configuration is for storing the input content. The {} is replaced by a date time tag. If you don't
 want to persist the input content, then let it empty.
 
-The filter is either Include mode or Discard mode.
+The filter can have UnaryExpression ```NOT```, BinaryExpression ```AND OR```, and Comparison ```(Group|Title|Name) ~ "regexp"```
+
+Example filter:  ```((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group ~ "^AU.*")```
+
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
 
