@@ -1,5 +1,7 @@
+extern crate pest;
+#[macro_use]
+extern crate pest_derive;
 use clap::ArgMatches;
-
 use crate::config::Config;
 use crate::service::get_playlist;
 
@@ -10,6 +12,7 @@ mod utils;
 mod api;
 mod api_model;
 mod service;
+mod filter;
 
 fn main() {
     let args = get_arguments();

@@ -1,15 +1,11 @@
-api: {host: 127.0.0.1, port: 8901, web_root: /home/m3u-filter/web}
+api: { host: 127.0.0.1, port: 8901, web_root: /home/m3u-filter/web }
 working_dir: /home/m3u-filter/data
 sources:
-  - input: {persist: 'playlist_1_{}.m3u', url: 'http://myserver.net/playlist.m3u'}
+  - input: { persist: 'playlist_1_{}.m3u', url: 'http://myserver.net/playlist.m3u' }
     targets:
       - filename: playlist_1.m3u
-        filter:
-          mode: Include
-          rules:
-            - {field: Group, pattern: ^DE\s.*}
-            - {field: Group, pattern: ^AU\s.*}
-        options: {ignore_logo: true}
+        filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*"'
+        options: { ignore_logo: true }
         rename:
-          - {field: Group, new_name: 1. DE$1, pattern: ^DE(.*)}
-        sort: {order: Asc}
+          - { field: Group, new_name: 1. DE$1, pattern: ^DE(.*) }
+        sort: { order: Asc }

@@ -1,8 +1,10 @@
 use std::io::Write;
+use config::ConfigTarget;
 
 use crate::{config, Config, get_playlist, m3u, utils};
 use crate::config::ItemField::Group;
 use crate::config::SortOrder::{Asc, Desc};
+use crate::filter::ValueProvider;
 use crate::m3u::PlaylistItem;
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
@@ -55,7 +57,7 @@ pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::Con
             }
             for pg in &new_playlist {
                 for pli in &pg.channels {
-                    if is_valid(&pli, &target.filter) {
+                    if is_valid(&pli, &target) {
                         let content = exec_rename(&pli, &target.rename).map_or_else(|| pli.to_m3u(&target.options), |p| p.to_m3u(&target.options));
                         match check_write(file.write(content.as_bytes())) {
                             Ok(_) => (),
@@ -92,20 +94,9 @@ fn set_field_value(pli: &mut m3u::PlaylistItem, field: &config::ItemField, value
     };
 }
 
-fn is_valid(pli: &m3u::PlaylistItem, filter: &config::ConfigFilters) -> bool {
-    let mut matched = false;
-    for r in &filter.rules {
-        let value = get_field_value(pli, &r.field);
-        matched = r.re.as_ref().unwrap().is_match(value);
-        if matched {
-            break;
-        }
-    }
-    return if filter.is_include() {
-        matched
-    } else {
-        !matched
-    };
+fn is_valid(pli: &m3u::PlaylistItem, target: &ConfigTarget) -> bool {
+    let provider = ValueProvider { pli };
+    return target.filter(&provider);
 }
 
 fn exec_rename(pli: &m3u::PlaylistItem, rename: &Vec<config::ConfigRename>) -> Option<PlaylistItem> {

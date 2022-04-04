@@ -1,9 +1,10 @@
 use path_absolutize::*;
-
+use enum_iterator::IntoEnumIterator;
+use crate::filter::{Filter, get_filter, ValueProvider};
 use crate::utils;
 use crate::utils::get_working_path;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, IntoEnumIterator)]
 pub enum ItemField {
     Group,
     Name,
@@ -26,25 +27,6 @@ pub enum FilterMode {
     Include,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ConfigFilter {
-    pub field: ItemField,
-    pub pattern: String,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub re: Option<regex::Regex>,
-}
-
-impl ConfigFilter {
-    pub(crate) fn prepare(&mut self) -> () {
-        let re = regex::Regex::new(&self.pattern);
-        if re.is_err() {
-            println!("cant parse regex: {}", &self.pattern);
-            std::process::exit(1);
-        }
-        self.re = Some(re.unwrap());
-    }
-}
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigOptions {
     pub ignore_logo: bool,
@@ -59,18 +41,6 @@ pub enum SortOrder {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSort {
     pub order: SortOrder,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigFilters {
-    pub mode: FilterMode,
-    pub rules: Vec<ConfigFilter>,
-}
-
-impl ConfigFilters {
-    pub(crate) fn is_include(&self) -> bool {
-        matches!(self.mode, FilterMode::Include)
-    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -98,9 +68,21 @@ pub struct ConfigTarget {
     pub filename: String,
     pub options: Option<ConfigOptions>,
     pub sort: Option<ConfigSort>,
-    pub filter: ConfigFilters,
+    pub filter: String,
     pub rename: Vec<ConfigRename>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _filter: Option<Filter>,
 }
+
+impl ConfigTarget {
+    pub(crate) fn prepare(&mut self) -> () {
+        self._filter = Some(get_filter(&self.filter));
+    }
+    pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
+        return self._filter.as_ref().unwrap().filter(provider);
+    }
+}
+
 
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -146,9 +128,7 @@ impl Config {
         self.prepare_api_web_root();
         for source in &mut self.sources {
             for target in &mut source.targets {
-                for f in &mut target.filter.rules {
-                    f.prepare();
-                }
+                target.prepare();
                 for r in &mut target.rename {
                     r.prepare();
                 }
@@ -203,6 +183,7 @@ impl Clone for ConfigTarget {
             sort: self.sort.as_ref().map(|s| s.clone()),
             filter: self.filter.clone(),
             rename: self.rename.clone(),
+            _filter: self._filter.clone()
         }
     }
 }
@@ -228,15 +209,6 @@ impl Clone for ConfigSort {
     fn clone(&self) -> Self {
         ConfigSort {
             order: self.order.clone(),
-        }
-    }
-}
-
-impl Clone for ConfigFilters {
-    fn clone(&self) -> Self {
-        ConfigFilters {
-            mode: self.mode.clone(),
-            rules: self.rules.clone(),
         }
     }
 }
