@@ -45,7 +45,7 @@ input:
 The input *persist* configuration is for storing the input content. The {} is replaced by a date time tag. If you don't
 want to persist the input content, then let it empty.
 
-The filter can have UnaryExpression ```NOT```, BinaryExpression ```AND OR```, and Comparison ```(Group|Title|Name) ~ "regexp"```
+The filter can have UnaryExpression ```NOT```, BinaryExpression ```AND OR```, and Comparison ```(Group|Title|Name|Url) ~ "regexp"```
 Filter fields are Group, Title, Name and Url.
 
 Example filter:  ```((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group ~ "^AU.*")```
