@@ -1,44 +1,10 @@
 use path_absolutize::*;
-use enum_iterator::IntoEnumIterator;
+
 use crate::filter::{Filter, get_filter, ValueProvider};
+use crate::model::{ItemField, SortOrder, TargetType};
 use crate::utils;
 use crate::utils::get_working_path;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, IntoEnumIterator)]
-pub enum ItemField {
-    Group,
-    Name,
-    Title,
-    Url
-}
-
-impl std::fmt::Display for ItemField {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            ItemField::Group => write!(f, "Group"),
-            ItemField::Name => write!(f, "Name"),
-            ItemField::Title => write!(f, "Title"),
-            ItemField::Url => write!(f, "Url"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum FilterMode {
-    Discard,
-    Include,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigOptions {
-    pub ignore_logo: bool,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum SortOrder {
-    Asc,
-    Desc,
-}
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSort {
@@ -66,11 +32,18 @@ impl ConfigRename {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ConfigOptions {
+    pub ignore_logo: bool,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigTarget {
     pub filename: String,
     pub options: Option<ConfigOptions>,
     pub sort: Option<ConfigSort>,
     pub filter: String,
+    #[serde(alias = "type")]
+    pub output: TargetType,
     pub rename: Vec<ConfigRename>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _filter: Option<Filter>,
@@ -84,8 +57,6 @@ impl ConfigTarget {
         return self._filter.as_ref().unwrap().filter(provider);
     }
 }
-
-
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSources {
@@ -184,6 +155,7 @@ impl Clone for ConfigTarget {
             options: self.options.as_ref().map(|o| o.clone()),
             sort: self.sort.as_ref().map(|s| s.clone()),
             filter: self.filter.clone(),
+            output: self.output.clone(),
             rename: self.rename.clone(),
             _filter: self._filter.clone()
         }

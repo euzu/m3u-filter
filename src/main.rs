@@ -13,6 +13,7 @@ mod api;
 mod api_model;
 mod service;
 mod filter;
+mod model;
 
 fn main() {
     let args = get_arguments();

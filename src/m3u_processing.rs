@@ -2,10 +2,10 @@ use std::io::Write;
 use config::ConfigTarget;
 
 use crate::{config, Config, get_playlist, m3u, utils};
-use crate::config::ItemField::Group;
-use crate::config::SortOrder::{Asc, Desc};
+use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::ValueProvider;
 use crate::m3u::PlaylistItem;
+use crate::model::ItemField;
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     match res {
@@ -21,7 +21,7 @@ pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::Con
         if target.rename.len() > 0 {
             for r in &target.rename {
                 match r.field {
-                    Group => {
+                    ItemField::Group => {
                         let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
                         grp.title = cap.into_owned();
                     }
@@ -76,23 +76,23 @@ pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::Con
     Ok(())
 }
 
-fn get_field_value<'a>(pli: &'a m3u::PlaylistItem, field: &config::ItemField) -> &'a str {
+fn get_field_value<'a>(pli: &'a m3u::PlaylistItem, field: &ItemField) -> &'a str {
     let value = match field {
-        config::ItemField::Group => pli.header.group.as_str(),
-        config::ItemField::Name => pli.header.name.as_str(),
-        config::ItemField::Title => pli.header.title.as_str(),
-        config::ItemField::Url => pli.url.as_str(),
+        ItemField::Group => pli.header.group.as_str(),
+        ItemField::Name => pli.header.name.as_str(),
+        ItemField::Title => pli.header.title.as_str(),
+        ItemField::Url => pli.url.as_str(),
     };
     value
 }
 
-fn set_field_value(pli: &mut m3u::PlaylistItem, field: &config::ItemField, value: String) -> () {
+fn set_field_value(pli: &mut m3u::PlaylistItem, field: &ItemField, value: String) -> () {
     let header = &mut pli.header;
     match field {
-        config::ItemField::Group => header.group = value,
-        config::ItemField::Name => header.name = value,
-        config::ItemField::Title => header.title = value,
-        config::ItemField::Url => {},
+        ItemField::Group => header.group = value,
+        ItemField::Name => header.name = value,
+        ItemField::Title => header.title = value,
+        ItemField::Url => {},
     };
 }
 

@@ -4,6 +4,7 @@ sources:
   - input: { persist: 'playlist_1_{}.m3u', url: 'http://myserver.net/playlist.m3u' }
     targets:
       - filename: playlist_1.m3u
+        type: M3u
         filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*"'
         options: { ignore_logo: true }
         rename:

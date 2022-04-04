@@ -1,10 +1,9 @@
+use enum_iterator::IntoEnumIterator;
 use std::borrow::Borrow;
 use std::sync::{Arc, Mutex};
 use pest::Parser;
-use enum_iterator::IntoEnumIterator;
-use config::ItemField;
-use crate::config;
 use crate::m3u::PlaylistItem;
+use crate::model::ItemField;
 
 pub struct ValueProvider<'a> {
     pub(crate) pli: &'a PlaylistItem,
@@ -13,10 +12,10 @@ pub struct ValueProvider<'a> {
 impl<'a> ValueProvider<'a> {
     fn call(&self, field: &'a ItemField) -> &str {
         return match field {
-            config::ItemField::Group => &*self.pli.header.group.as_str(),
-            config::ItemField::Name => &*self.pli.header.name.as_str(),
-            config::ItemField::Title => &*self.pli.header.title.as_str(),
-            config::ItemField::Url => &*self.pli.url.as_str(),
+            ItemField::Group => &*self.pli.header.group.as_str(),
+            ItemField::Name => &*self.pli.header.name.as_str(),
+            ItemField::Title => &*self.pli.header.title.as_str(),
+            ItemField::Url => &*self.pli.url.as_str(),
         }
     }
 }
