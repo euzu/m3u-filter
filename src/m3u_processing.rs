@@ -73,9 +73,13 @@ fn sanitize_for_filename(text: &String, underscore_whitespace: bool) -> String {
 
 fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
     let underscore_whitespace = target.options.as_ref().map_or(false, |o| o.underscore_whitespace);
+    let cleanup = target.options.as_ref().map_or(false, |o| o.cleanup);
 
     match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename))) {
         Some(path) => {
+            if cleanup {
+                let _ = std::fs::remove_dir_all(&path);
+            }
             match std::fs::create_dir_all(&path) {
                 Err(e) => {
                     println!("cant create directory: {:?}", &path);

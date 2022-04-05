@@ -18,7 +18,9 @@ If given as argument, it overrides the config file entry.
 There are two types of targets ```m3u``` and ```strm```. This can be set by the ```output``` attribute to ```Strm``` or ```M3u```. 
 If the attribute is not specified ```M3u``` is created by default.
 
-```Strm``` output has an additional option ```underscore_whitespace```. This replaces all whitespaces with ```_``` in the path.
+```Strm``` output has additional options ```underscore_whitespace``` and ```cleanup```.
+```underscore_whitespace``` replaces all whitespaces with ```_``` in the path.
+```cleanup``` deletes the directory given at ```filename```.
 
 the config.yml looks like:
 ```yaml

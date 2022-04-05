@@ -1,4 +1,7 @@
 # Changelog
+# v0.9.2(2022-04-05)
+* ```Strm``` output has an additional option ```cleanup```. This deletes the old directory given at ```filename```.
+
 # v0.9.1(2022-04-05)
 * There are two types of targets ```m3u``` and ```strm```. This can be set by the ```output``` attribute to ```Strm``` or ```M3u```.
 If the attribute is not specified ```M3u``` is created by default. ```Strm``` output has an additional option ```underscore_whitespace```. This replaces all whitespaces with ```_``` in the path.

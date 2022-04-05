@@ -41,6 +41,8 @@ pub struct ConfigOptions {
     pub ignore_logo: bool,
     #[serde(default = "default_as_false")]
     pub underscore_whitespace: bool,
+    #[serde(default = "default_as_false")]
+    pub cleanup: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -183,6 +185,7 @@ impl Clone for ConfigOptions {
         ConfigOptions {
             ignore_logo: self.ignore_logo,
             underscore_whitespace: self.underscore_whitespace,
+            cleanup: self.cleanup,
         }
     }
 }
