@@ -15,6 +15,11 @@ You can override this behaviour with the -c argument.
 The input file can be defined inside the config.yml file or can be given as -i argument.
 If given as argument, it overrides the config file entry.
 
+There are two types of targets ```m3u``` and ```strm```. This can be set by the ```output``` attribute to ```Strm``` or ```M3u```. 
+If the attribute is not specified ```M3u``` is created by default.
+
+```Strm``` output has an additional option ```underscore_whitespace```. This replaces all whitespaces with ```_``` in the path.
+
 the config.yml looks like:
 ```yaml
 working_dir: ./data
@@ -32,6 +37,18 @@ targets:
     sort:
       order: Asc
     filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*" 
+    rename:
+      - field: Group
+        pattern: ^DE(.*)
+        new_name: 1. DE$1
+  - filename: playlist_strm
+    output: Strm
+    options:
+      ignore_logo: true
+      underscore_whitespace: true
+    sort:
+      order: Asc
+    filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*"
     rename:
       - field: Group
         pattern: ^DE(.*)

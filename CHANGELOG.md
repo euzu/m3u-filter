@@ -1,4 +1,8 @@
 # Changelog
+# v0.9.1(2022-04-05)
+* There are two types of targets ```m3u``` and ```strm```. This can be set by the ```output``` attribute to ```Strm``` or ```M3u```.
+If the attribute is not specified ```M3u``` is created by default. ```Strm``` output has an additional option ```underscore_whitespace```. This replaces all whitespaces with ```_``` in the path.
+
 ## v0.9.0(2022-04-04)
 * Changed filter. Filter are now defined as filter statements. Url added to filter fields.
 

@@ -10,3 +10,10 @@ sources:
         rename:
           - { field: Group, new_name: 1. DE$1, pattern: ^DE(.*) }
         sort: { order: Asc }
+      - filename: playlist_strm
+        type: Strm
+        filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*"'
+        options: { ignore_logo: true, underscore_whitespace: true }
+        rename:
+          - { field: Group, new_name: 1. DE$1, pattern: ^DE(.*) }
+        sort: { order: Asc }
