@@ -4,8 +4,8 @@ use config::ConfigTarget;
 use crate::{config, Config, get_playlist, m3u, utils};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::ValueProvider;
-use crate::m3u::PlaylistItem;
-use crate::model::ItemField;
+use crate::m3u::{PlaylistGroup, PlaylistItem};
+use crate::model::{ItemField, TargetType};
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     match res {
@@ -15,6 +15,125 @@ fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
 }
 
 pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::ConfigTarget, cfg: &config::Config) -> Result<(), std::io::Error> {
+    let mut new_playlist = rename_playlist(playlist, &target);
+    sort_playlist(target, &mut new_playlist);
+    match &target.output {
+        Some(output_type) => {
+            match output_type {
+                TargetType::Strm => return write_strm_playlist(&target, &cfg, &mut new_playlist),
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+    return write_m3u_playlist(&target, &cfg, &mut new_playlist);
+}
+
+fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
+    match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename))) {
+        Some(path) => {
+            let mut m3u_file = match std::fs::File::create(&path) {
+                Ok(file) => file,
+                Err(e) => {
+                    println!("cant create file: {:?}", &path);
+                    return Err(e);
+                }
+            };
+
+            match check_write(m3u_file.write(b"#EXTM3U\n")) {
+                Ok(_) => (),
+                Err(e) => return Err(e),
+            }
+            for pg in new_playlist {
+                for pli in &pg.channels {
+                    if is_valid(&pli, &target) {
+                        let content = exec_rename(&pli, &target.rename).map_or_else(|| pli.to_m3u(&target.options), |p| p.to_m3u(&target.options));
+                        match check_write(m3u_file.write(content.as_bytes())) {
+                            Ok(_) => (),
+                            Err(e) => return Err(e),
+                        }
+                        match check_write(m3u_file.write(b"\n")) {
+                            Ok(_) => (),
+                            Err(e) => return Err(e),
+                        }
+                    }
+                }
+            }
+        }
+        None => (),
+    }
+    Ok(())
+}
+
+fn sanitize_for_filename(text: &String, underscore_whitespace: bool) -> String {
+    return text.chars().filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .map(|c| if underscore_whitespace { if c.is_whitespace() { '_' } else { c } } else { c })
+        .collect::<String>();
+}
+
+fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
+    let underscore_whitespace = target.options.as_ref().map_or(false, |o| o.underscore_whitespace);
+
+    match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename))) {
+        Some(path) => {
+            match std::fs::create_dir_all(&path) {
+                Err(e) => {
+                    println!("cant create directory: {:?}", &path);
+                    return Err(e);
+                }
+                _ => {}
+            };
+            for pg in new_playlist {
+                for pli in &pg.channels {
+                    if is_valid(&pli, &target) {
+                        match exec_rename(&pli, &target.rename) {
+                            Some(pli) => {
+                                let dir_path = path.join(sanitize_for_filename(&pli.header.group, underscore_whitespace));
+                                match std::fs::create_dir_all(&dir_path) {
+                                    Err(e) => {
+                                        println!("cant create directory: {:?}", &path);
+                                        return Err(e);
+                                    }
+                                    _ => {}
+                                };
+                                let file_path = dir_path.join(format!("{}.strm", sanitize_for_filename(&pli.header.title, underscore_whitespace)));
+                                println!("output: {:?}", &file_path);
+                                let mut strm_file = match std::fs::File::create(&file_path) {
+                                    Ok(file) => file,
+                                    Err(e) => {
+                                        println!("cant create file: {:?}", &file_path);
+                                        return Err(e);
+                                    }
+                                };
+                                match check_write(strm_file.write(pli.url.as_bytes())) {
+                                    Ok(_) => (),
+                                    Err(e) => return Err(e),
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        None => (),
+    }
+    Ok(())
+}
+
+fn sort_playlist(target: &ConfigTarget, new_playlist: &mut Vec<PlaylistGroup>) {
+    if let Some(sort) = &target.sort {
+        new_playlist.sort_by(|a, b| {
+            let ordering = a.title.partial_cmp(&b.title).unwrap();
+            match sort.order {
+                Asc => ordering,
+                Desc => ordering.reverse()
+            }
+        });
+    }
+}
+
+fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Vec<PlaylistGroup> {
     let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
     for g in playlist {
         let mut grp = g.clone();
@@ -31,49 +150,7 @@ pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::Con
         }
         new_playlist.push(grp);
     }
-
-    if let Some(sort) = &target.sort {
-        new_playlist.sort_by(|a, b| {
-            let ordering = a.title.partial_cmp(&b.title).unwrap();
-            match sort.order {
-                Asc => ordering,
-                Desc => ordering.reverse()
-            }
-        });
-    }
-    match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename))) {
-        Some(path) => {
-            let mut file = match std::fs::File::create(&path) {
-                Ok(file) => file,
-                Err(e) => {
-                    println!("cant open file: {:?}", &path);
-                    return Err(e);
-                }
-            };
-
-            match check_write(file.write(b"#EXTM3U\n")) {
-                Ok(_) => (),
-                Err(e) => return Err(e),
-            }
-            for pg in &new_playlist {
-                for pli in &pg.channels {
-                    if is_valid(&pli, &target) {
-                        let content = exec_rename(&pli, &target.rename).map_or_else(|| pli.to_m3u(&target.options), |p| p.to_m3u(&target.options));
-                        match check_write(file.write(content.as_bytes())) {
-                            Ok(_) => (),
-                            Err(e) => return Err(e),
-                        }
-                        match check_write(file.write(b"\n")) {
-                            Ok(_) => (),
-                            Err(e) => return Err(e),
-                        }
-                    }
-                }
-            }
-        }
-        None => (),
-    }
-    Ok(())
+    new_playlist
 }
 
 fn get_field_value<'a>(pli: &'a m3u::PlaylistItem, field: &ItemField) -> &'a str {
@@ -92,7 +169,7 @@ fn set_field_value(pli: &mut m3u::PlaylistItem, field: &ItemField, value: String
         ItemField::Group => header.group = value,
         ItemField::Name => header.name = value,
         ItemField::Title => header.title = value,
-        ItemField::Url => {},
+        ItemField::Url => {}
     };
 }
 

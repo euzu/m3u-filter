@@ -31,9 +31,16 @@ impl ConfigRename {
     }
 }
 
+fn default_as_false() -> bool {
+    false
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigOptions {
+    #[serde(default = "default_as_false")]
     pub ignore_logo: bool,
+    #[serde(default = "default_as_false")]
+    pub underscore_whitespace: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -43,7 +50,7 @@ pub struct ConfigTarget {
     pub sort: Option<ConfigSort>,
     pub filter: String,
     #[serde(alias = "type")]
-    pub output: TargetType,
+    pub output: Option<TargetType>,
     pub rename: Vec<ConfigRename>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _filter: Option<Filter>,
@@ -157,7 +164,7 @@ impl Clone for ConfigTarget {
             filter: self.filter.clone(),
             output: self.output.clone(),
             rename: self.rename.clone(),
-            _filter: self._filter.clone()
+            _filter: self._filter.clone(),
         }
     }
 }
@@ -175,6 +182,7 @@ impl Clone for ConfigOptions {
     fn clone(&self) -> Self {
         ConfigOptions {
             ignore_logo: self.ignore_logo,
+            underscore_whitespace: self.underscore_whitespace,
         }
     }
 }
