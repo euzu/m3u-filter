@@ -1,11 +1,18 @@
 use std::io::Write;
 use config::ConfigTarget;
-
+use chrono::Datelike;
 use crate::{config, Config, get_playlist, m3u, utils};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::ValueProvider;
 use crate::m3u::{PlaylistGroup, PlaylistItem};
 use crate::model::{ItemField, TargetType};
+
+struct KodiStyle {
+    year: regex::Regex,
+    season: regex::Regex,
+    episode: regex::Regex,
+    whitespace: regex::Regex,
+}
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     match res {
@@ -74,6 +81,7 @@ fn sanitize_for_filename(text: &String, underscore_whitespace: bool) -> String {
 fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
     let underscore_whitespace = target.options.as_ref().map_or(false, |o| o.underscore_whitespace);
     let cleanup = target.options.as_ref().map_or(false, |o| o.cleanup);
+    let kodi_style = target.options.as_ref().map_or(false, |o| o.kodi_style);
 
     match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename))) {
         Some(path) => {
@@ -100,8 +108,17 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
                                     }
                                     _ => {}
                                 };
-                                let file_path = dir_path.join(format!("{}.strm", sanitize_for_filename(&pli.header.title, underscore_whitespace)));
-                                println!("output: {:?}", &file_path);
+                                let mut file_name = sanitize_for_filename(&pli.header.title, underscore_whitespace);
+                                if kodi_style {
+                                    let style = KodiStyle {
+                                        season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
+                                        episode: regex::Regex::new(r"[Ee]\d\d").unwrap(),
+                                        year: regex::Regex::new(r"\d\d\d\d").unwrap(),
+                                        whitespace: regex::Regex::new(r"\s+").unwrap(),
+                                    };
+                                    file_name = kodi_style_rename(&file_name, &style);
+                                }
+                                let file_path = dir_path.join(format!("{}.strm", file_name));
                                 let mut strm_file = match std::fs::File::create(&file_path) {
                                     Ok(file) => file,
                                     Err(e) => {
@@ -123,6 +140,58 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
         None => (),
     }
     Ok(())
+}
+
+fn kodi_style_rename_year(name: &String, style: &KodiStyle) -> (String, Option<String>) {
+    let current_date = chrono::Utc::now();
+    let cur_year = current_date.year();
+    match style.year.find(&name) {
+        Some(m) => {
+            let s_year = &name[m.start()..m.end()];
+            let t_year: i32 = s_year.parse().unwrap();
+            if t_year > 1900 && t_year <= cur_year {
+                let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
+                return (new_name, Some(String::from(s_year)));
+            }
+            return (String::from(name), Some(cur_year.to_string()));
+        }
+        _ => (String::from(name), Some(cur_year.to_string())),
+    }
+}
+
+fn kodi_style_rename_season(name: &String, style: &KodiStyle) -> (String, Option<String>) {
+    match style.season.find(&name) {
+        Some(m) => {
+            let s_season = &name[m.start()..m.end()];
+            let season = Some(String::from(&s_season[1..]));
+            let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
+            return (new_name, season);
+        }
+        _ => (String::from(name), Some(String::from("01"))),
+    }
+}
+
+fn kodi_style_rename_episode(name: &String, style: &KodiStyle) -> (String, Option<String>) {
+    match style.episode.find(&name) {
+        Some(m) => {
+            let s_episode = &name[m.start()..m.end()];
+            let episode = Some(String::from(&s_episode[1..]));
+            let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
+            return (new_name, episode);
+        }
+        _ => (String::from(name), None),
+    }
+}
+
+fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
+    let (work_name_1, year) = kodi_style_rename_year(name, style);
+    let (work_name_2, season) = kodi_style_rename_season(&work_name_1, style);
+    let (work_name_3, episode) = kodi_style_rename_episode(&work_name_2, style);
+    if year.is_some() && season.is_some() && episode.is_some() {
+        let formatted = format!("{} ({}) S{}E{}", work_name_3, year.unwrap(), season.unwrap(), episode.unwrap());
+        return String::from(style.whitespace.replace_all(formatted.as_str(), " ").as_ref());
+    }
+    return String::from(name);
 }
 
 fn sort_playlist(target: &ConfigTarget, new_playlist: &mut Vec<PlaylistGroup>) {

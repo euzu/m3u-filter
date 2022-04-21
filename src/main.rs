@@ -48,7 +48,7 @@ fn read_config(config_file: &str) -> Config {
 
 fn get_arguments<'a>() -> ArgMatches<'a> {
     clap::App::new("m3u-filter")
-        .version("0.5.0")
+        .version("0.9.3")
         .author("euzu")
         .about("Extended M3U playlist filter")
         .arg(clap::Arg::with_name("config")

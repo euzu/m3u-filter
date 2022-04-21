@@ -43,6 +43,8 @@ pub struct ConfigOptions {
     pub underscore_whitespace: bool,
     #[serde(default = "default_as_false")]
     pub cleanup: bool,
+    #[serde(default = "default_as_false")]
+    pub kodi_style: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -186,6 +188,7 @@ impl Clone for ConfigOptions {
             ignore_logo: self.ignore_logo,
             underscore_whitespace: self.underscore_whitespace,
             cleanup: self.cleanup,
+            kodi_style: self.kodi_style,
         }
     }
 }

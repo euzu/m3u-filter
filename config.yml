@@ -12,8 +12,8 @@ sources:
         sort: { order: Asc }
       - filename: playlist_strm
         type: Strm
-        filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*"'
-        options: { ignore_logo: true, underscore_whitespace: true }
+        filter: 'Group ~ "^tv-shows.*"'
+        options: { ignore_logo: true, cleanup: true, underscore_whitespace: false, kodi_style: true }
         rename:
           - { field: Group, new_name: 1. DE$1, pattern: ^DE(.*) }
         sort: { order: Asc }

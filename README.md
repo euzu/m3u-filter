@@ -18,9 +18,10 @@ If given as argument, it overrides the config file entry.
 There are two types of targets ```m3u``` and ```strm```. This can be set by the ```output``` attribute to ```Strm``` or ```M3u```. 
 If the attribute is not specified ```M3u``` is created by default.
 
-```Strm``` output has additional options ```underscore_whitespace``` and ```cleanup```.
+```Strm``` output has additional options ```underscore_whitespace```, ```cleanup``` and ```kodi_style```.
 ```underscore_whitespace``` replaces all whitespaces with ```_``` in the path.
 ```cleanup``` deletes the directory given at ```filename```.
+```kodi_style``` tries to rename ```filename``` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 
 the config.yml looks like:
 ```yaml
@@ -47,7 +48,9 @@ targets:
     output: Strm
     options:
       ignore_logo: true
-      underscore_whitespace: true
+      underscore_whitespace: false
+      kodi_style: true
+      cleanup: true
     sort:
       order: Asc
     filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*"

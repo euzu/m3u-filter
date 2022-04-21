@@ -1,4 +1,8 @@
 # Changelog
+# v0.9.3(2022-04-21)
+* ```Strm``` output has an additional option ```kodi_style```. This option tries to guess the year, season and episode for kodi style names.
+https://kodi.wiki/view/Naming_video_files/TV_shows
+
 # v0.9.2(2022-04-05)
 * ```Strm``` output has an additional option ```cleanup```. This deletes the old directory given at ```filename```.
 
