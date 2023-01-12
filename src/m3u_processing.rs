@@ -23,7 +23,7 @@ fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
 }
 
 pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::ConfigTarget, cfg: &config::Config) -> Result<(), std::io::Error> {
-    let mut new_playlist = map_playlist(playlist, &target);
+    let mut new_playlist = map_playlist(playlist, &target).unwrap_or(playlist.clone());
     new_playlist = rename_playlist(&new_playlist, &target);
     sort_playlist(target, &mut new_playlist);
     match &target.output {
@@ -264,19 +264,21 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
     return channel.clone();
 }
 
-fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Vec<PlaylistGroup> {
-    let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
-    for g in playlist {
-        let mut grp = g.clone();
-        if target._mapping.is_some() {
+fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
+    if target._mapping.is_some() {
+        let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
+        for g in playlist {
+            let mut grp = g.clone();
             let mapping = target._mapping.as_ref().unwrap();
             if mapping.mapper.len() > 0 {
                 grp.channels = grp.channels.iter().map(|chan| map_channel(&chan, &mapping)).collect();
             }
+            new_playlist.push(grp);
         }
-        new_playlist.push(grp);
+        Some(new_playlist)
+    } else {
+        None
     }
-    new_playlist
 }
 
 fn get_field_value<'a>(pli: &'a m3u::PlaylistItem, field: &ItemField) -> &'a str {

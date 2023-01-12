@@ -5,7 +5,7 @@ sources:
     targets:
       - filename: playlist_1.m3u
         type: M3u
-        filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*"'
+        filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*" OR Group ~ "TF1.*"'
         options: { ignore_logo: true }
         rename:
           - { field: Group, new_name: 1. DE$1, pattern: ^DE(.*) }

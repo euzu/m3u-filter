@@ -35,7 +35,7 @@ impl Clone for Mapper {
             tvg_chno: self.tvg_chno.clone(),
             tvg_logo: self.tvg_logo.clone(),
             group_title: self.group_title.clone(),
-            re: None,
+            re: self.re.clone(),
         }
     }
 }

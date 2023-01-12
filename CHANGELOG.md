@@ -2,7 +2,8 @@
 # v0.9.4(2023-01-12)
 * Added mappings. Mappings are defined in a file named ```mapping.yml``` or can be given by command line option ```-m```.
 ```target``` has now an optional field ```mapping``` which has the id of the mapping configuration.   
-  
+* rename is now optional
+
 # v0.9.3(2022-04-21)
 * ```Strm``` output has an additional option ```kodi_style```. This option tries to guess the year, season and episode for kodi style names.
 https://kodi.wiki/view/Naming_video_files/TV_shows
