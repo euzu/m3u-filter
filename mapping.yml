@@ -2,15 +2,6 @@ mappings:
   - id: kumy
     tag: ""
     mapper:
-      - tvg_name: TRT 1 SD
-        tvg_names:
-          - "^TR: TRT 1 SD$"
-        tvg_id: TF1.fr
-        tvg_chno: "500"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
-        group_title:
-          - TR
-          - TNT
       - tvg_name: TF1
         tvg_names:
           - ^TF1$
