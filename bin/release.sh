@@ -40,9 +40,9 @@ fi
 #  exit $?
 #fi
 cp x86_64-pc-windows-gnu/release/m3u-filter.exe "$WIN_DIR" && \
-cp ../config.yml "$LIN_DIR" && \
-cp ../config.yml "$WIN_DIR" && \
-#cp ../config.yml $DARWIN_DIR && \
+cp ../*.yml "$LIN_DIR" && \
+cp ../*.yml "$WIN_DIR" && \
+#cp ../*.yml $DARWIN_DIR && \
 cp -rf ../frontend/build "$LIN_DIR"/web && \
 cp -rf ../frontend/build "$WIN_DIR"/web && \
 #cp -rf ../frontend/build "$DARWIN_DIR/web" && \
