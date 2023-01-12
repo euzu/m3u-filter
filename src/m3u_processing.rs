@@ -5,6 +5,7 @@ use crate::{config, Config, get_playlist, m3u, utils};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::ValueProvider;
 use crate::m3u::{PlaylistGroup, PlaylistItem};
+use crate::mapping::Mapping;
 use crate::model::{ItemField, TargetType};
 
 struct KodiStyle {
@@ -22,7 +23,8 @@ fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
 }
 
 pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::ConfigTarget, cfg: &config::Config) -> Result<(), std::io::Error> {
-    let mut new_playlist = rename_playlist(playlist, &target);
+    let mut new_playlist = map_playlist(playlist, &target);
+    new_playlist = rename_playlist(&new_playlist, &target);
     sort_playlist(target, &mut new_playlist);
     match &target.output {
         Some(output_type) => {
@@ -210,15 +212,66 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Vec<
     let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
     for g in playlist {
         let mut grp = g.clone();
-        if target.rename.len() > 0 {
-            for r in &target.rename {
-                match r.field {
-                    ItemField::Group => {
-                        let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
-                        grp.title = cap.into_owned();
+        match &target.rename {
+            Some(renames) => {
+                if renames.len() > 0 {
+                    for r in renames {
+                        match r.field {
+                            ItemField::Group => {
+                                let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
+                                grp.title = cap.into_owned();
+                            }
+                            _ => {}
+                        }
                     }
-                    _ => {}
                 }
+            }
+            _ => {}
+        }
+        new_playlist.push(grp);
+    }
+    new_playlist
+}
+
+fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
+    if mapping.mapper.len() > 0 {
+        let tag = if mapping.tag.is_empty() {
+            String::from("")
+        } else {
+            format!("- {}", &mapping.tag)
+        };
+        for m in &mapping.mapper {
+            match &m.re {
+                Some(regexps) => {
+                    for re in regexps {
+                        if re.is_match(&channel.header.name) {
+                            let mut chan = channel.clone();
+                            chan.header.name = format!("{}{}", m.tvg_name, tag);
+                            chan.header.chno = m.tvg_chno.clone();
+                            chan.header.id = m.tvg_id.clone();
+                            chan.header.logo = m.tvg_logo.clone();
+                            let mut split: Vec<String> = channel.header.group.split("|").map(|s| String::from(s.trim())).collect();
+                            split.append(m.group_title.clone().as_mut());
+                            chan.header.group = split.join("|");
+                            return chan;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    return channel.clone();
+}
+
+fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Vec<PlaylistGroup> {
+    let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
+    for g in playlist {
+        let mut grp = g.clone();
+        if target._mapping.is_some() {
+            let mapping = target._mapping.as_ref().unwrap();
+            if mapping.mapper.len() > 0 {
+                grp.channels = grp.channels.iter().map(|chan| map_channel(&chan, &mapping)).collect();
             }
         }
         new_playlist.push(grp);
@@ -251,18 +304,23 @@ fn is_valid(pli: &m3u::PlaylistItem, target: &ConfigTarget) -> bool {
     return target.filter(&provider);
 }
 
-fn exec_rename(pli: &m3u::PlaylistItem, rename: &Vec<config::ConfigRename>) -> Option<PlaylistItem> {
-    if rename.len() > 0 {
-        let mut result = pli.clone();
-        for r in rename {
-            let value = get_field_value(&result, &r.field);
-            let cap = r.re.as_ref().unwrap().replace_all(value, &r.new_name);
-            let value = cap.into_owned();
-            set_field_value(&mut result, &r.field, value);
+fn exec_rename(pli: &m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRename>>) -> Option<PlaylistItem> {
+    match rename {
+        Some(renames) => {
+            if renames.len() > 0 {
+                let mut result = pli.clone();
+                for r in renames {
+                    let value = get_field_value(&result, &r.field);
+                    let cap = r.re.as_ref().unwrap().replace_all(value, &r.new_name);
+                    let value = cap.into_owned();
+                    set_field_value(&mut result, &r.field, value);
+                }
+                return Some(result);
+            }
+            None
         }
-        return Some(result);
+        _ => None
     }
-    None
 }
 
 pub fn process_targets(cfg: &Config, verbose: bool) {

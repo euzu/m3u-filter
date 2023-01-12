@@ -1,6 +1,8 @@
 use path_absolutize::*;
 
 use crate::filter::{Filter, get_filter, ValueProvider};
+use crate::mapping::Mappings;
+use crate::mapping::Mapping;
 use crate::model::{ItemField, SortOrder, TargetType};
 use crate::utils;
 use crate::utils::get_working_path;
@@ -55,14 +57,23 @@ pub struct ConfigTarget {
     pub filter: String,
     #[serde(alias = "type")]
     pub output: Option<TargetType>,
-    pub rename: Vec<ConfigRename>,
+    pub rename: Option<Vec<ConfigRename>>,
+    pub mapping: Option<String>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _filter: Option<Filter>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _mapping: Option<Mapping>,
 }
 
 impl ConfigTarget {
     pub(crate) fn prepare(&mut self) -> () {
         self._filter = Some(get_filter(&self.filter));
+        match self.rename.as_mut() {
+            Some(renames) => for r in renames {
+                r.prepare();
+            },
+            _ => {}
+        }
     }
     pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
         return self._filter.as_ref().unwrap().filter(provider);
@@ -105,7 +116,26 @@ pub struct Config {
     pub working_dir: String,
 }
 
+
 impl Config {
+    pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) {
+        match mappings {
+            Some(mapping_list) => {
+                for source in &mut self.sources {
+                    for target in &mut source.targets {
+                        match &target.mapping {
+                            Some(mapping_id) => {
+                                target._mapping = mapping_list.get_mapping(mapping_id)
+                            },
+                            _ => {},
+                        }
+                    }
+                }
+            },
+            _ => {},
+        }
+    }
+
     pub(crate) fn prepare(&mut self) {
         self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
@@ -113,9 +143,6 @@ impl Config {
         for source in &mut self.sources {
             for target in &mut source.targets {
                 target.prepare();
-                for r in &mut target.rename {
-                    r.prepare();
-                }
             }
         }
     }
@@ -168,7 +195,9 @@ impl Clone for ConfigTarget {
             filter: self.filter.clone(),
             output: self.output.clone(),
             rename: self.rename.clone(),
+            mapping: self.mapping.clone(),
             _filter: self._filter.clone(),
+            _mapping: self._mapping.clone(),
         }
     }
 }

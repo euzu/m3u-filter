@@ -16,6 +16,7 @@ pub struct PlaylistItemHeader {
     pub time_shift: String,
     pub rec: String,
     pub source: String,
+    pub chno: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,8 +29,13 @@ impl PlaylistItem {
     pub(crate) fn to_m3u(&self, options: &Option<ConfigOptions>) -> String {
         let ignore_logo = options.as_ref().map_or(false, |o| o.ignore_logo);
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"", self.header.id, self.header.name, self.header.group);
+        if !self.header.chno.is_empty() {
+            line = format!("{} tvg-chno=\"{}\"", line, self.header.chno);
+        }
         if !ignore_logo {
-            line = format!("{} tvg-logo=\"{}\"", line, self.header.logo);
+            if !self.header.logo.is_empty() {
+                line = format!("{} tvg-logo=\"{}\"", line, self.header.logo);
+            }
             if !self.header.logo_small.is_empty() {
                 line = format!("{} tvg-logo-small=\"{}\"", line, self.header.logo_small);
             }
@@ -121,6 +127,7 @@ fn decode_header(content: &String) -> PlaylistItemHeader {
         time_shift: String::from(""),
         rec: String::from(""),
         source: String::from(content),
+        chno: String::from(""),
     };
 
     let mut it = content.chars();

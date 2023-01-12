@@ -27,6 +27,16 @@ pub(crate) fn get_default_config_path() -> String {
     })
 }
 
+pub(crate) fn get_default_mappings_path() -> String {
+    let path: std::path::PathBuf = get_exe_path();
+    let mappings_path = path.join("mapping.yml");
+    String::from(if mappings_path.exists() {
+        mappings_path.to_str().unwrap_or("./mapping.yml")
+    } else {
+        "./mapping.yml"
+    })
+}
+
 pub(crate) fn get_working_path(wd: &String) -> String {
     let current_dir = std::env::current_dir().unwrap();
     if wd.is_empty() {
