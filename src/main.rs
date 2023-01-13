@@ -65,8 +65,8 @@ fn read_mapping(mapping_file: &str) -> Option<Mappings> {
                     result.prepare();
                     Some(result)
                 }
-                Err(_) => {
-                    //println!("cant read mapping file: {}", e);
+                Err(err) => {
+                    println!("cant read mapping file: {}", err);
                     None
                 }
             }

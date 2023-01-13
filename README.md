@@ -27,7 +27,7 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 `processing_order: Frm` (valid values are: Frm, Fmr, Rfm, Rmf, Mfr, Mrf. default is Frm)
 
 The mapping is optional and can be configured for each target with:
-`mapping: <id of mapping>`
+`mapping: <list of mapping id's>`
 The mappings are defined in a file `mapping.yml`. The filename can be given as `-m` argument.
 
 the config.yml looks like:
@@ -62,7 +62,8 @@ targets:
     sort:
       order: Asc
     filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*"
-    mapping: France
+    mapping:
+       - France
     rename:
       - field: Group
         pattern: ^DE(.*)
@@ -90,15 +91,21 @@ with DE will be prefixed with "1.".
 If you dont care about sorting, you dont need the rename block.
 
 example mapping.yml file.
-(If you have some non standard ascii letters like `é`, you should use `.` for it in the regexp.) 
+(If you have some non standard ascii letters like `é`, you can set `match_as_ascii: true`.) 
 ```yaml
 mappings:
   - id: France
     tag: ""
+    match_as_ascii: true
+    templates:
+      - key: delimiter
+        value: '[\s_-]*'
+      - key: quality
+        value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'
     mapper:
       - tvg_name: TF1 $quality
         tvg_names:
-          - '^\s*(FR)?[: |]?TF1[\s_-]*(?P<quality>HD|hd|LQ|lq|4K|4k|UHD|uhd)?\s*$'
+          - '^\s*(FR)?[: |]?TF1!delimiter!!quality!\s*$'
         tvg_id: TF1.fr
         tvg_chno: "1"
         tvg_logo: https://emojipedia-us.s3.amazonaws.com/source/skype/289/shrimp_1f990.png
@@ -107,7 +114,7 @@ mappings:
           - TNT
       - tvg_name: TF1 Séries Films $quality
         tvg_names:
-          - '^.*TF1[\s_-]*S.ries?[\s_-]*Films?([\s_-]*(?P<quality>HD|hd|LQ|lq|4K|4k|UHD|uhd)?)\s*$'
+          - '^.*TF1!delimiter!Series?!delimiter!Films?(!delimiter!!quality!)\s*$'
         tvg_id: TF1SeriesFilms.fr
         tvg_chno: "20"
         tvg_logo: https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/google/350/shrimp_1f990.png
@@ -116,7 +123,7 @@ mappings:
           - TNT
       - tvg_name: TF1 +1 - $quality
         tvg_names:
-          - '^.*TF1[\s_-]*S.ries?[\s_-]*Films?[\s_-]*(\+|plus)1([\s_-]*(?P<quality>hd|lq|4k|uhd)?)\s*$'
+          - '^.*TF1!delimiter!Series?!delimiter!Films?!delimiter!(\+|plus)1(!delimiter!!quality!)\s*$'
         tvg_id: TF1Plus1.fr
         tvg_chno: "1"
         tvg_logo: https://emojipedia-us.s3.amazonaws.com/source/skype/289/shrimp_1f990.png

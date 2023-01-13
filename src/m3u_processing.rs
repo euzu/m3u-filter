@@ -297,10 +297,10 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
             format!("- {}", &mapping.tag)
         };
 
-        let channel_name = if mapping.match_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
+        let channel_name = if mapping.match_as_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
 
         for m in &mapping.mapper {
-            match &m.re {
+            match &m._re {
                 Some(regexps) => {
                     for re in regexps {
                         if re.re.is_match(&channel_name) {
@@ -312,11 +312,12 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
                                     let captures = captures_opt.unwrap();
                                     for cname in &re.captures {
                                         let match_opt = captures.name(cname.as_str());
-                                        if match_opt.is_some() {
-                                            chan_name = String::from(re.re.replace_all(&channel.header.name, &chan_name).as_ref());
+                                        let repl = if match_opt.is_some() {
+                                            match_opt.map_or("", |m| m.as_str())
                                         } else {
-                                            chan_name = String::from(&channel.header.name.replace(format!("${}", cname.as_str()).as_str(), ""));
-                                        }
+                                            ""
+                                        };
+                                        chan_name = String::from(chan_name.replace(format!("${}", cname.as_str()).as_str(), repl));
                                     }
                                 }
                             }

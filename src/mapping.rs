@@ -22,14 +22,20 @@ pub struct Mapper {
     pub tvg_logo: String,
     pub group_title: Vec<String>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub re: Option<Vec<MapperRe>>,
+    pub _re: Option<Vec<MapperRe>>,
 }
 
 impl Mapper {
-    pub(crate) fn prepare(&mut self) -> () {
+    pub(crate) fn prepare(&mut self, templates: Option<&Vec<MapperTemplate>>) -> () {
         let mut rev = Vec::new();
-        for regstr in &self.tvg_names {
-            let re = regex::Regex::new(regstr);
+        for rs in &self.tvg_names {
+            let mut regstr = String::from(rs);
+            let templ : &Vec<MapperTemplate> = templates.unwrap();
+            for t in templ {
+                regstr = regstr.replace(format!("!{}!", &t.key).as_str(), &t.value);
+            }
+
+            let re = regex::Regex::new(regstr.as_str());
             if re.is_err() {
                 println!("cant parse regex: {}", &regstr);
                 std::process::exit(1);
@@ -42,7 +48,7 @@ impl Mapper {
                 })
             }
         }
-        self.re = Some(rev);
+        self._re = Some(rev);
     }
 }
 
@@ -55,7 +61,7 @@ impl Clone for Mapper {
             tvg_chno: self.tvg_chno.clone(),
             tvg_logo: self.tvg_logo.clone(),
             group_title: self.group_title.clone(),
-            re: self.re.clone(),
+            _re: self._re.clone(),
         }
     }
 }
@@ -66,11 +72,28 @@ fn default_as_false() -> bool {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct MapperTemplate {
+    pub key: String,
+    pub value: String,
+}
+
+impl Clone for MapperTemplate {
+    fn clone(&self) -> Self {
+        MapperTemplate {
+            key: self.key.clone(),
+            value: self.value.clone()
+        }
+    }
+}
+
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Mapping {
     pub id: String,
     pub tag: String,
     #[serde(default = "default_as_false")]
-    pub match_ascii: bool,
+    pub match_as_ascii: bool,
+    pub templates: Option<Vec<MapperTemplate>>,
     pub mapper: Vec<Mapper>,
 }
 
@@ -79,7 +102,8 @@ impl Clone for Mapping {
         Mapping {
             id: self.id.clone(),
             tag: self.tag.clone(),
-            match_ascii: self.match_ascii,
+            match_as_ascii: self.match_as_ascii,
+            templates: self.templates.clone(),
             mapper: self.mapper.clone(),
         }
     }
@@ -88,7 +112,10 @@ impl Clone for Mapping {
 impl Mapping {
     pub(crate) fn prepare(&mut self) -> () {
         for mapper in &mut self.mapper {
-            mapper.prepare()
+            match &self.templates {
+              Some(templ) => mapper.prepare(Some(&templ)),
+                _ => mapper.prepare(None)
+            }
         }
     }
 }
