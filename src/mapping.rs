@@ -61,10 +61,16 @@ impl Clone for Mapper {
 }
 
 
+fn default_as_false() -> bool {
+    false
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Mapping {
     pub id: String,
     pub tag: String,
+    #[serde(default = "default_as_false")]
+    pub match_ascii: bool,
     pub mapper: Vec<Mapper>,
 }
 
@@ -73,6 +79,7 @@ impl Clone for Mapping {
         Mapping {
             id: self.id.clone(),
             tag: self.tag.clone(),
+            match_ascii: self.match_ascii,
             mapper: self.mapper.clone(),
         }
     }

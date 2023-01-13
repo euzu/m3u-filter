@@ -1,6 +1,7 @@
 mappings:
   - id: kumy
     tag: ""
+    decode_to_ascii: true
     mapper:
       - tvg_name: TF1
         tvg_names:

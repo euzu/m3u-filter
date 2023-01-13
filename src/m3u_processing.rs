@@ -1,12 +1,15 @@
+extern crate unidecode;
 use std::io::Write;
 use config::ConfigTarget;
 use chrono::Datelike;
+use unidecode::unidecode;
 use crate::{config, Config, get_playlist, m3u, utils};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::ValueProvider;
 use crate::m3u::{PlaylistGroup, PlaylistItem};
 use crate::mapping::Mapping;
 use crate::model::{ItemField, ProcessingOrder, TargetType};
+
 
 struct KodiStyle {
     year: regex::Regex,
@@ -293,21 +296,26 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
         } else {
             format!("- {}", &mapping.tag)
         };
+
+        let channel_name = if mapping.match_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
+
         for m in &mapping.mapper {
             match &m.re {
                 Some(regexps) => {
                     for re in regexps {
-                        if re.re.is_match(&channel.header.name) {
+                        if re.re.is_match(&channel_name) {
                             let mut chan = channel.clone();
                             let mut chan_name = m.tvg_name.clone();
                             if re.captures.len() > 0 {
-                                let captures_opt = re.re.captures(&channel.header.name);
+                                let captures_opt = re.re.captures(&channel_name);
                                 if captures_opt.is_some() {
                                     let captures = captures_opt.unwrap();
                                     for cname in &re.captures {
                                         let match_opt = captures.name(cname.as_str());
                                         if match_opt.is_some() {
                                             chan_name = String::from(re.re.replace_all(&channel.header.name, &chan_name).as_ref());
+                                        } else {
+                                            chan_name = String::from(&channel.header.name.replace(format!("${}", cname.as_str()).as_str(), ""));
                                         }
                                     }
                                 }

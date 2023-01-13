@@ -9,6 +9,8 @@
   - Mfr
   - Mrf
 default is Fmr
+* Added mapping parameter `decode_to_ascii`. Default is `false`. 
+If `true` before regexp matching the matching text will be converted to ascii. [unidecode](https://chowdhurya.github.io/rust-unidecode/unidecode/index.html)
 
 # v0.9.4(2023-01-12)
 * Added mappings. Mappings are defined in a file named ```mapping.yml``` or can be given by command line option ```-m```.

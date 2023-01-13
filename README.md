@@ -23,6 +23,13 @@ If the attribute is not specified ```M3u``` is created by default.
 ```cleanup``` deletes the directory given at ```filename```.
 ```kodi_style``` tries to rename ```filename``` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 
+The processing order (Filter, Rename and Map) can be configured for each target with:
+`processing_order: Frm` (valid values are: Frm, Fmr, Rfm, Rmf, Mfr, Mrf. default is Frm)
+
+The mapping is optional and can be configured for each target with:
+`mapping: <id of mapping>`
+The mappings are defined in a file `mapping.yml`. The filename can be given as `-m` argument.
+
 the config.yml looks like:
 ```yaml
 working_dir: ./data
@@ -35,6 +42,7 @@ input:
   persist: ./playlist_{}.m3u
 targets:
   - filename: playlist_1.m3u
+    processing_order: Frm
     options:
       ignore_logo: true
     sort:
@@ -54,6 +62,7 @@ targets:
     sort:
       order: Asc
     filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*"
+    mapping: France
     rename:
       - field: Group
         pattern: ^DE(.*)
@@ -80,6 +89,42 @@ This is needed for players which do not observe the order and sort themselves. I
 with DE will be prefixed with "1.". 
 If you dont care about sorting, you dont need the rename block.
 
+example mapping.yml file.
+(If you have some non standard ascii letters like `é`, you should use `.` for it in the regexp.) 
+```yaml
+mappings:
+  - id: France
+    tag: ""
+    mapper:
+      - tvg_name: TF1 $quality
+        tvg_names:
+          - '^\s*(FR)?[: |]?TF1[\s_-]*(?P<quality>HD|hd|LQ|lq|4K|4k|UHD|uhd)?\s*$'
+        tvg_id: TF1.fr
+        tvg_chno: "1"
+        tvg_logo: https://emojipedia-us.s3.amazonaws.com/source/skype/289/shrimp_1f990.png
+        group_title:
+          - FR
+          - TNT
+      - tvg_name: TF1 Séries Films $quality
+        tvg_names:
+          - '^.*TF1[\s_-]*S.ries?[\s_-]*Films?([\s_-]*(?P<quality>HD|hd|LQ|lq|4K|4k|UHD|uhd)?)\s*$'
+        tvg_id: TF1SeriesFilms.fr
+        tvg_chno: "20"
+        tvg_logo: https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/google/350/shrimp_1f990.png
+        group_title:
+          - FR
+          - TNT
+      - tvg_name: TF1 +1 - $quality
+        tvg_names:
+          - '^.*TF1[\s_-]*S.ries?[\s_-]*Films?[\s_-]*(\+|plus)1([\s_-]*(?P<quality>hd|lq|4k|uhd)?)\s*$'
+        tvg_id: TF1Plus1.fr
+        tvg_chno: "1"
+        tvg_logo: https://emojipedia-us.s3.amazonaws.com/source/skype/289/shrimp_1f990.png
+        group_title:
+          - FR
+          - TNT
+          - PLUS1
+```
 
 ## The EXTM3U format is an extension of the M3U format.
 m3u has become almost a standard for the formation of playlists of media players and media devices.
