@@ -3,7 +3,7 @@ use path_absolutize::*;
 use crate::filter::{Filter, get_filter, ValueProvider};
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
-use crate::model::{ItemField, SortOrder, TargetType};
+use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType};
 use crate::utils;
 use crate::utils::get_working_path;
 
@@ -49,6 +49,11 @@ pub struct ConfigOptions {
     pub kodi_style: bool,
 }
 
+
+fn default_as_frm() -> ProcessingOrder {
+    ProcessingOrder::Frm
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigTarget {
     pub filename: String,
@@ -59,6 +64,8 @@ pub struct ConfigTarget {
     pub output: Option<TargetType>,
     pub rename: Option<Vec<ConfigRename>>,
     pub mapping: Option<String>,
+    #[serde(default = "default_as_frm")]
+    pub processing_order: ProcessingOrder,
     #[serde(skip_serializing, skip_deserializing)]
     pub _filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -87,10 +94,24 @@ pub struct ConfigSources {
 
 }
 
+impl ConfigSources {
+    pub(crate) fn prepare(&mut self) {
+        self.input.prepare();
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigInput {
     pub url: String,
     pub persist: String,
+}
+
+impl ConfigInput {
+    pub(crate) fn prepare(&mut self) {
+        if self.persist.len() > 0 && self.persist.trim().is_empty() {
+            self.persist = String::from("");
+        }
+    }
 }
 
 
@@ -116,7 +137,6 @@ pub struct Config {
     pub working_dir: String,
 }
 
-
 impl Config {
     pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) {
         match mappings {
@@ -141,6 +161,7 @@ impl Config {
         self.api.prepare();
         self.prepare_api_web_root();
         for source in &mut self.sources {
+            source.prepare();
             for target in &mut source.targets {
                 target.prepare();
             }
@@ -196,6 +217,7 @@ impl Clone for ConfigTarget {
             output: self.output.clone(),
             rename: self.rename.clone(),
             mapping: self.mapping.clone(),
+            processing_order: self.processing_order.clone(),
             _filter: self._filter.clone(),
             _mapping: self._mapping.clone(),
         }

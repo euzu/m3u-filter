@@ -1,4 +1,15 @@
 # Changelog
+# v0.9.5(2023-01-13)
+* Upgraded libraries, fixed serde_yaml v.0.8 empty string bug.
+* Added Processing Pipe to target for filter, map and rename. Values are: 
+  - Frm
+  - Fmr 
+  - Rfm 
+  - Rmf 
+  - Mfr
+  - Mrf
+default is Fmr
+
 # v0.9.4(2023-01-12)
 * Added mappings. Mappings are defined in a file named ```mapping.yml``` or can be given by command line option ```-m```.
 ```target``` has now an optional field ```mapping``` which has the id of the mapping configuration.   

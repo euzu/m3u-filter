@@ -1,4 +1,4 @@
-use enum_iterator::IntoEnumIterator;
+use enum_iterator::all;
 use std::borrow::Borrow;
 use std::sync::{Arc, Mutex};
 use pest::Parser;
@@ -186,7 +186,7 @@ pub fn get_filter(source: &str) -> Filter {
 
                 let mut field: Option<ItemField> = None;
                 let field_text = pair.as_str();
-                for item in ItemField::into_enum_iter() {
+                for item in all::<ItemField>() {
                     if field_text.eq_ignore_ascii_case(item.to_string().as_str()) {
                         field = Some(item);
                         break;

@@ -1,6 +1,7 @@
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
+
 use clap::ArgMatches;
 use crate::config::Config;
 use crate::mapping::Mappings;
@@ -19,6 +20,7 @@ mod model;
 
 fn main() {
     let args = get_arguments();
+    let verbose = args.is_present("verbose");
 
     let default_config_path = utils::get_default_config_path();
     let config_file = args.value_of("config").unwrap_or(default_config_path.as_str());
@@ -28,9 +30,9 @@ fn main() {
     let mappings_file = args.value_of("mapping").unwrap_or(default_mappings_path.as_str());
 
     let mappings = read_mapping(mappings_file);
+    if verbose && mappings.is_none() { println!("no mapping loaded"); }
     cfg.set_mappings(mappings);
 
-    let verbose = args.is_present("verbose");
     if verbose { println!("working dir: {:?}", &cfg.working_dir); }
 
     if args.is_present("server") {
@@ -46,7 +48,7 @@ fn main() {
 }
 
 fn read_config(config_file: &str) -> Config {
-    let mut cfg: config::Config = match serde_yaml::from_reader(utils::open_file(&std::path::PathBuf::from(config_file))) {
+    let mut cfg: config::Config = match serde_yaml::from_reader(utils::open_file(&std::path::PathBuf::from(config_file), true).unwrap()) {
         Ok(result) => result,
         Err(e) => panic!("cant read config file: {}", e)
     };
@@ -55,22 +57,27 @@ fn read_config(config_file: &str) -> Config {
 }
 
 fn read_mapping(mapping_file: &str) -> Option<Mappings> {
-    let  mapping: Result<mapping::Mappings, _> = serde_yaml::from_reader(utils::open_file(&std::path::PathBuf::from(mapping_file)));
-    match mapping {
-        Ok(mut result) => {
-            result.prepare();
-            Some(result)
-        },
-        Err(e) => {
-            println!("cant read mapping file: {}", e);
-            None
+    match utils::open_file(&std::path::PathBuf::from(mapping_file), false) {
+        Some(file) => {
+            let mapping: Result<mapping::Mappings, _> = serde_yaml::from_reader(file);
+            match mapping {
+                Ok(mut result) => {
+                    result.prepare();
+                    Some(result)
+                }
+                Err(_) => {
+                    //println!("cant read mapping file: {}", e);
+                    None
+                }
+            }
         }
+        _ => None
     }
 }
 
 fn get_arguments<'a>() -> ArgMatches<'a> {
     clap::App::new("m3u-filter")
-        .version("0.9.4")
+        .version("0.9.5")
         .author("euzu")
         .about("Extended M3U playlist filter")
         .arg(clap::Arg::with_name("config")

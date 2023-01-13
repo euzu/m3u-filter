@@ -1,9 +1,14 @@
-use enum_iterator::IntoEnumIterator;
+use enum_iterator::Sequence;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, IntoEnumIterator)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub enum TargetType {
     M3u,
     Strm,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
+pub enum ProcessingOrder {
+    Frm, Fmr, Rfm, Rmf, Mfr,  Mrf
 }
 
 impl std::fmt::Display for TargetType {
@@ -15,7 +20,7 @@ impl std::fmt::Display for TargetType {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, IntoEnumIterator)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub enum ItemField {
     Group,
     Name,

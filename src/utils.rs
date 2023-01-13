@@ -71,14 +71,17 @@ pub(crate) fn get_working_path(wd: &String) -> String {
     }
 }
 
-pub(crate) fn open_file(file_name: &PathBuf) -> std::fs::File {
+pub(crate) fn open_file(file_name: &PathBuf, mandatory: bool) -> Option<std::fs::File> {
     match std::fs::File::open(file_name) {
-        Ok(file) => return file,
+        Ok(file) => Some(file),
         Err(_) => {
-            println!("cant open file: {:?}", file_name);
-            std::process::exit(1);
+            if mandatory {
+                println!("cant open file: {:?}", file_name);
+                std::process::exit(1);
+            }
+            None
         }
-    };
+    }
 }
 
 pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<std::path::PathBuf>) -> Option<Vec<String>> {
@@ -102,7 +105,7 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
                                 Err(e) => println!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e),
                             }
                         };
-                        Some(std::io::BufReader::new(open_file(file)).lines().map(|l| l.unwrap()).collect())
+                        Some(std::io::BufReader::new(open_file(file, true).unwrap()).lines().map(|l| l.unwrap()).collect())
                     } else {
                         None
                     }

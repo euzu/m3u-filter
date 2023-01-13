@@ -1,3 +1,18 @@
+#[derive(Debug)]
+pub struct MapperRe {
+    pub re: regex::Regex,
+    pub captures: Vec<String>,
+}
+
+impl Clone for MapperRe {
+    fn clone(&self) -> Self {
+        MapperRe {
+            re: self.re.clone(),
+            captures: self.captures.clone()
+        }
+    }
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Mapper {
     pub tvg_name: String,
@@ -7,7 +22,7 @@ pub struct Mapper {
     pub tvg_logo: String,
     pub group_title: Vec<String>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub re: Option<Vec<regex::Regex>>,
+    pub re: Option<Vec<MapperRe>>,
 }
 
 impl Mapper {
@@ -19,7 +34,12 @@ impl Mapper {
                 println!("cant parse regex: {}", &regstr);
                 std::process::exit(1);
             } else {
-                rev.push(re.unwrap())
+                let regexp = re.unwrap();
+                let captures = regexp.capture_names().map(|x| String::from(x.unwrap_or(""))).filter(|x| x.len() > 0).collect::<Vec<String>>();
+                rev.push(MapperRe {
+                    re: regexp,
+                    captures
+                })
             }
         }
         self.re = Some(rev);

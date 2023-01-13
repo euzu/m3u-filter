@@ -6,7 +6,7 @@ use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::ValueProvider;
 use crate::m3u::{PlaylistGroup, PlaylistItem};
 use crate::mapping::Mapping;
-use crate::model::{ItemField, TargetType};
+use crate::model::{ItemField, ProcessingOrder, TargetType};
 
 struct KodiStyle {
     year: regex::Regex,
@@ -22,9 +22,43 @@ fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     }
 }
 
+fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
+    let mut new_playlist = Vec::new();
+    for pg in playlist {
+        let mut channels = Vec::new();
+        for pli in &pg.channels {
+            if is_valid(&pli, &target) {
+                channels.push(pli.clone());
+            }
+        }
+        if channels.len() > 0 {
+            new_playlist.push(PlaylistGroup {
+                title: pg.title.clone(),
+                channels,
+            });
+        }
+    }
+    Some(new_playlist)
+}
+
 pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::ConfigTarget, cfg: &config::Config) -> Result<(), std::io::Error> {
-    let mut new_playlist = map_playlist(playlist, &target).unwrap_or(playlist.clone());
-    new_playlist = rename_playlist(&new_playlist, &target);
+    let pipe : Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<Vec<PlaylistGroup>>> = match &target.processing_order {
+        ProcessingOrder::Frm => vec![filter_playlist, rename_playlist, map_playlist],
+        ProcessingOrder::Fmr => vec![filter_playlist, map_playlist, rename_playlist],
+        ProcessingOrder::Rfm => vec![rename_playlist, filter_playlist, map_playlist],
+        ProcessingOrder::Rmf => vec![rename_playlist, map_playlist, filter_playlist],
+        ProcessingOrder::Mfr => vec![map_playlist, filter_playlist, rename_playlist],
+        ProcessingOrder::Mrf => vec![map_playlist, rename_playlist, filter_playlist]
+    };
+
+    let mut new_playlist= playlist.clone();
+    for f in pipe {
+        let r =  f(&new_playlist, &target);
+        if r.is_some() {
+            new_playlist = r.unwrap();
+        }
+    }
+
     sort_playlist(target, &mut new_playlist);
     match &target.output {
         Some(output_type) => {
@@ -55,16 +89,14 @@ fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Ve
             }
             for pg in new_playlist {
                 for pli in &pg.channels {
-                    if is_valid(&pli, &target) {
-                        let content = exec_rename(&pli, &target.rename).map_or_else(|| pli.to_m3u(&target.options), |p| p.to_m3u(&target.options));
-                        match check_write(m3u_file.write(content.as_bytes())) {
-                            Ok(_) => (),
-                            Err(e) => return Err(e),
-                        }
-                        match check_write(m3u_file.write(b"\n")) {
-                            Ok(_) => (),
-                            Err(e) => return Err(e),
-                        }
+                    let content = pli.to_m3u(&target.options);
+                    match check_write(m3u_file.write(content.as_bytes())) {
+                        Ok(_) => (),
+                        Err(e) => return Err(e),
+                    }
+                    match check_write(m3u_file.write(b"\n")) {
+                        Ok(_) => (),
+                        Err(e) => return Err(e),
                     }
                 }
             }
@@ -99,42 +131,35 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
             };
             for pg in new_playlist {
                 for pli in &pg.channels {
-                    if is_valid(&pli, &target) {
-                        match exec_rename(&pli, &target.rename) {
-                            Some(pli) => {
-                                let dir_path = path.join(sanitize_for_filename(&pli.header.group, underscore_whitespace));
-                                match std::fs::create_dir_all(&dir_path) {
-                                    Err(e) => {
-                                        println!("cant create directory: {:?}", &path);
-                                        return Err(e);
-                                    }
-                                    _ => {}
-                                };
-                                let mut file_name = sanitize_for_filename(&pli.header.title, underscore_whitespace);
-                                if kodi_style {
-                                    let style = KodiStyle {
-                                        season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
-                                        episode: regex::Regex::new(r"[Ee]\d\d").unwrap(),
-                                        year: regex::Regex::new(r"\d\d\d\d").unwrap(),
-                                        whitespace: regex::Regex::new(r"\s+").unwrap(),
-                                    };
-                                    file_name = kodi_style_rename(&file_name, &style);
-                                }
-                                let file_path = dir_path.join(format!("{}.strm", file_name));
-                                let mut strm_file = match std::fs::File::create(&file_path) {
-                                    Ok(file) => file,
-                                    Err(e) => {
-                                        println!("cant create file: {:?}", &file_path);
-                                        return Err(e);
-                                    }
-                                };
-                                match check_write(strm_file.write(pli.url.as_bytes())) {
-                                    Ok(_) => (),
-                                    Err(e) => return Err(e),
-                                }
-                            }
-                            _ => {}
+                    let dir_path = path.join(sanitize_for_filename(&pli.header.group, underscore_whitespace));
+                    match std::fs::create_dir_all(&dir_path) {
+                        Err(e) => {
+                            println!("cant create directory: {:?}", &path);
+                            return Err(e);
                         }
+                        _ => {}
+                    };
+                    let mut file_name = sanitize_for_filename(&pli.header.title, underscore_whitespace);
+                    if kodi_style {
+                        let style = KodiStyle {
+                            season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
+                            episode: regex::Regex::new(r"[Ee]\d\d").unwrap(),
+                            year: regex::Regex::new(r"\d\d\d\d").unwrap(),
+                            whitespace: regex::Regex::new(r"\s+").unwrap(),
+                        };
+                        file_name = kodi_style_rename(&file_name, &style);
+                    }
+                    let file_path = dir_path.join(format!("{}.strm", file_name));
+                    let mut strm_file = match std::fs::File::create(&file_path) {
+                        Ok(file) => file,
+                        Err(e) => {
+                            println!("cant create file: {:?}", &file_path);
+                            return Err(e);
+                        }
+                    };
+                    match check_write(strm_file.write(pli.url.as_bytes())) {
+                        Ok(_) => (),
+                        Err(e) => return Err(e),
                     }
                 }
             }
@@ -208,13 +233,36 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut Vec<PlaylistGroup>) {
     }
 }
 
-fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Vec<PlaylistGroup> {
-    let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
-    for g in playlist {
-        let mut grp = g.clone();
-        match &target.rename {
-            Some(renames) => {
-                if renames.len() > 0 {
+
+fn is_valid(pli: &m3u::PlaylistItem, target: &ConfigTarget) -> bool {
+    let provider = ValueProvider { pli };
+    return target.filter(&provider);
+}
+
+fn exec_rename(pli: &mut m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRename>>) {
+    match rename {
+        Some(renames) => {
+            if renames.len() > 0 {
+                let mut result = pli;
+                for r in renames {
+                    let value = get_field_value(&result, &r.field);
+                    let cap = r.re.as_ref().unwrap().replace_all(value, &r.new_name);
+                    let value = cap.into_owned();
+                    set_field_value(&mut result, &r.field, value);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
+    match &target.rename {
+        Some(renames) => {
+            if renames.len() > 0 {
+                let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
+                for g in playlist {
+                    let mut grp = g.clone();
                     for r in renames {
                         match r.field {
                             ItemField::Group => {
@@ -224,13 +272,18 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Vec<
                             _ => {}
                         }
                     }
+
+                    for pli in &mut grp.channels {
+                        exec_rename(pli, &target.rename)
+                    }
+                    new_playlist.push(grp);
                 }
+                return Some(new_playlist)
             }
-            _ => {}
+            None
         }
-        new_playlist.push(grp);
+        _ => None
     }
-    new_playlist
 }
 
 fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
@@ -244,9 +297,22 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
             match &m.re {
                 Some(regexps) => {
                     for re in regexps {
-                        if re.is_match(&channel.header.name) {
+                        if re.re.is_match(&channel.header.name) {
                             let mut chan = channel.clone();
-                            chan.header.name = format!("{}{}", m.tvg_name, tag);
+                            let mut chan_name = m.tvg_name.clone();
+                            if re.captures.len() > 0 {
+                                let captures_opt = re.re.captures(&channel.header.name);
+                                if captures_opt.is_some() {
+                                    let captures = captures_opt.unwrap();
+                                    for cname in &re.captures {
+                                        let match_opt = captures.name(cname.as_str());
+                                        if match_opt.is_some() {
+                                            chan_name = String::from(re.re.replace_all(&channel.header.name, &chan_name).as_ref());
+                                        }
+                                    }
+                                }
+                            }
+                            chan.header.name = format!("{}{}", &chan_name, tag);
                             chan.header.chno = m.tvg_chno.clone();
                             chan.header.id = m.tvg_id.clone();
                             chan.header.logo = m.tvg_logo.clone();
@@ -299,30 +365,6 @@ fn set_field_value(pli: &mut m3u::PlaylistItem, field: &ItemField, value: String
         ItemField::Title => header.title = value,
         ItemField::Url => {}
     };
-}
-
-fn is_valid(pli: &m3u::PlaylistItem, target: &ConfigTarget) -> bool {
-    let provider = ValueProvider { pli };
-    return target.filter(&provider);
-}
-
-fn exec_rename(pli: &m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRename>>) -> Option<PlaylistItem> {
-    match rename {
-        Some(renames) => {
-            if renames.len() > 0 {
-                let mut result = pli.clone();
-                for r in renames {
-                    let value = get_field_value(&result, &r.field);
-                    let cap = r.re.as_ref().unwrap().replace_all(value, &r.new_name);
-                    let value = cap.into_owned();
-                    set_field_value(&mut result, &r.field, value);
-                }
-                return Some(result);
-            }
-            None
-        }
-        _ => None
-    }
 }
 
 pub fn process_targets(cfg: &Config, verbose: bool) {
