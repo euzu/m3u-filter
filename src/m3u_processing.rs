@@ -343,9 +343,11 @@ fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<
         let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
         for g in playlist {
             let mut grp = g.clone();
-            let mapping = target._mapping.as_ref().unwrap();
-            if mapping.mapper.len() > 0 {
-                grp.channels = grp.channels.iter().map(|chan| map_channel(&chan, &mapping)).collect();
+            let mappings = target._mapping.as_ref().unwrap();
+            for mapping in mappings {
+                if mapping.mapper.len() > 0 {
+                    grp.channels = grp.channels.iter().map(|chan| map_channel(&chan, &mapping)).collect();
+                }
             }
             new_playlist.push(grp);
         }

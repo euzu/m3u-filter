@@ -63,13 +63,13 @@ pub struct ConfigTarget {
     #[serde(alias = "type")]
     pub output: Option<TargetType>,
     pub rename: Option<Vec<ConfigRename>>,
-    pub mapping: Option<String>,
+    pub mapping: Option<Vec<String>>,
     #[serde(default = "default_as_frm")]
     pub processing_order: ProcessingOrder,
     #[serde(skip_serializing, skip_deserializing)]
     pub _filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _mapping: Option<Mapping>,
+    pub _mapping: Option<Vec<Mapping>>,
 }
 
 impl ConfigTarget {
@@ -144,8 +144,15 @@ impl Config {
                 for source in &mut self.sources {
                     for target in &mut source.targets {
                         match &target.mapping {
-                            Some(mapping_id) => {
-                                target._mapping = mapping_list.get_mapping(mapping_id)
+                            Some(mapping_ids) => {
+                                let mut target_mappings = Vec::new();
+                                for mapping_id in mapping_ids {
+                                    let mapping = mapping_list.get_mapping(mapping_id);
+                                    if mapping.is_some() {
+                                        target_mappings.push(mapping.unwrap());
+                                    }
+                                }
+                                target._mapping = if target_mappings.len() > 0 { Some(target_mappings) } else {  None };
                             },
                             _ => {},
                         }

@@ -12,6 +12,14 @@ default is Fmr
 * Added mapping parameter `decode_to_ascii`. Default is `false`. 
 If `true` before regexp matching the matching text will be converted to ascii. [unidecode](https://chowdhurya.github.io/rust-unidecode/unidecode/index.html)
 
+* `mapping` attribute for target is now a list. You can assign multiple mapper to a target.
+```
+mapping:
+  - France
+  - Belgium
+  - Germany
+```
+
 # v0.9.4(2023-01-12)
 * Added mappings. Mappings are defined in a file named ```mapping.yml``` or can be given by command line option ```-m```.
 ```target``` has now an optional field ```mapping``` which has the id of the mapping configuration.   
