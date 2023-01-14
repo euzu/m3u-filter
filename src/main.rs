@@ -2,7 +2,7 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 
-use clap::ArgMatches;
+use clap::Parser;
 use crate::config::Config;
 use crate::mapping::Mappings;
 use crate::service::get_playlist;
@@ -18,32 +18,57 @@ mod service;
 mod filter;
 mod model;
 
+#[derive(Parser)]
+#[command(name = "m3u-filter")]
+#[command(author = "euzu <euzu@github.com>")]
+#[command(version)]
+#[command(about = "Extended M3U playlist filter", long_about = None)]
+struct Args {
+    /// The config file
+    #[arg(short, long)]
+    config: Option<String>,
+
+    /// The mapping file
+    #[arg(short, long)]
+    mapping: Option<String>,
+
+    /// Run in server mode
+    #[arg(short, long)]
+    server: Option<bool>,
+
+    /// Print more info
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+}
+
 fn main() {
-    let args = get_arguments();
-    let verbose = args.is_present("verbose");
+    //let args = get_arguments();
+    let args = Args::parse();
+    let verbose = args.verbose;
 
     let default_config_path = utils::get_default_config_path();
-    let config_file = args.value_of("config").unwrap_or(default_config_path.as_str());
-    let mut cfg = read_config(config_file);
+    let config_file: String = args.config.unwrap_or(default_config_path);
+    let mut cfg = read_config(config_file.as_str());
 
     let default_mappings_path = utils::get_default_mappings_path();
-    let mappings_file = args.value_of("mapping").unwrap_or(default_mappings_path.as_str());
+    let mappings_file: String = args.mapping.unwrap_or(default_mappings_path);
 
-    let mappings = read_mapping(mappings_file);
+    let mappings = read_mapping(mappings_file.as_str());
     if verbose && mappings.is_none() { println!("no mapping loaded"); }
     cfg.set_mappings(mappings);
 
     if verbose { println!("working dir: {:?}", &cfg.working_dir); }
 
-    if args.is_present("server") {
-        if verbose { println!("web_root: {}", &cfg.api.web_root); }
-        println!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
-        match api::start_server(cfg.clone()) {
-            Ok(_) => {}
-            Err(e) => panic!("cant start server: {}", e)
-        };
-    } else {
-        m3u_processing::process_targets(&cfg, verbose)
+    match args.server {
+        Some(_) => {
+            if verbose { println!("web_root: {}", &cfg.api.web_root); }
+            println!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
+            match api::start_server(cfg.clone()) {
+                Ok(_) => {}
+                Err(e) => panic!("cant start server: {}", e)
+            };
+        },
+        _=> m3u_processing::process_targets(&cfg, verbose)
     }
 }
 
@@ -74,32 +99,32 @@ fn read_mapping(mapping_file: &str) -> Option<Mappings> {
         _ => None
     }
 }
-
-fn get_arguments<'a>() -> ArgMatches<'a> {
-    clap::App::new("m3u-filter")
-        .version("0.9.5")
-        .author("euzu")
-        .about("Extended M3U playlist filter")
-        .arg(clap::Arg::with_name("config")
-            .short("c")
-            .long("config")
-            .takes_value(true)
-            .help("The config file"))
-        .arg(clap::Arg::with_name("mapping")
-            .short("m")
-            .long("mapping")
-            .takes_value(true)
-            .help("The mapping file"))
-        .arg(clap::Arg::with_name("server")
-            .short("s")
-            .long("server")
-            .takes_value(false)
-            .help("Starts the api server for web-ui! All other arguments are ignored!"))
-        .arg(clap::Arg::with_name("verbose")
-            .short("v")
-            .long("verbose")
-            .takes_value(false)
-            .help("Print  more log!"))
-        .get_matches()
-}
+//
+// fn get_arguments<'a>() -> ArgMatches<'a> {
+//     clap::App::new("m3u-filter")
+//         .version("0.9.5")
+//         .author("euzu")
+//         .about("Extended M3U playlist filter")
+//         .arg(clap::Arg::with_name("config")
+//             .short("c")
+//             .long("config")
+//             .takes_value(true)
+//             .help("The config file"))
+//         .arg(clap::Arg::with_name("mapping")
+//             .short("m")
+//             .long("mapping")
+//             .takes_value(true)
+//             .help("The mapping file"))
+//         .arg(clap::Arg::with_name("server")
+//             .short("s")
+//             .long("server")
+//             .takes_value(false)
+//             .help("Starts the api server for web-ui! All other arguments are ignored!"))
+//         .arg(clap::Arg::with_name("verbose")
+//             .short("v")
+//             .long("verbose")
+//             .takes_value(false)
+//             .help("Print  more log!"))
+//         .get_matches()
+// }
 

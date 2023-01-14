@@ -51,12 +51,12 @@ pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>,
                         target: &config::ConfigTarget, cfg: &config::Config, 
                         verbose: bool) -> Result<(), std::io::Error> {
     let pipe : Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> = match &target.processing_order {
-        ProcessingOrder::Frm => vec![filter_playlist, rename_playlist, map_playlist],
-        ProcessingOrder::Fmr => vec![filter_playlist, map_playlist, rename_playlist],
-        ProcessingOrder::Rfm => vec![rename_playlist, filter_playlist, map_playlist],
-        ProcessingOrder::Rmf => vec![rename_playlist, map_playlist, filter_playlist],
-        ProcessingOrder::Mfr => vec![map_playlist, filter_playlist, rename_playlist],
-        ProcessingOrder::Mrf => vec![map_playlist, rename_playlist, filter_playlist]
+        ProcessingOrder::FRM => vec![filter_playlist, rename_playlist, map_playlist],
+        ProcessingOrder::FMR => vec![filter_playlist, map_playlist, rename_playlist],
+        ProcessingOrder::RFM => vec![rename_playlist, filter_playlist, map_playlist],
+        ProcessingOrder::RMF => vec![rename_playlist, map_playlist, filter_playlist],
+        ProcessingOrder::MFR => vec![map_playlist, filter_playlist, rename_playlist],
+        ProcessingOrder::MRF => vec![map_playlist, rename_playlist, filter_playlist]
     };
 
     if verbose { println!("Processing order is {}", &target.processing_order)}
@@ -420,15 +420,19 @@ pub fn process_targets(cfg: &Config, verbose: bool) {
         let persist_file: Option<std::path::PathBuf> =
             if source.input.persist.is_empty() { None } else { utils::prepare_persist_path(source.input.persist.as_str()) };
         let file_path = utils::get_file_path(&cfg.working_dir, persist_file);
-        if verbose { println!("persist file: {:?}", &file_path); }
-
-        let result = get_playlist(&cfg.working_dir, url_str, file_path);
+        if verbose { println!("persist to file: {:?}", match &file_path { Some(fp) => fp.display().to_string(), _=> "".to_string() }); }
+        let result = get_playlist(&cfg.working_dir, url_str, file_path, verbose);
         match &result {
             Some(playlist) => {
-                for target in source.targets.iter() {
-                    match write_m3u(playlist, target, &cfg, verbose) {
-                        Ok(_) => (),
-                        Err(e) => println!("Failed to write file: {}", e)
+                if playlist.is_empty() {
+                    if verbose { println!("Input file is empty") }
+                } else {
+                    if verbose { println!("Input file has {} groups", playlist.len()) }
+                    for target in source.targets.iter() {
+                        match write_m3u(playlist, target, &cfg, verbose) {
+                            Ok(_) => (),
+                            Err(e) => println!("Failed to write file: {}", e)
+                        }
                     }
                 }
             }

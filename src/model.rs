@@ -17,18 +17,23 @@ impl std::fmt::Display for TargetType {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub enum ProcessingOrder {
-    Frm, Fmr, Rfm, Rmf, Mfr,  Mrf
+    FRM,
+    FMR,
+    RFM,
+    RMF,
+    MFR,
+    MRF
 }
 
 impl std::fmt::Display for ProcessingOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ProcessingOrder::Frm => write!(f, "filter, rename, map"),
-            ProcessingOrder::Fmr => write!(f, "filter, map, rename"),
-            ProcessingOrder::Rfm => write!(f, "rename, filter, map"),
-            ProcessingOrder::Rmf => write!(f, "rename, map, filter"),
-            ProcessingOrder::Mfr => write!(f, "map, filter, rename"),
-            ProcessingOrder::Mrf => write!(f, "map, rename, filter"),
+            ProcessingOrder::FRM => write!(f, "filter, rename, map"),
+            ProcessingOrder::FMR => write!(f, "filter, map, rename"),
+            ProcessingOrder::RFM => write!(f, "rename, filter, map"),
+            ProcessingOrder::RMF => write!(f, "rename, map, filter"),
+            ProcessingOrder::MFR => write!(f, "map, filter, rename"),
+            ProcessingOrder::MRF => write!(f, "map, rename, filter"),
         }
     }
 }

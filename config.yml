@@ -10,7 +10,8 @@ sources:
         rename:
           - { field: Group, new_name: 1. DE$1, pattern: ^DE(.*) }
         sort: { order: Asc }
-        mapping: kumy
+        mapping:
+          - kumy
       - filename: playlist_strm
         type: Strm
         filter: 'Group ~ "^tv-shows.*"'

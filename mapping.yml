@@ -1,7 +1,12 @@
 mappings:
   - id: kumy
-    tag: ""
-    decode_to_ascii: true
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_to_ascii: true
     mapper:
       - tvg_name: TF1
         tvg_names:

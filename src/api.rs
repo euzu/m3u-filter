@@ -21,7 +21,7 @@ pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let result = get_playlist(&_app_state.config.working_dir, &req.url.as_str(), None);
+    let result = get_playlist(&_app_state.config.working_dir, &req.url.as_str(), None, false);
     HttpResponse::Ok().json(result)
 }
 

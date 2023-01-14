@@ -8,7 +8,7 @@ use crate::utils;
 use crate::utils::get_working_path;
 
 fn default_as_false() -> bool { false }
-fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
+fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSort {

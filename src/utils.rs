@@ -84,9 +84,9 @@ pub(crate) fn open_file(file_name: &PathBuf, mandatory: bool) -> Option<std::fs:
     }
 }
 
-pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<std::path::PathBuf>) -> Option<Vec<String>> {
+pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<std::path::PathBuf>, verbose: bool) -> Option<Vec<String>> {
     match url_str.parse::<url::Url>() {
-        Ok(url) => match download_content(url, persist_file) {
+        Ok(url) => match download_content(url, persist_file, verbose) {
             Ok(content) => Some(content),
             Err(e) => {
                 println!("cant download input url: {}  => {}", url_str, e);
@@ -123,13 +123,13 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
     }
 }
 
-fn download_content(url: url::Url, persist_file: Option<PathBuf>) -> Result<Vec<String>, String> {
+fn download_content(url: url::Url, persist_file: Option<PathBuf>, verbose: bool) -> Result<Vec<String>, String> {
     match reqwest::blocking::get(url) {
         Ok(response) => {
             if response.status().is_success() {
                 match response.text_with_charset("utf8") {
                     Ok(text) => {
-                        persist_playlist(persist_file, &text);
+                        persist_playlist(persist_file, &text, verbose);
                         let result = text.lines().map(|l| String::from(l)).collect();
                         Ok(result)
                     }
@@ -143,13 +143,13 @@ fn download_content(url: url::Url, persist_file: Option<PathBuf>) -> Result<Vec<
     }
 }
 
-fn persist_playlist(persist_file: Option<PathBuf>, text: &String) {
+fn persist_playlist(persist_file: Option<PathBuf>, text: &String, verbose: bool) {
     match persist_file {
         Some(path_buf) => {
             let filename = &path_buf.to_str().unwrap_or("?");
             match std::fs::File::create(&path_buf) {
                 Ok(mut file) => match file.write_all(text.as_bytes()) {
-                    Ok(_) => println!("persisted: {}", filename),
+                    Ok(_) => if verbose { println!("persisted: {}", filename) },
                     Err(e) => println!("failed to persist file {}, {}", filename, e)
                 },
                 Err(e) => println!("failed to persist file {}, {}", filename, e)

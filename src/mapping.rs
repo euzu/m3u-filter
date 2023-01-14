@@ -29,11 +29,12 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    pub(crate) fn prepare(&mut self, templates: Option<&Vec<MapperTemplate>>) -> () {
+    pub(crate) fn prepare<'a>(&mut self, templates: Option<&Vec<MapperTemplate>>) -> () {
         let mut rev = Vec::new();
         for rs in &self.tvg_names {
             let mut regstr = String::from(rs);
-            let templ : &Vec<MapperTemplate> = templates.unwrap();
+            let empty_vec = Vec::new();
+            let templ : &Vec<MapperTemplate> = templates.unwrap_or(&empty_vec);
             for t in templ {
                 regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
             }
