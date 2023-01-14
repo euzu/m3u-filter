@@ -103,9 +103,9 @@ mappings:
       suffix: ' ]'
     match_as_ascii: true
     templates:
-      - key: delimiter
+      - name: delimiter
         value: '[\s_-]*'
-      - key: quality
+      - name: quality
         value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'
     mapper:
       - tvg_name: TF1 $quality
