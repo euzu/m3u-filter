@@ -1,4 +1,12 @@
 # Changelog
+# v0.9.6(2023-01-14)
+* Renamed `mappings.templates` attribute `key` to `name`
+* `mappings.tag` is now a struct
+  - captures: List of captured variable names like `quality`.
+  - concat: if you have more than one captures defined this is the join string between them
+  - suffix: suffix for thge tag
+  - prefix: prefix for the tag
+
 # v0.9.5(2023-01-13)
 * Upgraded libraries, fixed serde_yaml v.0.8 empty string bug.
 * Added Processing Pipe to target for filter, map and rename. Values are: 
@@ -11,6 +19,30 @@
 default is Fmr
 * Added mapping parameter `match_as_ascii`. Default is `false`. 
 If `true` before regexp matching the matching text will be converted to ascii. [unidecode](https://chowdhurya.github.io/rust-unidecode/unidecode/index.html)
+
+Added regexp templates to mapper:
+```yaml
+mappings:
+  - id: France
+    tag: ""
+    match_as_ascii: true
+    templates:
+      - key: delimiter
+        value: '[\s_-]*'
+      - key: quality
+        value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'
+    mapper:
+      - tvg_name: TF1 $quality
+        # https://regex101.com/r/UV233E/1
+        tvg_names:
+          - '^\s*(FR)?[: |]?TF1!delimiter!!quality!\s*$'
+        tvg_id: TF1.fr
+        tvg_chno: "1"
+        tvg_logo: https://emojipedia-us.s3.amazonaws.com/source/skype/289/shrimp_1f990.png
+        group_title:
+          - FR
+          - TNT
+```
 
 * `mapping` attribute for target is now a list. You can assign multiple mapper to a target.
 ```

@@ -1,3 +1,6 @@
+fn default_as_false() -> bool { false }
+fn default_as_empty_str() -> String { String::from("") }
+
 #[derive(Debug)]
 pub struct MapperRe {
     pub re: regex::Regex,
@@ -32,7 +35,7 @@ impl Mapper {
             let mut regstr = String::from(rs);
             let templ : &Vec<MapperTemplate> = templates.unwrap();
             for t in templ {
-                regstr = regstr.replace(format!("!{}!", &t.key).as_str(), &t.value);
+                regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
             }
 
             let re = regex::Regex::new(regstr.as_str());
@@ -66,31 +69,47 @@ impl Clone for Mapper {
     }
 }
 
-
-fn default_as_false() -> bool {
-    false
-}
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct MapperTemplate {
-    pub key: String,
+    pub name: String,
     pub value: String,
 }
 
 impl Clone for MapperTemplate {
     fn clone(&self) -> Self {
         MapperTemplate {
-            key: self.key.clone(),
+            name: self.name.clone(),
             value: self.value.clone()
         }
     }
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct MappingTag {
+    pub captures: Vec<String>,
+    #[serde(default = "default_as_empty_str")]
+    pub concat: String,
+    #[serde(default = "default_as_empty_str")]
+    pub prefix: String,
+    #[serde(default = "default_as_empty_str")]
+    pub suffix: String,
+}
+
+impl Clone for MappingTag {
+    fn clone(&self) -> Self {
+        MappingTag {
+            captures: self.captures.clone(),
+            concat: self.prefix.clone(),
+            prefix: self.prefix.clone(),
+            suffix: self.suffix.clone(),
+        }
+    }
+}
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Mapping {
     pub id: String,
-    pub tag: String,
+    pub tag: Option<MappingTag>,
     #[serde(default = "default_as_false")]
     pub match_as_ascii: bool,
     pub templates: Option<Vec<MapperTemplate>>,

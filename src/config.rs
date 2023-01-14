@@ -7,6 +7,8 @@ use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType};
 use crate::utils;
 use crate::utils::get_working_path;
 
+fn default_as_false() -> bool { false }
+fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSort {
@@ -33,10 +35,6 @@ impl ConfigRename {
     }
 }
 
-fn default_as_false() -> bool {
-    false
-}
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigOptions {
     #[serde(default = "default_as_false")]
@@ -47,11 +45,6 @@ pub struct ConfigOptions {
     pub cleanup: bool,
     #[serde(default = "default_as_false")]
     pub kodi_style: bool,
-}
-
-
-fn default_as_frm() -> ProcessingOrder {
-    ProcessingOrder::Frm
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

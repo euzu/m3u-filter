@@ -7,7 +7,7 @@ use crate::{config, Config, get_playlist, m3u, utils};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::ValueProvider;
 use crate::m3u::{PlaylistGroup, PlaylistItem};
-use crate::mapping::Mapping;
+use crate::mapping::{Mapping, MappingTag};
 use crate::model::{ItemField, ProcessingOrder, TargetType};
 
 
@@ -25,15 +25,18 @@ fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     }
 }
 
-fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
+fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
+    if verbose { println!("Filtering {} groups", playlist.len()) }
     let mut new_playlist = Vec::new();
     for pg in playlist {
+        if verbose { println!("Filtering group {} with {} items", pg.title, pg.channels.len()) }
         let mut channels = Vec::new();
         for pli in &pg.channels {
             if is_valid(&pli, &target) {
                 channels.push(pli.clone());
             }
         }
+        if verbose { println!("Filtered group {} has now {} items", pg.title, channels.len()) }
         if channels.len() > 0 {
             new_playlist.push(PlaylistGroup {
                 title: pg.title.clone(),
@@ -44,8 +47,10 @@ fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Opti
     Some(new_playlist)
 }
 
-pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::ConfigTarget, cfg: &config::Config) -> Result<(), std::io::Error> {
-    let pipe : Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<Vec<PlaylistGroup>>> = match &target.processing_order {
+pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, 
+                        target: &config::ConfigTarget, cfg: &config::Config, 
+                        verbose: bool) -> Result<(), std::io::Error> {
+    let pipe : Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> = match &target.processing_order {
         ProcessingOrder::Frm => vec![filter_playlist, rename_playlist, map_playlist],
         ProcessingOrder::Fmr => vec![filter_playlist, map_playlist, rename_playlist],
         ProcessingOrder::Rfm => vec![rename_playlist, filter_playlist, map_playlist],
@@ -54,9 +59,11 @@ pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, target: &config::Con
         ProcessingOrder::Mrf => vec![map_playlist, rename_playlist, filter_playlist]
     };
 
+    if verbose { println!("Processing order is {}", &target.processing_order)}
+    
     let mut new_playlist= playlist.clone();
     for f in pipe {
-        let r =  f(&new_playlist, &target);
+        let r =  f(&new_playlist, &target, verbose);
         if r.is_some() {
             new_playlist = r.unwrap();
         }
@@ -242,7 +249,7 @@ fn is_valid(pli: &m3u::PlaylistItem, target: &ConfigTarget) -> bool {
     return target.filter(&provider);
 }
 
-fn exec_rename(pli: &mut m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRename>>) {
+fn exec_rename(pli: &mut m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRename>>, verbose: bool) {
     match rename {
         Some(renames) => {
             if renames.len() > 0 {
@@ -250,6 +257,7 @@ fn exec_rename(pli: &mut m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRe
                 for r in renames {
                     let value = get_field_value(&result, &r.field);
                     let cap = r.re.as_ref().unwrap().replace_all(value, &r.new_name);
+                    if verbose { println!("Renamed {}={} to {}", &r.field, value, cap)}
                     let value = cap.into_owned();
                     set_field_value(&mut result, &r.field, value);
                 }
@@ -259,7 +267,7 @@ fn exec_rename(pli: &mut m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRe
     }
 }
 
-fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
+fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
     match &target.rename {
         Some(renames) => {
             if renames.len() > 0 {
@@ -270,6 +278,7 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Opti
                         match r.field {
                             ItemField::Group => {
                                 let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
+                                if verbose { println!("Renamed group {} to {}", &grp.title, cap); }
                                 grp.title = cap.into_owned();
                             }
                             _ => {}
@@ -277,7 +286,7 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Opti
                     }
 
                     for pli in &mut grp.channels {
-                        exec_rename(pli, &target.rename)
+                        exec_rename(pli, &target.rename, verbose)
                     }
                     new_playlist.push(grp);
                 }
@@ -289,15 +298,25 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Opti
     }
 }
 
-fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
-    if mapping.mapper.len() > 0 {
-        let tag = if mapping.tag.is_empty() {
-            String::from("")
-        } else {
-            format!("- {}", &mapping.tag)
-        };
+fn get_mapping_tag(mapping: &&Mapping) -> MappingTag {
+    let mapping_tag = match &mapping.tag {
+        Some(mtag) => mtag.clone(),
+        _ => MappingTag {
+            captures: vec![],
+            concat: "".to_string(),
+            prefix: "".to_string(),
+            suffix: "".to_string(),
+        }
+    };
+    mapping_tag
+}
 
+fn map_channel(channel: &PlaylistItem, mapping: &Mapping, verbose: bool) -> PlaylistItem {
+    if mapping.mapper.len() > 0 {
         let channel_name = if mapping.match_as_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
+        if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &channel.header.name, &channel_name)};
+        let mut tag = "".to_string();
+        let mapping_tag = get_mapping_tag(&mapping);
 
         for m in &mapping.mapper {
             match &m._re {
@@ -318,10 +337,27 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
                                             ""
                                         };
                                         chan_name = String::from(chan_name.replace(format!("${}", cname.as_str()).as_str(), repl));
+
+                                        for c in &mapping_tag.captures {
+                                            if c.eq(cname) {
+                                                if tag.is_empty() {
+                                                    tag = String::from(repl);
+                                                } else {
+                                                    tag = format!("{}{}{}", tag,  &mapping_tag.concat, String::from(repl))
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
-                            chan.header.name = format!("{}{}", &chan_name, tag);
+
+                            if !tag.is_empty() {
+                                tag = format!("{}{}{}", mapping_tag.prefix, tag, mapping_tag.suffix)
+                            }
+
+                            let new_name = format!("{}{}", &chan_name, tag);
+                            if verbose { println!("Mapped {} to {}", &channel.header.name, new_name)}
+                            chan.header.name = new_name;
                             chan.header.chno = m.tvg_chno.clone();
                             chan.header.id = m.tvg_id.clone();
                             chan.header.logo = m.tvg_logo.clone();
@@ -339,7 +375,7 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
     return channel.clone();
 }
 
-fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
+fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
     if target._mapping.is_some() {
         let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
         for g in playlist {
@@ -347,7 +383,7 @@ fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget) -> Option<
             let mappings = target._mapping.as_ref().unwrap();
             for mapping in mappings {
                 if mapping.mapper.len() > 0 {
-                    grp.channels = grp.channels.iter().map(|chan| map_channel(&chan, &mapping)).collect();
+                    grp.channels = grp.channels.iter().map(|chan| map_channel(&chan, &mapping, verbose)).collect();
                 }
             }
             new_playlist.push(grp);
@@ -390,7 +426,7 @@ pub fn process_targets(cfg: &Config, verbose: bool) {
         match &result {
             Some(playlist) => {
                 for target in source.targets.iter() {
-                    match write_m3u(playlist, target, &cfg) {
+                    match write_m3u(playlist, target, &cfg, verbose) {
                         Ok(_) => (),
                         Err(e) => println!("Failed to write file: {}", e)
                     }

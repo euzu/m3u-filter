@@ -95,7 +95,12 @@ example mapping.yml file.
 ```yaml
 mappings:
   - id: France
-    tag: ""
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' [ '
+      suffix: ' ]'
     match_as_ascii: true
     templates:
       - key: delimiter
@@ -132,6 +137,12 @@ mappings:
           - TNT
           - PLUS1
 ```
+
+* `mappings.tag` is a struct
+    - captures: List of captured variable names like `quality`. The names should be equal to the regexp capture names.
+    - concat: if you have more than one captures defined this is the join string between them
+    - suffix: suffix for thge tag
+    - prefix: prefix for the tag
 
 ## The EXTM3U format is an extension of the M3U format.
 m3u has become almost a standard for the formation of playlists of media players and media devices.
