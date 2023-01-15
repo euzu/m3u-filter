@@ -24,7 +24,7 @@ If the attribute is not specified ```M3u``` is created by default.
 ```kodi_style``` tries to rename ```filename``` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 
 The processing order (Filter, Rename and Map) can be configured for each target with:
-`processing_order: Frm` (valid values are: Frm, Fmr, Rfm, Rmf, Mfr, Mrf. default is Frm)
+`processing_order: FRM` (valid values are: FRM, FMR, RFM, RMF, MFR, MRF. default is FRM)
 
 The mapping is optional and can be configured for each target with:
 `mapping: <list of mapping id's>`
@@ -42,7 +42,7 @@ input:
   persist: ./playlist_{}.m3u
 targets:
   - filename: playlist_1.m3u
-    processing_order: Frm
+    processing_order: FRM
     options:
       ignore_logo: true
     sort:

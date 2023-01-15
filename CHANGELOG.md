@@ -10,13 +10,13 @@
 # v0.9.5(2023-01-13)
 * Upgraded libraries, fixed serde_yaml v.0.8 empty string bug.
 * Added Processing Pipe to target for filter, map and rename. Values are: 
-  - Frm
-  - Fmr 
-  - Rfm 
-  - Rmf 
-  - Mfr
-  - Mrf
-default is Fmr
+  - FRM
+  - FMR 
+  - RFM 
+  - RMF 
+  - MFR
+  - MRF
+default is FMR
 * Added mapping parameter `match_as_ascii`. Default is `false`. 
 If `true` before regexp matching the matching text will be converted to ascii. [unidecode](https://chowdhurya.github.io/rust-unidecode/unidecode/index.html)
 
