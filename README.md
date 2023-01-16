@@ -18,7 +18,6 @@ According to your configuration, use the printed url on console.
 The UI allows you to download a list. You can download the list with the Save Button.
 The downloaded list only contains *non-selected* entries.
 
-
 ## 1. `config.yml`
 
 For running in cli mode, you need to define a `config.yml` file which can be next to the executable or provided with the
@@ -110,7 +109,7 @@ Has 3 top level entries.
 `rename` supports capture groups. Each group can be adressed with `$1`, `$2` .. in the `new_name` attribute.
 
 This could be used for players which do not observe the order and sort themselves.
-```
+```yaml
 rename:
   - { field: Group,  pattern: ^DE(.*),  new_name: 1. DE$1 }
 ```
@@ -164,7 +163,7 @@ targets:
 
 ## 2. `mapping.yml`
 Has following top level entries:
-* id _ mandatory_
+* id _mandatory_
 * tag _optional_
 * match_as_ascii _optional_ default is `false`
 * templates _optional_
@@ -177,17 +176,17 @@ Is referenced in the `config.yml`, should be a unique identifier
 Has following top level entries: 
   - `captures`: List of captured variable names like `quality`. The names should be equal to the regexp capture names.
   - `concat`: if you have more than one captures defined this is the join string between them
-  - `suffix`: suffix for thge tag
+  - `suffix`: suffix for the tag
   - `prefix`: prefix for the tag
 
 ### 2.2 `match_as_ascii`
 If you have non ascii characters in you playlist and want to 
-write regexp without considering chars like `é` and use `e` insteadm set this option to `true`.
+write regexp without considering chars like `é` and use `e` instead, set this option to `true`.
 [unidecode](https://crates.io/crates/unidecode) is used to convert the text.
 
 ### 2.3 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
-```
+```yaml
 templates:
   - {name: delimiter, value: '[\s_-]*' }
   - {name: quality, value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'}
@@ -215,7 +214,7 @@ you should use `tag` instead, because it prevents the spaces if no matching qual
 Sequence for regexp's to apply the defined changes on match.
 
 (_Please be aware of the processing order. If you first rename, you should match the renamed entries!_)
-```
+```yaml
 tvg_names:
   - '^.*TF1!delimiter!Series?!delimiter!Films?(!delimiter!!quality!)\s*$'
 ```
