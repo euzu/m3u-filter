@@ -104,7 +104,7 @@ but lacks a few features like look around and backreferences.
 
 ### 1.3.2.7 `rename`
 Has 3 top level entries.
-* `field`  `Group`, `Title`, `Name` or `Url`.
+* `field` can be  `Group`, `Title`, `Name` or `Url`.
 * `new_name` can contain capture groups variables adressed with `$1`,`$2`,... 
 
 `rename` supports capture groups. Each group can be adressed with `$1`, `$2` .. in the `new_name` attribute.
@@ -164,11 +164,11 @@ targets:
 
 ## 2. `mapping.yml`
 Has following top level entries:
-* id _mandatory_
-* tag _optional_
-* match_as_ascii _optional_ default is `false`
-* templates _optional_
-* mapper _mandatory_
+* `id` _mandatory_
+* `tag` _optional_
+* `match_as_ascii` _optional_ default is `false`
+* `templates` _optional_
+* `mapper` _mandatory_
 
 ### 2.1 `id`
 Is referenced in the `config.yml`, should be a unique identifier
