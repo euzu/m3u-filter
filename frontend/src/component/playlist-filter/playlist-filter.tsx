@@ -1,4 +1,4 @@
-import React, {useMemo, useCallback, useRef} from "react";
+import React, {useMemo, useCallback, useRef, KeyboardEvent} from "react";
 import './playlist-filter.scss';
 import {TextField, InputAdornment, IconButton} from "@mui/material";
 import {Search} from "@mui/icons-material";
@@ -16,7 +16,7 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
         onFilter(value);
     }, [onFilter]);
 
-    const handleKeyPress = useCallback((event) => {
+    const handleKeyPress = useCallback((event:  KeyboardEvent<any>) => {
         if (event.key === 'Enter') {
             handleSearch();
         }

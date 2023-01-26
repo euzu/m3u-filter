@@ -1,4 +1,4 @@
-import React, {useRef, useState, useEffect, useCallback, useMemo} from "react";
+import React, {useRef, useState, useEffect, useCallback, useMemo, KeyboardEvent} from "react";
 
 import './source-selector.scss';
 import {IconButton, InputAdornment, Menu, MenuItem, TextField} from "@mui/material";
@@ -40,7 +40,7 @@ export default function SourceSelector(props: SourceSelectorProps) {
         }
     }, [addNewSource, onDownload]);
 
-    const handleKeyPress = useCallback((event) => {
+    const handleKeyPress = useCallback((event:  KeyboardEvent<any>) => {
         if (event.key === 'Enter') {
             handleDownload();
         }

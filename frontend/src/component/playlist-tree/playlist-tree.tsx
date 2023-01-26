@@ -1,7 +1,7 @@
 import React, {useCallback, useState, useRef} from 'react';
 import './playlist-tree.scss';
 import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
-import {ExpandMore, ChevronRight, LinkRounded} from "@mui/icons-material";
+import {ExpandMore, ChevronRight, LinkRounded, PlayArrow} from "@mui/icons-material";
 import copyToClipboard from "../../utils/clipboard";
 import {first} from "rxjs/operators";
 import {noop} from "rxjs";
@@ -12,14 +12,31 @@ export type PlaylistTreeState = { [key: number]: boolean };
 interface PlaylistTreeProps {
     data: PlaylistGroup[];
     state: PlaylistTreeState;
+    onPlay?: (playlistItem: PlaylistItem) => void;
 }
 
 export default function PlaylistTree(props: PlaylistTreeProps) {
-    const {state, data} = props;
+    const {state, data, onPlay} = props;
 
     const [, setForceUpdate] = useState(null);
     const expanded = useRef<PlaylistTreeState>({});
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
+
+    const getPlaylistItemById = useCallback((itemId: string): PlaylistItem => {
+        const id = parseInt(itemId);
+        if (data && !isNaN(id)) {
+            for (let i=0, len = data.length; i < len; i++) {
+                const group = data[i];
+                for (let j=0, clen = group.channels.length; j < clen; j++) {
+                    const plitem = group.channels[j];
+                    if (plitem.id == id) {
+                        return plitem;
+                    }
+                }
+            }
+        }
+        return undefined;
+    }, [data]);
 
     const handleChange = useCallback((event: any) => {
         const key = event.target.dataset.group;
@@ -34,28 +51,40 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     }, []);
 
     const handleClipboardUrl = useCallback((e: any) => {
-        const url = e.target.dataset.url;
-        if (url) {
-            copyToClipboard(url).pipe(first()).subscribe({
+        const item = getPlaylistItemById(e.target.dataset.item);
+        if (item) {
+            copyToClipboard(item.url).pipe(first()).subscribe({
                 next: value => enqueueSnackbar(value ? "URL copied to clipboard" : "Copy to clipboard failed!", {variant: value ? 'success' : 'error'}),
                 error: err => enqueueSnackbar("Copy to clipboard failed!", {variant: 'error'}),
                 complete: noop,
             });
         }
-    }, [enqueueSnackbar]);
+    }, [enqueueSnackbar, getPlaylistItemById]);
+
+    const handlePlayUrl = useCallback((e: any) => {
+        if (onPlay) {
+            const item = getPlaylistItemById(e.target.dataset.item);
+            if (item) {
+               onPlay(item);
+            }
+        }
+    }, [onPlay, getPlaylistItemById]);
 
     const renderEntry = useCallback((entry: PlaylistItem, index: number): React.ReactNode => {
         return <div key={entry.id} className={'tree-channel'}>
             <div className={'tree-channel-tools'}>
-                <div className={'tool-button'} data-item={entry.id} data-url={entry.url} onClick={handleClipboardUrl}>
+                <div className={'tool-button'} data-item={entry.id} onClick={handleClipboardUrl}>
                     <LinkRounded/>
+                </div>
+                <div style={{display: 'none'}} className={'tool-button'} data-item={entry.id} onClick={handlePlayUrl}>
+                    <PlayArrow/>
                 </div>
             </div>
             <div className={'tree-channel-content'}>
                 <div className={'tree-channel-nr'}>{index + 1}</div>
                 {entry.header.name}</div>
         </div>
-    }, [handleClipboardUrl]);
+    }, [handleClipboardUrl, handlePlayUrl]);
 
     const renderGroup = useCallback((group: PlaylistGroup): React.ReactNode => {
         return <div className={'tree-group'} key={group.id}>

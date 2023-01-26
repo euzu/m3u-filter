@@ -61,10 +61,11 @@ interface PlaylistViewerProps {
     playlist: PlaylistGroup[];
     searchChannel: Observable<string>;
     onProgress: (value: boolean) => void;
+    onPlay?: (playlistItem: PlaylistItem) => void;
 }
 
 const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: PlaylistViewerProps, ref: any) => {
-    const {playlist, searchChannel, onProgress} = props;
+    const {playlist, searchChannel, onProgress, onPlay} = props;
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [data, setData] = useState<PlaylistGroup[]>([]);
     const checked = useMemo((): PlaylistTreeState => ({}), []);
@@ -104,10 +105,10 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
             }
         });
         return () => sub.unsubscribe();
-    }, [searchChannel, playlist, enqueueSnackbar]);
+    }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
 
     return <div className={'playlist-viewer'}>
-        <PlaylistTree data={data} state={checked}/>
+        <PlaylistTree data={data} state={checked} onPlay={onPlay}/>
     </div>
 });
 
