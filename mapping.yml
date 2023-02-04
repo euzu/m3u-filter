@@ -1,682 +1,3081 @@
 mappings:
-  - id: kumy
+
+  - id: Belgique
     tag:
       captures:
         - quality
       concat: '|'
       prefix: ' ['
       suffix: ']'
-    match_to_ascii: true
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?!~!'
+      - name: channel
+        value: '[\s_-]*(channel|ch\.?)'
+        # value: '!~!((channel|ch\.?)'
+      - name: one
+        value: '[\s_-]*(1|one)'
+        # value: '!~!((1|one)'
+      - name: three
+        value: '[\s_-]*(3|three)'
+        # value: '!~!((3|three)'
+      - name: plus
+        value: '[\s_-]*(\+|plus)'
+        # value: '!~!(\+|plus)'
+      - name: plus1
+        value: '[\s_-]*(\+1|plus1|D[EÉ]CAL[EÉ])'
+        # value: '!~!(\+|plus)1'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
     mapper:
-      - pattern: 'Name ~ "^TF1$"'
-        attributes:
-          name: TF1,
-          id: TF1.fr,
-          chno: '1',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^TF1[_ ]*Series[_ ]*Films$'
-        attributes:
-          name: TF1 Series Films,
-          id: TF1SeriesFilms.fr,
-          chno: '20',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png,
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^TF1[_ ]*\+1$'
-        attributes:
-          name: TF1 +1,
-          id: TF1Plus1.fr,
-          chno: '1',
-          logo: https://upload.wikimedia.org/wikipedia/commons/8/83/Logo_TF1_%2B1.png,
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^FRANCE 2$'
-        attributes:
-          name: FRANCE 2,
-          id: France2.fr,
-          chno: '2',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/France_2_2018.svg/277px-France_2_2018.svg.png,
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^FRANCE 3$'
-        attributes:
-          name: FRANCE 3,
-          id: France3.fr,
-          chno: '3',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/France_3_2018.svg/281px-France_3_2018.svg.png,
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^FRANCE 4$'
-        attributes:
-          name: FRANCE 4,
-          id: France4.fr,
-          chno: '14',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/France_4_2018.svg/312px-France_4_2018.svg.png
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^FRANCE 5$'
-        attributes:
-          name: FRANCE 5,
-          id: France5.fr,
-          chno: '5',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^M6$'
-        attributes:
-          name: M6,
-          id: M6.fr,
-          chno: '6',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Logo_M6_%282020%2C_fond_clair%29.svg/320px-Logo_M6_%282020%2C_fond_clair%29.svg.png
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^TFX$'
-        attributes:
-          name: TFX,
-          id: NT1.fr,
-          chno: '11',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^6TER$'
-        attributes:
-          name: 6TER,
-          id: 6ter.fr,
-          chno: '22',
-          logo: https://upload.wikimedia.org/wikipedia/fr/a/a9/6ter_2012.png
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^CANAL\+$'
-        attributes:
-          name: CANAL+,
-          id: CanalPlus.fr,
-          chno: '51',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CANAL\+ CINEMA$'
-        attributes:
-          name: CANAL+ CINEMA,
-          id: CanalPlusCinema.fr,
-          chno: '52',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Canal%2BCin%C3%A9ma2009.svg/320px-Canal%2BCin%C3%A9ma2009.svg.png
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CANAL\+ DECALE$'
-        attributes:
-          name: CANAL+ DECALE,
-          id: CanalPlusDecale.fr,
-          chno: '53',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CANAL\+ FAMILY$'
-        attributes:
-          name: CANAL+ FAMILY,
-          id: CanalPlusFamily.fr,
-          chno: '54',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Canal%2BFamily_2009.svg/320px-Canal%2BFamily_2009.svg.png
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CANAL\+ SERIES$'
-        attributes:
-          name: CANAL+ SERIES,
-          id: CanalPlusSeries.fr,
-          chno: '40',
-          logo: https://upload.wikimedia.org/wikipedia/commons/4/48/C%2B_Series.png
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CANAL\+ SPORT$'
-        attributes:
-          name: CANAL+ SPORT,
-          id: CanalPlusSport.fr,
-          chno: '',
-          logo: https://upload.wikimedia.org/wikipedia/commons/d/d7/Canal%2BSport2009.png
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CANAL\+ KIDS$'
-        attributes:
-          name: CANAL+ KIDS,
-          id: CanalPlusKIDS.fr,
-          chno: '',
-          logo: https://upload.wikimedia.org/wikipedia/commons/3/34/Canal%2B_Kids_Logo_%282021%29.png
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CANAL\+ DOC(S)?$'
-        attributes:
-          name: CANAL+ DOCS,
-          id: CanalPlusDocs.fr,
-          chno: '54',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CANAL\+ GRAND ECRAN$'
-        attributes:
-          name: CANAL+ GRAND ECRAN,
-          id: CanalPlusGrandEcran.fr,
-          chno: '55',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CINE\+ PREMIER$'
-        attributes:
-          name: CINE+ PREMIER,
-          id: CinePlusPremier.fr,
-          chno: '60',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CINE\+ FRISSON$'
-        attributes:
-          name: CINE+ FRISSON,
-          id: CinePlusFrisson.fr,
-          chno: '61',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CINE\+ FAMIZ$'
-        attributes:
-          name: CINE+ FAMIZ,
-          id: CinePlusFamiz.fr,
-          chno: '62',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CINE\+ EMOTION$'
-        attributes:
-          name: CINE+ EMOTION,
-          id: CinePlusEmotion.fr,
-          chno: '63',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CINE\+ CLASSIC$'
-        attributes:
-          name: CINE+ CLASSIC,
-          id: CinePlusClassic.fr,
-          chno: '64',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CINE\+ CLUB$'
-        attributes:
-          name: CINE+ CLUB,
-          id: CinePlusClub.fr,
-          chno: '65',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^OCS MAX$'
-        attributes:
-          name: OCS MAX,
-          id: OCSMax.fr,
-          chno: '69',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^OCS CITY$'
-        attributes:
-          name: OCS CITY,
-          id: OCSCity.fr,
-          chno: '67',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^OCS GEANTS$'
-        attributes:
-          name: OCS GEANTS,
-          id: OCSGeants.fr,
-          chno: '68',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^OCS CHOC$'
-        attributes:
-          name: OCS CHOC,
-          id: OCSChoc.fr,
-          chno: '66',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^RTL[_ ]*9$'
-        attributes:
-          name: RTL9,
-          id: RTL9.fr,
-          chno: '29',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^ACTION$'
-        attributes:
-          name: ACTION,
-          id: Action.fr,
-          chno: '50',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^NRJ[_ ]*12$'
-        attributes:
-          name: NRJ12,
-          id: NRJ12.fr,
-          chno: '12',
-          logo: ''
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^CHERIE[_ ]*25$'
-        attributes:
-          name: CHERIE25,
-          id: Cherie25.fr,
-          chno: '25',
-          logo: ''
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^ARTE$'
-        attributes:
-          name: ARTE,
-          id: Arte.fr,
-          chno: '7',
-          logo: ''
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^W9$'
-        attributes:
-          name: W9,
-          id: W9.fr,
-          chno: '9',
-          logo: ''
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^PARIS PREMIERE$'
-        attributes:
-          name: PARIS PREMIERE,
-          id: ParisPremiere.fr,
-          chno: '72',
-          logo: ''
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^PARAMOUNT CHANNEL$ OR Name ~ ^PARAMOUNT$'
-        attributes:
-          name: PARAMOUNT CHANNEL,
-          id: ParamountChannel.fr,
-          chno: '70',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^PARAMOUNT DECALE$'
-        attributes:
-          name: PARAMOUNT DECALE,
-          id: ParamountChannelDecale.fr,
-          chno: '71',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^SYFY$'
-        attributes:
-          name: SYFY,
-          id: Syfy.fr,
-          chno: '46',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^POLAR\+$'
-        attributes:
-          name: POLAR+,
-          id: PolarPlus.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^SERIE CLUB$'
-        attributes:
-          name: SERIE CLUB,
-          id: SerieClub.fr,
-          chno: '45',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^13EME RUE$'
-        attributes:
-          name: 13eme RUE,
-          id: 13eRue.fr,
-          chno: '30',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^TMC$'
-        attributes:
-          name: TMC,
-          id: TMC.fr,
-          chno: '10',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^NOVELAS TV$ OR Name ~ ^NOVELAS$'
-        attributes:
-          name: NOVELAS TV,
-          id: NovelasTV.fr,
-          chno: '45',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^USHUAIA TV$'
-        attributes:
-          name: USHUAIA TV,
-          id: UshuaiaTV.fr,
-          chno: '176',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^PLANETE[_ ]*\+ CI$'
-        attributes:
-          name: PLANETE+ CI,
-          id: PLANETEJustice.fr,
-          chno: '154',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^PLANETE[_ ]*\+ A&E$'
-        attributes:
-          name: PLANETE+ A&E,
-          id: PlaneteAction.fr,
-          chno: '153',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^PLANETE[_ ]*\+$'
-        attributes:
-          name: PLANETE+,
-          id: PlanetePlus.fr,
-          chno: '152',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^NAT(IONAL)? GEO(GRAPHIC)?$'
-        attributes:
-          name: NATIONAL GEOGRAPHIC,
-          id: NationalGeographic.fr,
-          chno: '175',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^NAT(IONAL)? GEO(GRAPHIC)? WILD$'
-        attributes:
-          name: NATIONAL GEOGRAPHIC WILD,
-          id: NatGeoWild.fr,
-          chno: '174',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^DISCOVERY CH(ANNN?EL)?$'
-        attributes:
-          name: DISCOVERY CHANNEL,
-          id: DiscoveryChannel.fr,
-          chno: '170',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^DISCOVERY SCIENCE$'
-        attributes:
-          name: DISCOVERY SCIENCE,
-          id: DiscoveryScience.fr,
-          chno: '171',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^DISCOVERY FAMILY$'
-        attributes:
-          name: DISCOVERY FAMILY,
-          id: DiscoveryFamily.fr,
-          chno: '172',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^DISCOVERY (INVESTIGATION|ID)$'
-        attributes:
-          name: DISCOVERY INVESTIGATION,
-          id: DiscoveryInvestigation.fr,
-          chno: '173',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CRIME DISTRICT$ OR Name ~ ^CRIME DISTCRIT$'
-        attributes:
-          name: CRIME DISTRICT,
-          id: CrimeDistrict.fr,
-          chno: '150',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^SCIENCE ET VIE( TV)?$'
-        attributes:
-          name: SCIENCE ET VIE TV,
-          id: ScienceEtVieTV.fr,
-          chno: '150',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^RMC DECOUVERTE$'
-        attributes:
-          name: RMC DECOUVERTE,
-          id: RMCDecouverte.fr,
-          chno: '24',
-          logo: ''
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^RMC STORY$'
-        attributes:
-          name: RMC STORY,
-          id: Numero23.fr,
-          chno: '23',
-          logo: ''
-        suffix:
-          group: '|FR|TNT'
-      - pattern: 'Name ~ ^HISTOIRE TV$'
-        attributes:
-          name: HISTOIRE TV,
-          id: Histoire.fr,
-          chno: '151',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^TOUTE L[ _' ]HISTOIRE$'
-        attributes:
-          name: TOUTE L HISTOIRE,
-          id: TouteHistoire.fr,
-          chno: '152',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^C8$'
-        attributes:
-          name: C8,
-          id: C8.fr,
-          chno: '8',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CSTAR$'
-        attributes:
-          name: CSTAR,
-          id: Cstar.fr,
-          chno: '17',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^DISNEY CHANNEL$'
-        attributes:
-          name: DISNEY CHANNEL,
-          id: DisneyChannel.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^DISNEY CHANNEL \+1$'
-        attributes:
-          name: DISNEY CHANNEL +1,
-          id: DisneyChannelPlus1.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^DISNEY\+$'
-        attributes:
-          name: DISNEY+,
-          id: DisneyPlus.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^CARTOON NETWORK$'
-        attributes:
-          name: CARTOON NETWORK,
-          id: CartoonNetwork.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^GULLI$'
-        attributes:
-          name: GULLI,
-          id: Gulli.fr,
-          chno: '18',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^M6 MUSIC$'
-        attributes:
-          name: M6 MUSIC,
-          id: M6Music.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^NRJ HITS$'
-        attributes:
-          name: NRJ HITS,
-          id: NRJHits.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^MCM$'
-        attributes:
-          name: MCM,
-          id: MCM.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^MTV$'
-        attributes:
-          name: MTV,
-          id: MTV.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^MTV HITS$'
-        attributes:
-          name: MTV HITS,
-          id: MTVHits.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^RFM TV$'
-        attributes:
-          name: RFM TV,
-          id: RFMTV.fr,
-          chno: '',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^ALTICE STUDIO$'
-        attributes:
-          name: ALTICE STUDIO,
-          id: AlticeStudio.fr,
-          chno: '51',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^WARNER TV$'
-        attributes:
-          name: WARNER TV,
-          id: WarnerTV.fr,
-          chno: '57',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^TCM CINEMA$'
-        attributes:
-          name: TCM CINEMA,
-          id: TCM.fr,
-          chno: '73',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^COMEDIE\+$'
-        attributes:
-          name: COMEDIE+,
-          id: ComediePlus.fr,
-          chno: '31',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^COMEDY CENTRAL$'
-        attributes:
-          name: COMEDY CENTRAL,
-          id: ComedyCentral.fr,
-          chno: '32',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^TEVA$'
-        attributes:
-          name: TEVA,
-          id: Teva.fr,
-          chno: '19',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^AB1$'
-        attributes:
-          name: AB1,
-          id: AB1.fr,
-          chno: '40',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^AB3$'
-        attributes:
-          name: AB3,
-          id: AB3.fr,
-          chno: '41',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^TVBREIZH$'
-        attributes:
-          name: TVBREIZH,
-          id: TvBreizh.fr,
-          chno: '74',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^ULTRA NATURE$'
-        attributes:
-          name: ULTRA NATURE,
-          id: UltraNature.fr,
-          chno: '177',
-          logo: ''
-        suffix:
-          group: '|FR'
-      - pattern: 'Name ~ ^MANGAS$'
-        attributes:
-          name: MANGAS,
-          id: Mangas.fr,
-          chno: '45',
-          logo: ''
-        suffix:
-          group: '|FR'
+      - pattern: 'Name ~ "!start!LA!~!UNE!end!"'
+        attributes:
+          - name: 'La Une'
+            id: 'LaUne.be'
+            chno: '2'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/RTBF_La_Une_logo.svg/320px-RTBF_La_Une_logo.svg.png'
+        suffix:
+          - group: 'BE|CLASSICS'
+
+      - pattern: 'Name ~ "!start!TIPIK!end!" OR Name ~ "!start!LA!~!DEUX!end!"'
+        attributes:
+          - name: 'Tipik'
+            id: 'LaDeux.be'
+            chno: '2'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Tipikrtbf.png/320px-Tipikrtbf.png'
+        suffix:
+          - group: 'BE|CLASSICS'
+
+      - pattern: 'Name ~ "!start!AB!three!!end!"'
+        attributes:
+          - name: 'AB3'
+            id: 'AB3.fr'
+            chno: '8'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/AB3_logo.svg/240px-AB3_logo.svg.png'
+        suffix:
+          - group: 'BE|CLASSICS'
+
+      - pattern: 'Name ~ "!start!AB!~!E?XPLORE!end!"'
+        attributes:
+          - name: 'ABxplore'
+            id: 'ABXploreFR.fr'
+            chno: '9'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/ABXplore_logo.svg/320px-ABXplore_logo.svg.png'
+        suffix:
+          - group: 'BE|CLASSICS'
+
+  - id: France TNT
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)\[?(?P<quality>HD|FHD|LQ|4K|UHD)?\]?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?!~!'
+      - name: channel
+        value: '[\s_-]*(channel|ch\.?)'
+        # value: '!~!((channel|ch\.?)'
+      - name: one
+        value: '[\s_-]*(1|one)'
+        # value: '!~!((1|one)'
+      - name: plus
+        value: '[\s_-]*(\+|plus|pl)'
+        # value: '!~!(\+|plus|pl)'
+      - name: plus1
+        value: '[\s_-]*(\+1|plus1|D[EÉ]CAL[EÉ])'
+        # value: '!~!(\+|plus)1'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - pattern: 'Name ~ "!start!TF1!end!"'
+        attributes:
+          - name: 'TF1'
+            id: 'TF1.fr'
+            chno: '1'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!2!end!"'
+        attributes:
+          - name: 'France 2'
+            id: 'France2.fr'
+            chno: '2'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/France_2_2018.svg/277px-France_2_2018.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!end!"'
+        attributes:
+          - name: 'France 3'
+            id: 'France3.fr'
+            chno: '3'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/France_3_2018.svg/281px-France_3_2018.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!end!"'
+        attributes:
+          - name: 'Canal+'
+            id: 'CanalPlus.fr'
+            chno: '4'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png'
+        suffix:
+          - group: 'FR|CINEMA'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!plus1!!end!"'
+        attributes:
+          - name: 'Canal+ Décalé'
+            id: 'CanalPlusDecale.fr'
+            chno: '4'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png'
+        suffix:
+          - group: 'FR|CINEMA|PLUS1'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!5!end!"'
+        attributes:
+          - name: 'France 5'
+            id: 'France5.fr'
+            chno: '5'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!M6!end!"'
+        attributes:
+          - name: 'M6'
+            id: 'M6.fr'
+            chno: '6'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Logo_M6_%282020%2C_fond_clair%29.svg/320px-Logo_M6_%282020%2C_fond_clair%29.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!ARTE!end!"'
+        attributes:
+          - name: 'Arte'
+            id: 'Arte.fr'
+            chno: '7'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Arte-Logo.svg/320px-Arte-Logo.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!C8!end!" OR Name ~ "!start!D8!end!"'
+        attributes:
+          - name: 'C8'
+            id: 'C8.fr'
+            chno: '8'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Logo_C8.svg/320px-Logo_C8.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!W9!end!"'
+        attributes:
+          - name: 'W9'
+            id: 'W9.fr'
+            chno: '9'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/W9-Logo.svg/320px-W9-Logo.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!TMC!end!"'
+        attributes:
+          - name: 'TMC'
+            id: 'TMC.fr'
+            chno: '10'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/8/88/TMC_logo.jpg'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!TFX!end!"'
+        attributes:
+          - name: 'TFX'
+            id: 'NT1.fr'
+            chno: '11'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/TFX_logo.svg/320px-TFX_logo.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!NRJ!~!12!end!"'
+        attributes:
+          - name: 'NRJ 12'
+            id: 'NRJ12.fr'
+            chno: '12'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/d/de/NRJ122015.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!LCP!~!100%!end!" OR Name ~ "!start!LCP!end!"'
+        attributes:
+          - name: 'LCP 100%'
+            id: 'LCP100.fr'
+            chno: '13'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/5/56/LCP.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!PUBLIC!~!SENAT!end!"'
+        attributes:
+          - name: 'Public Sénat'
+            id: 'PublicSenat2424.fr'
+            chno: '13'
+            logo: 'https://storage.googleapis.com/endurance-apps-liip/media/cache/publicsenat_no_filter_grid_fs/5d8c809880564a5ed7204c4a'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!4!end!"'
+        attributes:
+          - name: 'France 4'
+            id: 'France4.fr'
+            chno: '14'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/France_4_2018.svg/312px-France_4_2018.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!BFM!~!TV!end!"'
+        attributes:
+          - name: 'BFM TV'
+            id: 'BFMTV.fr'
+            chno: '15'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/BFM_TV_logo.png/240px-BFM_TV_logo.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!CNEWS!end!" OR Name ~ "!start!I!~!TELE!end!"'
+        attributes:
+          - name: 'CNews'
+            id: 'CNews.fr'
+            chno: '16'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/9/91/Canal_News_logo.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!CSTAR!end!"'
+        attributes:
+          - name: 'CStar'
+            id: 'CStar.fr'
+            chno: '17'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Cstar-logo.jpg/320px-Cstar-logo.jpg'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!GULLI!end!"'
+        attributes:
+          - name: 'gulli'
+            id: 'Gulli.fr'
+            chno: '18'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/e/eb/Gulli_2017_nouveau_logo.jpg'
+        suffix:
+          - group: 'FR|TNT|KIDS'
+
+      - pattern: 'Name ~ "!start!TF1!~!Series?!~!(Films?)?!end!" OR Name ~ "!start!HD1!end!"'
+        attributes:
+          - name: 'TF1 Séries Films'
+            id: 'TF1SeriesFilms.fr'
+            chno: '20'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/d/d4/Logo_TF1_S%C3%A9ries_Films_2018.jpg'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!TF1!~!S.ries?!~!Films?!plus1!!end!"'
+        attributes:
+          - name: 'TF1 Séries Films+1'
+            id: 'TF1SeriesFilmsPlus1.fr'
+            chno: '20'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/d/d4/Logo_TF1_S%C3%A9ries_Films_2018.jpg'
+        suffix:
+          - group: 'FR|TNT|PLUS1'
+
+      - pattern: 'Name ~ "!start!L.EQUIPE!end!" OR Name ~ "!start!L.?EQUIPE!~!21!end!"'
+        attributes:
+          - name: 'L'Équipe'
+            id: 'EquipeTv.fr'
+            chno: '21'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/4/4a/L%27Equipe_logo.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!6TER!end!"'
+        attributes:
+          - name: '6TER'
+            id: '6ter.fr'
+            chno: '22'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/0/07/6ter.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!RMC!~!STORY!end!" OR Name ~ "!start!Numero!~!23!end!"'
+        attributes:
+          - name: 'RMC Story'
+            id: 'Numero23.fr'
+            chno: '23'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/RMC_Story_logo_2018.svg/320px-RMC_Story_logo_2018.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!RMC!~!DECOUVERTE!end!"'
+        attributes:
+          - name: 'RMC Découverte'
+            id: 'RMCDecouverte.fr'
+            chno: '24'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/5/58/Rmc_d%C3%A9couverte_logo_2017.jpg'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!CHERIE!~!25!end!"'
+        attributes:
+          - name: 'Chérie 25'
+            id: 'Cherie25.fr'
+            chno: '25'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Logo_Ch%C3%A9rie_25.svg/320px-Logo_Ch%C3%A9rie_25.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!LCI!end!"'
+        attributes:
+          - name: 'LCI'
+            id: 'LCI.fr'
+            chno: '26'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/3/38/LCI_-_Logo_%28Ao%C3%BBt_2017%29.svg/320px-LCI_-_Logo_%28Ao%C3%BBt_2017%29.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!INFO!end!" OR Name ~ "!start!FRANCE!~!O!end!"'
+        attributes:
+          - name: 'France Info'
+            id: 'FranceInfo.fr'
+            chno: '27'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Franceinfo.svg/320px-Franceinfo.svg.png'
+        suffix:
+          - group: 'FR|TNT'
+
+      - pattern: 'Name ~ "!start!PARIS!~!PREMIERE!end!"'
+        attributes:
+          - name: 'Paris Première'
+            id: 'ParisPremiere.fr'
+            chno: '28'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Logo_Paris_Premi%C3%A8re_rentr%C3%A9e_2011-2012.jpg/320px-Logo_Paris_Premi%C3%A8re_rentr%C3%A9e_2011-2012.jpg'
+        suffix:
+          - group: 'FR|TNT'
+
+  - id: France Premium
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?!~!'
+      - name: channel
+        value: '[\s_-]*(channel|ch\.?)'
+        # value: '!~!((channel|ch\.?)'
+      - name: one
+        value: '[\s_-]*(1|one)'
+        # value: '!~!((1|one)'
+      - name: plus
+        value: '[\s_-]*(\+|plus|pl)'
+        # value: '!~!(\+|plus|pl)'
+      - name: plus1
+        value: '[\s_-]*(\+1|plus1|D[EÉ]CAL[EÉ])'
+        # value: '!~!(\+|plus)1'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - pattern: 'Name ~ "!start!13!~!E(ME)?!~!RUE!end!"'
+        attributes:
+          - name: '13ème Rue'
+            id: '13eRue.fr'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Logo_of_13e_Rue.png/240px-Logo_of_13e_Rue.png'
+        suffix:
+          - group: 'FR'
+
+      - pattern: 'Name ~ "!start!RTL!~!9!end!" OR Name ~ "!start!UNIVERS!~!CINE!end!"'
+        attributes:
+          - name: 'RTL9'
+            id: 'RTL9.fr'
+            chno: '29'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/RTL_9.svg/320px-RTL_9.svg.png'
+        suffix:
+          - group: 'FR'
+
+      - pattern: 'Name ~ "!start!BEIN!~!SPORTS!~!1!end!"'
+        attributes:
+          - name: 'BeIN Sports 1'
+            id: 'beINSPORTS1.fr'
+            chno: '31'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/b/b4/BeinSports1.jpg'
+        suffix:
+          - group: 'FR|PREMIUM|SPORTS'
+
+      - pattern: 'Name ~ "!start!BEIN!~!SPORTS!~!2!end!"'
+        attributes:
+          - name: 'BeIN Sports 2'
+            id: 'beINSPORTS2.fr'
+            chno: '32'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/b/b4/BeinSports1.jpg'
+        suffix:
+          - group: 'FR|PREMIUM|SPORTS'
+
+      - pattern: 'Name ~ "!start!BEIN!~!SPORTS!~!3!end!"'
+        attributes:
+          - name: 'BeIN Sports 3'
+            id: 'beINSPORTS3.fr'
+            chno: '33'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/b/b4/BeinSports1.jpg'
+        suffix:
+          - group: 'FR|PREMIUM|SPORT'
+
+      - pattern: 'Name ~ "!start!RMC!~!SPORT!~!1!end!"'
+        attributes:
+          - name: 'RMC Sport 1'
+            id: 'RMCSport1.fr'
+            chno: '34'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Logo_RMC_Sport_2018.svg/320px-Logo_RMC_Sport_2018.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|SPORTS'
+
+      - pattern: 'Name ~ "!start!RMC!~!SPORT!~!2!end!"'
+        attributes:
+          - name: 'RMC Sport 2'
+            id: 'RMCSport2.fr'
+            chno: '35'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Logo_RMC_Sport_2018.svg/320px-Logo_RMC_Sport_2018.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|SPORTS'
+
+      - pattern: 'Name ~ "!start!INFO!~!SPORT!plus!!end!"'
+        attributes:
+          - name: 'Info Sport+'
+            id: 'InfosportPlus.fr'
+            chno: '36'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/2/24/InfosportPlus.svg/320px-InfosportPlus.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|SPORTS'
+
+      - pattern: 'Name ~ "!start!OCS!~!MAX!end!"'
+        attributes:
+          - name: 'OCS Max'
+            id: 'OCSMax.fr'
+            chno: '37'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/OCS_Max_2022.svg/320px-OCS_Max_2022.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|CINEMA'
+
+      - pattern: 'Name ~ "!start!OCS!~!CITY!end!"'
+        attributes:
+          - name: 'OCS City'
+            id: 'OCSCity.fr'
+            chno: '38'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/OCS_City_2022.svg/320px-OCS_City_2022.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|CINEMA'
+
+      - pattern: 'Name ~ "!start!OCS!~!CHOC!end!"'
+        attributes:
+          - name: 'OCS Choc'
+            id: 'OCSChoc.fr'
+            chno: '39'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/OCS_Choc_2022.svg/320px-OCS_Choc_2022.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|CINEMA'
+
+      - pattern: 'Name ~ "!start!OCS!~!GEANTS!end!"'
+        attributes:
+          - name: 'OCS Géants'
+            id: 'OCSGeants.fr'
+            chno: '40'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/OCS_G%C3%A9ants_2022.svg/320px-OCS_G%C3%A9ants_2022.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|CINEMA'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!~!CINEMA!end!"'
+        attributes:
+          - name: 'Canal+ Cinéma'
+            id: 'CanalPlusCinema.fr'
+            chno: '41'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Canal%2BCin%C3%A9ma2009.svg/320px-Canal%2BCin%C3%A9ma2009.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|CINEMA'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!~!GRAND!~!ECRAN!end!"'
+        attributes:
+          - name: 'Canal+ Grand Écran'
+            id: 'CanalPlusGrandEcran.fr'
+            chno: '42'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/b/b5/Logo_Canal%2B_Grand_%C3%89cran_2022.svg/320px-Logo_Canal%2B_Grand_%C3%89cran_2022.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|CINEMA'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!~!SERIES!end!"'
+        attributes:
+          - name: 'Canal+ Séries'
+            id: 'CanalPlusSeries.fr'
+            chno: '43'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/9/95/Canal%2B_S%C3%A9ries.svg/320px-Canal%2B_S%C3%A9ries.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|SERIES'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!~!SPORT!end!"'
+        attributes:
+          - name: 'Canal+ Sport'
+            id: 'CanalPlusSport.fr'
+            chno: '44'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/4/4f/Canal%2B_Sport_%282013%29.svg/320px-Canal%2B_Sport_%282013%29.svg.png'
+        suffix:
+          - group: 'FR|PREMIUM|SPORTS'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!~!SPORT!~!360!end!"'
+        attributes:
+          - name: 'Canal+ Sport 360'
+            id: 'CanalPlusSport360.fr'
+            chno: '45'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/6/64/Canal%2BSport_360.png?uselang=fr'
+        suffix:
+          - group: 'FR|PREMIUM|SPORTS'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!~!FOOT!end!"'
+        attributes:
+          - name: 'Canal+ Foot'
+            id: 'CanalPlusFoot.fr'
+            chno: '46'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/e/eb/Canal%2BFoot.png'
+        suffix:
+          - group: 'FR|PREMIUM|SPORTS|FOOT'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!~!DOCS?!end!"'
+        attributes:
+          - name: 'Canal+ Docs'
+            id: 'CanalPlusDocs.fr'
+            chno: '47'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/f/fe/Canal%2B_Docs_FR.png/320px-Canal%2B_Docs_FR.png'
+        suffix:
+          - group: 'FR|PREMIUM|DOCUMENTAIRES'
+
+      - pattern: 'Name ~ "!start!CANAL!plus!!~!KIDS!end!" OR Name ~ "!start!CANAL!~!KIDS!end!" OR Name ~ "!start!CANAL!plus!!~!FAMILY!end!" OR Name ~ "!start!CANAL!~!FAMILY!end!"'
+        attributes:
+          - name: 'Canal+ Kids'
+            id: 'CanalPlusKIDS.fr'
+            chno: '48'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/0/0c/Canal%2B_Kids.png'
+        suffix:
+          - group: 'FR|PREMIUM|KIDS'
+
+      - pattern: 'Name ~ "!start!DISNEY!channel!!end!"'
+        attributes:
+          - name: 'Disney Channel'
+            id: 'DisneyChannel.fr'
+            chno: '49'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/2019_Disney_Channel_logo.svg/320px-2019_Disney_Channel_logo.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!GAME!one!!end!"'
+        attributes:
+          - name: 'Game One'
+            id: 'GameOne.fr'
+            chno: '50'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/d/d2/Game_One_%282006%29_Logo.svg/320px-Game_One_%282006%29_Logo.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!AB!one!!end!"'
+        attributes:
+          - name: 'AB1'
+            id: 'AB1.fr'
+            chno: '51'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/9/9a/Logo_AB1_2021.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!PARAMOUNT!~!CHANNEL!end!" OR Name ~ "!start!PARAMOUNT!end!"'
+        attributes:
+          - name: 'Paramount Channel'
+            id: 'ParamountChannel.fr'
+            chno: '52'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/5/59/Paramount_Channel.svg/247px-Paramount_Channel.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT|MOVIES'
+
+      - pattern: 'Name ~ "!start!TEVA!end!"'
+        attributes:
+          - name: 'Téva'
+            id: 'Teva.fr'
+            chno: '53'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/T%C3%A9va_logo_2021.svg/240px-T%C3%A9va_logo_2021.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!TV!~!BREIZH!end!"'
+        attributes:
+          - name: 'TV Breizh'
+            id: 'TvBreizh.fr'
+            chno: '54'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/c/c7/TV_Breizh_logo_2019.svg/320px-TV_Breizh_logo_2019.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!POLAR!plus!!end!" OR Name ~ "!start!CINE!~!POLAR!end!"'
+        attributes:
+          - name: 'Polar+'
+            id: 'PolarPlus.fr'
+            chno: '55'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Polar%2B_%28Logo%29.png/320px-Polar%2B_%28Logo%29.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!SERIES?!~!CLUB!end!"'
+        attributes:
+          - name: 'Série Club'
+            id: 'serieclub.fr'
+            chno: '56'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/4/4c/Serieclub_%282012%29.svg/320px-Serieclub_%282012%29.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!WARNER!~!TV!end!"'
+        attributes:
+          - name: 'Warner TV'
+            id: 'WarnerTV.fr'
+            chno: '57'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/WarnerTV_France_2021.svg/238px-WarnerTV_France_2021.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!NOVELAS!~!TV!end!" OR Name ~ "!start!NOVELAS!end!"'
+        attributes:
+          - name: 'Novelas TV'
+            id: 'NovelasTV.fr'
+            chno: '58'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/e/ee/Logo_Novelas_TV.svg/320px-Logo_Novelas_TV.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!PLANETE!plus!!end!" OR Name ~ "!start!PLANETE!end!"'
+        attributes:
+          - name: 'Planète+'
+            id: 'PlanetePlus.fr'
+            chno: '59'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/9/9b/Planete_plus.png'
+        suffix:
+          - group: 'FR|DISCOVERY'
+
+      - pattern: 'Name ~ "!start!NATIONAL!~!GEOGRAPHIC!end!" OR Name ~ "!start!NAT!~!GEO!end!"'
+        attributes:
+          - name: 'National Geographic'
+            id: 'NationalGeographic.fr'
+            chno: '60'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Natgeologo.svg/320px-Natgeologo.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY'
+
+      - pattern: 'Name ~ "!start!NATIONAL!~!GEOGRAPHIC!~!WILD!end!" OR Name ~ "!start!NAT!~!GEO!~!WILD!end!"'
+        attributes:
+          - name: 'National Geographic Wild'
+            id: 'NatGeoWild.fr'
+            chno: '61'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/National_Geographic_Wild_logo.svg/320px-National_Geographic_Wild_logo.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY'
+
+      - pattern: 'Name ~ "!start!DISCOVERY!end!" OR Name ~ "!start!DISCOVERY!channel!!end!"'
+        attributes:
+          - name: 'Discovery Channel'
+            id: 'DiscoveryChannel.fr'
+            chno: '62'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/2019_Discovery_logo.svg/320px-2019_Discovery_logo.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY'
+
+      - pattern: 'Name ~ "!start!DISCOVERY!~!SCIENCE!end!"'
+        attributes:
+          - name: 'Discovery Science'
+            id: 'DiscoveryScience.fr'
+            chno: '63'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Discovery_science_new_logo_2017.png/320px-Discovery_science_new_logo_2017.png'
+        suffix:
+          - group: 'FR|DISCOVERY'
+
+      - pattern: 'Name ~ "!start!DISCOVERY!~!INVESTIGATION!end!"'
+        attributes:
+          - name: 'Discovery Investigation'
+            id: 'DiscoveryInvestigation.fr'
+            chno: '63'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/InvestigationDiscoveryLogo2020.svg/320px-InvestigationDiscoveryLogo2020.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY'
+
+      - pattern: 'Name ~ "!start!DISCOVERY!~!FAMILY!end!"'
+        attributes:
+          - name: 'Discovery Family'
+            id: 'DiscoveryFamily.fr'
+            chno: '63'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Discovery_Family_logo.svg/320px-Discovery_Family_logo.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY'
+
+      - pattern: 'Name ~ "!start!M6!~!MUSIC!end!" OR Name ~ "!start!M6!~!MUSIC!~!HITS!end!"'
+        attributes:
+          - name: 'M6 Music'
+            id: 'M6Music.fr'
+            chno: '64'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/3/3b/M6_Music_2018.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!NRJ!~!HITS!end!"'
+        attributes:
+          - name: 'NRJ Hits'
+            id: 'NRJHits.fr'
+            chno: '65'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/3/36/NRJ_Hits_2017.svg/236px-NRJ_Hits_2017.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MTV!~!HITS!end!"'
+        attributes:
+          - name: 'MTV Hits'
+            id: 'MTVHits.fr'
+            chno: '66'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/MTV_Hits_2021.svg/253px-MTV_Hits_2021.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!TF1!plus1!!end!"'
+        attributes:
+          - name: 'TF1+1'
+            id: 'TF1plus1.fr'
+            chno: '67'
+            logo: 'https://broccoli.tvchannellists.com/images/c/c4/TF1PLUS1-2020.png'
+        suffix:
+          - group: 'FR|GENERAL INTEREST|PLUS1'
+
+      - pattern: 'Name ~ "!start!TMC!plus1!!end!"'
+        attributes:
+          - name: 'TMC+1'
+            id: 'TMCplus1.fr'
+            chno: '68'
+            logo: 'https://broccoli.tvchannellists.com/images/f/f9/TMCPLUS1-2020.png'
+        suffix:
+          - group: 'FR|GENERAL INTEREST|PLUS1'
+
+      - pattern: 'Name ~ "!start!TV5!~!MONDE!end!" OR Name ~ "!start!TV5!~!MONDE!~!INFO!end!" OR Name ~ "!start!TV5!~!MONDE!~!EUROPE!end!"'
+        attributes:
+          - name: 'TV5 Monde'
+            id: 'TV5Monde.fr'
+            chno: '70'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Logo_TV5_Monde_-_2021.svg/320px-Logo_TV5_Monde_-_2021.svg.png'
+        suffix:
+          - group: 'FR|GENERAL INTEREST'
+
+      - pattern: 'Name ~ "!start!OLYMPIA!~!TV!end!" OR Name ~ "!start!OLYMPIA!end!"'
+        attributes:
+          - name: 'Olympia TV'
+            id: 'OlympiaTV.fr'
+            chno: '79'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/OlympiaTV.png/799px-OlympiaTV.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!COMEDIE!plus!!end!"'
+        attributes:
+          - name: 'Comédie+'
+            id: 'ComediePlus.fr'
+            chno: '80'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/4/49/Com%C3%A9die%2B_%282011%29.svg/267px-Com%C3%A9die%2B_%282011%29.svg.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!MTV!end!" OR Name ~ "!start!MTV!~!FRANCE!end!"'
+        attributes:
+          - name: 'MTV'
+            id: 'MTV.fr'
+            chno: '84'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/MTV-2021.svg/320px-MTV-2021.svg.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!MCM!end!"'
+        attributes:
+          - name: 'MCM'
+            id: 'MCM.fr'
+            chno: '87'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/a/ab/MCM_logo_2017.svg/320px-MCM_logo_2017.svg.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!J!~!ONE!end!"'
+        attributes:
+          - name: 'J-One'
+            id: 'MCM.fr'
+            chno: '88'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/6/6d/J-One.svg/320px-J-One.svg.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!GAME!~!ONE!plus1!!end!"'
+        attributes:
+          - name: 'Game One +1'
+            id: 'GameOneplus1.fr'
+            chno: '89'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/6/6d/J-One.svg/320px-J-One.svg.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!MANGAS!end!"'
+        attributes:
+          - name: 'Mangas'
+            id: 'Mangas.fr'
+            chno: '90'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/9/96/Logo-mangaschaine2022.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!MGG!~!TV!end!" OR Name ~ "!start!ES1!end!"'
+        attributes:
+          - name: 'MGG TV'
+            id: 'ES1.fr'
+            chno: '91'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/4/4e/Mgg_tv.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!ADULT!~!SWIM!end!"'
+        attributes:
+          - name: 'Adult Swim'
+            id: 'AdultSwim.fr'
+            chno: '92'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Adult_Swim_2003_logo.svg/320px-Adult_Swim_2003_logo.svg.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!GONG!end!"'
+        attributes:
+          - name: 'Gong'
+            id: 'Gong.fr'
+            chno: '94'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/e/e7/Gong_%28cha%C3%AEne_de_t%C3%A9l%C3%A9vision%29_Logo.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!GONG!~!MAX!end!"'
+        attributes:
+          - name: 'Gong Max'
+            id: 'GongMax.fr'
+            chno: '95'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/e/e7/Gong_%28cha%C3%AEne_de_t%C3%A9l%C3%A9vision%29_Logo.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!COMEDY!~!CENTRAL!end!"'
+        attributes:
+          - name: 'Comedy Central'
+            id: 'ComedyCentral.fr'
+            chno: '97'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Comedy_Central_2018.svg/320px-Comedy_Central_2018.svg.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!BET!end!"'
+        attributes:
+          - name: 'BET'
+            id: 'BET.fr'
+            chno: '99'
+            logo: 'https://logonoid.com/images/bet-logo.png'
+        suffix:
+          - group: 'FR|NEW GENERATION'
+
+      - pattern: 'Name ~ "!start!SYFY!end!" OR Name ~ "!start!SYFY!~!UNIVERSAL!end!"'
+        attributes:
+          - name: 'Syfy'
+            id: 'Syfy.fr'
+            chno: '107'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/SYFY.svg/320px-SYFY.svg.png'
+        suffix:
+          - group: 'FR|SERIES'
+
+      - pattern: 'Name ~ "!start!CINE!plus!!~!PREMIER!end!" OR Name ~ "!start!CINE!~!PREMIER!end!" OR Name ~ "!start!CINE!~!PERMIER!end!"'
+        attributes:
+          - name: 'Ciné+ Premier'
+            id: 'CinePlusPremier.fr'
+            chno: '109'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/b/b2/Cin%C3%A9%2B_Premier_%282011%29.svg/320px-Cin%C3%A9%2B_Premier_%282011%29.svg.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!CINE!plus!!~!FRISSON!end!" OR Name ~ "!start!CINE!~!FRISSON!end!"'
+        attributes:
+          - name: 'Ciné+ Frisson'
+            id: 'CinePlusFrisson.fr'
+            chno: '110'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/3/3d/CinePlusFrisson.svg/320px-CinePlusFrisson.svg.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!CINE!plus!!~!EMOTION!end!" OR Name ~ "!start!CINE!~!EMOTION!end!"'
+        attributes:
+          - name: 'Ciné+ Émotion'
+            id: 'CinePlusEmotion.fr'
+            chno: '111'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/8/89/CinePlusEmotion.svg/320px-CinePlusEmotion.svg.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!CINE!plus!!~!FAMIZ!end!" OR Name ~ "!start!CINE!~!FAMIZ!end!"'
+        attributes:
+          - name: 'Ciné+ Famiz'
+            id: 'CinePlusFamiz.fr'
+            chno: '112'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/c/cb/CinePlusFamiz_Logo.svg/320px-CinePlusFamiz_Logo.svg.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!CINE!plus!!~!CLUB!end!" OR Name ~ "!start!CINE!~!CLUB!end!"'
+        attributes:
+          - name: 'Ciné+ Club'
+            id: 'CinePlusClub.fr'
+            chno: '113'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/f/fd/CinePlusClub_Logo.svg/320px-CinePlusClub_Logo.svg.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!CINE!plus!!~!CLASSIC!end!" OR Name ~ "!start!CINE!~!CLASS!end!"'
+        attributes:
+          - name: 'Ciné+ Classic'
+            id: 'CinePlusClassic.fr'
+            chno: '114'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/5/55/CinePlusClassic.svg/320px-CinePlusClassic.svg.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!EUROCHANNEL!end!"'
+        attributes:
+          - name: 'Eurochannel'
+            id: 'Eurochannel.fr'
+            chno: '119'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/EURO_LOGO_FINALE.png/320px-EURO_LOGO_FINALE.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!DRIVE-!~!IN!~!!channel!!end!"'
+        attributes:
+          - name: 'Drive-in Movie Channel'
+            chno: '120'
+            logo: 'https://broccoli.tvchannellists.com/images/f/fd/DRIVEINMOVIE-2020.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!ACTION!end!"'
+        attributes:
+          - name: 'Action'
+            id: 'Action.fr'
+            chno: '121'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/2/2f/Action_%282014%29.svg/320px-Action_%282014%29.svg.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!PARAMOUNT!~!CHANNEL!plus1!!end!" OR Name ~ "!start!PARAMOUNT!plus1!!end!"'
+        attributes:
+          - name: 'Paramount Channel +1'
+            id: 'ParamountChannelDecale.fr'
+            chno: '122'
+            logo: 'https://broccoli.tvchannellists.com/images/8/81/Paramount_Channel_D%C3%A9cal%C3%A9.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT|MOVIES|PLUS1'
+
+      - pattern: 'Name ~ "!start!TCM!~!CINEMA!end!" OR Name ~ "!start!TCM!end!"'
+        attributes:
+          - name: 'TCM Cinéma'
+            id: 'TCM.fr'
+            chno: '123'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/TCM_Cin%C3%A9ma_logo_2019.png/320px-TCM_Cin%C3%A9ma_logo_2019.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!ALTICE!~!STUDIO!end!"'
+        attributes:
+          - name: 'Altice Studio'
+            id: 'AlticeStudio.fr'
+            chno: '124'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/7/71/Altice_studio_logo.png'
+        suffix:
+          - group: 'FR|MOVIES'
+
+      - pattern: 'Name ~ "!start!DISNEY!~!!channel!!plus1!!end!"'
+        attributes:
+          - name: 'Disney Channel+1'
+            id: 'DisneyChannelPlus1.fr'
+            chno: '139'
+            logo: 'https://broccoli.tvchannellists.com/images/d/d1/Disney_Channel_Plus1.png'
+        suffix:
+          - group: 'FR|KIDS|PLUS1'
+
+      - pattern: 'Name ~ "!start!DISNEY!~!JUNIOR!end!" OR Name ~ "!start!DISNEY!~!JR!end!"'
+        attributes:
+          - name: 'Disney Junior'
+            id: 'DisneyJunior.fr'
+            chno: '140'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/8/82/Disney_Junior_logo_2019.png/320px-Disney_Junior_logo_2019.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!DISNEY!~!XD!end!"'
+        attributes:
+          - name: 'Disney XD'
+            id: 'DisneyXD.fr'
+            chno: '140'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Disney_XD_-_2015.svg/320px-Disney_XD_-_2015.svg.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!DISNEY!~!CINEMA!end!"'
+        attributes:
+          - name: 'Disney Cinema'
+            id: 'DisneyCinema.fr'
+            chno: '140'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Disney_cinema_logo.png/320px-Disney_cinema_logo.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!DISNEY!plus!!end!" OR Name ~ "!start!DISNEY!~!HD!end!"'
+        attributes:
+          - name: 'Disney+'
+            id: 'DisneyPlus.fr'
+            chno: '140'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Disney%2B_logo.svg/320px-Disney%2B_logo.svg.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!NICKELODEON!~!JUNIOR!end!"'
+        attributes:
+          - name: 'Nickelodéon Junior'
+            id: 'NickelodeonJunior.fr'
+            chno: '141'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/1/17/Nickelodeon_Junior.svg/320px-Nickelodeon_Junior.svg.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!TIJI!end!"'
+        attributes:
+          - name: 'Tiji'
+            id: 'TIJI.fr'
+            chno: '142'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/f/f2/Logo_TiJi_%282019%29.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!PIWI!end!" OR Name ~ "!start!PIWI!plus!!end!"'
+        attributes:
+          - name: 'Piwi+'
+            id: 'PIWI.fr'
+            chno: '143'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/6/6e/Piwi%2B_logo_2011.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!BOOMERANG!end!"'
+        attributes:
+          - name: 'Boomerang'
+            id: 'Boomerang.fr'
+            chno: '144'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Boomerang_tv_logo.png/304px-Boomerang_tv_logo.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!BOOMERANG!plus1!!end!"'
+        attributes:
+          - name: 'Boomerang+1'
+            id: 'Boomerangplus1.fr'
+            chno: '145'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Boomerang_tv_logo.png/304px-Boomerang_tv_logo.png'
+        suffix:
+          - group: 'FR|KIDS|PLUS1'
+
+      - pattern: 'Name ~ "!start!CARTOON!~!NETWORK!end!"'
+        attributes:
+          - name: 'Cartoon Network'
+            id: 'CartoonNetwork.fr'
+            chno: '146'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Cartoon_Network_2010_logo.svg/320px-Cartoon_Network_2010_logo.svg.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!NICKELODEON!end!"'
+        attributes:
+          - name: 'Nickelodéon'
+            id: 'Nickelodeon.fr'
+            chno: '147'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/320px-Nickelodeon_2009_logo.svg.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!CANAL!~!J!end!"'
+        attributes:
+          - name: 'Canal J'
+            id: 'CanalJ.fr'
+            chno: '149'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/6/69/Logo_canal_J.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!TELETOON!plus!!end!"'
+        attributes:
+          - name: 'Télétoon+'
+            id: 'TeleToonPlus.fr'
+            chno: '150'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/T%C3%A9l%C3%A9toon%2B_Logo_2011.svg/320px-T%C3%A9l%C3%A9toon%2B_Logo_2011.svg.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!TELETOON!plus1!!end!"'
+        attributes:
+          - name: 'Télétoon+1'
+            id: 'TeleTOONplus1.fr'
+            chno: '151'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/T%C3%A9l%C3%A9toon%2B_Logo_2011.svg/320px-T%C3%A9l%C3%A9toon%2B_Logo_2011.svg.png'
+        suffix:
+          - group: 'FR|KIDS|PLUS1'
+
+      - pattern: 'Name ~ "!start!NICKELODEON!~!TEEN!end!" OR Name ~ "!start!NICKELODEON!~!4!~!TEEN!end!"'
+        attributes:
+          - name: 'Nickelodéon Teen'
+            id: 'Nickelodeon4Teen.fr'
+            chno: '152'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Nickelodeon_Teen.svg/320px-Nickelodeon_Teen.svg.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!BOING!end!"'
+        attributes:
+          - name: 'Boing'
+            id: 'Boing.fr'
+            chno: '153'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/Logo_Boing.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!TOONAMI!end!"'
+        attributes:
+          - name: 'Toonami'
+            id: 'Toonami.fr'
+            chno: '154'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/9/9e/Toonami_%282020%29.png/799px-Toonami_%282020%29.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!BABY!~!TV!end!"'
+        attributes:
+          - name: 'BabyTV'
+            id: 'BabyTV.fr'
+            chno: '155'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/4/45/BabyTV.png/320px-BabyTV.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!NICKELODEON!plus1!!end!"'
+        attributes:
+          - name: 'Nickelodéon +1'
+            id: 'NickelodeonPlus1.fr'
+            chno: '156'
+            logo: 'https://broccoli.tvchannellists.com/images/a/a9/NickelodeonPlus1.png'
+        suffix:
+          - group: 'FR|KIDS|PLUS1'
+
+      - pattern: 'Name ~ "!start!MON!~!NICKELODEON!~!JUNIOR!end!"'
+        attributes:
+          - name: 'Mon Nickelodéon Junior'
+            id: 'NickelodeonJunior.fr'
+            chno: '157'
+            logo: 'http://img3.wikia.nocookie.net/__cb20150314144112/logopedia/images/7/74/MON_NICKELODEON_JUNIOR.jpg'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!TV!~!PITCHOUN!end!"'
+        attributes:
+          - name: 'TV Pitchoun'
+            id: 'TVPitchoun.fr'
+            chno: '159'
+            logo: 'https://broccoli.tvchannellists.com/images/e/e1/PITCHOUNTV-2020.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!TV!~!PITCHOUN!plus1!!end!"'
+        attributes:
+          - name: 'TV Pitchoun +1'
+            chno: '160'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/4/4c/Pitchoun_TV_Plus1.png/799px-Pitchoun_TV_Plus1.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!TV!~!PITCHOUN!~!MUSIC!~!KIDS!end!"'
+        attributes:
+          - name: 'Pitchoun Music Kids'
+            chno: '161'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/2/21/Pitchoun_Music_Kids.png/273px-Pitchoun_Music_Kids.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!BOING!~!MAX!end!"'
+        attributes:
+          - name: 'Boing Max'
+            chno: '165'
+            logo: 'https://broccoli.tvchannellists.com/images/e/e3/Boing_Max.jpg'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!BOOMERANG!~!MAX!end!"'
+        attributes:
+          - name: 'Boomerang Max'
+            chno: '166'
+            logo: 'https://broccoli.tvchannellists.com/images/e/e3/Boomerang_Max.jpg'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!NICKELODEON!~!UKRAINE!end!"'
+        attributes:
+          - name: 'Nickelodéon Ukraine'
+            id: 'NickelodeonUkraine.fr'
+            chno: '167'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/a/ae/Nickelodeon_Ukraine.png/800px-Nickelodeon_Ukraine.png'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!OL!~!PLAY!end!"'
+        attributes:
+          - name: 'OL Play'
+            chno: '172'
+            logo: 'https://broccoli.tvchannellists.com/images/4/4b/OL_Play.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!REAL!~!MADRID!~!TV!~!ENGLISH!end!"'
+        attributes:
+          - name: 'Real Madrid TV English'
+            chno: '173'
+            logo: 'https://broccoli.tvchannellists.com/images/7/76/Real_MadridTV.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!FREE!~!LIGUE!~!1!~!UBER!~!EATS!end!"'
+        attributes:
+          - name: 'Free Ligue 1 Uber Eats'
+            chno: '174'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/2/2a/Free_Ligue_1.png/320px-Free_Ligue_1.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!CHEVAL!~!TV!end!"'
+        attributes:
+          - name: 'Cheval TV'
+            chno: '175'
+            logo: 'https://broccoli.tvchannellists.com/images/4/40/Cheval_TV.jpg'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!EQUIDIA!end!" OR Name ~ "!start!EQUIDIA!~!LIVE!end!" OR Name ~ "!start!EQUIDIAE!~!LIVE!end!" OR Name ~ "!start!EQUIDIA!~!LIFE!end!"'
+        attributes:
+          - name: 'Equidia'
+            id: 'Equidia.fr'
+            chno: '176'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/2/28/Equidia_logo_2018.svg/320px-Equidia_logo_2018.svg.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!HORSE!~!TV!end!"'
+        attributes:
+          - name: 'Horse TV'
+            chno: '177'
+            logo: 'https://broccoli.tvchannellists.com/images/e/e8/Horse_TV.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!TRACE!~!SPORT!~!STARS!end!"'
+        attributes:
+          - name: 'Trace Sport Stars'
+            id: 'TraceSportStars.fr'
+            chno: '178'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/TRACE_Sport_Stars.jpg/320px-TRACE_Sport_Stars.jpg'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!AUTOMOTO!~!LA!~!CHAINE!end!" OR Name ~ "!start!AUTOMOTO!~!TV!end!" OR Name ~ "!start!AUTOMOTO!end!" OR Name ~ "!start!AB!~!MOTEURS?!end!"'
+        attributes:
+          - name: 'Automoto La Chaine'
+            id: 'ABMoteurs.fr'
+            chno: '180'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/3/34/Automoto_La_cha%C3%AEne_%282018%29.png/320px-Automoto_La_cha%C3%AEne_%282018%29.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!MOTORVISION!~!TV!end!"'
+        attributes:
+          - name: 'Motorvision TV'
+            id: 'MotorVisionTV.fr'
+            chno: '182'
+            logo: 'https://motorvision.tv/wp-content/themes/motorvision/img/logo.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!NAUTICAL!channel!!end!" OR Name ~ "!start!NAUTICAL!end!"'
+        attributes:
+          - name: 'Nautical Channel'
+            id: 'NauticalChannel.fr'
+            chno: '183'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/b/b9/Nauticalchannel2022.jpg'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!GOLF!channel!!end!" OR Name ~ "!start!GOLF!end!"'
+        attributes:
+          - name: 'Golf Channel'
+            id: 'GolfChannel.fr'
+            chno: '185'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/8/87/Golf_Channel_%282014%29.svg/320px-Golf_Channel_%282014%29.svg.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!MCS!~!EXTREME!end!" OR Name ~ "!start!EXTREME!~!SPORTS!end!"'
+        attributes:
+          - name: 'MCS Extrême'
+            id: 'Extreme.fr'
+            chno: '186'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/4/4f/MCS_Extreme.png/320px-MCS_Extreme.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!JOURNAL!~!DU!~!GOLF!~!TV!end!"'
+        attributes:
+          - name: 'Journal du Golf TV'
+            chno: '187'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/c/c0/Journal_Golf_TV.png/239px-Journal_Golf_TV.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!GOLF!plus!!end!"'
+        attributes:
+          - name: 'Golf+'
+            id: 'GolfPlus.fr'
+            chno: '188'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/c/c2/Golf%2B.svg/320px-Golf%2B.svg.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!SPORT!~!EN!~!FRANCE!end!"'
+        attributes:
+          - name: 'Sport en France'
+            id: 'SportEnFrance.fr'
+            chno: '190'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/8/83/Sport_en_France_Logo.png/320px-Sport_en_France_Logo.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!FUEL!~!TV!end!"'
+        attributes:
+          - name: 'Fuel TV'
+            id: 'FuelTV.fr'
+            chno: '193'
+            logo: 'https://vignette.wikia.nocookie.net/logopedia/images/5/50/Fuel_TV_On-air_Logo.png/revision/latest?cb=20120215104007'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!WATAAA!end!"'
+        attributes:
+          - name: 'Wataaa'
+            chno: '197'
+            logo: 'https://broccoli.tvchannellists.com/images/f/f4/Wataa.png'
+        suffix:
+          - group: 'FR|SPORTS'
+
+      - pattern: 'Name ~ "!start!PLANETE!plus!!~!CRIME!end!" OR Name ~ "!start!PLANETE!plus!!~!CI!end!" OR Name ~ "!start!PLANETE!~!CI!end!"'
+        attributes:
+          - name: 'Planète+ Crime'
+            id: 'PLANETEJustice.fr'
+            chno: '200'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/d/dd/Planetepluscrime.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!PLANETE!plus!!~!AVENTURE!end!" OR Name ~ "!start!PLANETE!plus!!~!A[&_\s]E!end!" OR Name ~ "!start!PLANETE!~!A[&_\s]E!end!"'
+        attributes:
+          - name: 'Planète+ Aventure'
+            id: 'PlaneteAction.fr'
+            chno: '201'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/f/f6/Planeteplusaventure.png/320px-Planeteplusaventure.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!CRIME!~!DISTRICT!end!" OR Name ~ "!start!CRIME!~!DISTCRIT!end!"'
+        attributes:
+          - name: 'Crime District'
+            id: 'CrimeDistrict.fr'
+            chno: '202'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/c/c5/Crime_District_logo_2016.svg/320px-Crime_District_logo_2016.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!ULTRA!~!NATURE!end!"'
+        attributes:
+          - name: 'Ultra Nature'
+            id: 'UltraNature.fr'
+            chno: '203'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/4/44/Ultra_Nature_%282016%29.svg/320px-Ultra_Nature_%282016%29.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!USHUAIA!~!TV!end!" OR Name ~ "!start!USHUAIA!end!"'
+        attributes:
+          - name: 'Ushuaïa TV'
+            id: 'UshuaiaTV.fr'
+            chno: '204'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/d/d0/Ushua%C3%AFa_TV_logo_2019.svg/320px-Ushua%C3%AFa_TV_logo_2019.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!HISTOIRE!~!TV!end!" OR Name ~ "!start!HISTOIRE!end!"'
+        attributes:
+          - name: 'Histoire TV'
+            id: 'Histoire.fr'
+            chno: '205'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Histoire_tv_logo_V2-RVB.jpg/320px-Histoire_tv_logo_V2-RVB.jpg'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!TOUTE!~!L.HISTOIRE!end!"'
+        attributes:
+          - name: 'Toute l'Histoire'
+            id: 'TouteHistoire.fr'
+            chno: '206'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/c/c2/Toute_l%27Histoire_%282013%29.svg/320px-Toute_l%27Histoire_%282013%29.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!SCIENCE!~!(ET|&)!~!VIE!~!TV!end!" OR Name ~ "!start!SCIENCE!~!(ET|&)!~!VIE!end!"'
+        attributes:
+          - name: 'Science & Vie TV'
+            id: 'ScienceEtVieTV.fr'
+            chno: '207'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/b/bf/Science_%26_Vie_TV.svg/320px-Science_%26_Vie_TV.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!ANIMAUX!end!"'
+        attributes:
+          - name: 'Animaux'
+            id: 'Animaux.fr'
+            chno: '208'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/a/a2/Logo-Animaux-2017.svg/320px-Logo-Animaux-2017.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!TREK!end!"'
+        attributes:
+          - name: 'Trek'
+            id: 'Trek.fr'
+            chno: '209'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/f/f8/Trek_logo_2015.svg/320px-Trek_logo_2015.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!IMEARTH!end!"'
+        attributes:
+          - name: 'IMEARTH'
+            chno: '210'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/1/1f/IMEARTH.png/800px-IMEARTH.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!SOUVENIRS!~!FROM!~!EARTH!end!"'
+        attributes:
+          - name: 'Souvenirs from Earth'
+            id: 'SouvenirsFromEarth.fr'
+            chno: '211'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/e/e8/Souvenirs_from_Earth.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!IKONO!~!TV!end!"'
+        attributes:
+          - name: 'Ikono.tv'
+            chno: '212'
+            logo: 'https://broccoli.tvchannellists.com/images/4/45/IKONOTV-2020.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!MUSEUM!end!" OR Name ~ "!start!MUSEUM!channel!!end!"'
+        attributes:
+          - name: 'Museum'
+            id: 'Museum.fr'
+            chno: '213'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Logomuseumtv.png/248px-Logomuseumtv.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!MY!~!ZEN!end!" OR Name ~ "!start!MY!~!ZEN!~!TV!end!"'
+        attributes:
+          - name: 'My Zen Nature'
+            id: 'MyZenTV.fr'
+            chno: '214'
+            logo: 'https://broccoli.tvchannellists.com/images/c/c9/MyZen_Nature.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!TRAVEL!channel!!end!"'
+        attributes:
+          - name: 'Travel Channel'
+            chno: '215'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Travel_Channel_-_Logo.svg/320px-Travel_Channel_-_Logo.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!CHASSE!~!ET!~!PECHE!end!" OR Name ~ "!start!CHASSE!~!ET!~!PACHE!end!" OR Name ~ "!start!CHASSE!~!&!~!PECHE!end!"'
+        attributes:
+          - name: 'Chasse et Pêche'
+            id: 'ChasseEtPeche.fr'
+            chno: '216'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/6/64/Chasse_%26_P%C3%AAche_%282013%29.svg/320px-Chasse_%26_P%C3%AAche_%282013%29.svg.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!SEASONS!end!"'
+        attributes:
+          - name: 'Seasons'
+            id: 'Seasons.fr'
+            chno: '217'
+            logo: 'https://broccoli.tvchannellists.com/images/8/86/Seasons.jpg'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!TELESUD!end!"'
+        attributes:
+          - name: 'Télésud'
+            id: 'Telesud.fr'
+            chno: '218'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/6/6e/Telesud.png/320px-Telesud.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!TAHITI!~!NUI!~!TELEVISION!end!"'
+        attributes:
+          - name: 'Tahiti Nui Télévision'
+            chno: '219'
+            logo: 'https://broccoli.tvchannellists.com/images/f/f1/TNTV-2020.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!L!~!ESPRIT!~!SORICER!~!TV!end!"'
+        attributes:
+          - name: 'L'Esprit Soricer TV'
+            chno: '220'
+            logo: 'https://broccoli.tvchannellists.com/images/c/c0/Esprit_Sorcier_TV.jpg'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!CONNAISSANCE!~!DU!~!MONDE!end!"'
+        attributes:
+          - name: 'Connaissance du Monde'
+            chno: '221'
+            logo: 'https://broccoli.tvchannellists.com/images/0/01/CONNAISSANCESDUMONDE-2020.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!VOYAGE!end!"'
+        attributes:
+          - name: 'Voyage'
+            id: 'Voyage.fr'
+            chno: '222'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/3/30/Voyage_logo_2016.png'
+        suffix:
+          - group: 'FR|DISCOVERY & CULTURE'
+
+      - pattern: 'Name ~ "!start!LA!~!CHAINE!~!METEO!end!"'
+        attributes:
+          - name: 'La Chaîne Météo'
+            id: 'LaChaineMeteo.fr'
+            chno: '230'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/7/72/La_Cha%C3%AEne_M%C3%A9t%C3%A9o.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!TECH!~!.?!~!CO!end!" OR Name ~ "!start!TECH!~!.?!~!GEEK!end!"'
+        attributes:
+          - name: 'Tech & Co'
+            chno: '231'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/2/21/Tech_Co.png/320px-Tech_Co.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!AUTOPLUS!~!TV!end!"'
+        attributes:
+          - name: 'AutoPlus TV'
+            chno: '232'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/f/fe/Auto-plus.svg/324px-Auto-plus.svg.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!GOURMAND!~!TV!end!"'
+        attributes:
+          - name: 'Gourmand TV'
+            id: 'GourmandTV.fr'
+            chno: '234'
+            logo: 'https://broccoli.tvchannellists.com/images/e/e2/GOURMAND_TV.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!ASTROCENTER!~!TV!end!"'
+        attributes:
+          - name: 'Astrocenter TV'
+            id: 'AstroCenter.fr'
+            chno: '235'
+            logo: 'https://broccoli.tvchannellists.com/images/0/0b/Astrocenter_TV.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!DEMAIN!~!TV!end!" OR Name ~ "!start!DEMAIN!end!"'
+        attributes:
+          - name: 'Demain TV'
+            id: 'DemainTV.fr'
+            chno: '236'
+            logo: 'https://broccoli.tvchannellists.com/images/d/dc/DEMAIN-2020.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!LUXE!~!TV!end!" OR Name ~ "!start!LUXE!end!"'
+        attributes:
+          - name: 'Luxe TV'
+            id: 'LuxeTV.fr'
+            chno: '237'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/LUXETV_LOGO_BLACK_MONOCHROME.png/320px-LUXETV_LOGO_BLACK_MONOCHROME.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!MEN!~!S?!~!UP!~!TV!end!"'
+        attributes:
+          - name: 'Men's UP TV'
+            id: 'MensUpTV.fr'
+            chno: '238'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/f/fd/Men%E2%80%99s_UP_TV.png/320px-Men%E2%80%99s_UP_TV.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!TOP!~!SANTE!~!TV!end!"'
+        attributes:
+          - name: 'Top Santé TV'
+            chno: '239'
+            logo: 'https://broccoli.tvchannellists.com/images/c/c9/Top_Sante_TV.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!MAISON!~!.?!~!TRAVAUX!~!TV!end!" OR Name ~ "!start!A!~!LA!~!MAISON!end!"'
+        attributes:
+          - name: 'Maison & Travaux TV'
+            chno: '240'
+            logo: 'https://broccoli.tvchannellists.com/images/a/a0/Maison_Travaux_TV.PNG'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!FASHION!~!TV!end!"'
+        attributes:
+          - name: 'Fashion TV'
+            id: 'FashionTV.fr'
+            chno: '241'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/c/c7/Fashion_TV_Logo.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!FASHION!~!TV!~!HD!end!"'
+        attributes:
+          - name: 'Fashion TV HD'
+            id: 'FashionTV.fr'
+            chno: '242'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/c/c7/Fashion_TV_Logo.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!MY!~!ZEN!end!" OR Name ~ "!start!MY!~!ZEN!~!TV!end!"'
+        attributes:
+          - name: 'My Zen TV'
+            id: 'MyZenTV.fr'
+            chno: '243'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/My_Zen_Tv_LOGO_Couleur_vide.jpg/240px-My_Zen_Tv_LOGO_Couleur_vide.jpg'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!LUCKY!~!JACK!end!"'
+        attributes:
+          - name: 'Lucky Jack TV'
+            id: 'LuckyJack.fr'
+            chno: '244'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/9/93/Lucky_Jack.tv_logo.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!KTO!end!"'
+        attributes:
+          - name: 'KTO'
+            id: 'KTO.fr'
+            chno: '245'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/4/4f/Logo_de_KTO_T%C3%A9l%C3%A9vision_catholique_2022.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!ENGLISH!~!CLUB!~!TV!end!"'
+        attributes:
+          - name: 'English Club TV'
+            chno: '246'
+            logo: 'https://english-club.tv/wp-content/uploads/2015/09/logo-round.png'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!SQOOL!~!TV!end!"'
+        attributes:
+          - name: 'Sqool TV'
+            chno: '247'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/1/1a/Sqool_TV.jpg/320px-Sqool_TV.jpg'
+        suffix:
+          - group: 'FR|LIFESTYLE & SERVICES'
+
+      - pattern: 'Name ~ "!start!CSTAR!~!HITS!~!FRANCE!end!"'
+        attributes:
+          - name: 'CStar Hits France'
+            id: 'CStarHitsFrance.fr'
+            chno: '259'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/CStar_Hits_France_logo.jpg/320px-CStar_Hits_France_logo.jpg'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MY!~!MTV!end!"'
+        attributes:
+          - name: 'My MTV'
+            chno: '260'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/MTV-2021.svg/320px-MTV-2021.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!RFM!~!TV!end!"'
+        attributes:
+          - name: 'RFM TV'
+            id: 'RFMTV.fr'
+            chno: '261'
+            logo: 'https://broccoli.tvchannellists.com/images/b/ba/RFM_TV.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MELODY!end!" OR Name ~ "!start!HARMONY!end!"'
+        attributes:
+          - name: 'Melody'
+            id: 'Melody.fr'
+            chno: '262'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/4/4f/Melody_logo_2013.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MEZZO!end!"'
+        attributes:
+          - name: 'Mezzo'
+            id: 'Mezzo.fr'
+            chno: '263'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Mezzo_Logo.svg/320px-Mezzo_Logo.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MEZZO!~!LIVE!end!"'
+        attributes:
+          - name: 'Mezzo Live'
+            id: 'MezzoLive.fr'
+            chno: '264'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Mezzo_Logo.svg/320px-Mezzo_Logo.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!STINGRAY!~!DJAZZ!end!" OR Name ~ "!start!DJAZZ!end!"'
+        attributes:
+          - name: 'Stingray Djazz'
+            id: 'StingrayDjazz.fr'
+            chno: '265'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Stingray_Djazz.svg/320px-Stingray_Djazz.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!STINGRAY!~!CLASSICA!end!"'
+        attributes:
+          - name: 'Stingray Classica'
+            id: 'StingrayClassica.fr'
+            chno: '266'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Stingray_Classica_Alternative.svg/320px-Stingray_Classica_Alternative.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!STINGRAY!~!ICONCERTS!end!"'
+        attributes:
+          - name: 'Stingray iConcerts'
+            id: 'StingrayClassica.fr'
+            chno: '266'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Stingray_Concerts.svg/320px-Stingray_Concerts.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!STINGRAY!~!BRAVA!end!" OR Name ~ "!start!BRAVA!end!" OR Name ~ "!start!CMUSIC!end!"'
+        attributes:
+          - name: 'Stingray Brava'
+            id: 'StingrayBrava.fr'
+            chno: '266'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Stingray_Bravo.svg/320px-Stingray_Bravo.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MCM!~!TOP!end!"'
+        attributes:
+          - name: 'MCM Top'
+            id: 'MCMTop.fr'
+            chno: '271'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/a/aa/MCM_Top.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!CLUBBING!~!TV!end!"'
+        attributes:
+          - name: 'Clubbing TV'
+            id: 'ClubbingTV.fr'
+            chno: '274'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/3/39/Clubbing_TV.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!STINGRAY!~!CMUSIC!end!"'
+        attributes:
+          - name: 'Stingray CMusic'
+            chno: '278'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Stingray_cmusic.svg/320px-Stingray_cmusic.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!VH1!end!" OR Name ~ "!start!MTV!~!00!end!"'
+        attributes:
+          - name: 'VH1'
+            chno: '279'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/VH1_logo.svg/320px-VH1_logo.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MTV!~!80s!end!"'
+        attributes:
+          - name: 'MTV 80s'
+            chno: '280'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/MTV_80s_2022.png/552px-MTV_80s_2022.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MTV!~!90s!end!"'
+        attributes:
+          - name: 'MTV 90s'
+            chno: '281'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/MTV_90s_2022.svg/213px-MTV_90s_2022.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!CLUB!~!MTV!end!"'
+        attributes:
+          - name: 'Club MTV'
+            chno: '282'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Club_MTV_2021_logo.svg/253px-Club_MTV_2021_logo.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!PEOPLE!~!24!end!"'
+        attributes:
+          - name: 'People24'
+            chno: '283'
+            logo: 'https://broccoli.tvchannellists.com/images/8/8a/PEOPLE24-2020.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!GENERATIONS!~!TV!end!"'
+        attributes:
+          - name: 'Générations TV'
+            chno: '284'
+            logo: 'https://broccoli.tvchannellists.com/images/b/b7/GENERATIONSTV-2020.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!TRACE!~!LATINA!end!"'
+        attributes:
+          - name: 'Trace Latina'
+            id: 'TraceLatina.fr'
+            chno: '286'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/TRACE_Latina_Logo.png/320px-TRACE_Latina_Logo.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!TRACE!~!URBAN!end!"'
+        attributes:
+          - name: 'Trace Urban'
+            id: 'TraceUrban.fr'
+            chno: '287'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Trace_Urban_logo_2010.svg/320px-Trace_Urban_logo_2010.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!TRACE!~!CARIBBEAN!end!"'
+        attributes:
+          - name: 'Trace Caribbean'
+            id: 'TraceCaribbean.fr'
+            chno: '288'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/0/02/Trace.caribbean.webp/320px-Trace.caribbean.webp.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!TRACE!~!TOCA!end!"'
+        attributes:
+          - name: 'Trace Toca'
+            id: 'TraceToca.fr'
+            chno: '289'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Trace_Toca.png/320px-Trace_Toca.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!TRACE!~!GOSPEL!end!"'
+        attributes:
+          - name: 'Trace Gospel'
+            id: 'TraceGospel.fr'
+            chno: '290'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/b/b8/Logo_gospel-1.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MELODY!~!AFRIQUE!end!" OR Name ~ "!start!MELODY!~!D!~!AFRIQUE!end!"'
+        attributes:
+          - name: 'Melody d'Afrique'
+            chno: '294'
+            logo: 'https://broccoli.tvchannellists.com/images/5/5b/MELODYAFRIQUE-2020.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!NATIONAL!end!"'
+        attributes:
+          - name: 'France 3 National'
+            chno: '301'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/France_3_2018.svg/281px-France_3_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!ALPES!end!"'
+        attributes:
+          - name: 'France 3 Alpes'
+            chno: '302'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/France_3_Alpes_-_Logo_2018.svg/640px-France_3_Alpes_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!ALSACE!end!"'
+        attributes:
+          - name: 'France 3 Alsace'
+            chno: '303'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/France_3_Alsace_-_Logo_2018.svg/320px-France_3_Alsace_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!AQUITAINE!end!"'
+        attributes:
+          - name: 'France 3 Aquitaine'
+            chno: '304'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/France_3_Aquitaine_-_Logo_2018.svg/320px-France_3_Aquitaine_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!AUVERGNE!end!"'
+        attributes:
+          - name: 'France 3 Auvergne'
+            chno: '305'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/France_3_Auvergne_-_Logo_2018.svg/320px-France_3_Auvergne_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!BASSE!~!NORMANDIE!end!"'
+        attributes:
+          - name: 'France 3 Basse-Normandie'
+            chno: '306'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/France_3_Normandie_-_Logo_2018.svg/320px-France_3_Normandie_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!BOURGOGNE!end!"'
+        attributes:
+          - name: 'France 3 Bourgogne'
+            chno: '307'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/France_3_Bourgogne_-_Logo_2018.svg/320px-France_3_Bourgogne_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!BRETAGNE!end!"'
+        attributes:
+          - name: 'France 3 Bretagne'
+            chno: '308'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/France_3_Bretagne_-_Logo_2018.svg/320px-France_3_Bretagne_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!CENTRE!~!VAL!~!DE!~!LOIRE!end!"'
+        attributes:
+          - name: 'France 3 Centre-Val de Loire'
+            chno: '309'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/France_3_Centre-Val_de_Loire_-_Logo_2018.svg/320px-France_3_Centre-Val_de_Loire_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!CHAMPAGNE!~!ARDENNE!end!"'
+        attributes:
+          - name: 'France 3 Champagne-Ardenne'
+            chno: '310'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/France_3_Champagne-Ardenne_-_Logo_2018.svg/320px-France_3_Champagne-Ardenne_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!CORSE!~!VIA!~!STELLA!end!"'
+        attributes:
+          - name: 'France 3 Corse ViaStella'
+            chno: '311'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/France_3_Corse_-_Logo_2018.svg/320px-France_3_Corse_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!COTE!~!D!~!AZUR!end!"'
+        attributes:
+          - name: 'France 3 Côte d'Azur'
+            chno: '312'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/France_3_Cote_d%27Azur_-_Logo_2018.svg/320px-France_3_Cote_d%27Azur_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!FRANCHE!~!COMTE!end!"'
+        attributes:
+          - name: 'France 3 Franche-Comté'
+            chno: '313'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/France_3_Franche-Comt%C3%A9_-_Logo_2018.svg/320px-France_3_Franche-Comt%C3%A9_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!HAUTE!~!NORMANDIE!end!"'
+        attributes:
+          - name: 'France 3 Haute-Normandie'
+            chno: '314'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/France_3_Normandie_-_Logo_2018.svg/320px-France_3_Normandie_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!LANGUEDOC!~!ROUSSILLON!end!"'
+        attributes:
+          - name: 'France 3 Languedoc-Roussillon'
+            chno: '315'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/France_3_Languedoc-Roussillon_-_Logo_2018.svg/320px-France_3_Languedoc-Roussillon_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!LIMOUSIN!end!"'
+        attributes:
+          - name: 'France 3 Limousin'
+            chno: '316'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/France_3_Limousin_-_Logo_2018.svg/320px-France_3_Limousin_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!LORRAINE!end!"'
+        attributes:
+          - name: 'France 3 Lorraine'
+            chno: '317'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/France_3_Lorraine_-_Logo_2018.svg/320px-France_3_Lorraine_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!MIDI!~!PYRENEES!end!"'
+        attributes:
+          - name: 'France 3 Midi-Pyrénées'
+            chno: '318'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/France_3_Midi-Pyr%C3%A9n%C3%A9es_-_Logo_2018.svg/320px-France_3_Midi-Pyr%C3%A9n%C3%A9es_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!NORD!~!PAS!~!DE!~!CALAIS!end!"'
+        attributes:
+          - name: 'France 3 Nord-Pas-de-Calais'
+            chno: '319'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/France_3_Nord-Pas-de-Calais_-_Logo_2018.svg/320px-France_3_Nord-Pas-de-Calais_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!PARIS!~!ILE!~!DE!~!FRANCE!end!"'
+        attributes:
+          - name: 'France 3 Paris Île-de-France'
+            chno: '320'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/France_3_Paris_Ile-de-France_-_Logo_2018.svg/320px-France_3_Paris_Ile-de-France_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!PAYS!~!DE!~!LA!~!LOIRE!end!"'
+        attributes:
+          - name: 'France 3 Pays de la Loire'
+            chno: '321'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/France_3_Pays_de_la_Loire_-_Logo_2018.svg/320px-France_3_Pays_de_la_Loire_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!PICARDIE!end!"'
+        attributes:
+          - name: 'France 3 Picardie'
+            chno: '322'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/France_3_Picardie_-_Logo_2018.svg/320px-France_3_Picardie_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!POITOU!~!CHARENTES!end!"'
+        attributes:
+          - name: 'France 3 Poitou-Charentes'
+            chno: '323'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/France_3_Poitou-Charentes_-_Logo_2018.svg/320px-France_3_Poitou-Charentes_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!PROVENCE!~!ALPES!end!"'
+        attributes:
+          - name: 'France 3 Provence-Alpes'
+            chno: '324'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/France_3_Provence-Alpes_-_Logo_2018.svg/320px-France_3_Provence-Alpes_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!RHONE!~!ALPES!end!"'
+        attributes:
+          - name: 'France 3 Rhône-Alpes'
+            chno: '325'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/France_3_Rh%C3%B4ne-Alpes_-_Logo_2018.svg/320px-France_3_Rh%C3%B4ne-Alpes_-_Logo_2018.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!3!~!NOA!end!"'
+        attributes:
+          - name: 'France 3 NoA'
+            chno: '326'
+            logo: 'https://broccoli.tvchannellists.com/images/d/d8/FRANCE3NOA-2020.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!24!~!FRENCH!end!" OR Name ~ "!start!FRANCE!~!24!~!FRANCE!end!" OR Name ~ "!start!FRANCE!~!24!end!"'
+        attributes:
+          - name: 'France 24 French'
+            id: 'France24.fr'
+            chno: '340'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/France24.png/254px-France24.png'
+        suffix:
+          - group: 'FR|NEWS'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!24!~!ENGLISH!end!"'
+        attributes:
+          - name: 'France 24 English'
+            chno: '341'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/France24.png/254px-France24.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!FRANCE!~!24!~!ARABIC!end!"'
+        attributes:
+          - name: 'France 24 Arabic'
+            chno: '342'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/France24.png/254px-France24.png'
+        suffix:
+          - group: 'AR|NEWS'
+
+      - pattern: 'Name ~ "!start!EURONEWS!~!FRENCH!end!"'
+        attributes:
+          - name: 'Euronews French'
+            id: 'Euronews.fr'
+            chno: '345'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Euronews_2016_logo.svg/320px-Euronews_2016_logo.svg.png'
+        suffix:
+          - group: 'FR|NEWS'
+
+      - pattern: 'Name ~ "!start!EURONEWS!~!ENGLISH!end!"'
+        attributes:
+          - name: 'Euronews English'
+            chno: '346'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Euronews_2016_logo.svg/320px-Euronews_2016_logo.svg.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!BFM!~!BUSINESS!end!"'
+        attributes:
+          - name: 'BFM Business'
+            id: 'BFMBusiness.fr'
+            chno: '347'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/6/68/Logo_BFM-Business.svg/240px-Logo_BFM-Business.svg.png'
+        suffix:
+          - group: 'FR|NEWS'
+
+      - pattern: 'Name ~ "!start!ARRET!~!SUR!~!IMAGES!end!"'
+        attributes:
+          - name: 'Arrêt sur images'
+            chno: '348'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/0/0f/LOGO_%40SI_FINAL.svg/320px-LOGO_%40SI_FINAL.svg.png'
+        suffix:
+          - group: 'FR|NEWS'
+
+      - pattern: 'Name ~ "!start!B!~!SMART!end!"'
+        attributes:
+          - name: 'BSmart'
+            id: 'BSmart.fr'
+            chno: '349'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/B_SMART_logo.png/320px-B_SMART_logo.png'
+        suffix:
+          - group: 'FR|NEWS'
+
+      - pattern: 'Name ~ "!start!BBC!~!WORLD!~!NEWS!end!"'
+        attributes:
+          - name: 'BBC World News'
+            chno: '349'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/BBC_World_News_2022_%28Boxed%29.svg/240px-BBC_World_News_2022_%28Boxed%29.svg.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!SKY!~!NEWS!end!"'
+        attributes:
+          - name: 'Sky News'
+            chno: '350'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/b/b9/Sky-news-logo_new.svg/320px-Sky-news-logo_new.svg.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!CNN!~!INTERNATIONAL!end!"'
+        attributes:
+          - name: 'CNN International'
+            chno: '351'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/CNNinternational-logo.png/320px-CNNinternational-logo.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!FOX!~!NEWS!channel!!end!"'
+        attributes:
+          - name: 'Fox News Channel'
+            chno: '352'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/0/0d/Fox_News_Channel_Logo.svg/254px-Fox_News_Channel_Logo.svg.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!BLOOMBERG!~!TV!end!"'
+        attributes:
+          - name: 'Bloomberg TV'
+            chno: '353'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/3/3b/Bloomberg_Television_2016.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!CNBC!~!Europe!end!"'
+        attributes:
+          - name: 'CNBC Europe'
+            chno: '354'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/CNBC_logo.svg/301px-CNBC_logo.svg.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!AL!~!JAZEERA!~!ENGLISH!end!"'
+        attributes:
+          - name: 'Al Jazeera English'
+            chno: '355'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/0/0f/Al_Jazeera.svg/144px-Al_Jazeera.svg.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!AFRICA!~!24!end!"'
+        attributes:
+          - name: 'Africa 24'
+            chno: '356'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/6/6a/Logo_Africa_24.jpg'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!NHK!~!WORLD!end!"'
+        attributes:
+          - name: 'NHK World'
+            chno: '358'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/NHK_World.svg/240px-NHK_World.svg.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!RT!~!FRANCE!end!"'
+        attributes:
+          - name: 'RT France'
+            id: 'RTFrance.fr'
+            chno: '359'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/9/9e/RT_France.svg/240px-RT_France.svg.png'
+        suffix:
+          - group: 'FR|NEWS'
+
+      - pattern: 'Name ~ "!start!I!~!24!~!NEWS!~!FRENCH!end!" OR Name ~ "!start!I!~!24!~!NEWS!~!FRANCE!end!" OR Name ~ "!start!I!~!24!~!NEWS!end!"'
+        attributes:
+          - name: 'i24news French'
+            id: 'I24news.fr'
+            chno: '357'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/LOGO_i24NEWS.png/240px-LOGO_i24NEWS.png'
+        suffix:
+          - group: 'EN|NEWS'
+
+      - pattern: 'Name ~ "!start!A!plus!!end!"'
+        attributes:
+          - name: 'A+'
+            chno: '444'
+            logo: 'https://broccoli.tvchannellists.com/images/8/8d/APLUS-2020.png'
+        suffix:
+          - group: 'FR|INTERNATIONAL'
+
+      - pattern: 'Name ~ "!start!NOLLYWOOD!end!" OR Name ~ "!start!NOLLYWOOD!~!TV!end!"'
+        attributes:
+          - name: 'Nollywood TV'
+            id: 'NollywoodTV.fr'
+            chno: '460'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/0/08/Nouvelle_logo_de_Nollywood_TV.png'
+        suffix:
+          - group: 'FR|INTERNATIONAL'
+
+      - pattern: 'Name ~ "!start!TRACE!~!MZIKI!end!"'
+        attributes:
+          - name: 'Trace Mziki'
+            id: 'TraceGospel.fr'
+            chno: '501'
+            logo: 'https://trace.tv/trace-mziki/wp-content/uploads/sites/21/2016/11/logo_mziki-1.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!DELUXE!~!LOUNGE!~!\(STV\)!end!"'
+        attributes:
+          - name: 'Deluxe Lounge'
+            chno: '825'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Deluxe_Lounge_HD_2021.svg/320px-Deluxe_Lounge_HD_2021.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!GRAND!~!LILLE!end!"'
+        attributes:
+          - name: 'BFM Grand Lille'
+            id: 'BFMGrandLille.fr'
+            chno: '900'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/BFM_Grand_Lille_2021.jpg/240px-BFM_Grand_Lille_2021.jpg'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TV7!end!" OR Name ~ "!start!TV7!~!BORDEAUX!end!"'
+        attributes:
+          - name: 'TV7 Bordeaux'
+            id: 'TV7Bordeaux.fr'
+            chno: '901'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/4/4b/TV7_Bordeaux.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TV7!~!COLMAR!end!"'
+        attributes:
+          - name: 'TV7 Colmar'
+            id: 'TV7Colmar.fr'
+            chno: '901'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/4/4b/TV7_Bordeaux.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TV8!~!MONT!~!BLANC!end!" OR Name ~ "!start!8!~!MONT!~!BLANC!end!"'
+        attributes:
+          - name: '8 Mont-Blanc'
+            id: '8MontBlanc.fr'
+            chno: '902'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/6/6a/Logo_8_Mont_Blanc_2015.svg/251px-Logo_8_Mont_Blanc_2015.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TELE!~!GRENOBLE!~!ISERE!end!"'
+        attributes:
+          - name: 'Télé Grenoble Isère'
+            id: 'TeleGrenobleIsere.fr'
+            chno: '903'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Logo_T%C3%A9l%C3%A9grenoble_2021.jpg/320px-Logo_T%C3%A9l%C3%A9grenoble_2021.jpg'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!MUSEUM!~!TV!~!PARIS!end!"'
+        attributes:
+          - name: 'Museum TV Paris'
+            chno: '904'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Museum_TV_Paris.png/214px-Museum_TV_Paris.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!ERE!~!TV!end!"'
+        attributes:
+          - name: 'Ère TV'
+            chno: '905'
+            logo: 'https://broccoli.tvchannellists.com/images/a/ae/ERE_TV-2020.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!NORMANDIE!end!"'
+        attributes:
+          - name: 'BFM Normandie'
+            id: 'BFMNormandie.fr'
+            chno: '906'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/b/b8/BFM-Normandie.svg/240px-BFM-Normandie.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TELE!~!NANTES!end!"'
+        attributes:
+          - name: 'Télénantes'
+            id: 'Telenantes.fr'
+            chno: '907'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/T%C3%A9l%C3%A9Nantes_Logo_2020.png/320px-T%C3%A9l%C3%A9Nantes_Logo_2020.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TV!~!TOURS!~!VAL!~!DE!~!LOIRE!end!"'
+        attributes:
+          - name: 'TV Tours Val de Loire'
+            chno: '908'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Logo_tvt_2016_RVB.png/240px-Logo_tvt_2016_RVB.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!IDF1!end!"'
+        attributes:
+          - name: 'IDF1'
+            id: 'IDF1.fr'
+            chno: '910'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/f/f7/Logo_IDF1_2017-09.svg/320px-Logo_IDF1_2017-09.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!PITCHOUN!~!TV!~!IDF!end!"'
+        attributes:
+          - name: 'Pitchoun TV IDF'
+            chno: '911'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/6/64/Pitchoun_IDF.jpg/320px-Pitchoun_IDF.jpg'
+        suffix:
+          - group: 'FR|LOCAL|KIDS'
+
+      - pattern: 'Name ~ "!start!BFM!~!ALSACE!end!"'
+        attributes:
+          - name: 'BFM Alsace'
+            id: 'BFMAlsace.fr'
+            chno: '912'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/c/cb/BFM-Alsace.svg/240px-BFM-Alsace.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TV!~!78!end!"'
+        attributes:
+          - name: 'TV 78'
+            id: 'TV78.fr'
+            chno: '913'
+            logo: 'https://broccoli.tvchannellists.com/images/2/20/TV78-2020.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!WEO!~!NORD!end!"'
+        attributes:
+          - name: 'Wéo Nord'
+            id: 'WeoNord.fr'
+            chno: '914'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Logo_de_W%C3%A9o_NPdC.png/320px-Logo_de_W%C3%A9o_NPdC.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!LYON!end!" OR Name ~ "!start!BFM!~!LYON!~!METROPOLE!end!" OR Name ~ "!start!BFM!~!TV!~!LYON!~!METROPOLE!end!"'
+        attributes:
+          - name: 'BFM Lyon'
+            id: 'BFMLyon.fr'
+            chno: '915'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/b/b8/BFM-Lyon.svg/240px-BFM-Lyon.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!MARSEILLE!end!" OR Name ~ "!start!BFM!~!MARSEILLE!~!PROVENCE!end!" OR Name ~ "!start!BFM!~!TV!~!MARSEILLE!~!PROVENCE!end!"'
+        attributes:
+          - name: 'BFM Marseille'
+            id: 'BFMMarseille.fr'
+            chno: '916'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/8/8e/BFM-Marseille-Provence.svg/241px-BFM-Marseille-Provence.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!CANAL!~!10!end!"'
+        attributes:
+          - name: 'Canal 10'
+            chno: '917'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Canal_10.png/320px-Canal_10.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TLC!end!"'
+        attributes:
+          - name: 'TLC'
+            chno: '918'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/6/64/TLC_logo_2010.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!VIA!~!OCCITANIE!~!PAYS!~!GARDOIS!end!"'
+        attributes:
+          - name: 'Vià Occitanie Pays Gardois'
+            id: 'ViaOccitanieProvence.fr'
+            chno: '919'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Logo_de_Vi%C3%A0Occitanie_Pays_Gardois.png/320px-Logo_de_Vi%C3%A0Occitanie_Pays_Gardois.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!MOSELLE!~!TV!end!"'
+        attributes:
+          - name: 'Moselle TV'
+            id: 'MirabelleTV.fr'
+            chno: '920'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Logo_Moselle_TV.png/320px-Logo_Moselle_TV.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!VOSGES!~!TV!end!"'
+        attributes:
+          - name: 'Vosges TV'
+            id: 'VosgesTV.fr'
+            chno: '921'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/1/11/Vosges_TV.jpg'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!VIA!~!OCCITANIE!~!MONTPELLIER!end!"'
+        attributes:
+          - name: 'Vià Occitanie Montpellier'
+            id: 'ViaOccitanieMontpellier.fr'
+            chno: '922'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Logo_de_Vi%C3%A0Occitanie_Montpellier.png/320px-Logo_de_Vi%C3%A0Occitanie_Montpellier.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!MARITIMA!~!TV!end!"'
+        attributes:
+          - name: 'Maritima TV'
+            id: 'MaritimaTV.fr'
+            chno: '923'
+            logo: 'https://broccoli.tvchannellists.com/images/7/70/MARITIMATV-2018.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TV!~!VENDEE!end!"'
+        attributes:
+          - name: 'TV Vendée'
+            id: 'TVVendee.fr'
+            chno: '924'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/b/b6/Logotype_TV_vend%C3%A9e.svg/320px-Logotype_TV_vend%C3%A9e.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!CANAL!~!32!end!"'
+        attributes:
+          - name: 'Canal 32'
+            id: 'Canal32.fr'
+            chno: '925'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Logo_C32_couleur.png/240px-Logo_C32_couleur.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!GRAND!~!LITTORAL!end!"'
+        attributes:
+          - name: 'BFM Grand Littoral'
+            id: 'BFMGrandLittoral.fr'
+            chno: '926'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/5/5d/BFM-Grand-Littoral.svg/240px-BFM-Grand-Littoral.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TVR!end!" OR Name ~ "!start!TV!~!RENNES!~!35!~!BRETAGNE!end!"'
+        attributes:
+          - name: 'TVR'
+            id: 'TVRennes35Bretagne.fr'
+            chno: '927'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/3/35/TVR_%28Bretagne%29_logo_2011.png/242px-TVR_%28Bretagne%29_logo_2011.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TEBESUD!end!"'
+        attributes:
+          - name: 'TébéSud'
+            id: 'TebeSud.fr'
+            chno: '928'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/2/20/T%C3%A9b%C3%A9Sud_logo_2013.png/320px-T%C3%A9b%C3%A9Sud_logo_2013.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TEBEO!end!"'
+        attributes:
+          - name: 'Tébéo'
+            id: 'Tebeo.fr'
+            chno: '929'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/c/cf/Logo_T%C3%A9b%C3%A9o.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!DICI!~!ALPES!end!"'
+        attributes:
+          - name: 'BFM D!CI Alpes'
+            chno: '930'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/BFM-DICI_Alpes_du_Sud.png/480px-BFM-DICI_Alpes_du_Sud.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!TOULON!~!VAR!end!"'
+        attributes:
+          - name: 'BFM Toulon Var'
+            chno: '931'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/1/18/BFM-Toulon-Var.svg/240px-BFM-Toulon-Var.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TELE!~!ANTILLES!end!"'
+        attributes:
+          - name: 'Télé Antilles'
+            chno: '932'
+            logo: 'https://broccoli.tvchannellists.com/images/0/0f/TELE_ANTILLES-2020.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TL7!end!"'
+        attributes:
+          - name: 'TL7'
+            id: 'TL7SaintEtienne.fr'
+            chno: '933'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/LOGO_TL7.png/318px-LOGO_TL7.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TVPI!end!"'
+        attributes:
+          - name: 'TVPI'
+            id: 'TVPI.fr'
+            chno: '934'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/6/63/Tvpi-logo-jaune-alpha.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!NICE!end!" OR Name ~ "!start!BFM!~!NICE!~!COTE!~!D.?AZUR!end!"'
+        attributes:
+          - name: 'BFM Nice Côte d'Azur'
+            id: 'BFMNice.fr'
+            chno: '935'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/6/62/BFM-Nice-CoteAzur.svg/240px-BFM-Nice-CoteAzur.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!VIA!~!OCCITANIE!~!PAYS!~!CATALAN!end!"'
+        attributes:
+          - name: 'Vià Occitanie Pays Catalan'
+            id: 'ViaOccitaniePaysCatalan.fr'
+            chno: '936'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Logo_de_Vi%C3%A0Occitanie_Pays_Catalan.png/320px-Logo_de_Vi%C3%A0Occitanie_Pays_Catalan.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!MA!~!TELE!end!"'
+        attributes:
+          - name: 'Matélé'
+            id: 'MaTele.be'
+            chno: '937'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Logo_de_MATELE.png/320px-Logo_de_MATELE.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!ANGERS!~!TELE!end!"'
+        attributes:
+          - name: 'Angers Télé'
+            id: 'AngersTele.fr'
+            chno: '938'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/3/30/Logo_Angers_T%C3%A9l%C3%A9_-_2022.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TELE!~!BOCAL!end!"'
+        attributes:
+          - name: 'Télé Bocal'
+            chno: '939'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/e/e5/T%C3%A9l%C3%A9_Bocal_logo.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!DICI!~!PROVENCE!end!" OR Name ~ "!start!BFM!~!DICI!~!HAUTE!~!PROVENCE!end!"'
+        attributes:
+          - name: 'BFM D!CI Haute-Provence'
+            chno: '940'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/BFM-DICI_Haute-Provence.png/240px-BFM-DICI_Haute-Provence.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!WEO!~!PICARDIE!end!"'
+        attributes:
+          - name: 'Wéo Picardie'
+            id: 'WeoPicardie.fr'
+            chno: '941'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Logo_de_W%C3%A9o_Picardie.png/320px-Logo_de_W%C3%A9o_Picardie.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!VIA!~!OCCITANIE!~!TOULOUSE!end!"'
+        attributes:
+          - name: 'Vià Occitanie Toulouse'
+            id: 'ViaOccitanieToulouse.fr'
+            chno: '942'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Logo_de_Vi%C3%A0Occitanie_Toulouse.png/320px-Logo_de_Vi%C3%A0Occitanie_Toulouse.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BFM!~!PARIS!end!"'
+        attributes:
+          - name: 'BFM Paris'
+            id: 'BFMParis.fr'
+            chno: '943'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/a/af/BFM-Paris-IDF-2022.svg/240px-BFM-Paris-IDF-2022.svg.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!ASTV!end!"'
+        attributes:
+          - name: 'ASTV'
+            chno: '944'
+            logo: 'https://broccoli.tvchannellists.com/images/3/33/ASTV-2018.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!BIP!~!TV!end!"'
+        attributes:
+          - name: 'Bip TV'
+            id: 'BipTV.fr'
+            chno: '945'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/b/b1/Bip_TV_logo.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!VIA!~!TELE!~!PAESE!end!"'
+        attributes:
+          - name: 'Via Tele Paese'
+            chno: '946'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/b/b3/Via_Tele_Paese.png/320px-Via_Tele_Paese.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!MAURIENNE!~!TV!end!"'
+        attributes:
+          - name: 'Maurienne TV'
+            chno: '949'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/3/3c/Maurienne_TV.png/320px-Maurienne_TV.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!LA!~!CHAINE!~!32!end!"'
+        attributes:
+          - name: 'La Chaîne 32'
+            chno: '950'
+            logo: 'https://broccoli.tvchannellists.com/images/6/68/La_Chaine_32.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!7!~!A!~!LIMOGES!end!"'
+        attributes:
+          - name: '7 à Limoges'
+            chno: '951'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/3/39/Logo7alimoges.jpg'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!NA!~!TV!end!"'
+        attributes:
+          - name: 'NA TV'
+            chno: '952'
+            logo: 'https://broccoli.tvchannellists.com/images/thumb/7/77/NA_TV.png/320px-NA_TV.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TV3V!end!"'
+        attributes:
+          - name: 'TV3V'
+            chno: '953'
+            logo: 'https://www.tv3v.fr/images/logo_tv3v.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!UNIVERS!~!CINE!end!"'
+        attributes:
+          - name: 'Univers Ciné'
+            chno: '1000'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/LOGO_UC_BLACK.png/320px-LOGO_UC_BLACK.png'
+        suffix:
+          - group: 'FR|VOD'
+
+      - pattern: 'Name ~ "!start!XILAM!~!TV!end!"'
+        attributes:
+          - name: 'Xilam TV'
+            chno: '1001'
+        suffix:
+          - group: 'FR|KIDS'
+
+      - pattern: 'Name ~ "!start!WILD!~!SIDE!~!TV!end!"'
+        attributes:
+          - name: 'Wild Side TV'
+            id: 'WildSideTv.fr'
+            chno: '1002'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/thumb/0/00/Wild_Side_Films_Logo.png/137px-Wild_Side_Films_Logo.png'
+        suffix:
+          - group: 'FR|KIDS|PLUTO'
+
+      - pattern: 'Name ~ "!start!TRACE!~!KITOKO!end!"'
+        attributes:
+          - name: 'Trace Kitoko'
+            chno: '1003'
+            logo: 'https://fr.trace.tv/trace-kitoko/wp-content/uploads/sites/43/2018/04/TRACE-logo-kitoko-01.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!E.!~!ENTERTAINMENT!end!"'
+        attributes:
+          - name: 'E! Entertainment'
+            chno: '1004'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/E%21_Logo_2012.svg/74px-E%21_Logo_2012.svg.png'
+        suffix:
+          - group: 'FR|ENTERTAINMENT'
+
+      - pattern: 'Name ~ "!start!DBM!~!TV!end!"'
+        attributes:
+          - name: 'DBM TV'
+            chno: '1005'
+            logo: 'https://www.dbm-tv.fr/wp-content/uploads/2017/12/logo-dbm.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!VIA!~!OCCITANIE!end!" OR Name ~ "!start!TV!~!SUD!end!"'
+        attributes:
+          - name: 'Vià Occitanie'
+            id: 'ViaOccitanie.fr'
+            chno: '1006'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Logo_de_Vi%C3%A0Occitanie.png/320px-Logo_de_Vi%C3%A0Occitanie.png'
+        suffix:
+          - group: 'FR|LOCAL'
+
+      - pattern: 'Name ~ "!start!TRACE!~!NAIJA!end!"'
+        attributes:
+          - name: 'Trace Naija'
+            chno: '1007'
+            logo: 'https://trace.tv/trace-naija/wp-content/uploads/sites/25/2016/11/logo_naija-1.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!TRACE!~!AFRICA!end!"'
+        attributes:
+          - name: 'Trace Africa'
+            chno: '1008'
+            logo: 'https://trace.tv/trace-africa/wp-content/uploads/sites/23/2016/11/logo_africa-1.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MTV!~!BASE!end!"'
+        attributes:
+          - name: 'MTV Base'
+            id: 'MTVBase.fr'
+            chno: '1009'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/MTV-2021.svg/320px-MTV-2021.svg.png'
+        suffix:
+          - group: 'FR|MUSIC'
+
+      - pattern: 'Name ~ "!start!MDL!end!"'
+        attributes:
+          - name: 'MDL'
+            chno: '1010'
+        suffix:
+          - group: 'FR'
+
+      - pattern: 'Name ~ "!start!FRANCOPHONIE!~!24!end!"'
+        attributes:
+          - name: 'Francophonie 24'
+            chno: '1011'
+        suffix:
+          - group: 'FR'
+
+  - id: Canada
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|LQ|4K|UHD)?!~!'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - pattern: 'Name ~ "!start!CPAC!end!"'
+        attributes:
+          - name: 'Rouge TV'
+            chno: '104'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/2016_CPAC_logo.svg/320px-2016_CPAC_logo.svg.png'
+        suffix:
+          - group: 'CH'
+
+  - id: Suisse
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|LQ|4K|UHD)?!~!'
+      - name: plus
+        value: '[\s_-]*(\+|plus)'
+        # value: '!~!(\+|plus)'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - pattern: 'Name ~ "!start!ROUGE!~!TV!end!"'
+        attributes:
+          - name: 'Rouge TV'
+            id: 'RougeTV.ch'
+            chno: '13'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/d/d3/Rouge_Tv-_cmjn.png'
+        suffix:
+          - group: 'CH'
+
+      - pattern: 'Name ~ "!start!CANAL!~!ALPHA!~!JU!end!" OR Name ~ "!start!CANAL!plus!!~!ALPHA!end!"'
+        attributes:
+          - name: 'Canal Alpha JU'
+            id: 'CanalAlpha.ch'
+            chno: '18'
+            logo: 'https://upload.wikimedia.org/wikipedia/fr/7/77/Logo_Canal_Alpha_Noire_2.jpg'
+        suffix:
+          - group: 'CH'
+
+      - pattern: 'Name ~ "!start!TVM!~!3!end!"'
+        attributes:
+          - name: 'TVM 3'
+            id: 'TVM3.ch'
+            chno: '79'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Logo_TVM3_2015.png/320px-Logo_TVM3_2015.png'
+        suffix:
+          - group: 'CH'
+
+      - pattern: 'Name ~ "!start!RTS!~!UN!end!"'
+        attributes:
+          - name: 'RTS Un'
+            id: 'RTSUn.ch'
+            chno: '301'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/RTS_1_logo_2019.svg/320px-RTS_1_logo_2019.svg.png'
+        suffix:
+          - group: 'CH'
+
+      - pattern: 'Name ~ "!start!RTS!~!DEUX!end!"'
+        attributes:
+          - name: 'RTS Deux'
+            id: 'RTSDeux.ch'
+            chno: '302'
+            logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/RTS_2_logo_2019.svg/320px-RTS_2_logo_2019.svg.png'
+        suffix:
+          - group: 'CH'
+
+  - id: RakutenTv
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|LQ|4K|UHD)?!~!'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - pattern: 'Name ~ "!start!FILMS!~!THRILLER!end!"'
+        attributes:
+          - name: 'Films Thriller'
+            chno: '1'
+        suffix:
+          - group: 'FR|RAKUTEN TV'
+
+      - pattern: 'Name ~ "!start!FILMS!~!DRAMES!end!"'
+        attributes:
+          - name: 'Films Drames'
+            chno: '2'
+        suffix:
+          - group: 'FR|RAKUTEN TV'
+
+      - pattern: 'Name ~ "!start!FAMILLE!end!"'
+        attributes:
+          - name: 'Famille'
+            chno: '3'
+        suffix:
+          - group: 'FR|RAKUTEN TV'
