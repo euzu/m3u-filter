@@ -1,702 +1,3642 @@
 mappings:
-  - id: kumy
+
+  - id: Belgique
     tag:
       captures:
         - quality
       concat: '|'
       prefix: ' ['
       suffix: ']'
-    match_to_ascii: true
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?!~!'
+      - name: channel
+        value: '[\s_-]*(channel|ch\.?)'
+        # value: '!~!((channel|ch\.?)'
+      - name: one
+        value: '[\s_-]*(1|one)'
+        # value: '!~!((1|one)'
+      - name: three
+        value: '[\s_-]*(3|three)'
+        # value: '!~!((3|three)'
+      - name: plus
+        value: '[\s_-]*(\+|plus)'
+        # value: '!~!(\+|plus)'
+      - name: plus1
+        value: '[\s_-]*(\+1|plus1|D[EÉ]CAL[EÉ])'
+        # value: '!~!(\+|plus)1'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - tvg_name: La Une
+        tvg_names:
+          - '!start!LA!~!UNE!end!'
+        tvg_id: LaUne.be
+        tvg_chno: 2
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/RTBF_La_Une_logo.svg/320px-RTBF_La_Une_logo.svg.png
+        group_title:
+          - BE
+          - CLASSICS
+
+      - tvg_name: Tipik
+        tvg_names:
+          - '!start!TIPIK!end!'
+          - '!start!LA!~!DEUX!end!'
+        tvg_id: LaDeux.be
+        tvg_chno: 2
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Tipikrtbf.png/320px-Tipikrtbf.png
+        group_title:
+          - BE
+          - CLASSICS
+
+      - tvg_name: AB3
+        tvg_names:
+          - '!start!AB!three!!end!'
+        tvg_id: AB3.fr
+        tvg_chno: 8
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/AB3_logo.svg/240px-AB3_logo.svg.png
+        group_title:
+          - BE
+          - CLASSICS
+
+      - tvg_name: ABxplore
+        tvg_names:
+          - '!start!AB!~!E?XPLORE!end!'
+        tvg_id: AB3.fr
+        tvg_chno: 9
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/ABXplore_logo.svg/320px-ABXplore_logo.svg.png
+        group_title:
+          - BE
+          - CLASSICS
+
+  - id: France TNT
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)\[?(?P<quality>HD|FHD|LQ|4K|UHD)?\]?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?!~!'
+      - name: channel
+        value: '[\s_-]*(channel|ch\.?)'
+        # value: '!~!((channel|ch\.?)'
+      - name: one
+        value: '[\s_-]*(1|one)'
+        # value: '!~!((1|one)'
+      - name: plus
+        value: '[\s_-]*(\+|plus|pl)'
+        # value: '!~!(\+|plus|pl)'
+      - name: plus1
+        value: '[\s_-]*(\+1|plus1|D[EÉ]CAL[EÉ])'
+        # value: '!~!(\+|plus)1'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
     mapper:
       - tvg_name: TF1
+        # https://regex101.com/r/UV233E/1
         tvg_names:
-          - ^TF1$
+          - '!start!TF1!end!'
         tvg_id: TF1.fr
         tvg_chno: "1"
         tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
         group_title:
           - FR
           - TNT
-      - tvg_name: TF1 Series Films
+
+      - tvg_name: France 2
         tvg_names:
-          - ^TF1[_ ]*Series[_ ]*Films$
-        tvg_id: TF1SeriesFilms.fr
-        tvg_chno: "20"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: TF1 +1
-        tvg_names:
-          - ^TF1[_ ]*\+1$
-        tvg_id: TF1Plus1.fr
-        tvg_chno: "1"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/8/83/Logo_TF1_%2B1.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: FRANCE 2
-        tvg_names:
-          - ^FRANCE 2$
+          - '!start!FRANCE!~!2!end!'
         tvg_id: France2.fr
         tvg_chno: "2"
         tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/France_2_2018.svg/277px-France_2_2018.svg.png
         group_title:
           - FR
           - TNT
-      - tvg_name: FRANCE 3
+
+      - tvg_name: France 3
         tvg_names:
-          - ^FRANCE 3$
+          - '!start!FRANCE!~!3!end!'
         tvg_id: France3.fr
         tvg_chno: "3"
         tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/France_3_2018.svg/281px-France_3_2018.svg.png
         group_title:
           - FR
           - TNT
-      - tvg_name: FRANCE 4
+
+      - tvg_name: Canal+
         tvg_names:
-          - ^FRANCE 4$
-        tvg_id: France4.fr
-        tvg_chno: "14"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/France_4_2018.svg/312px-France_4_2018.svg.png
+          - '!start!CANAL!plus!!end!'
+        tvg_id: CanalPlus.fr
+        tvg_chno: 4
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
         group_title:
           - FR
-          - TNT
-      - tvg_name: FRANCE 5
+          - CINEMA
+
+      - tvg_name: Canal+ Décalé
         tvg_names:
-          - ^FRANCE 5$
+          - '!start!CANAL!plus!!plus1!!end!'
+        tvg_id: CanalPlusDecale.fr
+        tvg_chno: 4
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
+        group_title:
+          - FR
+          - CINEMA
+          - PLUS1
+
+      - tvg_name: France 5
+        tvg_names:
+          - '!start!FRANCE!~!5!end!'
         tvg_id: France5.fr
         tvg_chno: "5"
         tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png
         group_title:
           - FR
           - TNT
+
       - tvg_name: M6
         tvg_names:
-          - ^M6$
+          - '!start!M6!end!'
         tvg_id: M6.fr
         tvg_chno: "6"
         tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Logo_M6_%282020%2C_fond_clair%29.svg/320px-Logo_M6_%282020%2C_fond_clair%29.svg.png
         group_title:
           - FR
           - TNT
+
+      - tvg_name: Arte
+        tvg_names:
+          - '!start!ARTE!end!'
+        tvg_id: Arte.fr
+        tvg_chno: "7"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Arte-Logo.svg/320px-Arte-Logo.svg.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: C8
+        tvg_names:
+          - '!start!C8!end!'
+          - '!start!D8!end!'
+        tvg_id: C8.fr
+        tvg_chno: "8"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Logo_C8.svg/320px-Logo_C8.svg.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: W9
+        tvg_names:
+          - '!start!W9!end!'
+        tvg_id: W9.fr
+        tvg_chno: "9"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/W9-Logo.svg/320px-W9-Logo.svg.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: TMC
+        tvg_names:
+          - '!start!TMC!end!'
+        tvg_id: TMC.fr
+        tvg_chno: "10"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/8/88/TMC_logo.jpg
+        group_title:
+          - FR
+          - TNT
+
       - tvg_name: TFX
         tvg_names:
-          - ^TFX$
+          - '!start!TFX!end!'
         tvg_id: NT1.fr
         tvg_chno: "11"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/TFX_logo.svg/320px-TFX_logo.svg.png
         group_title:
           - FR
           - TNT
+
+      - tvg_name: NRJ 12
+        tvg_names:
+          - '!start!NRJ!~!12!end!'
+        tvg_id: NRJ12.fr
+        tvg_chno: "12"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/d/de/NRJ122015.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: LCP 100%
+        tvg_names:
+          - '!start!LCP!~!100%!end!'
+          - '!start!LCP!end!'
+        tvg_id: LCP100.fr
+        tvg_chno: "13"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/5/56/LCP.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: Public Sénat
+        tvg_names:
+          - '!start!PUBLIC!~!SENAT!end!'
+        tvg_id: PublicSenat2424.fr
+        tvg_chno: "13"
+        tvg_logo: https://storage.googleapis.com/endurance-apps-liip/media/cache/publicsenat_no_filter_grid_fs/5d8c809880564a5ed7204c4a
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: France 4
+        tvg_names:
+          - '!start!FRANCE!~!4!end!'
+        tvg_id: France4.fr
+        tvg_chno: "14"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/France_4_2018.svg/312px-France_4_2018.svg.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: BFM TV
+        tvg_names:
+          - '!start!BFM!~!TV!end!'
+        tvg_id: BFMTV.fr
+        tvg_chno: "15"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/BFM_TV_logo.png/240px-BFM_TV_logo.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: CNews
+        tvg_names:
+          - '!start!CNEWS!end!'
+          - '!start!I!~!TELE!end!'
+        tvg_id: CNews.fr
+        tvg_chno: "16"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/9/91/Canal_News_logo.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: CStar
+        tvg_names:
+          - '!start!CSTAR!end!'
+        tvg_id: CStar.fr
+        tvg_chno: "17"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Cstar-logo.jpg/320px-Cstar-logo.jpg
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: gulli
+        tvg_names:
+          - '!start!GULLI!end!'
+        tvg_id: Gulli.fr
+        tvg_chno: "18"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/e/eb/Gulli_2017_nouveau_logo.jpg
+        group_title:
+          - FR
+          - TNT
+          - KIDS
+
+      - tvg_name: TF1 Séries Films
+        # https://regex101.com/r/lU0hjK/1
+        tvg_names:
+          - '!start!TF1!~!Series?!~!(Films?)?!end!'
+          - '!start!HD1!end!'
+        tvg_id: TF1SeriesFilms.fr
+        tvg_chno: "20"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/d/d4/Logo_TF1_S%C3%A9ries_Films_2018.jpg
+        group_title:
+          - FR
+          - TNT
+          
+      - tvg_name: TF1 Séries Films+1
+        # https://regex101.com/r/mV6zOc/1
+        tvg_names:
+          - '!start!TF1!~!S.ries?!~!Films?!plus1!!end!'
+        tvg_id: TF1SeriesFilmsPlus1.fr
+        tvg_chno: "20"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/d/d4/Logo_TF1_S%C3%A9ries_Films_2018.jpg
+        group_title:
+          - FR
+          - TNT
+          - PLUS1
+
+      - tvg_name: L'Équipe
+        tvg_names:
+          - '!start!L.EQUIPE!end!'
+          - '!start!L.?EQUIPE!~!21!end!'
+        tvg_id: EquipeTv.fr
+        tvg_chno: "21"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/4/4a/L%27Equipe_logo.png
+        group_title:
+          - FR
+          - TNT
+
       - tvg_name: 6TER
         tvg_names:
-          - ^6TER$
+          - '!start!6TER!end!'
         tvg_id: 6ter.fr
         tvg_chno: "22"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/a/a9/6ter_2012.png
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/0/07/6ter.png
         group_title:
           - FR
           - TNT
-      - tvg_name: CANAL+
+
+      - tvg_name: RMC Story
         tvg_names:
-          - ^CANAL\+$
-        tvg_id: CanalPlus.fr
-        tvg_chno: "51"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
+          - '!start!RMC!~!STORY!end!'
+          - '!start!Numero!~!23!end!'
+        tvg_id: Numero23.fr
+        tvg_chno: "23"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/RMC_Story_logo_2018.svg/320px-RMC_Story_logo_2018.svg.png
         group_title:
           - FR
-      - tvg_name: CANAL+ CINEMA
+          - TNT
+
+      - tvg_name: RMC Découverte
         tvg_names:
-          - ^CANAL\+ CINEMA$
+          - '!start!RMC!~!DECOUVERTE!end!'
+        tvg_id: RMCDecouverte.fr
+        tvg_chno: "24"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/5/58/Rmc_d%C3%A9couverte_logo_2017.jpg
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: Chérie 25
+        tvg_names:
+          - '!start!CHERIE!~!25!end!'
+        tvg_id: Cherie25.fr
+        tvg_chno: "25"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Logo_Ch%C3%A9rie_25.svg/320px-Logo_Ch%C3%A9rie_25.svg.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: LCI
+        tvg_names:
+          - '!start!LCI!end!'
+        tvg_id: LCI.fr
+        tvg_chno: "26"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/3/38/LCI_-_Logo_%28Ao%C3%BBt_2017%29.svg/320px-LCI_-_Logo_%28Ao%C3%BBt_2017%29.svg.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: France Info
+        tvg_names:
+          - '!start!FRANCE!~!INFO!end!'
+          - '!start!FRANCE!~!O!end!'
+        tvg_id: FranceInfo.fr
+        tvg_chno: "27"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Franceinfo.svg/320px-Franceinfo.svg.png
+        group_title:
+          - FR
+          - TNT
+
+      - tvg_name: Paris Première
+        tvg_names:
+          - '!start!PARIS!~!PREMIERE!end!'
+        tvg_id: ParisPremiere.fr
+        tvg_chno: "28"
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Logo_Paris_Premi%C3%A8re_rentr%C3%A9e_2011-2012.jpg/320px-Logo_Paris_Premi%C3%A8re_rentr%C3%A9e_2011-2012.jpg
+        group_title:
+          - FR
+          - TNT
+
+  - id: France Premium
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?!~!'
+      - name: channel
+        value: '[\s_-]*(channel|ch\.?)'
+        # value: '!~!((channel|ch\.?)'
+      - name: one
+        value: '[\s_-]*(1|one)'
+        # value: '!~!((1|one)'
+      - name: plus
+        value: '[\s_-]*(\+|plus|pl)'
+        # value: '!~!(\+|plus|pl)'
+      - name: plus1
+        value: '[\s_-]*(\+1|plus1|D[EÉ]CAL[EÉ])'
+        # value: '!~!(\+|plus)1'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - tvg_name: 13ème Rue
+        tvg_names:
+          - '!start!13!~!E(ME)?!~!RUE!end!'
+        tvg_id: 13eRue.fr
+        tvg_chno:
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Logo_of_13e_Rue.png/240px-Logo_of_13e_Rue.png
+        group_title:
+          - FR
+
+      - tvg_name: RTL9
+        tvg_names:
+          - '!start!RTL!~!9!end!'
+          - '!start!UNIVERS!~!CINE!end!'
+        tvg_id: RTL9.fr
+        tvg_chno: 29
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/RTL_9.svg/320px-RTL_9.svg.png
+        group_title:
+          - FR
+
+      - tvg_name: BeIN Sports 1
+        tvg_names:
+          - '!start!BEIN!~!SPORTS!~!1!end!'
+        tvg_id: beINSPORTS1.fr
+        tvg_chno: 31
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/b/b4/BeinSports1.jpg
+        group_title:
+          - FR
+          - PREMIUM
+          - SPORTS
+
+      - tvg_name: BeIN Sports 2
+        tvg_names:
+          - '!start!BEIN!~!SPORTS!~!2!end!'
+        tvg_id: beINSPORTS2.fr
+        tvg_chno: 32
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/b/b4/BeinSports1.jpg
+        group_title:
+          - FR
+          - PREMIUM
+          - SPORTS
+
+      - tvg_name: BeIN Sports 3
+        tvg_names:
+          - '!start!BEIN!~!SPORTS!~!3!end!'
+        tvg_id: beINSPORTS3.fr
+        tvg_chno: 33
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/b/b4/BeinSports1.jpg
+        group_title:
+          - FR
+          - PREMIUM
+          - SPORT
+
+      - tvg_name: RMC Sport 1
+        tvg_names:
+          - '!start!RMC!~!SPORT!~!1!end!'
+        tvg_id: RMCSport1.fr
+        tvg_chno: 34
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Logo_RMC_Sport_2018.svg/320px-Logo_RMC_Sport_2018.svg.png
+        group_title:
+          - FR
+          - PREMIUM
+          - SPORTS
+
+      - tvg_name: RMC Sport 2
+        tvg_names:
+          - '!start!RMC!~!SPORT!~!2!end!'
+        tvg_id: RMCSport2.fr
+        tvg_chno: 35
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Logo_RMC_Sport_2018.svg/320px-Logo_RMC_Sport_2018.svg.png
+        group_title:
+          - FR
+          - PREMIUM
+          - SPORTS
+
+      - tvg_name: Info Sport+
+        tvg_names:
+          - '!start!INFO!~!SPORT!plus!!end!'
+        tvg_id: InfosportPlus.fr
+        tvg_chno: 36
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/2/24/InfosportPlus.svg/320px-InfosportPlus.svg.png
+        group_title:
+          - FR
+          - PREMIUM
+          - SPORTS
+
+      - tvg_name: OCS Max
+        tvg_names:
+          - '!start!OCS!~!MAX!end!'
+        tvg_id: OCSMax.fr
+        tvg_chno: 37
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/OCS_Max_2022.svg/320px-OCS_Max_2022.svg.png
+        group_title:
+          - FR
+          - PREMIUM
+          - CINEMA
+
+      - tvg_name: OCS City
+        tvg_names:
+          - '!start!OCS!~!CITY!end!'
+        tvg_id: OCSCity.fr
+        tvg_chno: 38
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/OCS_City_2022.svg/320px-OCS_City_2022.svg.png
+        group_title:
+          - FR
+          - PREMIUM
+          - CINEMA
+
+      - tvg_name: OCS Choc
+        tvg_names:
+          - '!start!OCS!~!CHOC!end!'
+        tvg_id: OCSChoc.fr
+        tvg_chno: 39
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/OCS_Choc_2022.svg/320px-OCS_Choc_2022.svg.png
+        group_title:
+          - FR
+          - PREMIUM
+          - CINEMA
+
+      - tvg_name: OCS Géants
+        tvg_names:
+          - '!start!OCS!~!GEANTS!end!'
+        tvg_id: OCSGeants.fr
+        tvg_chno: 40
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/OCS_G%C3%A9ants_2022.svg/320px-OCS_G%C3%A9ants_2022.svg.png
+        group_title:
+          - FR
+          - PREMIUM
+          - CINEMA
+
+      - tvg_name: Canal+ Cinéma
+        tvg_names:
+          - '!start!CANAL!plus!!~!CINEMA!end!'
         tvg_id: CanalPlusCinema.fr
-        tvg_chno: "52"
+        tvg_chno: 41
         tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Canal%2BCin%C3%A9ma2009.svg/320px-Canal%2BCin%C3%A9ma2009.svg.png
         group_title:
           - FR
-      - tvg_name: CANAL+ DECALE
+          - PREMIUM
+          - CINEMA
+
+      - tvg_name: Canal+ Grand Écran
         tvg_names:
-          - ^CANAL\+ DECALE$
-        tvg_id: CanalPlusDecale.fr
-        tvg_chno: "53"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ FAMILY
-        tvg_names:
-          - ^CANAL\+ FAMILY$
-        tvg_id: CanalPlusFamily.fr
-        tvg_chno: "54"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Canal%2BFamily_2009.svg/320px-Canal%2BFamily_2009.svg.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ SERIES
-        tvg_names:
-          - ^CANAL\+ SERIES$
-        tvg_id: CanalPlusSeries.fr
-        tvg_chno: "40"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/4/48/C%2B_Series.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ SPORT
-        tvg_names:
-          - ^CANAL\+ SPORT$
-        tvg_id: CanalPlusSport.fr
-        tvg_chno: ""
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/d/d7/Canal%2BSport2009.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ KIDS
-        tvg_names:
-          - ^CANAL\+ KIDS$
-        tvg_id: CanalPlusKIDS.fr
-        tvg_chno: ""
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/3/34/Canal%2B_Kids_Logo_%282021%29.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ DOCS
-        tvg_names:
-          - ^CANAL\+ DOC(S)?$
-        tvg_id: CanalPlusDocs.fr
-        tvg_chno: "54"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CANAL+ GRAND ECRAN
-        tvg_names:
-          - ^CANAL\+ GRAND ECRAN$
+          - '!start!CANAL!plus!!~!GRAND!~!ECRAN!end!'
         tvg_id: CanalPlusGrandEcran.fr
-        tvg_chno: "55"
-        tvg_logo: ""
+        tvg_chno: 42
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/b/b5/Logo_Canal%2B_Grand_%C3%89cran_2022.svg/320px-Logo_Canal%2B_Grand_%C3%89cran_2022.svg.png
         group_title:
           - FR
-      - tvg_name: CINE+ PREMIER
+          - PREMIUM
+          - CINEMA
+
+      - tvg_name: Canal+ Séries
         tvg_names:
-          - ^CINE\+ PREMIER$
-        tvg_id: CinePlusPremier.fr
-        tvg_chno: "60"
-        tvg_logo: ""
+          - '!start!CANAL!plus!!~!SERIES!end!'
+        tvg_id: CanalPlusSeries.fr
+        tvg_chno: 43
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/9/95/Canal%2B_S%C3%A9ries.svg/320px-Canal%2B_S%C3%A9ries.svg.png
         group_title:
           - FR
-      - tvg_name: CINE+ FRISSON
+          - PREMIUM
+          - SERIES
+
+      - tvg_name: Canal+ Sport
         tvg_names:
-          - ^CINE\+ FRISSON$
-        tvg_id: CinePlusFrisson.fr
-        tvg_chno: "61"
-        tvg_logo: ""
+          - '!start!CANAL!plus!!~!SPORT!end!'
+        tvg_id: CanalPlusSport.fr
+        tvg_chno: 44
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/4/4f/Canal%2B_Sport_%282013%29.svg/320px-Canal%2B_Sport_%282013%29.svg.png
         group_title:
           - FR
-      - tvg_name: CINE+ FAMIZ
+          - PREMIUM
+          - SPORTS
+
+      - tvg_name: Canal+ Sport 360
         tvg_names:
-          - ^CINE\+ FAMIZ$
-        tvg_id: CinePlusFamiz.fr
-        tvg_chno: "62"
-        tvg_logo: ""
+          - '!start!CANAL!plus!!~!SPORT!~!360!end!'
+        tvg_id: CanalPlusSport360.fr
+        tvg_chno: 45
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/6/64/Canal%2BSport_360.png?uselang=fr
         group_title:
           - FR
-      - tvg_name: CINE+ EMOTION
+          - PREMIUM
+          - SPORTS
+
+      - tvg_name: Canal+ Foot
         tvg_names:
-          - ^CINE\+ EMOTION$
-        tvg_id: CinePlusEmotion.fr
-        tvg_chno: "63"
-        tvg_logo: ""
+          - '!start!CANAL!plus!!~!FOOT!end!'
+        tvg_id: CanalPlusFoot.fr
+        tvg_chno: 46
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/e/eb/Canal%2BFoot.png
         group_title:
           - FR
-      - tvg_name: CINE+ CLASSIC
+          - PREMIUM
+          - SPORTS
+          - FOOT
+
+      - tvg_name: Canal+ Docs
         tvg_names:
-          - ^CINE\+ CLASSIC$
-        tvg_id: CinePlusClassic.fr
-        tvg_chno: "64"
-        tvg_logo: ""
+          - '!start!CANAL!plus!!~!DOCS?!end!'
+        tvg_id: CanalPlusDocs.fr
+        tvg_chno: 47
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/f/fe/Canal%2B_Docs_FR.png/320px-Canal%2B_Docs_FR.png
         group_title:
           - FR
-      - tvg_name: CINE+ CLUB
+          - PREMIUM
+          - DOCUMENTAIRES
+
+      - tvg_name: Canal+ Kids
         tvg_names:
-          - ^CINE\+ CLUB$
-        tvg_id: CinePlusClub.fr
-        tvg_chno: "65"
-        tvg_logo: ""
+          - '!start!CANAL!plus!!~!KIDS!end!'
+          - '!start!CANAL!~!KIDS!end!'
+          - '!start!CANAL!plus!!~!FAMILY!end!'
+          - '!start!CANAL!~!FAMILY!end!'
+        tvg_id: CanalPlusKIDS.fr
+        tvg_chno: 48
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/0/0c/Canal%2B_Kids.png
         group_title:
           - FR
-      - tvg_name: OCS MAX
+          - PREMIUM
+          - KIDS
+
+      - tvg_name: Disney Channel
         tvg_names:
-          - ^OCS MAX$
-        tvg_id: OCSMax.fr
-        tvg_chno: "69"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: OCS CITY
-        tvg_names:
-          - ^OCS CITY$
-        tvg_id: OCSCity.fr
-        tvg_chno: "67"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: OCS GEANTS
-        tvg_names:
-          - ^OCS GEANTS$
-        tvg_id: OCSGeants.fr
-        tvg_chno: "68"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: OCS CHOC
-        tvg_names:
-          - ^OCS CHOC$
-        tvg_id: OCSChoc.fr
-        tvg_chno: "66"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: RTL9
-        tvg_names:
-          - ^RTL[_ ]*9$
-        tvg_id: RTL9.fr
-        tvg_chno: "29"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: ACTION
-        tvg_names:
-          - ^ACTION$
-        tvg_id: Action.fr
-        tvg_chno: "50"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NRJ12
-        tvg_names:
-          - ^NRJ[_ ]*12$
-        tvg_id: NRJ12.fr
-        tvg_chno: "12"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: CHERIE25
-        tvg_names:
-          - ^CHERIE[_ ]*25$
-        tvg_id: Cherie25.fr
-        tvg_chno: "25"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: ARTE
-        tvg_names:
-          - ^ARTE$
-        tvg_id: Arte.fr
-        tvg_chno: "7"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: W9
-        tvg_names:
-          - ^W9$
-        tvg_id: W9.fr
-        tvg_chno: "9"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: PARIS PREMIERE
-        tvg_names:
-          - ^PARIS PREMIERE$
-        tvg_id: ParisPremiere.fr
-        tvg_chno: "72"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: PARAMOUNT CHANNEL
-        tvg_names:
-          - ^PARAMOUNT CHANNEL$
-          - r'^PARAMOUNT$'
-        tvg_id: ParamountChannel.fr
-        tvg_chno: "70"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: PARAMOUNT DECALE
-        tvg_names:
-          - ^PARAMOUNT DECALE$
-        tvg_id: ParamountChannelDecale.fr
-        tvg_chno: "71"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: SYFY
-        tvg_names:
-          - ^SYFY$
-        tvg_id: Syfy.fr
-        tvg_chno: "46"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: POLAR+
-        tvg_names:
-          - ^POLAR\+$
-        tvg_id: PolarPlus.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: SERIE CLUB
-        tvg_names:
-          - ^SERIE CLUB$
-        tvg_id: SerieClub.fr
-        tvg_chno: "45"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: 13eme RUE
-        tvg_names:
-          - ^13EME RUE$
-        tvg_id: 13eRue.fr
-        tvg_chno: "30"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TMC
-        tvg_names:
-          - ^TMC$
-        tvg_id: TMC.fr
-        tvg_chno: "10"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NOVELAS TV
-        tvg_names:
-          - ^NOVELAS TV$
-          - ^NOVELAS$
-        tvg_id: NovelasTV.fr
-        tvg_chno: "45"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: USHUAIA TV
-        tvg_names:
-          - ^USHUAIA TV$
-        tvg_id: UshuaiaTV.fr
-        tvg_chno: "176"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: PLANETE+ CI
-        tvg_names:
-          - ^PLANETE[_ ]*\+ CI$
-        tvg_id: PLANETEJustice.fr
-        tvg_chno: "154"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: PLANETE+ A&E
-        tvg_names:
-          - ^PLANETE[_ ]*\+ A&E$
-        tvg_id: PlaneteAction.fr
-        tvg_chno: "153"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: PLANETE+
-        tvg_names:
-          - ^PLANETE[_ ]*\+$
-        tvg_id: PlanetePlus.fr
-        tvg_chno: "152"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NATIONAL GEOGRAPHIC
-        tvg_names:
-          - ^NAT(IONAL)? GEO(GRAPHIC)?$
-        tvg_id: NationalGeographic.fr
-        tvg_chno: "175"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NATIONAL GEOGRAPHIC WILD
-        tvg_names:
-          - ^NAT(IONAL)? GEO(GRAPHIC)? WILD$
-        tvg_id: NatGeoWild.fr
-        tvg_chno: "174"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISCOVERY CHANNEL
-        tvg_names:
-          - ^DISCOVERY CH(ANNN?EL)?$
-        tvg_id: DiscoveryChannel.fr
-        tvg_chno: "170"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISCOVERY SCIENCE
-        tvg_names:
-          - ^DISCOVERY SCIENCE$
-        tvg_id: DiscoveryScience.fr
-        tvg_chno: "171"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISCOVERY FAMILY
-        tvg_names:
-          - ^DISCOVERY FAMILY$
-        tvg_id: DiscoveryFamily.fr
-        tvg_chno: "172"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISCOVERY INVESTIGATION
-        tvg_names:
-          - ^DISCOVERY (INVESTIGATION|ID)$
-        tvg_id: DiscoveryInvestigation.fr
-        tvg_chno: "173"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CRIME DISTRICT
-        tvg_names:
-          - ^CRIME DISTRICT$
-          - ^CRIME DISTCRIT$
-        tvg_id: CrimeDistrict.fr
-        tvg_chno: "150"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: SCIENCE ET VIE TV
-        tvg_names:
-          - ^SCIENCE ET VIE( TV)?$
-        tvg_id: ScienceEtVieTV.fr
-        tvg_chno: "150"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: RMC DECOUVERTE
-        tvg_names:
-          - ^RMC DECOUVERTE$
-        tvg_id: RMCDecouverte.fr
-        tvg_chno: "24"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: RMC STORY
-        tvg_names:
-          - ^RMC STORY$
-        tvg_id: Numero23.fr
-        tvg_chno: "23"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: HISTOIRE TV
-        tvg_names:
-          - ^HISTOIRE TV$
-        tvg_id: Histoire.fr
-        tvg_chno: "151"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TOUTE L HISTOIRE
-        tvg_names:
-          - ^TOUTE L[ _']HISTOIRE$
-        tvg_id: TouteHistoire.fr
-        tvg_chno: "152"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: C8
-        tvg_names:
-          - ^C8$
-        tvg_id: C8.fr
-        tvg_chno: "8"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CSTAR
-        tvg_names:
-          - ^CSTAR$
-        tvg_id: Cstar.fr
-        tvg_chno: "17"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISNEY CHANNEL
-        tvg_names:
-          - ^DISNEY CHANNEL$
+          - '!start!DISNEY!channel!!end!'
         tvg_id: DisneyChannel.fr
-        tvg_chno: ""
-        tvg_logo: ""
+        tvg_chno: 49
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/2019_Disney_Channel_logo.svg/320px-2019_Disney_Channel_logo.svg.png
         group_title:
           - FR
-      - tvg_name: DISNEY CHANNEL +1
+          - ENTERTAINMENT
+
+      - tvg_name: Game One
         tvg_names:
-          - ^DISNEY CHANNEL \+1$
-        tvg_id: DisneyChannelPlus1.fr
-        tvg_chno: ""
-        tvg_logo: ""
+          - '!start!GAME!one!!end!'
+        tvg_id: GameOne.fr
+        tvg_chno: 50
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/d/d2/Game_One_%282006%29_Logo.svg/320px-Game_One_%282006%29_Logo.svg.png
         group_title:
           - FR
-      - tvg_name: DISNEY+
-        tvg_names:
-          - ^DISNEY\+$
-        tvg_id: DisneyPlus.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CARTOON NETWORK
-        tvg_names:
-          - ^CARTOON NETWORK$
-        tvg_id: CartoonNetwork.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: GULLI
-        tvg_names:
-          - ^GULLI$
-        tvg_id: Gulli.fr
-        tvg_chno: "18"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: M6 MUSIC
-        tvg_names:
-          - ^M6 MUSIC$
-        tvg_id: M6Music.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NRJ HITS
-        tvg_names:
-          - ^NRJ HITS$
-        tvg_id: NRJHits.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: MCM
-        tvg_names:
-          - ^MCM$
-        tvg_id: MCM.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: MTV
-        tvg_names:
-          - ^MTV$
-        tvg_id: MTV.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: MTV HITS
-        tvg_names:
-          - ^MTV HITS$
-        tvg_id: MTVHits.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: RFM TV
-        tvg_names:
-          - ^RFM TV$
-        tvg_id: RFMTV.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: ALTICE STUDIO
-        tvg_names:
-          - ^ALTICE STUDIO$
-        tvg_id: AlticeStudio.fr
-        tvg_chno: "51"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: WARNER TV
-        tvg_names:
-          - ^WARNER TV$
-        tvg_id: WarnerTV.fr
-        tvg_chno: "57"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TCM CINEMA
-        tvg_names:
-          - ^TCM CINEMA$
-        tvg_id: TCM.fr
-        tvg_chno: "73"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: COMEDIE+
-        tvg_names:
-          - ^COMEDIE\+$
-        tvg_id: ComediePlus.fr
-        tvg_chno: "31"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: COMEDY CENTRAL
-        tvg_names:
-          - ^COMEDY CENTRAL$
-        tvg_id: ComedyCentral.fr
-        tvg_chno: "32"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TEVA
-        tvg_names:
-          - ^TEVA$
-        tvg_id: Teva.fr
-        tvg_chno: "19"
-        tvg_logo: ""
-        group_title:
-          - FR
+          - ENTERTAINMENT
+
       - tvg_name: AB1
         tvg_names:
-          - ^AB1$
+          - '!start!AB!one!!end!'
         tvg_id: AB1.fr
-        tvg_chno: "40"
-        tvg_logo: ""
+        tvg_chno: 51
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/9/9a/Logo_AB1_2021.png
         group_title:
           - FR
-      - tvg_name: AB3
+          - ENTERTAINMENT
+
+      - tvg_name: Paramount Channel
         tvg_names:
-          - ^AB3$
-        tvg_id: AB3.fr
-        tvg_chno: "41"
-        tvg_logo: ""
+          - '!start!PARAMOUNT!~!CHANNEL!end!'
+          - '!start!PARAMOUNT!end!'
+        tvg_id: ParamountChannel.fr
+        tvg_chno: 52
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/5/59/Paramount_Channel.svg/247px-Paramount_Channel.svg.png
         group_title:
           - FR
-      - tvg_name: TVBREIZH
+          - ENTERTAINMENT
+          - MOVIES
+
+      - tvg_name: Téva
         tvg_names:
-          - ^TVBREIZH$
+          - '!start!TEVA!end!'
+        tvg_id: Teva.fr
+        tvg_chno: 53
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/T%C3%A9va_logo_2021.svg/240px-T%C3%A9va_logo_2021.svg.png
+        group_title:
+          - FR
+          - ENTERTAINMENT
+
+      - tvg_name: TV Breizh
+        tvg_names:
+          - '!start!TV!~!BREIZH!end!'
         tvg_id: TvBreizh.fr
-        tvg_chno: "74"
-        tvg_logo: ""
+        tvg_chno: 54
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/c/c7/TV_Breizh_logo_2019.svg/320px-TV_Breizh_logo_2019.svg.png
         group_title:
           - FR
-      - tvg_name: ULTRA NATURE
+          - ENTERTAINMENT
+
+      - tvg_name: Polar+
         tvg_names:
-          - ^ULTRA NATURE$
-        tvg_id: UltraNature.fr
-        tvg_chno: "177"
-        tvg_logo: ""
+          - '!start!POLAR!plus!!end!'
+          - '!start!CINE!~!POLAR!end!'
+        tvg_id: PolarPlus.fr
+        tvg_chno: 55
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Polar%2B_%28Logo%29.png/320px-Polar%2B_%28Logo%29.png
         group_title:
           - FR
-      - tvg_name: MANGAS
+          - ENTERTAINMENT
+
+      - tvg_name: Série Club
         tvg_names:
-          - ^MANGAS$
+          - '!start!SERIES?!~!CLUB!end!'
+        tvg_id: serieclub.fr
+        tvg_chno: 56
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/4/4c/Serieclub_%282012%29.svg/320px-Serieclub_%282012%29.svg.png
+        group_title:
+          - FR
+          - ENTERTAINMENT
+
+      - tvg_name: Warner TV
+        tvg_names:
+          - '!start!WARNER!~!TV!end!'
+        tvg_id: WarnerTV.fr
+        tvg_chno: 57
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/WarnerTV_France_2021.svg/238px-WarnerTV_France_2021.svg.png
+        group_title:
+          - FR
+          - ENTERTAINMENT
+
+      - tvg_name: Novelas TV
+        tvg_names:
+          - '!start!NOVELAS!~!TV!end!'
+          - '!start!NOVELAS!end!'
+        tvg_id: NovelasTV.fr
+        tvg_chno: 58
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/e/ee/Logo_Novelas_TV.svg/320px-Logo_Novelas_TV.svg.png
+        group_title:
+          - FR
+          - ENTERTAINMENT
+
+      - tvg_name: Planète+
+        tvg_names:
+          - '!start!PLANETE!plus!!end!'
+          - '!start!PLANETE!end!'
+        tvg_id: PlanetePlus.fr
+        tvg_chno: 59
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/9/9b/Planete_plus.png
+        group_title:
+          - FR
+          - DISCOVERY
+
+      - tvg_name: National Geographic
+        tvg_names:
+          - '!start!NATIONAL!~!GEOGRAPHIC!end!'
+          - '!start!NAT!~!GEO!end!'
+        tvg_id: NationalGeographic.fr
+        tvg_chno: 60
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Natgeologo.svg/320px-Natgeologo.svg.png
+        group_title:
+          - FR
+          - DISCOVERY
+
+      - tvg_name: National Geographic Wild
+        tvg_names:
+          - '!start!NATIONAL!~!GEOGRAPHIC!~!WILD!end!'
+          - '!start!NAT!~!GEO!~!WILD!end!'
+        tvg_id: NatGeoWild.fr
+        tvg_chno: 61
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/National_Geographic_Wild_logo.svg/320px-National_Geographic_Wild_logo.svg.png
+        group_title:
+          - FR
+          - DISCOVERY
+
+      - tvg_name: Discovery Channel
+        tvg_names:
+          - '!start!DISCOVERY!end!'
+          - '!start!DISCOVERY!channel!!end!'
+        tvg_id: DiscoveryChannel.fr
+        tvg_chno: 62
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/2019_Discovery_logo.svg/320px-2019_Discovery_logo.svg.png
+        group_title:
+          - FR
+          - DISCOVERY
+
+      - tvg_name: Discovery Science
+        tvg_names:
+          - '!start!DISCOVERY!~!SCIENCE!end!'
+        tvg_id: DiscoveryScience.fr
+        tvg_chno: 63
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Discovery_science_new_logo_2017.png/320px-Discovery_science_new_logo_2017.png
+        group_title:
+          - FR
+          - DISCOVERY
+
+      - tvg_name: Discovery Investigation
+        tvg_names:
+          - '!start!DISCOVERY!~!INVESTIGATION!end!'
+        tvg_id: DiscoveryInvestigation.fr
+        tvg_chno: 63
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/InvestigationDiscoveryLogo2020.svg/320px-InvestigationDiscoveryLogo2020.svg.png
+        group_title:
+          - FR
+          - DISCOVERY
+
+      - tvg_name: Discovery Family
+        tvg_names:
+          - '!start!DISCOVERY!~!FAMILY!end!'
+        tvg_id: DiscoveryFamily.fr
+        tvg_chno: 63
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Discovery_Family_logo.svg/320px-Discovery_Family_logo.svg.png
+        group_title:
+          - FR
+          - DISCOVERY
+
+      - tvg_name: M6 Music
+        tvg_names:
+          - '!start!M6!~!MUSIC!end!'
+          - '!start!M6!~!MUSIC!~!HITS!end!'
+        tvg_id: M6Music.fr
+        tvg_chno: 64
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/3/3b/M6_Music_2018.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: NRJ Hits
+        tvg_names:
+          - '!start!NRJ!~!HITS!end!'
+        tvg_id: NRJHits.fr
+        tvg_chno: 65
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/3/36/NRJ_Hits_2017.svg/236px-NRJ_Hits_2017.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: MTV Hits
+        tvg_names:
+          - '!start!MTV!~!HITS!end!'
+        tvg_id: MTVHits.fr
+        tvg_chno: 66
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/MTV_Hits_2021.svg/253px-MTV_Hits_2021.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: TF1+1
+        tvg_names:
+          - '!start!TF1!plus1!!end!'
+        tvg_id: TF1plus1.fr
+        tvg_chno: 67
+        tvg_logo: https://broccoli.tvchannellists.com/images/c/c4/TF1PLUS1-2020.png
+        group_title:
+          - FR
+          - GENERAL INTEREST
+          - PLUS1
+
+      - tvg_name: TMC+1
+        tvg_names:
+          - '!start!TMC!plus1!!end!'
+        tvg_id: TMCplus1.fr
+        tvg_chno: 68
+        tvg_logo: https://broccoli.tvchannellists.com/images/f/f9/TMCPLUS1-2020.png
+        group_title:
+          - FR
+          - GENERAL INTEREST
+          - PLUS1
+
+      - tvg_name: TV5 Monde
+        tvg_names:
+          - '!start!TV5!~!MONDE!end!'
+          - '!start!TV5!~!MONDE!~!INFO!end!'
+          - '!start!TV5!~!MONDE!~!EUROPE!end!'
+        tvg_id: TV5Monde.fr
+        tvg_chno: 70
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Logo_TV5_Monde_-_2021.svg/320px-Logo_TV5_Monde_-_2021.svg.png
+        group_title:
+          - FR
+          - GENERAL INTEREST
+
+      - tvg_name: Olympia TV
+        tvg_names:
+          - '!start!OLYMPIA!~!TV!end!'
+          - '!start!OLYMPIA!end!'
+        tvg_id: OlympiaTV.fr
+        tvg_chno: 79
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/OlympiaTV.png/799px-OlympiaTV.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: Comédie+
+        tvg_names:
+          - '!start!COMEDIE!plus!!end!'
+        tvg_id: ComediePlus.fr
+        tvg_chno: 80
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/4/49/Com%C3%A9die%2B_%282011%29.svg/267px-Com%C3%A9die%2B_%282011%29.svg.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: MTV
+        tvg_names:
+          - '!start!MTV!end!'
+          - '!start!MTV!~!FRANCE!end!'
+        tvg_id: MTV.fr
+        tvg_chno: 84
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/MTV-2021.svg/320px-MTV-2021.svg.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: MCM
+        tvg_names:
+          - '!start!MCM!end!'
+        tvg_id: MCM.fr
+        tvg_chno: 87
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/a/ab/MCM_logo_2017.svg/320px-MCM_logo_2017.svg.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: J-One
+        tvg_names:
+          - '!start!J!~!ONE!end!'
+        tvg_id: MCM.fr
+        tvg_chno: 88
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/6/6d/J-One.svg/320px-J-One.svg.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: Game One +1
+        tvg_names:
+          - '!start!GAME!~!ONE!plus1!!end!'
+        tvg_id: GameOneplus1.fr
+        tvg_chno: 89
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/6/6d/J-One.svg/320px-J-One.svg.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: Mangas
+        tvg_names:
+          - '!start!MANGAS!end!'
         tvg_id: Mangas.fr
-        tvg_chno: "45"
-        tvg_logo: ""
+        tvg_chno: 90
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/9/96/Logo-mangaschaine2022.png
         group_title:
           - FR
+          - NEW GENERATION
+
+      - tvg_name: MGG TV
+        tvg_names:
+          - '!start!MGG!~!TV!end!'
+          - '!start!ES1!end!'
+        tvg_id: ES1.fr
+        tvg_chno: 91
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/4/4e/Mgg_tv.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: Adult Swim
+        tvg_names:
+          - '!start!ADULT!~!SWIM!end!'
+        tvg_id: AdultSwim.fr
+        tvg_chno: 92
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Adult_Swim_2003_logo.svg/320px-Adult_Swim_2003_logo.svg.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: Gong
+        tvg_names:
+          - '!start!GONG!end!'
+        tvg_id: Gong.fr
+        tvg_chno: 94
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/e/e7/Gong_%28cha%C3%AEne_de_t%C3%A9l%C3%A9vision%29_Logo.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: Gong Max
+        tvg_names:
+          - '!start!GONG!~!MAX!end!'
+        tvg_id: GongMax.fr
+        tvg_chno: 95
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/e/e7/Gong_%28cha%C3%AEne_de_t%C3%A9l%C3%A9vision%29_Logo.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: Comedy Central
+        tvg_names:
+          - '!start!COMEDY!~!CENTRAL!end!'
+        tvg_id: ComedyCentral.fr
+        tvg_chno: 97
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Comedy_Central_2018.svg/320px-Comedy_Central_2018.svg.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: BET
+        tvg_names:
+          - '!start!BET!end!'
+        tvg_id: BET.fr
+        tvg_chno: 99
+        tvg_logo: https://logonoid.com/images/bet-logo.png
+        group_title:
+          - FR
+          - NEW GENERATION
+
+      - tvg_name: Syfy
+        tvg_names:
+          - '!start!SYFY!end!'
+          - '!start!SYFY!~!UNIVERSAL!end!'
+        tvg_id: Syfy.fr
+        tvg_chno: 107
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/SYFY.svg/320px-SYFY.svg.png
+        group_title:
+          - FR
+          - SERIES
+
+      - tvg_name: Ciné+ Premier
+        tvg_names:
+          - '!start!CINE!plus!!~!PREMIER!end!'
+          - '!start!CINE!~!PREMIER!end!'
+          - '!start!CINE!~!PERMIER!end!'
+        tvg_id: CinePlusPremier.fr
+        tvg_chno: 109
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/b/b2/Cin%C3%A9%2B_Premier_%282011%29.svg/320px-Cin%C3%A9%2B_Premier_%282011%29.svg.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Ciné+ Frisson
+        tvg_names:
+          - '!start!CINE!plus!!~!FRISSON!end!'
+          - '!start!CINE!~!FRISSON!end!'
+        tvg_id: CinePlusFrisson.fr
+        tvg_chno: 110
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/3/3d/CinePlusFrisson.svg/320px-CinePlusFrisson.svg.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Ciné+ Émotion
+        tvg_names:
+          - '!start!CINE!plus!!~!EMOTION!end!'
+          - '!start!CINE!~!EMOTION!end!'
+        tvg_id: CinePlusEmotion.fr
+        tvg_chno: 111
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/8/89/CinePlusEmotion.svg/320px-CinePlusEmotion.svg.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Ciné+ Famiz
+        tvg_names:
+          - '!start!CINE!plus!!~!FAMIZ!end!'
+          - '!start!CINE!~!FAMIZ!end!'
+        tvg_id: CinePlusFamiz.fr
+        tvg_chno: 112
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/c/cb/CinePlusFamiz_Logo.svg/320px-CinePlusFamiz_Logo.svg.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Ciné+ Club
+        tvg_names:
+          - '!start!CINE!plus!!~!CLUB!end!'
+          - '!start!CINE!~!CLUB!end!'
+        tvg_id: CinePlusClub.fr
+        tvg_chno: 113
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/f/fd/CinePlusClub_Logo.svg/320px-CinePlusClub_Logo.svg.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Ciné+ Classic
+        tvg_names:
+          - '!start!CINE!plus!!~!CLASSIC!end!'
+          - '!start!CINE!~!CLASS!end!'
+        tvg_id: CinePlusClassic.fr
+        tvg_chno: 114
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/5/55/CinePlusClassic.svg/320px-CinePlusClassic.svg.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Eurochannel
+        tvg_names:
+          - '!start!EUROCHANNEL!end!'
+        tvg_id: Eurochannel.fr
+        tvg_chno: 119
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/EURO_LOGO_FINALE.png/320px-EURO_LOGO_FINALE.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Drive-in Movie Channel
+        tvg_names:
+          - '!start!DRIVE-!~!IN!~!!channel!!end!'
+        tvg_id:
+        tvg_chno: 120
+        tvg_logo: https://broccoli.tvchannellists.com/images/f/fd/DRIVEINMOVIE-2020.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Action
+        tvg_names:
+          - '!start!ACTION!end!'
+        tvg_id: Action.fr
+        tvg_chno: 121
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/2/2f/Action_%282014%29.svg/320px-Action_%282014%29.svg.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Paramount Channel +1
+        tvg_names:
+          - '!start!PARAMOUNT!~!CHANNEL!plus1!!end!'
+          - '!start!PARAMOUNT!plus1!!end!'
+        tvg_id: ParamountChannelDecale.fr
+        tvg_chno: 122
+        tvg_logo: https://broccoli.tvchannellists.com/images/8/81/Paramount_Channel_D%C3%A9cal%C3%A9.png
+        group_title:
+          - FR
+          - ENTERTAINMENT
+          - MOVIES
+          - PLUS1
+
+      - tvg_name: TCM Cinéma
+        tvg_names:
+          - '!start!TCM!~!CINEMA!end!'
+          - '!start!TCM!end!'
+        tvg_id: TCM.fr
+        tvg_chno: 123
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/TCM_Cin%C3%A9ma_logo_2019.png/320px-TCM_Cin%C3%A9ma_logo_2019.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Altice Studio
+        tvg_names:
+          - '!start!ALTICE!~!STUDIO!end!'
+        tvg_id: AlticeStudio.fr
+        tvg_chno: 124
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/7/71/Altice_studio_logo.png
+        group_title:
+          - FR
+          - MOVIES
+
+      - tvg_name: Disney Channel+1
+        tvg_names:
+          - '!start!DISNEY!~!!channel!!plus1!!end!'
+        tvg_id: DisneyChannelPlus1.fr
+        tvg_chno: 139
+        tvg_logo: https://broccoli.tvchannellists.com/images/d/d1/Disney_Channel_Plus1.png
+        group_title:
+          - FR
+          - KIDS
+          - PLUS1
+
+      - tvg_name: Disney Junior
+        tvg_names:
+          - '!start!DISNEY!~!JUNIOR!end!'
+          - '!start!DISNEY!~!JR!end!'
+        tvg_id: DisneyJunior.fr
+        tvg_chno: 140
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/8/82/Disney_Junior_logo_2019.png/320px-Disney_Junior_logo_2019.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Disney XD
+        tvg_names:
+          - '!start!DISNEY!~!XD!end!'
+        tvg_id: DisneyXD.fr
+        tvg_chno: 140
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Disney_XD_-_2015.svg/320px-Disney_XD_-_2015.svg.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Disney Cinema
+        tvg_names:
+          - '!start!DISNEY!~!CINEMA!end!'
+        tvg_id: DisneyCinema.fr
+        tvg_chno: 140
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Disney_cinema_logo.png/320px-Disney_cinema_logo.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Disney+
+        tvg_names:
+          - '!start!DISNEY!plus!!end!'
+          - '!start!DISNEY!~!HD!end!'
+        tvg_id: DisneyPlus.fr
+        tvg_chno: 140
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Disney%2B_logo.svg/320px-Disney%2B_logo.svg.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Nickelodéon Junior
+        tvg_names:
+          - '!start!NICKELODEON!~!JUNIOR!end!'
+        tvg_id: NickelodeonJunior.fr
+        tvg_chno: 141
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/1/17/Nickelodeon_Junior.svg/320px-Nickelodeon_Junior.svg.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Tiji
+        tvg_names:
+          - '!start!TIJI!end!'
+        tvg_id: TIJI.fr
+        tvg_chno: 142
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/f/f2/Logo_TiJi_%282019%29.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Piwi+
+        tvg_names:
+          - '!start!PIWI!end!'
+          - '!start!PIWI!plus!!end!'
+        tvg_id: PIWI.fr
+        tvg_chno: 143
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/6/6e/Piwi%2B_logo_2011.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Boomerang
+        tvg_names:
+          - '!start!BOOMERANG!end!'
+        tvg_id: Boomerang.fr
+        tvg_chno: 144
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Boomerang_tv_logo.png/304px-Boomerang_tv_logo.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Boomerang+1
+        tvg_names:
+          - '!start!BOOMERANG!plus1!!end!'
+        tvg_id: Boomerangplus1.fr
+        tvg_chno: 145
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Boomerang_tv_logo.png/304px-Boomerang_tv_logo.png
+        group_title:
+          - FR
+          - KIDS
+          - PLUS1
+
+      - tvg_name: Cartoon Network
+        tvg_names:
+          - '!start!CARTOON!~!NETWORK!end!'
+        tvg_id: CartoonNetwork.fr
+        tvg_chno: 146
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Cartoon_Network_2010_logo.svg/320px-Cartoon_Network_2010_logo.svg.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Nickelodéon
+        tvg_names:
+          - '!start!NICKELODEON!end!'
+        tvg_id: Nickelodeon.fr
+        tvg_chno: 147
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/320px-Nickelodeon_2009_logo.svg.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Canal J
+        tvg_names:
+          - '!start!CANAL!~!J!end!'
+        tvg_id: CanalJ.fr
+        tvg_chno: 149
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/6/69/Logo_canal_J.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Télétoon+
+        tvg_names:
+          - '!start!TELETOON!plus!!end!'
+        tvg_id: TeleToonPlus.fr
+        tvg_chno: 150
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/T%C3%A9l%C3%A9toon%2B_Logo_2011.svg/320px-T%C3%A9l%C3%A9toon%2B_Logo_2011.svg.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Télétoon+1
+        tvg_names:
+          - '!start!TELETOON!plus1!!end!'
+        tvg_id: TeleTOONplus1.fr
+        tvg_chno: 151
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/T%C3%A9l%C3%A9toon%2B_Logo_2011.svg/320px-T%C3%A9l%C3%A9toon%2B_Logo_2011.svg.png
+        group_title:
+          - FR
+          - KIDS
+          - PLUS1
+
+      - tvg_name: Nickelodéon Teen
+        tvg_names:
+          - '!start!NICKELODEON!~!TEEN!end!'
+          - '!start!NICKELODEON!~!4!~!TEEN!end!'
+        tvg_id: Nickelodeon4Teen.fr
+        tvg_chno: 152
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Nickelodeon_Teen.svg/320px-Nickelodeon_Teen.svg.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Boing
+        tvg_names:
+          - '!start!BOING!end!'
+        tvg_id: Boing.fr
+        tvg_chno: 153
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/8/8c/Logo_Boing.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Toonami
+        tvg_names:
+          - '!start!TOONAMI!end!'
+        tvg_id: Toonami.fr
+        tvg_chno: 154
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/9/9e/Toonami_%282020%29.png/799px-Toonami_%282020%29.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: BabyTV
+        tvg_names:
+          - '!start!BABY!~!TV!end!'
+        tvg_id: BabyTV.fr
+        tvg_chno: 155
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/4/45/BabyTV.png/320px-BabyTV.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Nickelodéon +1
+        tvg_names:
+          - '!start!NICKELODEON!plus1!!end!'
+        tvg_id: NickelodeonPlus1.fr
+        tvg_chno: 156
+        tvg_logo: https://broccoli.tvchannellists.com/images/a/a9/NickelodeonPlus1.png
+        group_title:
+          - FR
+          - KIDS
+          - PLUS1
+
+      - tvg_name: Mon Nickelodéon Junior
+        tvg_names:
+          - '!start!MON!~!NICKELODEON!~!JUNIOR!end!'
+        tvg_id: NickelodeonJunior.fr
+        tvg_chno: 157
+        tvg_logo: http://img3.wikia.nocookie.net/__cb20150314144112/logopedia/images/7/74/MON_NICKELODEON_JUNIOR.jpg
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: TV Pitchoun
+        tvg_names:
+          - '!start!TV!~!PITCHOUN!end!'
+        tvg_id: TVPitchoun.fr
+        tvg_chno: 159
+        tvg_logo: https://broccoli.tvchannellists.com/images/e/e1/PITCHOUNTV-2020.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: TV Pitchoun +1
+        tvg_names:
+          - '!start!TV!~!PITCHOUN!plus1!!end!'
+        tvg_id:
+        tvg_chno: 160
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/4/4c/Pitchoun_TV_Plus1.png/799px-Pitchoun_TV_Plus1.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Pitchoun Music Kids
+        tvg_names:
+          - '!start!TV!~!PITCHOUN!~!MUSIC!~!KIDS!end!'
+        tvg_id:
+        tvg_chno: 161
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/2/21/Pitchoun_Music_Kids.png/273px-Pitchoun_Music_Kids.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Boing Max
+        tvg_names:
+          - '!start!BOING!~!MAX!end!'
+        tvg_id:
+        tvg_chno: 165
+        tvg_logo: https://broccoli.tvchannellists.com/images/e/e3/Boing_Max.jpg
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Boomerang Max
+        tvg_names:
+          - '!start!BOOMERANG!~!MAX!end!'
+        tvg_id:
+        tvg_chno: 166
+        tvg_logo: https://broccoli.tvchannellists.com/images/e/e3/Boomerang_Max.jpg
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Nickelodéon Ukraine
+        tvg_names:
+          - '!start!NICKELODEON!~!UKRAINE!end!'
+        tvg_id: NickelodeonUkraine.fr
+        tvg_chno: 167
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/a/ae/Nickelodeon_Ukraine.png/800px-Nickelodeon_Ukraine.png
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: OL Play
+        tvg_names:
+          - '!start!OL!~!PLAY!end!'
+        tvg_id:
+        tvg_chno: 172
+        tvg_logo: https://broccoli.tvchannellists.com/images/4/4b/OL_Play.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Real Madrid TV English
+        tvg_names:
+          - '!start!REAL!~!MADRID!~!TV!~!ENGLISH!end!'
+        tvg_id:
+        tvg_chno: 173
+        tvg_logo: https://broccoli.tvchannellists.com/images/7/76/Real_MadridTV.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Free Ligue 1 Uber Eats
+        tvg_names:
+          - '!start!FREE!~!LIGUE!~!1!~!UBER!~!EATS!end!'
+        tvg_id:
+        tvg_chno: 174
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/2/2a/Free_Ligue_1.png/320px-Free_Ligue_1.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Cheval TV
+        tvg_names:
+          - '!start!CHEVAL!~!TV!end!'
+        tvg_id:
+        tvg_chno: 175
+        tvg_logo: https://broccoli.tvchannellists.com/images/4/40/Cheval_TV.jpg
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Equidia
+        tvg_names:
+          - '!start!EQUIDIA!end!'
+          - '!start!EQUIDIA!~!LIVE!end!'
+          - '!start!EQUIDIAE!~!LIVE!end!'
+          - '!start!EQUIDIA!~!LIFE!end!'
+        tvg_id: Equidia.fr
+        tvg_chno: 176
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/2/28/Equidia_logo_2018.svg/320px-Equidia_logo_2018.svg.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Horse TV
+        tvg_names:
+          - '!start!HORSE!~!TV!end!'
+        tvg_id:
+        tvg_chno: 177
+        tvg_logo: https://broccoli.tvchannellists.com/images/e/e8/Horse_TV.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Trace Sport Stars
+        tvg_names:
+          - '!start!TRACE!~!SPORT!~!STARS!end!'
+        tvg_id: TraceSportStars.fr
+        tvg_chno: 178
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/TRACE_Sport_Stars.jpg/320px-TRACE_Sport_Stars.jpg
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Automoto La Chaine
+        tvg_names:
+          - '!start!AUTOMOTO!~!LA!~!CHAINE!end!'
+          - '!start!AUTOMOTO!~!TV!end!'
+          - '!start!AUTOMOTO!end!'
+          - '!start!AB!~!MOTEURS?!end!'
+        tvg_id: ABMoteurs.fr
+        tvg_chno: 180
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/3/34/Automoto_La_cha%C3%AEne_%282018%29.png/320px-Automoto_La_cha%C3%AEne_%282018%29.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Motorvision TV
+        tvg_names:
+          - '!start!MOTORVISION!~!TV!end!'
+        tvg_id: MotorVisionTV.fr
+        tvg_chno: 182
+        tvg_logo: https://motorvision.tv/wp-content/themes/motorvision/img/logo.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Nautical Channel
+        tvg_names:
+          - '!start!NAUTICAL!channel!!end!'
+          - '!start!NAUTICAL!end!'
+        tvg_id: NauticalChannel.fr
+        tvg_chno: 183
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/b/b9/Nauticalchannel2022.jpg
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Golf Channel
+        tvg_names:
+          - '!start!GOLF!channel!!end!'
+          - '!start!GOLF!end!'
+        tvg_id: GolfChannel.fr
+        tvg_chno: 185
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/8/87/Golf_Channel_%282014%29.svg/320px-Golf_Channel_%282014%29.svg.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: MCS Extrême
+        tvg_names:
+          - '!start!MCS!~!EXTREME!end!'
+          - '!start!EXTREME!~!SPORTS!end!'
+        tvg_id: Extreme.fr
+        tvg_chno: 186
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/4/4f/MCS_Extreme.png/320px-MCS_Extreme.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Journal du Golf TV
+        tvg_names:
+          - '!start!JOURNAL!~!DU!~!GOLF!~!TV!end!'
+        tvg_id:
+        tvg_chno: 187
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/c/c0/Journal_Golf_TV.png/239px-Journal_Golf_TV.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Golf+
+        tvg_names:
+          - '!start!GOLF!plus!!end!'
+        tvg_id: GolfPlus.fr
+        tvg_chno: 188
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/c/c2/Golf%2B.svg/320px-Golf%2B.svg.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Sport en France 
+        tvg_names:
+          - '!start!SPORT!~!EN!~!FRANCE!end!'
+        tvg_id: SportEnFrance.fr
+        tvg_chno: 190
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/8/83/Sport_en_France_Logo.png/320px-Sport_en_France_Logo.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Fuel TV
+        tvg_names:
+          - '!start!FUEL!~!TV!end!'
+        tvg_id: FuelTV.fr
+        tvg_chno: 193
+        tvg_logo: https://vignette.wikia.nocookie.net/logopedia/images/5/50/Fuel_TV_On-air_Logo.png/revision/latest?cb=20120215104007
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Wataaa
+        tvg_names:
+          - '!start!WATAAA!end!'
+        tvg_id:
+        tvg_chno: 197
+        tvg_logo: https://broccoli.tvchannellists.com/images/f/f4/Wataa.png
+        group_title:
+          - FR
+          - SPORTS
+
+      - tvg_name: Planète+ Crime
+        tvg_names:
+          - '!start!PLANETE!plus!!~!CRIME!end!'
+          - '!start!PLANETE!plus!!~!CI!end!'
+          - '!start!PLANETE!~!CI!end!'
+        tvg_id: PLANETEJustice.fr
+        tvg_chno: 200
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/d/dd/Planetepluscrime.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Planète+ Aventure
+        tvg_names:
+          - '!start!PLANETE!plus!!~!AVENTURE!end!'
+          - '!start!PLANETE!plus!!~!A[&_\s]E!end!'
+          - '!start!PLANETE!~!A[&_\s]E!end!'
+        tvg_id: PlaneteAction.fr
+        tvg_chno: 201
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/f/f6/Planeteplusaventure.png/320px-Planeteplusaventure.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Crime District
+        tvg_names:
+          - '!start!CRIME!~!DISTRICT!end!'
+          - '!start!CRIME!~!DISTCRIT!end!'
+        tvg_id: CrimeDistrict.fr
+        tvg_chno: 202
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/c/c5/Crime_District_logo_2016.svg/320px-Crime_District_logo_2016.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Ultra Nature
+        tvg_names:
+          - '!start!ULTRA!~!NATURE!end!'
+        tvg_id: UltraNature.fr
+        tvg_chno: 203
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/4/44/Ultra_Nature_%282016%29.svg/320px-Ultra_Nature_%282016%29.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Ushuaïa TV
+        tvg_names:
+          - '!start!USHUAIA!~!TV!end!'
+          - '!start!USHUAIA!end!'
+        tvg_id: UshuaiaTV.fr
+        tvg_chno: 204
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/d/d0/Ushua%C3%AFa_TV_logo_2019.svg/320px-Ushua%C3%AFa_TV_logo_2019.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Histoire TV
+        tvg_names:
+          - '!start!HISTOIRE!~!TV!end!'
+          - '!start!HISTOIRE!end!'
+        tvg_id: Histoire.fr
+        tvg_chno: 205
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Histoire_tv_logo_V2-RVB.jpg/320px-Histoire_tv_logo_V2-RVB.jpg
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Toute l'Histoire
+        tvg_names:
+          - '!start!TOUTE!~!L.HISTOIRE!end!'
+        tvg_id: TouteHistoire.fr
+        tvg_chno: 206
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/c/c2/Toute_l%27Histoire_%282013%29.svg/320px-Toute_l%27Histoire_%282013%29.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Science & Vie TV
+        tvg_names:
+          - '!start!SCIENCE!~!(ET|&)!~!VIE!~!TV!end!'
+          - '!start!SCIENCE!~!(ET|&)!~!VIE!end!'
+        tvg_id: ScienceEtVieTV.fr
+        tvg_chno: 207
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/b/bf/Science_%26_Vie_TV.svg/320px-Science_%26_Vie_TV.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Animaux
+        tvg_names:
+          - '!start!ANIMAUX!end!'
+        tvg_id: Animaux.fr
+        tvg_chno: 208
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/a/a2/Logo-Animaux-2017.svg/320px-Logo-Animaux-2017.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Trek
+        tvg_names:
+          - '!start!TREK!end!'
+        tvg_id: Trek.fr
+        tvg_chno: 209
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/f/f8/Trek_logo_2015.svg/320px-Trek_logo_2015.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: IMEARTH
+        tvg_names:
+          - '!start!IMEARTH!end!'
+        tvg_id: 
+        tvg_chno: 210
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/1/1f/IMEARTH.png/800px-IMEARTH.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Souvenirs from Earth
+        tvg_names:
+          - '!start!SOUVENIRS!~!FROM!~!EARTH!end!'
+        tvg_id: SouvenirsFromEarth.fr
+        tvg_chno: 211
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/e/e8/Souvenirs_from_Earth.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Ikono.tv
+        tvg_names:
+          - '!start!IKONO!~!TV!end!'
+        tvg_id:
+        tvg_chno: 212
+        tvg_logo: https://broccoli.tvchannellists.com/images/4/45/IKONOTV-2020.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Museum
+        tvg_names:
+          - '!start!MUSEUM!end!'
+          - '!start!MUSEUM!channel!!end!'
+        tvg_id: Museum.fr
+        tvg_chno: 213
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Logomuseumtv.png/248px-Logomuseumtv.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: My Zen Nature
+        tvg_names:
+          - '!start!MY!~!ZEN!end!'
+          - '!start!MY!~!ZEN!~!TV!end!'
+        tvg_id: MyZenTV.fr
+        tvg_chno: 214
+        tvg_logo: https://broccoli.tvchannellists.com/images/c/c9/MyZen_Nature.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Travel Channel
+        tvg_names:
+          - '!start!TRAVEL!channel!!end!'
+        tvg_id:
+        tvg_chno: 215
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Travel_Channel_-_Logo.svg/320px-Travel_Channel_-_Logo.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Chasse et Pêche
+        tvg_names:
+          - '!start!CHASSE!~!ET!~!PECHE!end!'
+          - '!start!CHASSE!~!ET!~!PACHE!end!'
+          - '!start!CHASSE!~!&!~!PECHE!end!'
+        tvg_id: ChasseEtPeche.fr
+        tvg_chno: 216
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/6/64/Chasse_%26_P%C3%AAche_%282013%29.svg/320px-Chasse_%26_P%C3%AAche_%282013%29.svg.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Seasons
+        tvg_names:
+          - '!start!SEASONS!end!'
+        tvg_id: Seasons.fr
+        tvg_chno: 217
+        tvg_logo: https://broccoli.tvchannellists.com/images/8/86/Seasons.jpg
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Télésud
+        tvg_names:
+          - '!start!TELESUD!end!'
+        tvg_id: Telesud.fr
+        tvg_chno: 218
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/6/6e/Telesud.png/320px-Telesud.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Tahiti Nui Télévision
+        tvg_names:
+          - '!start!TAHITI!~!NUI!~!TELEVISION!end!'
+        tvg_id:
+        tvg_chno: 219
+        tvg_logo: https://broccoli.tvchannellists.com/images/f/f1/TNTV-2020.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: L'Esprit Soricer TV
+        tvg_names:
+          - '!start!L!~!ESPRIT!~!SORICER!~!TV!end!'
+        tvg_id:
+        tvg_chno: 220
+        tvg_logo: https://broccoli.tvchannellists.com/images/c/c0/Esprit_Sorcier_TV.jpg
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Connaissance du Monde
+        tvg_names:
+          - '!start!CONNAISSANCE!~!DU!~!MONDE!end!'
+        tvg_id:
+        tvg_chno: 221
+        tvg_logo: https://broccoli.tvchannellists.com/images/0/01/CONNAISSANCESDUMONDE-2020.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: Voyage
+        tvg_names:
+          - '!start!VOYAGE!end!'
+        tvg_id: Voyage.fr
+        tvg_chno: 222
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/3/30/Voyage_logo_2016.png
+        group_title:
+          - FR
+          - DISCOVERY & CULTURE
+
+      - tvg_name: La Chaîne Météo
+        tvg_names:
+          - '!start!LA!~!CHAINE!~!METEO!end!'
+        tvg_id: LaChaineMeteo.fr
+        tvg_chno: 230
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/7/72/La_Cha%C3%AEne_M%C3%A9t%C3%A9o.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Tech & Co
+        tvg_names:
+          - '!start!TECH!~!.?!~!CO!end!'
+          - '!start!TECH!~!.?!~!GEEK!end!'
+        tvg_id:
+        tvg_chno: 231
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/2/21/Tech_Co.png/320px-Tech_Co.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: AutoPlus TV
+        tvg_names:
+          - '!start!AUTOPLUS!~!TV!end!'
+        tvg_id:
+        tvg_chno: 232
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/f/fe/Auto-plus.svg/324px-Auto-plus.svg.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Gourmand TV
+        tvg_names:
+          - '!start!GOURMAND!~!TV!end!'
+        tvg_id: GourmandTV.fr
+        tvg_chno: 234
+        tvg_logo: https://broccoli.tvchannellists.com/images/e/e2/GOURMAND_TV.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Astrocenter TV
+        tvg_names:
+          - '!start!ASTROCENTER!~!TV!end!'
+        tvg_id: AstroCenter.fr
+        tvg_chno: 235
+        tvg_logo: https://broccoli.tvchannellists.com/images/0/0b/Astrocenter_TV.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Demain TV
+        tvg_names:
+          - '!start!DEMAIN!~!TV!end!'
+          - '!start!DEMAIN!end!'
+        tvg_id: DemainTV.fr
+        tvg_chno: 236
+        tvg_logo: https://broccoli.tvchannellists.com/images/d/dc/DEMAIN-2020.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Luxe TV
+        tvg_names:
+          - '!start!LUXE!~!TV!end!'
+          - '!start!LUXE!end!'
+        tvg_id: LuxeTV.fr
+        tvg_chno: 237
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/LUXETV_LOGO_BLACK_MONOCHROME.png/320px-LUXETV_LOGO_BLACK_MONOCHROME.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Men's UP TV
+        tvg_names:
+          - '!start!MEN!~!S?!~!UP!~!TV!end!'
+        tvg_id: MensUpTV.fr
+        tvg_chno: 238
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/f/fd/Men%E2%80%99s_UP_TV.png/320px-Men%E2%80%99s_UP_TV.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Top Santé TV
+        tvg_names:
+          - '!start!TOP!~!SANTE!~!TV!end!'
+        tvg_id:
+        tvg_chno: 239
+        tvg_logo: https://broccoli.tvchannellists.com/images/c/c9/Top_Sante_TV.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Maison & Travaux TV
+        tvg_names:
+          - '!start!MAISON!~!.?!~!TRAVAUX!~!TV!end!'
+          # Unsure this one is really valid
+          - '!start!A!~!LA!~!MAISON!end!'
+        tvg_id:
+        tvg_chno: 240
+        tvg_logo: https://broccoli.tvchannellists.com/images/a/a0/Maison_Travaux_TV.PNG
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Fashion TV
+        tvg_names:
+          - '!start!FASHION!~!TV!end!'
+        tvg_id: FashionTV.fr
+        tvg_chno: 241
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/c/c7/Fashion_TV_Logo.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Fashion TV HD
+        tvg_names:
+          - '!start!FASHION!~!TV!~!HD!end!'
+        tvg_id: FashionTV.fr
+        tvg_chno: 242
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/c/c7/Fashion_TV_Logo.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: My Zen TV
+        tvg_names:
+          - '!start!MY!~!ZEN!end!'
+          - '!start!MY!~!ZEN!~!TV!end!'
+        tvg_id: MyZenTV.fr
+        tvg_chno: 243
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/My_Zen_Tv_LOGO_Couleur_vide.jpg/240px-My_Zen_Tv_LOGO_Couleur_vide.jpg
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Lucky Jack TV
+        tvg_names:
+          - '!start!LUCKY!~!JACK!end!'
+        tvg_id: LuckyJack.fr
+        tvg_chno: 244
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/9/93/Lucky_Jack.tv_logo.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: KTO
+        tvg_names:
+          - '!start!KTO!end!'
+        tvg_id: KTO.fr
+        tvg_chno: 245
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/4/4f/Logo_de_KTO_T%C3%A9l%C3%A9vision_catholique_2022.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: English Club TV
+        tvg_names:
+          - '!start!ENGLISH!~!CLUB!~!TV!end!'
+        tvg_id:
+        tvg_chno: 246
+        tvg_logo: https://english-club.tv/wp-content/uploads/2015/09/logo-round.png
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: Sqool TV
+        tvg_names:
+          - '!start!SQOOL!~!TV!end!'
+        tvg_id:
+        tvg_chno: 247
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/1/1a/Sqool_TV.jpg/320px-Sqool_TV.jpg
+        group_title:
+          - FR
+          - LIFESTYLE & SERVICES
+
+      - tvg_name: CStar Hits France
+        tvg_names:
+          - '!start!CSTAR!~!HITS!~!FRANCE!end!'
+        tvg_id: CStarHitsFrance.fr 
+        tvg_chno: 259
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/CStar_Hits_France_logo.jpg/320px-CStar_Hits_France_logo.jpg
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: My MTV
+        tvg_names:
+          - '!start!MY!~!MTV!end!'
+        tvg_id:
+        tvg_chno: 260
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/MTV-2021.svg/320px-MTV-2021.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: RFM TV
+        tvg_names:
+          - '!start!RFM!~!TV!end!'
+        tvg_id: RFMTV.fr
+        tvg_chno: 261
+        tvg_logo: https://broccoli.tvchannellists.com/images/b/ba/RFM_TV.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Melody
+        tvg_names:
+          - '!start!MELODY!end!'
+          - '!start!HARMONY!end!'
+        tvg_id: Melody.fr
+        tvg_chno: 262
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/4/4f/Melody_logo_2013.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Mezzo
+        tvg_names:
+          - '!start!MEZZO!end!'
+        tvg_id: Mezzo.fr
+        tvg_chno: 263
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Mezzo_Logo.svg/320px-Mezzo_Logo.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Mezzo Live
+        tvg_names:
+          - '!start!MEZZO!~!LIVE!end!'
+        tvg_id: MezzoLive.fr
+        tvg_chno: 264
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Mezzo_Logo.svg/320px-Mezzo_Logo.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Stingray Djazz
+        tvg_names:
+          - '!start!STINGRAY!~!DJAZZ!end!'
+          - '!start!DJAZZ!end!'
+        tvg_id: StingrayDjazz.fr
+        tvg_chno: 265
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Stingray_Djazz.svg/320px-Stingray_Djazz.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Stingray Classica
+        tvg_names:
+          - '!start!STINGRAY!~!CLASSICA!end!'
+        tvg_id: StingrayClassica.fr
+        tvg_chno: 266
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Stingray_Classica_Alternative.svg/320px-Stingray_Classica_Alternative.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Stingray iConcerts
+        tvg_names:
+          - '!start!STINGRAY!~!ICONCERTS!end!'
+        tvg_id: StingrayClassica.fr
+        tvg_chno: 266
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Stingray_Concerts.svg/320px-Stingray_Concerts.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Stingray Brava
+        tvg_names:
+          - '!start!STINGRAY!~!BRAVA!end!'
+          - '!start!BRAVA!end!'
+          - '!start!CMUSIC!end!'
+        tvg_id: StingrayBrava.fr 
+        tvg_chno: 266
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Stingray_Bravo.svg/320px-Stingray_Bravo.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: MCM Top
+        tvg_names:
+          - '!start!MCM!~!TOP!end!'
+        tvg_id: MCMTop.fr
+        tvg_chno: 271
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/a/aa/MCM_Top.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Clubbing TV
+        tvg_names:
+          - '!start!CLUBBING!~!TV!end!'
+        tvg_id: ClubbingTV.fr
+        tvg_chno: 274
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/3/39/Clubbing_TV.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Stingray CMusic
+        tvg_names:
+          - '!start!STINGRAY!~!CMUSIC!end!'
+        tvg_id: 
+        tvg_chno: 278
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Stingray_cmusic.svg/320px-Stingray_cmusic.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: VH1
+        tvg_names:
+          - '!start!VH1!end!'
+          - '!start!MTV!~!00!end!'
+        tvg_id: 
+        tvg_chno: 279
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/VH1_logo.svg/320px-VH1_logo.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: MTV 80s
+        tvg_names:
+          - '!start!MTV!~!80s!end!'
+        tvg_id: 
+        tvg_chno: 280
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/MTV_80s_2022.png/552px-MTV_80s_2022.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: MTV 90s
+        tvg_names:
+          - '!start!MTV!~!90s!end!'
+        tvg_id: 
+        tvg_chno: 281
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/MTV_90s_2022.svg/213px-MTV_90s_2022.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Club MTV
+        tvg_names:
+          - '!start!CLUB!~!MTV!end!'
+        tvg_id: 
+        tvg_chno: 282
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Club_MTV_2021_logo.svg/253px-Club_MTV_2021_logo.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: People24
+        tvg_names:
+          - '!start!PEOPLE!~!24!end!'
+        tvg_id: 
+        tvg_chno: 283
+        tvg_logo: https://broccoli.tvchannellists.com/images/8/8a/PEOPLE24-2020.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Générations TV
+        tvg_names:
+          - '!start!GENERATIONS!~!TV!end!'
+        tvg_id: 
+        tvg_chno: 284
+        tvg_logo: https://broccoli.tvchannellists.com/images/b/b7/GENERATIONSTV-2020.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Trace Latina
+        tvg_names:
+          - '!start!TRACE!~!LATINA!end!'
+        tvg_id: TraceLatina.fr
+        tvg_chno: 286
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/TRACE_Latina_Logo.png/320px-TRACE_Latina_Logo.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Trace Urban
+        tvg_names:
+          - '!start!TRACE!~!URBAN!end!'
+        tvg_id: TraceUrban.fr
+        tvg_chno: 287
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Trace_Urban_logo_2010.svg/320px-Trace_Urban_logo_2010.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Trace Caribbean
+        tvg_names:
+          - '!start!TRACE!~!CARIBBEAN!end!'
+        tvg_id: TraceCaribbean.fr
+        tvg_chno: 288
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/0/02/Trace.caribbean.webp/320px-Trace.caribbean.webp.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Trace Toca
+        tvg_names:
+          - '!start!TRACE!~!TOCA!end!'
+        tvg_id: TraceToca.fr
+        tvg_chno: 289
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Trace_Toca.png/320px-Trace_Toca.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Trace Gospel
+        tvg_names:
+          - '!start!TRACE!~!GOSPEL!end!'
+        tvg_id: TraceGospel.fr
+        tvg_chno: 290
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/b/b8/Logo_gospel-1.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Melody d'Afrique
+        tvg_names:
+          - '!start!MELODY!~!AFRIQUE!end!'
+          - '!start!MELODY!~!D!~!AFRIQUE!end!'
+        tvg_id:
+        tvg_chno: 294
+        tvg_logo: https://broccoli.tvchannellists.com/images/5/5b/MELODYAFRIQUE-2020.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: France 3 National
+        tvg_names:
+          - '!start!FRANCE!~!3!~!NATIONAL!end!'
+        tvg_id:
+        tvg_chno: 301
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/France_3_2018.svg/281px-France_3_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Alpes
+        tvg_names:
+          - '!start!FRANCE!~!3!~!ALPES!end!'
+        tvg_id:
+        tvg_chno: 302
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/France_3_Alpes_-_Logo_2018.svg/640px-France_3_Alpes_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Alsace
+        tvg_names:
+          - '!start!FRANCE!~!3!~!ALSACE!end!'
+        tvg_id:
+        tvg_chno: 303
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/France_3_Alsace_-_Logo_2018.svg/320px-France_3_Alsace_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Aquitaine
+        tvg_names:
+          - '!start!FRANCE!~!3!~!AQUITAINE!end!'
+        tvg_id:
+        tvg_chno: 304
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/France_3_Aquitaine_-_Logo_2018.svg/320px-France_3_Aquitaine_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Auvergne
+        tvg_names:
+          - '!start!FRANCE!~!3!~!AUVERGNE!end!'
+        tvg_id:
+        tvg_chno: 305
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/France_3_Auvergne_-_Logo_2018.svg/320px-France_3_Auvergne_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Basse-Normandie
+        tvg_names:
+          - '!start!FRANCE!~!3!~!BASSE!~!NORMANDIE!end!'
+        tvg_id:
+        tvg_chno: 306
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/France_3_Normandie_-_Logo_2018.svg/320px-France_3_Normandie_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Bourgogne
+        tvg_names:
+          - '!start!FRANCE!~!3!~!BOURGOGNE!end!'
+        tvg_id:
+        tvg_chno: 307
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/France_3_Bourgogne_-_Logo_2018.svg/320px-France_3_Bourgogne_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Bretagne
+        tvg_names:
+          - '!start!FRANCE!~!3!~!BRETAGNE!end!'
+        tvg_id:
+        tvg_chno: 308
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/France_3_Bretagne_-_Logo_2018.svg/320px-France_3_Bretagne_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Centre-Val de Loire
+        tvg_names:
+          - '!start!FRANCE!~!3!~!CENTRE!~!VAL!~!DE!~!LOIRE!end!'
+        tvg_id:
+        tvg_chno: 309
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/France_3_Centre-Val_de_Loire_-_Logo_2018.svg/320px-France_3_Centre-Val_de_Loire_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Champagne-Ardenne
+        tvg_names:
+          - '!start!FRANCE!~!3!~!CHAMPAGNE!~!ARDENNE!end!'
+        tvg_id:
+        tvg_chno: 310
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/France_3_Champagne-Ardenne_-_Logo_2018.svg/320px-France_3_Champagne-Ardenne_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Corse ViaStella
+        tvg_names:
+          - '!start!FRANCE!~!3!~!CORSE!~!VIA!~!STELLA!end!'
+        tvg_id:
+        tvg_chno: 311
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/France_3_Corse_-_Logo_2018.svg/320px-France_3_Corse_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Côte d'Azur
+        tvg_names:
+          - '!start!FRANCE!~!3!~!COTE!~!D!~!AZUR!end!'
+        tvg_id:
+        tvg_chno: 312
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/France_3_Cote_d%27Azur_-_Logo_2018.svg/320px-France_3_Cote_d%27Azur_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Franche-Comté
+        tvg_names:
+          - '!start!FRANCE!~!3!~!FRANCHE!~!COMTE!end!'
+        tvg_id:
+        tvg_chno: 313
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/France_3_Franche-Comt%C3%A9_-_Logo_2018.svg/320px-France_3_Franche-Comt%C3%A9_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Haute-Normandie
+        tvg_names:
+          - '!start!FRANCE!~!3!~!HAUTE!~!NORMANDIE!end!'
+        tvg_id:
+        tvg_chno: 314
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/France_3_Normandie_-_Logo_2018.svg/320px-France_3_Normandie_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Languedoc-Roussillon
+        tvg_names:
+          - '!start!FRANCE!~!3!~!LANGUEDOC!~!ROUSSILLON!end!'
+        tvg_id:
+        tvg_chno: 315
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/France_3_Languedoc-Roussillon_-_Logo_2018.svg/320px-France_3_Languedoc-Roussillon_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Limousin
+        tvg_names:
+          - '!start!FRANCE!~!3!~!LIMOUSIN!end!'
+        tvg_id:
+        tvg_chno: 316
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/France_3_Limousin_-_Logo_2018.svg/320px-France_3_Limousin_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Lorraine
+        tvg_names:
+          - '!start!FRANCE!~!3!~!LORRAINE!end!'
+        tvg_id:
+        tvg_chno: 317
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/France_3_Lorraine_-_Logo_2018.svg/320px-France_3_Lorraine_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Midi-Pyrénées
+        tvg_names:
+          - '!start!FRANCE!~!3!~!MIDI!~!PYRENEES!end!'
+        tvg_id:
+        tvg_chno: 318
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/France_3_Midi-Pyr%C3%A9n%C3%A9es_-_Logo_2018.svg/320px-France_3_Midi-Pyr%C3%A9n%C3%A9es_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Nord-Pas-de-Calais
+        tvg_names:
+          - '!start!FRANCE!~!3!~!NORD!~!PAS!~!DE!~!CALAIS!end!'
+        tvg_id:
+        tvg_chno: 319
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/France_3_Nord-Pas-de-Calais_-_Logo_2018.svg/320px-France_3_Nord-Pas-de-Calais_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Paris Île-de-France
+        tvg_names:
+          - '!start!FRANCE!~!3!~!PARIS!~!ILE!~!DE!~!FRANCE!end!'
+        tvg_id:
+        tvg_chno: 320
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/France_3_Paris_Ile-de-France_-_Logo_2018.svg/320px-France_3_Paris_Ile-de-France_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Pays de la Loire
+        tvg_names:
+          - '!start!FRANCE!~!3!~!PAYS!~!DE!~!LA!~!LOIRE!end!'
+        tvg_id:
+        tvg_chno: 321
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/France_3_Pays_de_la_Loire_-_Logo_2018.svg/320px-France_3_Pays_de_la_Loire_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Picardie
+        tvg_names:
+          - '!start!FRANCE!~!3!~!PICARDIE!end!'
+        tvg_id:
+        tvg_chno: 322
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/France_3_Picardie_-_Logo_2018.svg/320px-France_3_Picardie_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Poitou-Charentes
+        tvg_names:
+          - '!start!FRANCE!~!3!~!POITOU!~!CHARENTES!end!'
+        tvg_id:
+        tvg_chno: 323
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/France_3_Poitou-Charentes_-_Logo_2018.svg/320px-France_3_Poitou-Charentes_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Provence-Alpes
+        tvg_names:
+          - '!start!FRANCE!~!3!~!PROVENCE!~!ALPES!end!'
+        tvg_id:
+        tvg_chno: 324
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/France_3_Provence-Alpes_-_Logo_2018.svg/320px-France_3_Provence-Alpes_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 Rhône-Alpes
+        tvg_names:
+          - '!start!FRANCE!~!3!~!RHONE!~!ALPES!end!'
+        tvg_id:
+        tvg_chno: 325
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/France_3_Rh%C3%B4ne-Alpes_-_Logo_2018.svg/320px-France_3_Rh%C3%B4ne-Alpes_-_Logo_2018.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 3 NoA
+        tvg_names:
+          - '!start!FRANCE!~!3!~!NOA!end!'
+        tvg_id:
+        tvg_chno: 326
+        tvg_logo: https://broccoli.tvchannellists.com/images/d/d8/FRANCE3NOA-2020.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: France 24 French
+        tvg_names:
+          - '!start!FRANCE!~!24!~!FRENCH!end!'
+          - '!start!FRANCE!~!24!~!FRANCE!end!'
+          - '!start!FRANCE!~!24!end!'
+        tvg_id: France24.fr
+        tvg_chno: 340
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/France24.png/254px-France24.png
+        group_title:
+          - FR
+          - NEWS
+
+      - tvg_name: France 24 English
+        tvg_names:
+          - '!start!FRANCE!~!24!~!ENGLISH!end!'
+        tvg_id:
+        tvg_chno: 341
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/France24.png/254px-France24.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: France 24 Arabic
+        tvg_names:
+          - '!start!FRANCE!~!24!~!ARABIC!end!'
+        tvg_id:
+        tvg_chno: 342
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/France24.png/254px-France24.png
+        group_title:
+          - AR
+          - NEWS
+
+      - tvg_name: Euronews French
+        tvg_names:
+          - '!start!EURONEWS!~!FRENCH!end!'
+        tvg_id: Euronews.fr
+        tvg_chno: 345
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Euronews_2016_logo.svg/320px-Euronews_2016_logo.svg.png
+        group_title:
+          - FR
+          - NEWS
+
+      - tvg_name: Euronews English
+        tvg_names:
+          - '!start!EURONEWS!~!ENGLISH!end!'
+        tvg_id:
+        tvg_chno: 346
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Euronews_2016_logo.svg/320px-Euronews_2016_logo.svg.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: BFM Business
+        tvg_names:
+          - '!start!BFM!~!BUSINESS!end!'
+        tvg_id: BFMBusiness.fr
+        tvg_chno: 347
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/6/68/Logo_BFM-Business.svg/240px-Logo_BFM-Business.svg.png
+        group_title:
+          - FR
+          - NEWS
+
+      - tvg_name: Arrêt sur images
+        tvg_names:
+          - '!start!ARRET!~!SUR!~!IMAGES!end!'
+        tvg_id:
+        tvg_chno: 348
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/0/0f/LOGO_%40SI_FINAL.svg/320px-LOGO_%40SI_FINAL.svg.png
+        group_title:
+          - FR
+          - NEWS
+
+      - tvg_name: BSmart
+        tvg_names:
+          - '!start!B!~!SMART!end!'
+        tvg_id: BSmart.fr
+        tvg_chno: 349
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/B_SMART_logo.png/320px-B_SMART_logo.png
+        group_title:
+          - FR
+          - NEWS
+
+      - tvg_name: BBC World News
+        tvg_names:
+          - '!start!BBC!~!WORLD!~!NEWS!end!'
+        tvg_id:
+        tvg_chno: 349
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/BBC_World_News_2022_%28Boxed%29.svg/240px-BBC_World_News_2022_%28Boxed%29.svg.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: Sky News
+        tvg_names:
+          - '!start!SKY!~!NEWS!end!'
+        tvg_id:
+        tvg_chno: 350
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/b/b9/Sky-news-logo_new.svg/320px-Sky-news-logo_new.svg.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: CNN International
+        tvg_names:
+          - '!start!CNN!~!INTERNATIONAL!end!'
+        tvg_id:
+        tvg_chno: 351
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/CNNinternational-logo.png/320px-CNNinternational-logo.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: Fox News Channel
+        tvg_names:
+          - '!start!FOX!~!NEWS!channel!!end!'
+        tvg_id:
+        tvg_chno: 352
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/0/0d/Fox_News_Channel_Logo.svg/254px-Fox_News_Channel_Logo.svg.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: Bloomberg TV
+        tvg_names:
+          - '!start!BLOOMBERG!~!TV!end!'
+        tvg_id:
+        tvg_chno: 353
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/3/3b/Bloomberg_Television_2016.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: CNBC Europe
+        tvg_names:
+          - '!start!CNBC!~!Europe!end!'
+        tvg_id:
+        tvg_chno: 354
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/CNBC_logo.svg/301px-CNBC_logo.svg.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: Al Jazeera English
+        tvg_names:
+          - '!start!AL!~!JAZEERA!~!ENGLISH!end!'
+        tvg_id:
+        tvg_chno: 355
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/0/0f/Al_Jazeera.svg/144px-Al_Jazeera.svg.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: Africa 24
+        tvg_names:
+          - '!start!AFRICA!~!24!end!'
+        tvg_id:
+        tvg_chno: 356
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/6/6a/Logo_Africa_24.jpg
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: NHK World
+        tvg_names:
+          - '!start!NHK!~!WORLD!end!'
+        tvg_id:
+        tvg_chno: 358
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/NHK_World.svg/240px-NHK_World.svg.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: RT France
+        tvg_names:
+          - '!start!RT!~!FRANCE!end!'
+        tvg_id: RTFrance.fr
+        tvg_chno: 359
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/9/9e/RT_France.svg/240px-RT_France.svg.png
+        group_title:
+          - FR
+          - NEWS
+
+      - tvg_name: i24news French
+        tvg_names:
+          - '!start!I!~!24!~!NEWS!~!FRENCH!end!'
+          - '!start!I!~!24!~!NEWS!~!FRANCE!end!'
+          - '!start!I!~!24!~!NEWS!end!'
+        tvg_id: I24news.fr
+        tvg_chno: 357
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/LOGO_i24NEWS.png/240px-LOGO_i24NEWS.png
+        group_title:
+          - EN
+          - NEWS
+
+      - tvg_name: A+
+        tvg_names:
+          - '!start!A!plus!!end!'
+        tvg_id:
+        tvg_chno: 444
+        tvg_logo: https://broccoli.tvchannellists.com/images/8/8d/APLUS-2020.png
+        group_title:
+          - FR
+          - INTERNATIONAL
+
+      - tvg_name: Nollywood TV
+        tvg_names:
+          - '!start!NOLLYWOOD!end!'
+          - '!start!NOLLYWOOD!~!TV!end!'
+        tvg_id: NollywoodTV.fr
+        tvg_chno: 460
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/0/08/Nouvelle_logo_de_Nollywood_TV.png
+        group_title:
+          - FR
+          - INTERNATIONAL
+
+      - tvg_name: Trace Mziki
+        tvg_names:
+          - '!start!TRACE!~!MZIKI!end!'
+        tvg_id: TraceGospel.fr
+        tvg_chno: 501
+        tvg_logo: https://trace.tv/trace-mziki/wp-content/uploads/sites/21/2016/11/logo_mziki-1.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Deluxe Lounge
+        tvg_names:
+          - '!start!DELUXE!~!LOUNGE!~!\(STV\)!end!'
+        tvg_id:
+        tvg_chno: 825
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Deluxe_Lounge_HD_2021.svg/320px-Deluxe_Lounge_HD_2021.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM Grand Lille
+        tvg_names:
+          - '!start!BFM!~!GRAND!~!LILLE!end!'
+        tvg_id: BFMGrandLille.fr
+        tvg_chno: 900
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/BFM_Grand_Lille_2021.jpg/240px-BFM_Grand_Lille_2021.jpg
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TV7 Bordeaux
+        tvg_names:
+          - '!start!TV7!end!'
+          - '!start!TV7!~!BORDEAUX!end!'
+        tvg_id: TV7Bordeaux.fr
+        tvg_chno: 901
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/4/4b/TV7_Bordeaux.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TV7 Colmar
+        tvg_names:
+          - '!start!TV7!~!COLMAR!end!'
+        tvg_id: TV7Colmar.fr
+        tvg_chno: 901
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/4/4b/TV7_Bordeaux.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: 8 Mont-Blanc
+        tvg_names:
+          - '!start!TV8!~!MONT!~!BLANC!end!'
+          - '!start!8!~!MONT!~!BLANC!end!'
+        tvg_id: 8MontBlanc.fr
+        tvg_chno: 902
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/6/6a/Logo_8_Mont_Blanc_2015.svg/251px-Logo_8_Mont_Blanc_2015.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Télé Grenoble Isère
+        tvg_names:
+          - '!start!TELE!~!GRENOBLE!~!ISERE!end!'
+        tvg_id: TeleGrenobleIsere.fr
+        tvg_chno: 903
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Logo_T%C3%A9l%C3%A9grenoble_2021.jpg/320px-Logo_T%C3%A9l%C3%A9grenoble_2021.jpg
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Museum TV Paris
+        tvg_names:
+          - '!start!MUSEUM!~!TV!~!PARIS!end!'
+        tvg_id:
+        tvg_chno: 904
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Museum_TV_Paris.png/214px-Museum_TV_Paris.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Ère TV
+        tvg_names:
+          - '!start!ERE!~!TV!end!'
+        tvg_id:
+        tvg_chno: 905
+        tvg_logo: https://broccoli.tvchannellists.com/images/a/ae/ERE_TV-2020.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM Normandie
+        tvg_names:
+          - '!start!BFM!~!NORMANDIE!end!'
+        tvg_id: BFMNormandie.fr
+        tvg_chno: 906
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/b/b8/BFM-Normandie.svg/240px-BFM-Normandie.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Télénantes
+        tvg_names:
+          - '!start!TELE!~!NANTES!end!'
+        tvg_id: Telenantes.fr
+        tvg_chno: 907
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/T%C3%A9l%C3%A9Nantes_Logo_2020.png/320px-T%C3%A9l%C3%A9Nantes_Logo_2020.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TV Tours Val de Loire
+        tvg_names:
+          - '!start!TV!~!TOURS!~!VAL!~!DE!~!LOIRE!end!'
+        tvg_id:
+        tvg_chno: 908
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Logo_tvt_2016_RVB.png/240px-Logo_tvt_2016_RVB.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: IDF1
+        tvg_names:
+          - '!start!IDF1!end!'
+        tvg_id: IDF1.fr
+        tvg_chno: 910
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/f/f7/Logo_IDF1_2017-09.svg/320px-Logo_IDF1_2017-09.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Pitchoun TV IDF
+        tvg_names:
+          - '!start!PITCHOUN!~!TV!~!IDF!end!'
+        tvg_id:
+        tvg_chno: 911
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/6/64/Pitchoun_IDF.jpg/320px-Pitchoun_IDF.jpg
+        group_title:
+          - FR
+          - LOCAL
+          - KIDS
+
+      - tvg_name: BFM Alsace
+        tvg_names:
+          - '!start!BFM!~!ALSACE!end!'
+        tvg_id: BFMAlsace.fr
+        tvg_chno: 912
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/c/cb/BFM-Alsace.svg/240px-BFM-Alsace.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TV 78
+        tvg_names:
+          - '!start!TV!~!78!end!'
+        tvg_id: TV78.fr
+        tvg_chno: 913
+        tvg_logo: https://broccoli.tvchannellists.com/images/2/20/TV78-2020.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Wéo Nord
+        tvg_names:
+          - '!start!WEO!~!NORD!end!'
+        tvg_id: WeoNord.fr
+        tvg_chno: 914
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Logo_de_W%C3%A9o_NPdC.png/320px-Logo_de_W%C3%A9o_NPdC.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM Lyon
+        tvg_names:
+          - '!start!BFM!~!LYON!end!'
+          - '!start!BFM!~!LYON!~!METROPOLE!end!'
+          - '!start!BFM!~!TV!~!LYON!~!METROPOLE!end!'
+        tvg_id: BFMLyon.fr
+        tvg_chno: 915
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/b/b8/BFM-Lyon.svg/240px-BFM-Lyon.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM Marseille
+        tvg_names:
+          - '!start!BFM!~!MARSEILLE!end!'
+          - '!start!BFM!~!MARSEILLE!~!PROVENCE!end!'
+          - '!start!BFM!~!TV!~!MARSEILLE!~!PROVENCE!end!'
+        tvg_id: BFMMarseille.fr
+        tvg_chno: 916
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/8/8e/BFM-Marseille-Provence.svg/241px-BFM-Marseille-Provence.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Canal 10
+        tvg_names:
+          - '!start!CANAL!~!10!end!'
+        tvg_id:
+        tvg_chno: 917
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Canal_10.png/320px-Canal_10.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TLC
+        tvg_names:
+          - '!start!TLC!end!'
+        tvg_id:
+        tvg_chno: 918
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/6/64/TLC_logo_2010.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Vià Occitanie Pays Gardois
+        tvg_names:
+          - '!start!VIA!~!OCCITANIE!~!PAYS!~!GARDOIS!end!'
+        tvg_id: ViaOccitanieProvence.fr
+        tvg_chno: 919
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Logo_de_Vi%C3%A0Occitanie_Pays_Gardois.png/320px-Logo_de_Vi%C3%A0Occitanie_Pays_Gardois.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Moselle TV
+        tvg_names:
+          - '!start!MOSELLE!~!TV!end!'
+        tvg_id: MirabelleTV.fr
+        tvg_chno: 920
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Logo_Moselle_TV.png/320px-Logo_Moselle_TV.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Vosges TV
+        tvg_names:
+          - '!start!VOSGES!~!TV!end!'
+        tvg_id: VosgesTV.fr
+        tvg_chno: 921
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/1/11/Vosges_TV.jpg
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Vià Occitanie Montpellier
+        tvg_names:
+          - '!start!VIA!~!OCCITANIE!~!MONTPELLIER!end!'
+        tvg_id: ViaOccitanieMontpellier.fr
+        tvg_chno: 922
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Logo_de_Vi%C3%A0Occitanie_Montpellier.png/320px-Logo_de_Vi%C3%A0Occitanie_Montpellier.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Maritima TV
+        tvg_names:
+          - '!start!MARITIMA!~!TV!end!'
+        tvg_id: MaritimaTV.fr
+        tvg_chno: 923
+        tvg_logo: https://broccoli.tvchannellists.com/images/7/70/MARITIMATV-2018.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TV Vendée
+        tvg_names:
+          - '!start!TV!~!VENDEE!end!'
+        tvg_id: TVVendee.fr
+        tvg_chno: 924
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/b/b6/Logotype_TV_vend%C3%A9e.svg/320px-Logotype_TV_vend%C3%A9e.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Canal 32
+        tvg_names:
+          - '!start!CANAL!~!32!end!'
+        tvg_id: Canal32.fr
+        tvg_chno: 925
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Logo_C32_couleur.png/240px-Logo_C32_couleur.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM Grand Littoral
+        tvg_names:
+          - '!start!BFM!~!GRAND!~!LITTORAL!end!'
+        tvg_id: BFMGrandLittoral.fr
+        tvg_chno: 926
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/5/5d/BFM-Grand-Littoral.svg/240px-BFM-Grand-Littoral.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TVR
+        tvg_names:
+          - '!start!TVR!end!'
+          - '!start!TV!~!RENNES!~!35!~!BRETAGNE!end!'
+        tvg_id: TVRennes35Bretagne.fr
+        tvg_chno: 927
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/3/35/TVR_%28Bretagne%29_logo_2011.png/242px-TVR_%28Bretagne%29_logo_2011.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TébéSud
+        tvg_names:
+          - '!start!TEBESUD!end!'
+        tvg_id: TebeSud.fr
+        tvg_chno: 928
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/2/20/T%C3%A9b%C3%A9Sud_logo_2013.png/320px-T%C3%A9b%C3%A9Sud_logo_2013.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Tébéo
+        tvg_names:
+          - '!start!TEBEO!end!'
+        tvg_id: Tebeo.fr
+        tvg_chno: 929
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/c/cf/Logo_T%C3%A9b%C3%A9o.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM D!CI Alpes
+        tvg_names:
+          - '!start!BFM!~!DICI!~!ALPES!end!'
+        tvg_id:
+        tvg_chno: 930
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/BFM-DICI_Alpes_du_Sud.png/480px-BFM-DICI_Alpes_du_Sud.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM Toulon Var
+        tvg_names:
+          - '!start!BFM!~!TOULON!~!VAR!end!'
+        tvg_id:
+        tvg_chno: 931
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/1/18/BFM-Toulon-Var.svg/240px-BFM-Toulon-Var.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Télé Antilles
+        tvg_names:
+          - '!start!TELE!~!ANTILLES!end!'
+        tvg_id:
+        tvg_chno: 932
+        tvg_logo: https://broccoli.tvchannellists.com/images/0/0f/TELE_ANTILLES-2020.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TL7
+        tvg_names:
+          - '!start!TL7!end!'
+        tvg_id: TL7SaintEtienne.fr
+        tvg_chno: 933
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/LOGO_TL7.png/318px-LOGO_TL7.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TVPI
+        tvg_names:
+          - '!start!TVPI!end!'
+        tvg_id: TVPI.fr
+        tvg_chno: 934
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/6/63/Tvpi-logo-jaune-alpha.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM Nice Côte d'Azur
+        tvg_names:
+          - '!start!BFM!~!NICE!end!'
+          - '!start!BFM!~!NICE!~!COTE!~!D.?AZUR!end!'
+        tvg_id: BFMNice.fr
+        tvg_chno: 935
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/6/62/BFM-Nice-CoteAzur.svg/240px-BFM-Nice-CoteAzur.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Vià Occitanie Pays Catalan
+        tvg_names:
+          - '!start!VIA!~!OCCITANIE!~!PAYS!~!CATALAN!end!'
+        tvg_id: ViaOccitaniePaysCatalan.fr
+        tvg_chno: 936
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Logo_de_Vi%C3%A0Occitanie_Pays_Catalan.png/320px-Logo_de_Vi%C3%A0Occitanie_Pays_Catalan.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Matélé
+        tvg_names:
+          - '!start!MA!~!TELE!end!'
+        tvg_id: MaTele.be
+        tvg_chno: 937
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Logo_de_MATELE.png/320px-Logo_de_MATELE.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Angers Télé
+        tvg_names:
+          - '!start!ANGERS!~!TELE!end!'
+        tvg_id: AngersTele.fr 
+        tvg_chno: 938
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/3/30/Logo_Angers_T%C3%A9l%C3%A9_-_2022.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Télé Bocal
+        tvg_names:
+          - '!start!TELE!~!BOCAL!end!'
+        tvg_id:
+        tvg_chno: 939
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/e/e5/T%C3%A9l%C3%A9_Bocal_logo.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM D!CI Haute-Provence
+        tvg_names:
+          - '!start!BFM!~!DICI!~!PROVENCE!end!'
+          - '!start!BFM!~!DICI!~!HAUTE!~!PROVENCE!end!'
+        tvg_id:
+        tvg_chno: 940
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/BFM-DICI_Haute-Provence.png/240px-BFM-DICI_Haute-Provence.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Wéo Picardie
+        tvg_names:
+          - '!start!WEO!~!PICARDIE!end!'
+        tvg_id: WeoPicardie.fr
+        tvg_chno: 941
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Logo_de_W%C3%A9o_Picardie.png/320px-Logo_de_W%C3%A9o_Picardie.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Vià Occitanie Toulouse
+        tvg_names:
+          - '!start!VIA!~!OCCITANIE!~!TOULOUSE!end!'
+        tvg_id: ViaOccitanieToulouse.fr
+        tvg_chno: 942
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Logo_de_Vi%C3%A0Occitanie_Toulouse.png/320px-Logo_de_Vi%C3%A0Occitanie_Toulouse.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: BFM Paris
+        tvg_names:
+          - '!start!BFM!~!PARIS!end!'
+        tvg_id: BFMParis.fr
+        tvg_chno: 943
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/a/af/BFM-Paris-IDF-2022.svg/240px-BFM-Paris-IDF-2022.svg.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: ASTV
+        tvg_names:
+          - '!start!ASTV!end!'
+        tvg_id:
+        tvg_chno: 944
+        tvg_logo: https://broccoli.tvchannellists.com/images/3/33/ASTV-2018.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Bip TV
+        tvg_names:
+          - '!start!BIP!~!TV!end!'
+        tvg_id: BipTV.fr
+        tvg_chno: 945
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/b/b1/Bip_TV_logo.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Via Tele Paese
+        tvg_names:
+          - '!start!VIA!~!TELE!~!PAESE!end!'
+        tvg_id:
+        tvg_chno: 946
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/b/b3/Via_Tele_Paese.png/320px-Via_Tele_Paese.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Maurienne TV
+        tvg_names:
+          - '!start!MAURIENNE!~!TV!end!'
+        tvg_id:
+        tvg_chno: 949
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/3/3c/Maurienne_TV.png/320px-Maurienne_TV.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: La Chaîne 32
+        tvg_names:
+          - '!start!LA!~!CHAINE!~!32!end!'
+        tvg_id:
+        tvg_chno: 950
+        tvg_logo: https://broccoli.tvchannellists.com/images/6/68/La_Chaine_32.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: 7 à Limoges
+        tvg_names:
+          - '!start!7!~!A!~!LIMOGES!end!'
+        tvg_id:
+        tvg_chno: 951
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/3/39/Logo7alimoges.jpg
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: NA TV
+        tvg_names:
+          - '!start!NA!~!TV!end!'
+        tvg_id:
+        tvg_chno: 952
+        tvg_logo: https://broccoli.tvchannellists.com/images/thumb/7/77/NA_TV.png/320px-NA_TV.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: TV3V
+        tvg_names:
+          - '!start!TV3V!end!'
+        tvg_id:
+        tvg_chno: 953
+        tvg_logo: https://www.tv3v.fr/images/logo_tv3v.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Univers Ciné
+        tvg_names:
+          - '!start!UNIVERS!~!CINE!end!'
+        tvg_id:
+        tvg_chno: 1000
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/LOGO_UC_BLACK.png/320px-LOGO_UC_BLACK.png
+        group_title:
+          - FR
+          - VOD
+
+      - tvg_name: Xilam TV
+        tvg_names:
+          - '!start!XILAM!~!TV!end!'
+        tvg_id:
+        tvg_chno: 1001
+        tvg_logo:
+        group_title:
+          - FR
+          - KIDS
+
+      - tvg_name: Wild Side TV
+        tvg_names:
+          - '!start!WILD!~!SIDE!~!TV!end!'
+        tvg_id: WildSideTv.fr
+        tvg_chno: 1002
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/thumb/0/00/Wild_Side_Films_Logo.png/137px-Wild_Side_Films_Logo.png
+        group_title:
+          - FR
+          - KIDS
+          - PLUTO
+
+      - tvg_name: Trace Kitoko
+        tvg_names:
+          - '!start!TRACE!~!KITOKO!end!'
+        tvg_id:
+        tvg_chno: 1003
+        tvg_logo: https://fr.trace.tv/trace-kitoko/wp-content/uploads/sites/43/2018/04/TRACE-logo-kitoko-01.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: E! Entertainment
+        tvg_names:
+          - '!start!E.!~!ENTERTAINMENT!end!'
+        tvg_id:
+        tvg_chno: 1004
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/E%21_Logo_2012.svg/74px-E%21_Logo_2012.svg.png
+        group_title:
+          - FR
+          - ENTERTAINMENT
+
+      - tvg_name: DBM TV
+        tvg_names:
+          - '!start!DBM!~!TV!end!'
+        tvg_id:
+        tvg_chno: 1005
+        tvg_logo: https://www.dbm-tv.fr/wp-content/uploads/2017/12/logo-dbm.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Vià Occitanie
+        tvg_names:
+          - '!start!VIA!~!OCCITANIE!end!'
+          - '!start!TV!~!SUD!end!'
+        tvg_id: ViaOccitanie.fr
+        tvg_chno: 1006
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Logo_de_Vi%C3%A0Occitanie.png/320px-Logo_de_Vi%C3%A0Occitanie.png
+        group_title:
+          - FR
+          - LOCAL
+
+      - tvg_name: Trace Naija
+        tvg_names:
+          - '!start!TRACE!~!NAIJA!end!'
+        tvg_id:
+        tvg_chno: 1007
+        tvg_logo: https://trace.tv/trace-naija/wp-content/uploads/sites/25/2016/11/logo_naija-1.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: Trace Africa
+        tvg_names:
+          - '!start!TRACE!~!AFRICA!end!'
+        tvg_id:
+        tvg_chno: 1008
+        tvg_logo: https://trace.tv/trace-africa/wp-content/uploads/sites/23/2016/11/logo_africa-1.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: MTV Base
+        tvg_names:
+          - '!start!MTV!~!BASE!end!'
+        tvg_id: MTVBase.fr
+        tvg_chno: 1009
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/MTV-2021.svg/320px-MTV-2021.svg.png
+        group_title:
+          - FR
+          - MUSIC
+
+      - tvg_name: MDL
+        tvg_names:
+          - '!start!MDL!end!'
+        tvg_id:
+        tvg_chno: 1010
+        tvg_logo:
+        group_title:
+          - FR
+
+      - tvg_name: Francophonie 24
+        tvg_names:
+          - '!start!FRANCOPHONIE!~!24!end!'
+        tvg_id:
+        tvg_chno: 1011
+        tvg_logo:
+        group_title:
+          - FR
+
+  - id: Canada
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|LQ|4K|UHD)?!~!'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - tvg_name: Rouge TV
+        tvg_names:
+          - '!start!CPAC!end!'
+        tvg_id:
+        tvg_chno: 104
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/2016_CPAC_logo.svg/320px-2016_CPAC_logo.svg.png
+        group_title:
+          - CH
+
+  - id: Suisse
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|LQ|4K|UHD)?!~!'
+      - name: plus
+        value: '[\s_-]*(\+|plus)'
+        # value: '!~!(\+|plus)'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - tvg_name: Rouge TV
+        tvg_names:
+          - '!start!ROUGE!~!TV!end!'
+        tvg_id: RougeTV.ch
+        tvg_chno: 13
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/d/d3/Rouge_Tv-_cmjn.png
+        group_title:
+          - CH
+
+      - tvg_name: Canal Alpha JU
+        tvg_names:
+          - '!start!CANAL!~!ALPHA!~!JU!end!'
+          - '!start!CANAL!plus!!~!ALPHA!end!'
+        tvg_id: CanalAlpha.ch
+        tvg_chno: 18
+        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/7/77/Logo_Canal_Alpha_Noire_2.jpg
+        group_title:
+          - CH
+
+      - tvg_name: TVM 3
+        tvg_names:
+          - '!start!TVM!~!3!end!'
+        tvg_id: TVM3.ch
+        tvg_chno: 79
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Logo_TVM3_2015.png/320px-Logo_TVM3_2015.png
+        group_title:
+          - CH
+
+      - tvg_name: RTS Un
+        tvg_names:
+          - '!start!RTS!~!UN!end!'
+        tvg_id: RTSUn.ch
+        tvg_chno: 301
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/RTS_1_logo_2019.svg/320px-RTS_1_logo_2019.svg.png
+        group_title:
+          - CH
+
+      - tvg_name: RTS Deux
+        tvg_names:
+          - '!start!RTS!~!DEUX!end!'
+        tvg_id: RTSDeux.ch
+        tvg_chno: 302
+        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/RTS_2_logo_2019.svg/320px-RTS_2_logo_2019.svg.png
+        group_title:
+          - CH
+
+  - id: RakutenTv
+    tag:
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+    match_as_ascii: true
+    templates:
+      - name: '~'
+        value: '[\s_-]*'
+      - name: 'delimiter'
+        value: '[\s_-]*'
+        # value: '!~!'
+      - name: quality
+        value: '[\s_-]*(?i)(?P<quality>HD|LQ|4K|UHD)?[\s_-]*'
+        # value: '!~!(?i)(?P<quality>HD|LQ|4K|UHD)?!~!'
+      - name: start
+        value: '^(?i)[\s_-]*'
+        # value: '^(?i)!~!'
+      - name: end
+        value: '[\s_-]*(?i)(?P<quality>HD|FHD|LQ|4K|UHD)?(?:[\s_-]*-?[\s_-]*[a-zA-Z0-9]+)?[\s_-]*$'
+        # value: '!quality!$'
+    mapper:
+      - tvg_name: Films Thriller
+        tvg_names:
+          - '!start!FILMS!~!THRILLER!end!'
+        tvg_id:
+        tvg_chno: 1
+        tvg_logo:
+        group_title:
+          - FR
+          - RAKUTEN TV
+
+      - tvg_name: Films Drames
+        tvg_names:
+          - '!start!FILMS!~!DRAMES!end!'
+        tvg_id:
+        tvg_chno: 2
+        tvg_logo:
+        group_title:
+          - FR
+          - RAKUTEN TV
+
+      - tvg_name: Famille
+        tvg_names:
+          - '!start!FAMILLE!end!'
+        tvg_id:
+        tvg_chno: 3
+        tvg_logo:
+        group_title:
+          - FR
+          - RAKUTEN TV
+
