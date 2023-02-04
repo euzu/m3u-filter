@@ -73,7 +73,7 @@ mappings:
       - tvg_name: ABxplore
         tvg_names:
           - '!start!AB!~!E?XPLORE!end!'
-        tvg_id: AB3.fr
+        tvg_id: ABXploreFR.fr
         tvg_chno: 9
         tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/ABXplore_logo.svg/320px-ABXplore_logo.svg.png
         group_title:
