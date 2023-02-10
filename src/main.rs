@@ -33,8 +33,8 @@ struct Args {
     mapping: Option<String>,
 
     /// Run in server mode
-    #[arg(short, long)]
-    server: Option<bool>,
+    #[arg(short, long, default_value_t = false, default_missing_value = "true")]
+    server: bool,
 
     /// Print more info
     #[arg(short, long, default_value_t = false)]
@@ -59,16 +59,15 @@ fn main() {
 
     if verbose { println!("working dir: {:?}", &cfg.working_dir); }
 
-    match args.server {
-        Some(_) => {
-            if verbose { println!("web_root: {}", &cfg.api.web_root); }
-            println!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
-            match api::start_server(cfg.clone()) {
-                Ok(_) => {}
-                Err(e) => panic!("cant start server: {}", e)
-            };
-        },
-        _=> m3u_processing::process_targets(&cfg, verbose)
+    if args.server {
+        if verbose { println!("web_root: {}", &cfg.api.web_root); }
+        println!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
+        match api::start_server(cfg) {
+            Ok(_) => {}
+            Err(e) => panic!("cant start server: {}", e)
+        };
+    } else {
+        m3u_processing::process_targets(&cfg, verbose);
     }
 }
 
