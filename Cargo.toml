@@ -30,3 +30,4 @@ pest = "2.5.3"
 pest_derive = "2.5.3"
 enum-iterator = "1.2.0"
 unidecode = "0"
+openssl = { version = "*", features = ["vendored"] } #https://docs.rs/openssl/0.10.34/openssl/#vendored
