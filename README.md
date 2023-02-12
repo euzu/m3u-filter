@@ -163,29 +163,11 @@ targets:
 ```
 
 ## 2. `mapping.yml`
-Has the following top level entries:
-* `id` _mandatory_
-* `tag` _optional_
-* `match_as_ascii` _optional_ default is `false`
+Has the root item `mappings` which has the following top level entries:
 * `templates` _optional_
-* `mapper` _mandatory_
+* mapping _mandatory_
 
-### 2.1 `id`
-Is referenced in the `config.yml`, should be a unique identifier
-
-### 2.2 `tag`
-Has the following top level entries: 
-  - `captures`: List of captured variable names like `quality`. The names should be equal to the regexp capture names.
-  - `concat`: if you have more than one captures defined this is the join string between them
-  - `suffix`: suffix for the tag
-  - `prefix`: prefix for the tag
-
-### 2.2 `match_as_ascii`
-If you have non ascii characters in you playlist and want to 
-write regexp without considering chars like `é` and use `e` instead, set this option to `true`.
-[unidecode](https://crates.io/crates/unidecode) is used to convert the text.
-
-### 2.3 `templates`
+### 2.1 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
 ```yaml
 templates:
@@ -198,14 +180,37 @@ With this definition you can use `delimiter` and `quality` in your regexp's surr
 
 This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp string.
 
-### 2.4 `mapper`
+### 2.2 `mapping`
+Has the following top level entries:
+* `id` _mandatory_
+* `tag` _optional_
+* `match_as_ascii` _optional_ default is `false`
+* `mapper` _mandatory_
+
+### 2.2.1 `id`
+Is referenced in the `config.yml`, should be a unique identifier
+
+### 2.2.2 `tag`
+Has the following top level entries: 
+  - `captures`: List of captured variable names like `quality`. The names should be equal to the regexp capture names.
+  - `concat`: if you have more than one captures defined this is the join string between them
+  - `suffix`: suffix for the tag
+  - `prefix`: prefix for the tag
+
+### 2.2.3 `match_as_ascii`
+If you have non ascii characters in you playlist and want to 
+write regexp without considering chars like `é` and use `e` instead, set this option to `true`.
+[unidecode](https://crates.io/crates/unidecode) is used to convert the text.
+
+
+### 2.2.4 `mapper`
 Has the following top level entries:
 * `pattern`
 * `attributes`
 * `suffix`
 * `prefix`
 
-#### 2.4.1 `pattern`
+#### 2.2.4.1 `pattern`
 The pattern is a string with a statement (@see filter statements).
 The pattern can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
 Filter fields are `Group`, `Title`, `Name` and `Url`.
@@ -217,7 +222,7 @@ but lacks a few features like look around and backreferences.
 The Regular expressions in the pattern can contain captured variable names like `TF1 $quality`,
 or template variables.
 
-#### 2.4.2 `attributes`
+#### 2.2.4.2 `attributes`
 Attributes is a map of key value pairs. Valid keys are:
 - name
 - group
@@ -228,7 +233,7 @@ Attributes is a map of key value pairs. Valid keys are:
 
 If the regexps matches, the given fields will be set to the new value
 
-#### 2.4.3 `suffix`
+#### 2.2.4.3 `suffix`
 Suffix is a map of key value pairs. Valid keys are
 - name
 - group
@@ -244,7 +249,7 @@ Example:
 
 If the regexps matches, the given fields will be appended to field value
 
-#### 2.4.3 `prefix`
+#### 2.2.4.4 `prefix`
 Suffix is a map of key value pairs. Valid keys are
 - name
 - group
@@ -263,37 +268,38 @@ If the regexps matches, the given fields will be prefixed to field value
 ### 2.5 Example mapping.yml file.
 ```yaml
 mappings:
-  - id: France
-    tag:
-      captures:
-        - quality
-      concat: '|'
-      prefix: ' [ '
-      suffix: ' ]'
-    match_as_ascii: true
     templates:
       - name: delimiter
         value: '[\s_-]*'
       - name: quality
         value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'
-    mapper:
-      - pattern: 'Name ~ "^TF1$"'
-        attributes:
-          name: TF1 $quality,
-          id: TF1.fr,
-          chno: '1',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
-        suffix:
-          title: '<tag>'
-          group: '|FR|TNT'
-      - pattern: 'Name ~ "^TF1!delimiter!!quality!*Series[_ ]*Films$"'
-        attributes:
-          name: TF1 Series Films,
-          id: TF1SeriesFilms.fr,
-          chno: '20',
-          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png,
-        suffix:
-          group: '|FR|TNT'
+    mapping:
+      - id: France
+        tag:
+          captures:
+            - quality
+          concat: '|'
+          prefix: ' [ '
+          suffix: ' ]'
+        match_as_ascii: true
+        mapper:
+          - pattern: 'Name ~ "^TF1$"'
+            attributes:
+              name: TF1 $quality,
+              id: TF1.fr,
+              chno: '1',
+              logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
+            suffix:
+              title: '<tag>'
+              group: '|FR|TNT'
+          - pattern: 'Name ~ "^TF1!delimiter!!quality!*Series[_ ]*Films$"'
+            attributes:
+              name: TF1 Series Films,
+              id: TF1SeriesFilms.fr,
+              chno: '20',
+              logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png,
+            suffix:
+              group: '|FR|TNT'
 ```
 
 ## 3. Compilation

@@ -1,4 +1,8 @@
 # Changelog
+# v0.9.?(2023-02-12)
+* Breaking changes, mappings.yml refactored 
+
+
 # v0.9.6(2023-01-14)
 * Renamed `mappings.templates` attribute `key` to `name`
 * `mappings.tag` is now a struct

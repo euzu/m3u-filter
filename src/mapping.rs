@@ -173,7 +173,6 @@ pub struct Mapping {
     pub tag: Option<MappingTag>,
     #[serde(default = "default_as_false")]
     pub match_as_ascii: bool,
-    pub templates: Option<Vec<PatternTemplate>>,
     pub mapper: Vec<Mapper>,
 }
 
@@ -183,17 +182,16 @@ impl Clone for Mapping {
             id: self.id.clone(),
             tag: self.tag.clone(),
             match_as_ascii: self.match_as_ascii,
-            templates: self.templates.clone(),
             mapper: self.mapper.clone(),
         }
     }
 }
 
 impl Mapping {
-    pub(crate) fn prepare(&mut self) -> () {
+    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>) -> () {
         for mapper in &mut self.mapper {
-            match &self.templates {
-              Some(templ) => mapper.prepare(Some(&templ)),
+            match templates {
+                Some(templ) => mapper.prepare(Some(templ)),
                 _ => mapper.prepare(None)
             }
         }
@@ -201,19 +199,43 @@ impl Mapping {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct MappingDefinition {
+    pub templates: Option<Vec<PatternTemplate>>,
+    pub mapping: Vec<Mapping>
+}
+
+impl MappingDefinition {
+    pub(crate) fn prepare(&mut self) {
+        for mapping in &mut self.mapping {
+            match &self.templates {
+                Some(templ) => mapping.prepare(Some(&templ)),
+                _ => mapping.prepare(None)
+            }
+        }
+    }
+}
+
+impl Clone for MappingDefinition {
+    fn clone(&self) -> Self {
+        MappingDefinition {
+            templates: self.templates.clone(),
+            mapping: self.mapping.clone(),
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Mappings {
-    pub mappings: Vec<Mapping>
+    pub mappings: MappingDefinition
 }
 
 impl Mappings {
     pub(crate) fn prepare(&mut self) {
-        for mapping in &mut self.mappings {
-            mapping.prepare();
-        }
+        self.mappings.prepare();
     }
 
     pub(crate) fn get_mapping(&self, mapping_id: &String) -> Option<Mapping> {
-        for mapping in &self.mappings {
+        for mapping in &self.mappings.mapping {
             if mapping.id.eq(mapping_id) {
                 return Some(mapping.clone())
             }
