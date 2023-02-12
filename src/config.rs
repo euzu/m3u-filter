@@ -1,6 +1,6 @@
 use path_absolutize::*;
 
-use crate::filter::{Filter, get_filter, ValueProvider};
+use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, ValueProvider};
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
 use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType};
@@ -66,8 +66,8 @@ pub struct ConfigTarget {
 }
 
 impl ConfigTarget {
-    pub(crate) fn prepare(&mut self) -> () {
-        self._filter = Some(get_filter(&self.filter));
+    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>) -> () {
+        self._filter = Some(get_filter(&self.filter, templates));
         match self.rename.as_mut() {
             Some(renames) => for r in renames {
                 r.prepare();
@@ -75,16 +75,17 @@ impl ConfigTarget {
             _ => {}
         }
     }
-    pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
-        return self._filter.as_ref().unwrap().filter(provider);
+    pub(crate) fn filter(&self, provider: &ValueProvider, verbose: bool) -> bool {
+        let mut processor = MockValueProcessor{};
+        return self._filter.as_ref().unwrap().filter(provider, &mut processor, verbose);
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSources {
     pub input: ConfigInput,
+    pub templates: Option<Vec<PatternTemplate>>,
     pub targets: Vec<ConfigTarget>,
-
 }
 
 impl ConfigSources {
@@ -163,7 +164,10 @@ impl Config {
         for source in &mut self.sources {
             source.prepare();
             for target in &mut source.targets {
-                target.prepare();
+                match &source.templates {
+                    Some(templ) => target.prepare(Some(&templ)),
+                    _ => target.prepare(None)
+                }
             }
         }
     }
@@ -228,6 +232,7 @@ impl Clone for ConfigSources {
     fn clone(&self) -> Self {
         ConfigSources {
             input: self.input.clone(),
+            templates: self.templates.clone(),
             targets: self.targets.clone(),
         }
     }

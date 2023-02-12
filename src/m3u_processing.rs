@@ -1,13 +1,14 @@
 extern crate unidecode;
+
 use std::io::Write;
 use config::ConfigTarget;
 use chrono::Datelike;
 use unidecode::unidecode;
 use crate::{config, Config, get_playlist, m3u, utils};
 use crate::model::SortOrder::{Asc, Desc};
-use crate::filter::ValueProvider;
+use crate::filter::{ValueProvider};
 use crate::m3u::{PlaylistGroup, PlaylistItem};
-use crate::mapping::{Mapping, MappingTag};
+use crate::mapping::{Mapping, MappingTag, MappingValueProcessor};
 use crate::model::{ItemField, ProcessingOrder, TargetType};
 
 
@@ -50,7 +51,8 @@ fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
 pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, 
                         target: &config::ConfigTarget, cfg: &config::Config, 
                         verbose: bool) -> Result<(), std::io::Error> {
-    let pipe : Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> = match &target.processing_order {
+    let pipe : Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> =
+        match &target.processing_order {
         ProcessingOrder::FRM => vec![filter_playlist, rename_playlist, map_playlist],
         ProcessingOrder::FMR => vec![filter_playlist, map_playlist, rename_playlist],
         ProcessingOrder::RFM => vec![rename_playlist, filter_playlist, map_playlist],
@@ -246,7 +248,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut Vec<PlaylistGroup>) {
 
 fn is_valid(pli: &m3u::PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli };
-    return target.filter(&provider);
+    return target.filter(&provider, false);
 }
 
 fn exec_rename(pli: &mut m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRename>>, verbose: bool) {
@@ -311,62 +313,17 @@ fn get_mapping_tag(mapping: &&Mapping) -> MappingTag {
     mapping_tag
 }
 
-fn map_channel(channel: &PlaylistItem, mapping: &Mapping, verbose: bool) -> PlaylistItem {
+fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> PlaylistItem {
     if mapping.mapper.len() > 0 {
         let channel_name = if mapping.match_as_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
         if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &channel.header.name, &channel_name)};
-        let mut tag = "".to_string();
         let mapping_tag = get_mapping_tag(&mapping);
-
+        let provider = ValueProvider { pli: &channel.clone() };
         for m in &mapping.mapper {
-            match &m._re {
-                Some(regexps) => {
-                    for re in regexps {
-                        if re.re.is_match(&channel_name) {
-                            let mut chan = channel.clone();
-                            let mut chan_name = m.tvg_name.clone();
-                            if re.captures.len() > 0 {
-                                let captures_opt = re.re.captures(&channel_name);
-                                if captures_opt.is_some() {
-                                    let captures = captures_opt.unwrap();
-                                    for cname in &re.captures {
-                                        let match_opt = captures.name(cname.as_str());
-                                        let repl = if match_opt.is_some() {
-                                            match_opt.map_or("", |m| m.as_str())
-                                        } else {
-                                            ""
-                                        };
-                                        chan_name = String::from(chan_name.replace(format!("${}", cname.as_str()).as_str(), repl));
-
-                                        for c in &mapping_tag.captures {
-                                            if c.eq(cname) {
-                                                if tag.is_empty() {
-                                                    tag = String::from(repl);
-                                                } else {
-                                                    tag = format!("{}{}{}", tag,  &mapping_tag.concat, String::from(repl))
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if !tag.is_empty() {
-                                tag = format!("{}{}{}", mapping_tag.prefix, tag, mapping_tag.suffix)
-                            }
-
-                            let new_name = format!("{}{}", &chan_name, tag);
-                            if verbose { println!("Mapped {} to {}", &channel.header.name, new_name)}
-                            chan.header.name = new_name;
-                            chan.header.chno = m.tvg_chno.clone();
-                            chan.header.id = m.tvg_id.clone();
-                            chan.header.logo = m.tvg_logo.clone();
-                            let mut split: Vec<String> = channel.header.group.split("|").map(|s| String::from(s.trim())).collect();
-                            split.append(m.group_title.clone().as_mut());
-                            chan.header.group = split.join("|");
-                            return chan;
-                        }
-                    }
+            let mut processor = MappingValueProcessor { pli: channel, mapping_tag: &mapping_tag, mapper: m };
+            match &m._filter {
+                Some(filter) => {
+                    filter.filter(&provider, &mut processor, verbose);
                 }
                 _ => {}
             }
@@ -383,7 +340,7 @@ fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: b
             let mappings = target._mapping.as_ref().unwrap();
             for mapping in mappings {
                 if mapping.mapper.len() > 0 {
-                    grp.channels = grp.channels.iter().map(|chan| map_channel(&chan, &mapping, verbose)).collect();
+                    grp.channels = grp.channels.iter_mut().map(|chan| map_channel(chan, &mapping, verbose)).collect();
                 }
             }
             new_playlist.push(grp);

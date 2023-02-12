@@ -4,7 +4,7 @@ m3u-filter is a simple application which can filter, rename and map entries out 
 M3U format is supported by most media and iptv players as a playlist.
 If you have a playlist which contains unwanted entries, you can create filter which include or discard entries
 based on the header information of the playlist entries, you can rename entries or map entries based on regular expressions.
-Currently filter and rename operations support group, name and title fields.
+Currently, filter and rename operations support group, name and title fields.
 
 You can run m3u-filter as command line application to update your playlists (manually or as cron job), or you can 
 run it in server mode and open the web-ui to see the contents of the playlist, filter/search content and save the filtered groups as a new playlist.
@@ -105,9 +105,9 @@ but lacks a few features like look around and backreferences.
 ### 1.3.2.7 `rename`
 Has 3 top level entries.
 * `field` can be  `Group`, `Title`, `Name` or `Url`.
-* `new_name` can contain capture groups variables adressed with `$1`,`$2`,... 
+* `new_name` can contain capture groups variables addressed with `$1`,`$2`,... 
 
-`rename` supports capture groups. Each group can be adressed with `$1`, `$2` .. in the `new_name` attribute.
+`rename` supports capture groups. Each group can be addressed with `$1`, `$2` .. in the `new_name` attribute.
 
 This could be used for players which do not observe the order and sort themselves.
 ```yaml
@@ -163,7 +163,7 @@ targets:
 ```
 
 ## 2. `mapping.yml`
-Has following top level entries:
+Has the following top level entries:
 * `id` _mandatory_
 * `tag` _optional_
 * `match_as_ascii` _optional_ default is `false`
@@ -174,7 +174,7 @@ Has following top level entries:
 Is referenced in the `config.yml`, should be a unique identifier
 
 ### 2.2 `tag`
-Has following top level entries: 
+Has the following top level entries: 
   - `captures`: List of captured variable names like `quality`. The names should be equal to the regexp capture names.
   - `concat`: if you have more than one captures defined this is the join string between them
   - `suffix`: suffix for the tag
@@ -199,26 +199,66 @@ With this definition you can use `delimiter` and `quality` in your regexp's surr
 This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp string.
 
 ### 2.4 `mapper`
-Has following top level entries:
-* `tvg_name`
-* `tvg_names`
-* `tvg_id` simple text
-* `tvg_chno` simple text
-* `tvg_logo` simple text
-* `group_title` sequence of simple text which are concatenated with `|` and added to the `group` entry.
+Has the following top level entries:
+* `pattern`
+* `attributes`
+* `suffix`
+* `prefix`
 
-#### 2.4.1 `tvg_name`
-Is a simple text which can contain captured variable names like `TF1 $quality`. For this example 
-you should use `tag` instead, because it prevents the spaces if no matching quality was found.
+#### 2.4.1 `pattern`
+The pattern is a string with a statement (@see filter statements).
+The pattern can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
+Filter fields are `Group`, `Title`, `Name` and `Url`.
+Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group ~ "^AU.*")`
 
-#### 2.4.2 `tvg_names`
-Sequence for regexp's to apply the defined changes on match.
+The regular expression syntax is similar to Perl-style regular expressions,
+but lacks a few features like look around and backreferences.
 
-(_Please be aware of the processing order. If you first rename, you should match the renamed entries!_)
-```yaml
-tvg_names:
-  - '^.*TF1!delimiter!Series?!delimiter!Films?(!delimiter!!quality!)\s*$'
+The Regular expressions in the pattern can contain captured variable names like `TF1 $quality`,
+or template variables.
+
+#### 2.4.2 `attributes`
+Attributes is a map of key value pairs. Valid keys are:
+- name
+- group
+- title
+- logo
+- id
+- chno
+
+If the regexps matches, the given fields will be set to the new value
+
+#### 2.4.3 `suffix`
+Suffix is a map of key value pairs. Valid keys are
+- name
+- group
+- title
+
+The special text `<tag>` is used to append the tag if not empty.
+Example:
 ```
+  suffix:
+     name: '<tag>'
+     title: '-=[<tag>]=-'
+```
+
+If the regexps matches, the given fields will be appended to field value
+
+#### 2.4.3 `prefix`
+Suffix is a map of key value pairs. Valid keys are
+- name
+- group
+- title
+
+The special text `<tag>` is used to append the tag if not empty
+Example:
+```
+  suffix:
+     name: '<tag>'
+     title: '-=[<tag>]=-'
+```
+
+If the regexps matches, the given fields will be prefixed to field value
 
 ### 2.5 Example mapping.yml file.
 ```yaml
@@ -237,34 +277,23 @@ mappings:
       - name: quality
         value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'
     mapper:
-      - tvg_name: TF1 $quality
-        tvg_names:
-          - '^\s*(FR)?[: |]?TF1!delimiter!!quality!\s*$'
-        tvg_id: TF1.fr
-        tvg_chno: "1"
-        tvg_logo: https://emojipedia-us.s3.amazonaws.com/source/skype/289/shrimp_1f990.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: TF1 Séries Films $quality
-        tvg_names:
-          - '^.*TF1!delimiter!Series?!delimiter!Films?(!delimiter!!quality!)\s*$'
-        tvg_id: TF1SeriesFilms.fr
-        tvg_chno: "20"
-        tvg_logo: https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/google/350/shrimp_1f990.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: TF1 +1 - $quality
-        tvg_names:
-          - '^.*TF1!delimiter!Series?!delimiter!Films?!delimiter!(\+|plus)1(!delimiter!!quality!)\s*$'
-        tvg_id: TF1Plus1.fr
-        tvg_chno: "1"
-        tvg_logo: https://emojipedia-us.s3.amazonaws.com/source/skype/289/shrimp_1f990.png
-        group_title:
-          - FR
-          - TNT
-          - PLUS1
+      - pattern: 'Name ~ "^TF1$"'
+        attributes:
+          name: TF1 $quality,
+          id: TF1.fr,
+          chno: '1',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
+        suffix:
+          title: '<tag>'
+          group: '|FR|TNT'
+      - pattern: 'Name ~ "^TF1!delimiter!!quality!*Series[_ ]*Films$"'
+        attributes:
+          name: TF1 Series Films,
+          id: TF1SeriesFilms.fr,
+          chno: '20',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png,
+        suffix:
+          group: '|FR|TNT'
 ```
 
 ## 3. Compilation

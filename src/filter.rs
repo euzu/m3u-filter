@@ -1,5 +1,5 @@
 use enum_iterator::all;
-use std::borrow::Borrow;
+use std::borrow::{Borrow};
 use std::sync::{Arc, Mutex};
 use pest::Parser;
 use crate::m3u::PlaylistItem;
@@ -20,6 +20,48 @@ impl<'a> ValueProvider<'a> {
     }
 }
 
+pub trait ValueProcessor {
+    fn process(&mut self, field: &ItemField, value: &str, rewc: &RegexWithCaptures, verbose: bool) -> bool;
+}
+
+pub struct MockValueProcessor {}
+impl ValueProcessor for MockValueProcessor {
+    fn process(&mut self, _: &ItemField, _: &str, _: &RegexWithCaptures, _: bool) -> bool {
+        return false;
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct PatternTemplate {
+    pub name: String,
+    pub value: String,
+}
+
+impl Clone for PatternTemplate {
+    fn clone(&self) -> Self {
+        PatternTemplate {
+            name: self.name.clone(),
+            value: self.value.clone()
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RegexWithCaptures {
+    pub re: regex::Regex,
+    pub captures: Vec<String>,
+}
+
+impl Clone for RegexWithCaptures {
+    fn clone(&self) -> Self {
+        RegexWithCaptures {
+            re: self.re.clone(),
+            captures: self.captures.clone()
+        }
+    }
+}
+
+
 #[derive(Parser)]
 #[grammar_inline = "field = { \"Group\" | \"Title\" | \"Name\" | \"Url\"}\nand = {\"AND\" | \"and\"}\nor = {\"OR\" | \"or\"}\nnot = { \"NOT\" | \"not\" }\nlparen = { \"(\" }\nrparen = { \")\" }\nregexp_op = _{ \"~\" }\nregexp = @{ \"\\\"\" ~ ( \"\\\\\\\"\" | (!\"\\\"\" ~ ANY) )* ~ \"\\\"\" }\nvalue = _{ regexp }\n\noperator = _{ regexp_op }\nmatch_comparison = _{ field ~ operator ~ value }\npredicate = _{ match_comparison }\nbool_test = _{ predicate | lparen ~ condition ~ rparen }\nbool_factor = _{ not? ~ bool_test }\nbool_term = _{ bool_factor ~ (and ~ bool_factor)* }\ncondition = _{ bool_term ~ (or ~ bool_term)* }\nmain = _{ SOI ~ condition ~ EOI }\nWHITESPACE = _{ \" \" | \"\\t\" }"]
 struct FilterParser;
@@ -38,23 +80,30 @@ pub enum BinaryOperator {
 #[derive(Debug, Clone)]
 pub enum Filter {
     Group(Arc<Mutex<Vec<Arc<Filter>>>>),
-    Comparison(ItemField, Arc<Mutex<Option<regex::Regex>>>),
+    Comparison(ItemField, Arc<Mutex<Option<RegexWithCaptures>>>),
     UnaryExpression(UnaryOperator, Arc<Mutex<Option<Arc<Filter>>>>),
     BinaryExpression(BinaryOperator, Arc<Filter>, Arc<Mutex<Option<Arc<Filter>>>>),
 }
 
 impl Filter {
-    pub fn filter(&self, provider: &ValueProvider) -> bool {
+    pub fn filter(&self, provider: &ValueProvider, processor: &mut dyn ValueProcessor, verbose: bool) -> bool {
         match self {
             Filter::Comparison(field, regex) => {
                 return match &*regex.lock().unwrap() {
-                    Some(re) => re.is_match(provider.call(&field)),
+                    Some(rewc) => {
+                        let value = provider.call(&field);
+                        let is_match = rewc.re.is_match(value);
+                        if is_match {
+                            processor.process(field, &value, rewc, verbose);
+                        }
+                        return is_match
+                    },
                     _ => false
                 };
             },
             Filter::Group(stmts) => {
                 for stmt in &*stmts.lock().unwrap() {
-                    if !stmt.filter(provider) {
+                    if !stmt.filter(provider, processor, verbose) {
                         return false;
                     }
                 }
@@ -64,7 +113,7 @@ impl Filter {
                 match op {
                     UnaryOperator::NOT => {
                         match &*expr.lock().unwrap() {
-                            Some(e) => !e.filter(provider),
+                            Some(e) => !e.filter(provider, processor, verbose),
                             _ => false
                         }
                     }
@@ -73,8 +122,10 @@ impl Filter {
             Filter::BinaryExpression(op, left, right) => {
                 return match &*right.lock().unwrap() {
                     Some(r) => return match op {
-                        BinaryOperator::AND => left.filter(provider) && r.filter(provider),
-                        BinaryOperator::OR => left.filter(provider) || r.filter(provider),
+                        BinaryOperator::AND => left.filter(provider, processor, verbose)
+                            && r.filter(provider, processor, verbose),
+                        BinaryOperator::OR => left.filter(provider, processor, verbose)
+                            || r.filter(provider, processor, verbose),
                     },
                     _ => false
                 }
@@ -148,8 +199,10 @@ fn compact_stack(stack: &mut Vec<Arc<Filter>>) {
     }
 }
 
-pub fn get_filter(source: &str) -> Filter {
+pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>) -> Filter {
     let mut stack: Vec<Arc<Filter>> = vec![];
+    let empty_vec = Vec::new();
+    let templ : &Vec<PatternTemplate> = templates.unwrap_or(&empty_vec);
 
     let pairs = FilterParser::parse(Rule::main, source).unwrap_or_else(|e| panic!("{}", e));
     for pair in pairs {
@@ -203,14 +256,24 @@ pub fn get_filter(source: &str) -> Filter {
                 let mut parsed_text = String::from(pair.as_str());
                 parsed_text.pop();
                 parsed_text.remove(0);
-                let re = regex::Regex::new(parsed_text.as_str());
-                if re.is_err() {
-                    exit(format!("cant parse regex: {}", parsed_text).as_str());
+                let mut regstr = String::from(parsed_text.as_str());
+                for t in templ {
+                    regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
                 }
+                let re = regex::Regex::new(regstr.as_str());
+                if re.is_err() {
+                    exit(format!("cant parse regex: {}", regstr).as_str());
+                }
+                let regexp = re.unwrap();
+                let captures = regexp.capture_names().map(|x| String::from(x.unwrap_or(""))).filter(|x| x.len() > 0).collect::<Vec<String>>();
+                let  regexp_with_captures = RegexWithCaptures {
+                    re: regexp,
+                    captures
+                };
                 let left = stack.last().unwrap();
                 match left.borrow() {
                     Filter::Comparison(_, regex) => {
-                        *regex.lock().unwrap() = Some(re.unwrap());
+                            *regex.lock().unwrap() = Some(regexp_with_captures);
                         compact_stack(&mut stack);
                     }
                     _ => {}
