@@ -8,7 +8,7 @@ use crate::{config, Config, get_playlist, m3u, utils};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::{ValueProvider};
 use crate::m3u::{PlaylistGroup, PlaylistItem};
-use crate::mapping::{Mapping, MappingTag, MappingValueProcessor};
+use crate::mapping::{Mapping, MappingValueProcessor};
 use crate::model::{ItemField, ProcessingOrder, TargetType};
 
 
@@ -300,27 +300,13 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
     }
 }
 
-fn get_mapping_tag(mapping: &&Mapping) -> MappingTag {
-    let mapping_tag = match &mapping.tag {
-        Some(mtag) => mtag.clone(),
-        _ => MappingTag {
-            captures: vec![],
-            concat: "".to_string(),
-            prefix: "".to_string(),
-            suffix: "".to_string(),
-        }
-    };
-    mapping_tag
-}
-
 fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> PlaylistItem {
     if mapping.mapper.len() > 0 {
         let channel_name = if mapping.match_as_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
         if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &channel.header.name, &channel_name)};
-        let mapping_tag = get_mapping_tag(&mapping);
         let provider = ValueProvider { pli: &channel.clone() };
         for m in &mapping.mapper {
-            let mut processor = MappingValueProcessor { pli: channel, mapping_tag: &mapping_tag, mapper: m };
+            let mut processor = MappingValueProcessor { pli: channel, mapper: m };
             match &m._filter {
                 Some(filter) => {
                     filter.filter(&provider, &mut processor, verbose);

@@ -31,14 +31,16 @@ mappings:
       # value: '!quality!$'
     - name: '~'
       value: '[\s_-]*'
+  tags:
+    - name: quality
+      captures:
+        - quality
+      concat: '|'
+      prefix: ' ['
+      suffix: ']'
+
   mapping:
     - id: Belgique
-      tag:
-        captures:
-          - quality
-        concat: '|'
-        prefix: ' ['
-        suffix: ']'
       match_as_ascii: true
       mapper:
         - pattern: 'Name ~ "!start!LA!~!UNE!end!"'
@@ -78,12 +80,6 @@ mappings:
             - group: 'BE|CLASSICS'
 
     - id: France TNT
-      tag:
-        captures:
-          - quality
-        concat: '|'
-        prefix: ' ['
-        suffix: ']'
       match_as_ascii: true
       mapper:
         - pattern: 'Name ~ "!start!TF1!end!"'
@@ -357,12 +353,6 @@ mappings:
             - group: 'FR|TNT'
 
     - id: France Premium
-      tag:
-        captures:
-          - quality
-        concat: '|'
-        prefix: ' ['
-        suffix: ']'
       match_as_ascii: true
       mapper:
         - pattern: 'Name ~ "!start!13!~!E(ME)?!~!RUE!end!"'
@@ -2880,12 +2870,6 @@ mappings:
             - group: 'FR'
 
     - id: Canada
-      tag:
-        captures:
-          - quality
-        concat: '|'
-        prefix: ' ['
-        suffix: ']'
       match_as_ascii: true
       mapper:
         - pattern: 'Name ~ "!start!CPAC!end!"'
@@ -2897,12 +2881,6 @@ mappings:
             - group: 'CH'
 
     - id: Suisse
-      tag:
-        captures:
-          - quality
-        concat: '|'
-        prefix: ' ['
-        suffix: ']'
       match_as_ascii: true
       mapper:
         - pattern: 'Name ~ "!start!ROUGE!~!TV!end!"'
@@ -2951,12 +2929,6 @@ mappings:
             - group: 'CH'
 
     - id: RakutenTv
-      tag:
-        captures:
-          - quality
-        concat: '|'
-        prefix: ' ['
-        suffix: ']'
       match_as_ascii: true
       mapper:
         - pattern: 'Name ~ "!start!FILMS!~!THRILLER!end!"'

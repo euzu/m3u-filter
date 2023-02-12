@@ -201,8 +201,8 @@ fn compact_stack(stack: &mut Vec<Arc<Filter>>) {
 
 pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>) -> Filter {
     let mut stack: Vec<Arc<Filter>> = vec![];
-    let empty_vec = Vec::new();
-    let templ : &Vec<PatternTemplate> = templates.unwrap_or(&empty_vec);
+    let empty_list = Vec::new();
+    let template_list : &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
 
     let pairs = FilterParser::parse(Rule::main, source).unwrap_or_else(|e| panic!("{}", e));
     for pair in pairs {
@@ -257,7 +257,7 @@ pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>) -> Fil
                 parsed_text.pop();
                 parsed_text.remove(0);
                 let mut regstr = String::from(parsed_text.as_str());
-                for t in templ {
+                for t in template_list {
                     regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
                 }
                 let re = regex::Regex::new(regstr.as_str());

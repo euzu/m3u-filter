@@ -165,6 +165,7 @@ targets:
 ## 2. `mapping.yml`
 Has the root item `mappings` which has the following top level entries:
 * `templates` _optional_
+* `tags` _optional_
 * mapping _mandatory_
 
 ### 2.1 `templates`
@@ -180,37 +181,38 @@ With this definition you can use `delimiter` and `quality` in your regexp's surr
 
 This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp string.
 
-### 2.2 `mapping`
+### 2.2 `tags`
+Has the following top level entries:
+- `name`: unique name of the tag.
+- `captures`: List of captured variable names like `quality`. The names should be equal to the regexp capture names.
+- `concat`: if you have more than one captures defined this is the join string between them
+- `suffix`: suffix for the tag
+- `prefix`: prefix for the tag
+
+
+### 2.3 `mapping`
 Has the following top level entries:
 * `id` _mandatory_
-* `tag` _optional_
 * `match_as_ascii` _optional_ default is `false`
 * `mapper` _mandatory_
 
-### 2.2.1 `id`
+### 2.3.1 `id`
 Is referenced in the `config.yml`, should be a unique identifier
 
-### 2.2.2 `tag`
-Has the following top level entries: 
-  - `captures`: List of captured variable names like `quality`. The names should be equal to the regexp capture names.
-  - `concat`: if you have more than one captures defined this is the join string between them
-  - `suffix`: suffix for the tag
-  - `prefix`: prefix for the tag
-
-### 2.2.3 `match_as_ascii`
+### 2.3.2 `match_as_ascii`
 If you have non ascii characters in you playlist and want to 
 write regexp without considering chars like `é` and use `e` instead, set this option to `true`.
 [unidecode](https://crates.io/crates/unidecode) is used to convert the text.
 
 
-### 2.2.4 `mapper`
+### 2.3.3 `mapper`
 Has the following top level entries:
 * `pattern`
 * `attributes`
 * `suffix`
 * `prefix`
 
-#### 2.2.4.1 `pattern`
+#### 2.3.4.1 `pattern`
 The pattern is a string with a statement (@see filter statements).
 The pattern can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
 Filter fields are `Group`, `Title`, `Name` and `Url`.
@@ -222,7 +224,7 @@ but lacks a few features like look around and backreferences.
 The Regular expressions in the pattern can contain captured variable names like `TF1 $quality`,
 or template variables.
 
-#### 2.2.4.2 `attributes`
+#### 2.3.4.2 `attributes`
 Attributes is a map of key value pairs. Valid keys are:
 - name
 - group
@@ -233,35 +235,39 @@ Attributes is a map of key value pairs. Valid keys are:
 
 If the regexps matches, the given fields will be set to the new value
 
-#### 2.2.4.3 `suffix`
+#### 2.3.4.3 `suffix`
 Suffix is a map of key value pairs. Valid keys are
 - name
 - group
 - title
 
-The special text `<tag>` is used to append the tag if not empty.
+The special text `<tag:tag_name>` is used to append the tag if not empty.
 Example:
 ```
   suffix:
-     name: '<tag>'
-     title: '-=[<tag>]=-'
+     name: '<tag:quality>'
+     title: '-=[<tag:group>]=-'
 ```
+
+In this example there must be 2 tag definitions `quality` and `group`.
 
 If the regexps matches, the given fields will be appended to field value
 
-#### 2.2.4.4 `prefix`
+#### 2.3.4.4 `prefix`
 Suffix is a map of key value pairs. Valid keys are
 - name
 - group
 - title
 
-The special text `<tag>` is used to append the tag if not empty
+The special text `<tag:tag_name>` is used to append the tag if not empty
 Example:
 ```
   suffix:
-     name: '<tag>'
-     title: '-=[<tag>]=-'
+     name: '<tag:quality>'
+     title: '-=[<tag:group>]=-'
 ```
+
+In this example there must be 2 tag definitions `quality` and `group`.
 
 If the regexps matches, the given fields will be prefixed to field value
 
@@ -273,14 +279,15 @@ mappings:
         value: '[\s_-]*'
       - name: quality
         value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'
+    tags:
+      - name: quality
+        captures:
+          - quality
+        concat: '|'
+        prefix: ' [ '
+        suffix: ' ]'
     mapping:
       - id: France
-        tag:
-          captures:
-            - quality
-          concat: '|'
-          prefix: ' [ '
-          suffix: ' ]'
         match_as_ascii: true
         mapper:
           - pattern: 'Name ~ "^TF1$"'
