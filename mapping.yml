@@ -8,695 +8,675 @@ mappings:
       suffix: ']'
     match_to_ascii: true
     mapper:
-      - tvg_name: TF1
-        tvg_names:
-          - ^TF1$
-        tvg_id: TF1.fr
-        tvg_chno: "1"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: TF1 Series Films
-        tvg_names:
-          - ^TF1[_ ]*Series[_ ]*Films$
-        tvg_id: TF1SeriesFilms.fr
-        tvg_chno: "20"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: TF1 +1
-        tvg_names:
-          - ^TF1[_ ]*\+1$
-        tvg_id: TF1Plus1.fr
-        tvg_chno: "1"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/8/83/Logo_TF1_%2B1.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: FRANCE 2
-        tvg_names:
-          - ^FRANCE 2$
-        tvg_id: France2.fr
-        tvg_chno: "2"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/France_2_2018.svg/277px-France_2_2018.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: FRANCE 3
-        tvg_names:
-          - ^FRANCE 3$
-        tvg_id: France3.fr
-        tvg_chno: "3"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/France_3_2018.svg/281px-France_3_2018.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: FRANCE 4
-        tvg_names:
-          - ^FRANCE 4$
-        tvg_id: France4.fr
-        tvg_chno: "14"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/France_4_2018.svg/312px-France_4_2018.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: FRANCE 5
-        tvg_names:
-          - ^FRANCE 5$
-        tvg_id: France5.fr
-        tvg_chno: "5"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: M6
-        tvg_names:
-          - ^M6$
-        tvg_id: M6.fr
-        tvg_chno: "6"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Logo_M6_%282020%2C_fond_clair%29.svg/320px-Logo_M6_%282020%2C_fond_clair%29.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: TFX
-        tvg_names:
-          - ^TFX$
-        tvg_id: NT1.fr
-        tvg_chno: "11"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: 6TER
-        tvg_names:
-          - ^6TER$
-        tvg_id: 6ter.fr
-        tvg_chno: "22"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/fr/a/a9/6ter_2012.png
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: CANAL+
-        tvg_names:
-          - ^CANAL\+$
-        tvg_id: CanalPlus.fr
-        tvg_chno: "51"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ CINEMA
-        tvg_names:
-          - ^CANAL\+ CINEMA$
-        tvg_id: CanalPlusCinema.fr
-        tvg_chno: "52"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Canal%2BCin%C3%A9ma2009.svg/320px-Canal%2BCin%C3%A9ma2009.svg.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ DECALE
-        tvg_names:
-          - ^CANAL\+ DECALE$
-        tvg_id: CanalPlusDecale.fr
-        tvg_chno: "53"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ FAMILY
-        tvg_names:
-          - ^CANAL\+ FAMILY$
-        tvg_id: CanalPlusFamily.fr
-        tvg_chno: "54"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Canal%2BFamily_2009.svg/320px-Canal%2BFamily_2009.svg.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ SERIES
-        tvg_names:
-          - ^CANAL\+ SERIES$
-        tvg_id: CanalPlusSeries.fr
-        tvg_chno: "40"
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/4/48/C%2B_Series.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ SPORT
-        tvg_names:
-          - ^CANAL\+ SPORT$
-        tvg_id: CanalPlusSport.fr
-        tvg_chno: ""
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/d/d7/Canal%2BSport2009.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ KIDS
-        tvg_names:
-          - ^CANAL\+ KIDS$
-        tvg_id: CanalPlusKIDS.fr
-        tvg_chno: ""
-        tvg_logo: https://upload.wikimedia.org/wikipedia/commons/3/34/Canal%2B_Kids_Logo_%282021%29.png
-        group_title:
-          - FR
-      - tvg_name: CANAL+ DOCS
-        tvg_names:
-          - ^CANAL\+ DOC(S)?$
-        tvg_id: CanalPlusDocs.fr
-        tvg_chno: "54"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CANAL+ GRAND ECRAN
-        tvg_names:
-          - ^CANAL\+ GRAND ECRAN$
-        tvg_id: CanalPlusGrandEcran.fr
-        tvg_chno: "55"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CINE+ PREMIER
-        tvg_names:
-          - ^CINE\+ PREMIER$
-        tvg_id: CinePlusPremier.fr
-        tvg_chno: "60"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CINE+ FRISSON
-        tvg_names:
-          - ^CINE\+ FRISSON$
-        tvg_id: CinePlusFrisson.fr
-        tvg_chno: "61"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CINE+ FAMIZ
-        tvg_names:
-          - ^CINE\+ FAMIZ$
-        tvg_id: CinePlusFamiz.fr
-        tvg_chno: "62"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CINE+ EMOTION
-        tvg_names:
-          - ^CINE\+ EMOTION$
-        tvg_id: CinePlusEmotion.fr
-        tvg_chno: "63"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CINE+ CLASSIC
-        tvg_names:
-          - ^CINE\+ CLASSIC$
-        tvg_id: CinePlusClassic.fr
-        tvg_chno: "64"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CINE+ CLUB
-        tvg_names:
-          - ^CINE\+ CLUB$
-        tvg_id: CinePlusClub.fr
-        tvg_chno: "65"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: OCS MAX
-        tvg_names:
-          - ^OCS MAX$
-        tvg_id: OCSMax.fr
-        tvg_chno: "69"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: OCS CITY
-        tvg_names:
-          - ^OCS CITY$
-        tvg_id: OCSCity.fr
-        tvg_chno: "67"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: OCS GEANTS
-        tvg_names:
-          - ^OCS GEANTS$
-        tvg_id: OCSGeants.fr
-        tvg_chno: "68"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: OCS CHOC
-        tvg_names:
-          - ^OCS CHOC$
-        tvg_id: OCSChoc.fr
-        tvg_chno: "66"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: RTL9
-        tvg_names:
-          - ^RTL[_ ]*9$
-        tvg_id: RTL9.fr
-        tvg_chno: "29"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: ACTION
-        tvg_names:
-          - ^ACTION$
-        tvg_id: Action.fr
-        tvg_chno: "50"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NRJ12
-        tvg_names:
-          - ^NRJ[_ ]*12$
-        tvg_id: NRJ12.fr
-        tvg_chno: "12"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: CHERIE25
-        tvg_names:
-          - ^CHERIE[_ ]*25$
-        tvg_id: Cherie25.fr
-        tvg_chno: "25"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: ARTE
-        tvg_names:
-          - ^ARTE$
-        tvg_id: Arte.fr
-        tvg_chno: "7"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: W9
-        tvg_names:
-          - ^W9$
-        tvg_id: W9.fr
-        tvg_chno: "9"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: PARIS PREMIERE
-        tvg_names:
-          - ^PARIS PREMIERE$
-        tvg_id: ParisPremiere.fr
-        tvg_chno: "72"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: PARAMOUNT CHANNEL
-        tvg_names:
-          - ^PARAMOUNT CHANNEL$
-          - r'^PARAMOUNT$'
-        tvg_id: ParamountChannel.fr
-        tvg_chno: "70"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: PARAMOUNT DECALE
-        tvg_names:
-          - ^PARAMOUNT DECALE$
-        tvg_id: ParamountChannelDecale.fr
-        tvg_chno: "71"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: SYFY
-        tvg_names:
-          - ^SYFY$
-        tvg_id: Syfy.fr
-        tvg_chno: "46"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: POLAR+
-        tvg_names:
-          - ^POLAR\+$
-        tvg_id: PolarPlus.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: SERIE CLUB
-        tvg_names:
-          - ^SERIE CLUB$
-        tvg_id: SerieClub.fr
-        tvg_chno: "45"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: 13eme RUE
-        tvg_names:
-          - ^13EME RUE$
-        tvg_id: 13eRue.fr
-        tvg_chno: "30"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TMC
-        tvg_names:
-          - ^TMC$
-        tvg_id: TMC.fr
-        tvg_chno: "10"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NOVELAS TV
-        tvg_names:
-          - ^NOVELAS TV$
-          - ^NOVELAS$
-        tvg_id: NovelasTV.fr
-        tvg_chno: "45"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: USHUAIA TV
-        tvg_names:
-          - ^USHUAIA TV$
-        tvg_id: UshuaiaTV.fr
-        tvg_chno: "176"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: PLANETE+ CI
-        tvg_names:
-          - ^PLANETE[_ ]*\+ CI$
-        tvg_id: PLANETEJustice.fr
-        tvg_chno: "154"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: PLANETE+ A&E
-        tvg_names:
-          - ^PLANETE[_ ]*\+ A&E$
-        tvg_id: PlaneteAction.fr
-        tvg_chno: "153"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: PLANETE+
-        tvg_names:
-          - ^PLANETE[_ ]*\+$
-        tvg_id: PlanetePlus.fr
-        tvg_chno: "152"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NATIONAL GEOGRAPHIC
-        tvg_names:
-          - ^NAT(IONAL)? GEO(GRAPHIC)?$
-        tvg_id: NationalGeographic.fr
-        tvg_chno: "175"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NATIONAL GEOGRAPHIC WILD
-        tvg_names:
-          - ^NAT(IONAL)? GEO(GRAPHIC)? WILD$
-        tvg_id: NatGeoWild.fr
-        tvg_chno: "174"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISCOVERY CHANNEL
-        tvg_names:
-          - ^DISCOVERY CH(ANNN?EL)?$
-        tvg_id: DiscoveryChannel.fr
-        tvg_chno: "170"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISCOVERY SCIENCE
-        tvg_names:
-          - ^DISCOVERY SCIENCE$
-        tvg_id: DiscoveryScience.fr
-        tvg_chno: "171"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISCOVERY FAMILY
-        tvg_names:
-          - ^DISCOVERY FAMILY$
-        tvg_id: DiscoveryFamily.fr
-        tvg_chno: "172"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISCOVERY INVESTIGATION
-        tvg_names:
-          - ^DISCOVERY (INVESTIGATION|ID)$
-        tvg_id: DiscoveryInvestigation.fr
-        tvg_chno: "173"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CRIME DISTRICT
-        tvg_names:
-          - ^CRIME DISTRICT$
-          - ^CRIME DISTCRIT$
-        tvg_id: CrimeDistrict.fr
-        tvg_chno: "150"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: SCIENCE ET VIE TV
-        tvg_names:
-          - ^SCIENCE ET VIE( TV)?$
-        tvg_id: ScienceEtVieTV.fr
-        tvg_chno: "150"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: RMC DECOUVERTE
-        tvg_names:
-          - ^RMC DECOUVERTE$
-        tvg_id: RMCDecouverte.fr
-        tvg_chno: "24"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: RMC STORY
-        tvg_names:
-          - ^RMC STORY$
-        tvg_id: Numero23.fr
-        tvg_chno: "23"
-        tvg_logo: ""
-        group_title:
-          - FR
-          - TNT
-      - tvg_name: HISTOIRE TV
-        tvg_names:
-          - ^HISTOIRE TV$
-        tvg_id: Histoire.fr
-        tvg_chno: "151"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TOUTE L HISTOIRE
-        tvg_names:
-          - ^TOUTE L[ _']HISTOIRE$
-        tvg_id: TouteHistoire.fr
-        tvg_chno: "152"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: C8
-        tvg_names:
-          - ^C8$
-        tvg_id: C8.fr
-        tvg_chno: "8"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CSTAR
-        tvg_names:
-          - ^CSTAR$
-        tvg_id: Cstar.fr
-        tvg_chno: "17"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISNEY CHANNEL
-        tvg_names:
-          - ^DISNEY CHANNEL$
-        tvg_id: DisneyChannel.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISNEY CHANNEL +1
-        tvg_names:
-          - ^DISNEY CHANNEL \+1$
-        tvg_id: DisneyChannelPlus1.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: DISNEY+
-        tvg_names:
-          - ^DISNEY\+$
-        tvg_id: DisneyPlus.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: CARTOON NETWORK
-        tvg_names:
-          - ^CARTOON NETWORK$
-        tvg_id: CartoonNetwork.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: GULLI
-        tvg_names:
-          - ^GULLI$
-        tvg_id: Gulli.fr
-        tvg_chno: "18"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: M6 MUSIC
-        tvg_names:
-          - ^M6 MUSIC$
-        tvg_id: M6Music.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: NRJ HITS
-        tvg_names:
-          - ^NRJ HITS$
-        tvg_id: NRJHits.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: MCM
-        tvg_names:
-          - ^MCM$
-        tvg_id: MCM.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: MTV
-        tvg_names:
-          - ^MTV$
-        tvg_id: MTV.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: MTV HITS
-        tvg_names:
-          - ^MTV HITS$
-        tvg_id: MTVHits.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: RFM TV
-        tvg_names:
-          - ^RFM TV$
-        tvg_id: RFMTV.fr
-        tvg_chno: ""
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: ALTICE STUDIO
-        tvg_names:
-          - ^ALTICE STUDIO$
-        tvg_id: AlticeStudio.fr
-        tvg_chno: "51"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: WARNER TV
-        tvg_names:
-          - ^WARNER TV$
-        tvg_id: WarnerTV.fr
-        tvg_chno: "57"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TCM CINEMA
-        tvg_names:
-          - ^TCM CINEMA$
-        tvg_id: TCM.fr
-        tvg_chno: "73"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: COMEDIE+
-        tvg_names:
-          - ^COMEDIE\+$
-        tvg_id: ComediePlus.fr
-        tvg_chno: "31"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: COMEDY CENTRAL
-        tvg_names:
-          - ^COMEDY CENTRAL$
-        tvg_id: ComedyCentral.fr
-        tvg_chno: "32"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TEVA
-        tvg_names:
-          - ^TEVA$
-        tvg_id: Teva.fr
-        tvg_chno: "19"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: AB1
-        tvg_names:
-          - ^AB1$
-        tvg_id: AB1.fr
-        tvg_chno: "40"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: AB3
-        tvg_names:
-          - ^AB3$
-        tvg_id: AB3.fr
-        tvg_chno: "41"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: TVBREIZH
-        tvg_names:
-          - ^TVBREIZH$
-        tvg_id: TvBreizh.fr
-        tvg_chno: "74"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: ULTRA NATURE
-        tvg_names:
-          - ^ULTRA NATURE$
-        tvg_id: UltraNature.fr
-        tvg_chno: "177"
-        tvg_logo: ""
-        group_title:
-          - FR
-      - tvg_name: MANGAS
-        tvg_names:
-          - ^MANGAS$
-        tvg_id: Mangas.fr
-        tvg_chno: "45"
-        tvg_logo: ""
-        group_title:
-          - FR
+      - pattern: 'Name ~ "^TF1$"'
+        attributes:
+          name: TF1,
+          id: TF1.fr,
+          chno: '1',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^TF1[_ ]*Series[_ ]*Films$'
+        attributes:
+          name: TF1 Series Films,
+          id: TF1SeriesFilms.fr,
+          chno: '20',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png,
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^TF1[_ ]*\+1$'
+        attributes:
+          name: TF1 +1,
+          id: TF1Plus1.fr,
+          chno: '1',
+          logo: https://upload.wikimedia.org/wikipedia/commons/8/83/Logo_TF1_%2B1.png,
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^FRANCE 2$'
+        attributes:
+          name: FRANCE 2,
+          id: France2.fr,
+          chno: '2',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/France_2_2018.svg/277px-France_2_2018.svg.png,
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^FRANCE 3$'
+        attributes:
+          name: FRANCE 3,
+          id: France3.fr,
+          chno: '3',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/France_3_2018.svg/281px-France_3_2018.svg.png,
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^FRANCE 4$'
+        attributes:
+          name: FRANCE 4,
+          id: France4.fr,
+          chno: '14',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/France_4_2018.svg/312px-France_4_2018.svg.png
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^FRANCE 5$'
+        attributes:
+          name: FRANCE 5,
+          id: France5.fr,
+          chno: '5',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^M6$'
+        attributes:
+          name: M6,
+          id: M6.fr,
+          chno: '6',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Logo_M6_%282020%2C_fond_clair%29.svg/320px-Logo_M6_%282020%2C_fond_clair%29.svg.png
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^TFX$'
+        attributes:
+          name: TFX,
+          id: NT1.fr,
+          chno: '11',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/France_5_2018.svg/281px-France_5_2018.svg.png
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^6TER$'
+        attributes:
+          name: 6TER,
+          id: 6ter.fr,
+          chno: '22',
+          logo: https://upload.wikimedia.org/wikipedia/fr/a/a9/6ter_2012.png
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^CANAL\+$'
+        attributes:
+          name: CANAL+,
+          id: CanalPlus.fr,
+          chno: '51',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CANAL\+ CINEMA$'
+        attributes:
+          name: CANAL+ CINEMA,
+          id: CanalPlusCinema.fr,
+          chno: '52',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Canal%2BCin%C3%A9ma2009.svg/320px-Canal%2BCin%C3%A9ma2009.svg.png
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CANAL\+ DECALE$'
+        attributes:
+          name: CANAL+ DECALE,
+          id: CanalPlusDecale.fr,
+          chno: '53',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Canal_plus_logo.svg/320px-Canal_plus_logo.svg.png
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CANAL\+ FAMILY$'
+        attributes:
+          name: CANAL+ FAMILY,
+          id: CanalPlusFamily.fr,
+          chno: '54',
+          logo: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Canal%2BFamily_2009.svg/320px-Canal%2BFamily_2009.svg.png
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CANAL\+ SERIES$'
+        attributes:
+          name: CANAL+ SERIES,
+          id: CanalPlusSeries.fr,
+          chno: '40',
+          logo: https://upload.wikimedia.org/wikipedia/commons/4/48/C%2B_Series.png
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CANAL\+ SPORT$'
+        attributes:
+          name: CANAL+ SPORT,
+          id: CanalPlusSport.fr,
+          chno: '',
+          logo: https://upload.wikimedia.org/wikipedia/commons/d/d7/Canal%2BSport2009.png
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CANAL\+ KIDS$'
+        attributes:
+          name: CANAL+ KIDS,
+          id: CanalPlusKIDS.fr,
+          chno: '',
+          logo: https://upload.wikimedia.org/wikipedia/commons/3/34/Canal%2B_Kids_Logo_%282021%29.png
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CANAL\+ DOC(S)?$'
+        attributes:
+          name: CANAL+ DOCS,
+          id: CanalPlusDocs.fr,
+          chno: '54',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CANAL\+ GRAND ECRAN$'
+        attributes:
+          name: CANAL+ GRAND ECRAN,
+          id: CanalPlusGrandEcran.fr,
+          chno: '55',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CINE\+ PREMIER$'
+        attributes:
+          name: CINE+ PREMIER,
+          id: CinePlusPremier.fr,
+          chno: '60',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CINE\+ FRISSON$'
+        attributes:
+          name: CINE+ FRISSON,
+          id: CinePlusFrisson.fr,
+          chno: '61',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CINE\+ FAMIZ$'
+        attributes:
+          name: CINE+ FAMIZ,
+          id: CinePlusFamiz.fr,
+          chno: '62',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CINE\+ EMOTION$'
+        attributes:
+          name: CINE+ EMOTION,
+          id: CinePlusEmotion.fr,
+          chno: '63',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CINE\+ CLASSIC$'
+        attributes:
+          name: CINE+ CLASSIC,
+          id: CinePlusClassic.fr,
+          chno: '64',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CINE\+ CLUB$'
+        attributes:
+          name: CINE+ CLUB,
+          id: CinePlusClub.fr,
+          chno: '65',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^OCS MAX$'
+        attributes:
+          name: OCS MAX,
+          id: OCSMax.fr,
+          chno: '69',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^OCS CITY$'
+        attributes:
+          name: OCS CITY,
+          id: OCSCity.fr,
+          chno: '67',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^OCS GEANTS$'
+        attributes:
+          name: OCS GEANTS,
+          id: OCSGeants.fr,
+          chno: '68',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^OCS CHOC$'
+        attributes:
+          name: OCS CHOC,
+          id: OCSChoc.fr,
+          chno: '66',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^RTL[_ ]*9$'
+        attributes:
+          name: RTL9,
+          id: RTL9.fr,
+          chno: '29',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^ACTION$'
+        attributes:
+          name: ACTION,
+          id: Action.fr,
+          chno: '50',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^NRJ[_ ]*12$'
+        attributes:
+          name: NRJ12,
+          id: NRJ12.fr,
+          chno: '12',
+          logo: ''
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^CHERIE[_ ]*25$'
+        attributes:
+          name: CHERIE25,
+          id: Cherie25.fr,
+          chno: '25',
+          logo: ''
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^ARTE$'
+        attributes:
+          name: ARTE,
+          id: Arte.fr,
+          chno: '7',
+          logo: ''
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^W9$'
+        attributes:
+          name: W9,
+          id: W9.fr,
+          chno: '9',
+          logo: ''
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^PARIS PREMIERE$'
+        attributes:
+          name: PARIS PREMIERE,
+          id: ParisPremiere.fr,
+          chno: '72',
+          logo: ''
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^PARAMOUNT CHANNEL$ OR Name ~ ^PARAMOUNT$'
+        attributes:
+          name: PARAMOUNT CHANNEL,
+          id: ParamountChannel.fr,
+          chno: '70',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^PARAMOUNT DECALE$'
+        attributes:
+          name: PARAMOUNT DECALE,
+          id: ParamountChannelDecale.fr,
+          chno: '71',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^SYFY$'
+        attributes:
+          name: SYFY,
+          id: Syfy.fr,
+          chno: '46',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^POLAR\+$'
+        attributes:
+          name: POLAR+,
+          id: PolarPlus.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^SERIE CLUB$'
+        attributes:
+          name: SERIE CLUB,
+          id: SerieClub.fr,
+          chno: '45',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^13EME RUE$'
+        attributes:
+          name: 13eme RUE,
+          id: 13eRue.fr,
+          chno: '30',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^TMC$'
+        attributes:
+          name: TMC,
+          id: TMC.fr,
+          chno: '10',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^NOVELAS TV$ OR Name ~ ^NOVELAS$'
+        attributes:
+          name: NOVELAS TV,
+          id: NovelasTV.fr,
+          chno: '45',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^USHUAIA TV$'
+        attributes:
+          name: USHUAIA TV,
+          id: UshuaiaTV.fr,
+          chno: '176',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^PLANETE[_ ]*\+ CI$'
+        attributes:
+          name: PLANETE+ CI,
+          id: PLANETEJustice.fr,
+          chno: '154',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^PLANETE[_ ]*\+ A&E$'
+        attributes:
+          name: PLANETE+ A&E,
+          id: PlaneteAction.fr,
+          chno: '153',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^PLANETE[_ ]*\+$'
+        attributes:
+          name: PLANETE+,
+          id: PlanetePlus.fr,
+          chno: '152',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^NAT(IONAL)? GEO(GRAPHIC)?$'
+        attributes:
+          name: NATIONAL GEOGRAPHIC,
+          id: NationalGeographic.fr,
+          chno: '175',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^NAT(IONAL)? GEO(GRAPHIC)? WILD$'
+        attributes:
+          name: NATIONAL GEOGRAPHIC WILD,
+          id: NatGeoWild.fr,
+          chno: '174',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^DISCOVERY CH(ANNN?EL)?$'
+        attributes:
+          name: DISCOVERY CHANNEL,
+          id: DiscoveryChannel.fr,
+          chno: '170',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^DISCOVERY SCIENCE$'
+        attributes:
+          name: DISCOVERY SCIENCE,
+          id: DiscoveryScience.fr,
+          chno: '171',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^DISCOVERY FAMILY$'
+        attributes:
+          name: DISCOVERY FAMILY,
+          id: DiscoveryFamily.fr,
+          chno: '172',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^DISCOVERY (INVESTIGATION|ID)$'
+        attributes:
+          name: DISCOVERY INVESTIGATION,
+          id: DiscoveryInvestigation.fr,
+          chno: '173',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CRIME DISTRICT$ OR Name ~ ^CRIME DISTCRIT$'
+        attributes:
+          name: CRIME DISTRICT,
+          id: CrimeDistrict.fr,
+          chno: '150',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^SCIENCE ET VIE( TV)?$'
+        attributes:
+          name: SCIENCE ET VIE TV,
+          id: ScienceEtVieTV.fr,
+          chno: '150',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^RMC DECOUVERTE$'
+        attributes:
+          name: RMC DECOUVERTE,
+          id: RMCDecouverte.fr,
+          chno: '24',
+          logo: ''
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^RMC STORY$'
+        attributes:
+          name: RMC STORY,
+          id: Numero23.fr,
+          chno: '23',
+          logo: ''
+        suffix:
+          group: '|FR|TNT'
+      - pattern: 'Name ~ ^HISTOIRE TV$'
+        attributes:
+          name: HISTOIRE TV,
+          id: Histoire.fr,
+          chno: '151',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^TOUTE L[ _' ]HISTOIRE$'
+        attributes:
+          name: TOUTE L HISTOIRE,
+          id: TouteHistoire.fr,
+          chno: '152',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^C8$'
+        attributes:
+          name: C8,
+          id: C8.fr,
+          chno: '8',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CSTAR$'
+        attributes:
+          name: CSTAR,
+          id: Cstar.fr,
+          chno: '17',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^DISNEY CHANNEL$'
+        attributes:
+          name: DISNEY CHANNEL,
+          id: DisneyChannel.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^DISNEY CHANNEL \+1$'
+        attributes:
+          name: DISNEY CHANNEL +1,
+          id: DisneyChannelPlus1.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^DISNEY\+$'
+        attributes:
+          name: DISNEY+,
+          id: DisneyPlus.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^CARTOON NETWORK$'
+        attributes:
+          name: CARTOON NETWORK,
+          id: CartoonNetwork.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^GULLI$'
+        attributes:
+          name: GULLI,
+          id: Gulli.fr,
+          chno: '18',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^M6 MUSIC$'
+        attributes:
+          name: M6 MUSIC,
+          id: M6Music.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^NRJ HITS$'
+        attributes:
+          name: NRJ HITS,
+          id: NRJHits.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^MCM$'
+        attributes:
+          name: MCM,
+          id: MCM.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^MTV$'
+        attributes:
+          name: MTV,
+          id: MTV.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^MTV HITS$'
+        attributes:
+          name: MTV HITS,
+          id: MTVHits.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^RFM TV$'
+        attributes:
+          name: RFM TV,
+          id: RFMTV.fr,
+          chno: '',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^ALTICE STUDIO$'
+        attributes:
+          name: ALTICE STUDIO,
+          id: AlticeStudio.fr,
+          chno: '51',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^WARNER TV$'
+        attributes:
+          name: WARNER TV,
+          id: WarnerTV.fr,
+          chno: '57',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^TCM CINEMA$'
+        attributes:
+          name: TCM CINEMA,
+          id: TCM.fr,
+          chno: '73',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^COMEDIE\+$'
+        attributes:
+          name: COMEDIE+,
+          id: ComediePlus.fr,
+          chno: '31',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^COMEDY CENTRAL$'
+        attributes:
+          name: COMEDY CENTRAL,
+          id: ComedyCentral.fr,
+          chno: '32',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^TEVA$'
+        attributes:
+          name: TEVA,
+          id: Teva.fr,
+          chno: '19',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^AB1$'
+        attributes:
+          name: AB1,
+          id: AB1.fr,
+          chno: '40',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^AB3$'
+        attributes:
+          name: AB3,
+          id: AB3.fr,
+          chno: '41',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^TVBREIZH$'
+        attributes:
+          name: TVBREIZH,
+          id: TvBreizh.fr,
+          chno: '74',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^ULTRA NATURE$'
+        attributes:
+          name: ULTRA NATURE,
+          id: UltraNature.fr,
+          chno: '177',
+          logo: ''
+        suffix:
+          group: '|FR'
+      - pattern: 'Name ~ ^MANGAS$'
+        attributes:
+          name: MANGAS,
+          id: Mangas.fr,
+          chno: '45',
+          logo: ''
+        suffix:
+          group: '|FR'
