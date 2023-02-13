@@ -7,7 +7,9 @@ use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType};
 use crate::utils;
 use crate::utils::get_working_path;
 
+fn default_as_zero() -> u8 { 0 }
 fn default_as_false() -> bool { false }
+fn default_as_empty_str() -> String { String::from("") }
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -97,6 +99,7 @@ impl ConfigSources {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigInput {
     pub url: String,
+    #[serde(default = "default_as_empty_str")]
     pub persist: String,
 }
 
@@ -126,8 +129,8 @@ impl ConfigApi {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Config {
-    #[serde(default = "default_as_false")]
-    pub parallel: bool,
+    #[serde(default = "default_as_zero")]
+    pub threads: u8,
     pub api: ConfigApi,
     pub sources: Vec<ConfigSources>,
     pub working_dir: String,
@@ -206,7 +209,7 @@ impl Config {
 impl Clone for Config {
     fn clone(&self) -> Self {
         Config {
-            parallel: self.parallel,
+            threads: self.threads,
             api: self.api.clone(),
             sources: self.sources.clone(),
             working_dir: self.working_dir.clone(),

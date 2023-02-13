@@ -5,9 +5,7 @@ use crate::m3u::PlaylistItem;
 use crate::model::ItemField;
 
 fn default_as_false() -> bool { false }
-
 fn default_as_empty_str() -> String { String::from("") }
-
 fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
 
 
@@ -44,6 +42,8 @@ pub struct Mapper {
     suffix: HashMap<String, String>,
     #[serde(default = "default_as_empty_map")]
     prefix: HashMap<String, String>,
+    #[serde(default = "default_as_empty_map")]
+    assignments: HashMap<String, String>,
     #[serde(skip_serializing, skip_deserializing)]
     pub(crate) _filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -70,6 +70,7 @@ impl Clone for Mapper {
             attributes: self.attributes.clone(),
             suffix: self.suffix.clone(),
             prefix: self.prefix.clone(),
+            assignments: self.assignments.clone(),
             _filter: self._filter.clone(),
             _tags: self._tags.clone(),
             _tagre: self._tagre.clone(),
@@ -139,8 +140,14 @@ impl MappingValueProcessor<'_> {
 
     fn apply_attributes(&mut self, verbose: bool) {
         for (key, value) in &self.mapper.attributes {
-            if valid_property!(key, ["name", "title", "group", "logo", "id", "chno"]) {
-                self.set_property(key, value, verbose);
+            if valid_property!(key, ["name", "title", "group", "id", "chno"]) &&
+                valid_property!(value, ["name", "title", "group", "id", "chno"]) {
+                match self.get_property(value) {
+                    Some(prop_value) => {
+                        self.set_property(key, &prop_value, verbose);
+                    },
+                    _ => {}
+                }
             }
         }
     }
@@ -216,6 +223,21 @@ impl MappingValueProcessor<'_> {
             }
         }
     }
+
+    fn apply_assignments(&mut self, verbose: bool) {
+        for (key, value) in &self.mapper.assignments {
+            if valid_property!(key, ["name", "title", "group", "id", "chno"]) &&
+                valid_property!(value, ["name", "title", "group", "id", "chno"]) {
+                match self.get_property(value) {
+                    Some(prop_value) => {
+                        self.set_property(key, &prop_value, verbose);
+                    },
+                    _ => {}
+                }
+            }
+        }
+    }
+
 }
 
 impl ValueProcessor for MappingValueProcessor<'_> {
@@ -239,6 +261,7 @@ impl ValueProcessor for MappingValueProcessor<'_> {
         let _ = &MappingValueProcessor::<'_>::apply_attributes(self, verbose);
         let _ = &MappingValueProcessor::<'_>::apply_suffix(self, &captured_values, verbose);
         let _ = &MappingValueProcessor::<'_>::apply_prefix(self, &captured_values, verbose);
+        let _ = &MappingValueProcessor::<'_>::apply_assignments(self, verbose);
         true
     }
 }

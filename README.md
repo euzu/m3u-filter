@@ -25,14 +25,15 @@ For running in cli mode, you need to define a `config.yml` file which can be nex
 `-c` cli argument. It contains the filter, rename and mapping definitions.
 
 Top level entries in the config files are:
-* `parallel` _optional_
+* `threads` _optional_
 * `api`
 * `working_dir`
 * `sources`
 
-### 1.1. `parallel`
-If you are running on a cpu which has multiple cores, you can set `parallel: true` to handle each source in a thread.
-Default is `false`.
+### 1.1. `threads`
+If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
+Don't use too many threads, you should consider max of `cpu cores * 2`.
+Default is `0`.
 
 ### 1.2. `api`
 `api` contains the `server-mode` settings. To run `m3u-filter` in `server-mode` you need to start it with the `s`cli argument.
@@ -129,7 +130,7 @@ The mappings are defined in a file `mapping.yml`. The filename can be given as `
 
 ## Example config file
 ```yaml
-parallel: false
+threads: 4
 working_dir: ./data
 api:
   host: localhost
@@ -216,6 +217,7 @@ Has the following top level entries:
 * `attributes`
 * `suffix`
 * `prefix`
+* `assignments`
 
 #### 2.3.4.1 `pattern`
 The pattern is a string with a statement (@see filter statements).
@@ -276,6 +278,21 @@ In this example there must be 2 tag definitions `quality` and `group`.
 
 If the regexps matches, the given fields will be prefixed to field value
 
+#### 2.3.4.5 `assignments`
+Attributes is a map of key value pairs. Valid keys and values are:
+- name
+- group
+- title
+- id
+- chno
+
+Example configuration is:
+```
+assignments:
+   title: name
+```
+This configuration sets `title` property to the value of `name`.
+
 ### 2.5 Example mapping.yml file.
 ```yaml
 mappings:
@@ -304,6 +321,8 @@ mappings:
             suffix:
               title: '<tag:quality>'
               group: '|FR|TNT'
+            assignments:
+              title: name
           - pattern: 'Name ~ "^TF1!delimiter!!quality!*Series[_ ]*Films$"'
             attributes:
               name: TF1 Series Films,

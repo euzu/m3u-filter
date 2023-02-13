@@ -1,4 +1,5 @@
 api: { host: 127.0.0.1, port: 8901, web_root: /home/m3u-filter/web }
+threads: 0
 working_dir: /home/m3u-filter/data
 sources:
   - input: { persist: 'playlist_1_{}.m3u', url: 'http://myserver.net/playlist.m3u' }

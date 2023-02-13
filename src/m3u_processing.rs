@@ -13,15 +13,6 @@ use crate::m3u::{PlaylistGroup, PlaylistItem};
 use crate::mapping::{Mapping, MappingValueProcessor};
 use crate::model::{ItemField, ProcessingOrder, TargetType};
 
-
-struct KodiStyle {
-    year: regex::Regex,
-    season: regex::Regex,
-    episode: regex::Regex,
-    whitespace: regex::Regex,
-}
-
-
 macro_rules! open_file {
   ($path:expr) => {{
        match std::fs::File::create($path) {
@@ -32,6 +23,13 @@ macro_rules! open_file {
                 }
             }
     }};
+}
+
+struct KodiStyle {
+    year: regex::Regex,
+    season: regex::Regex,
+    episode: regex::Regex,
+    whitespace: regex::Regex,
 }
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
@@ -391,17 +389,26 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
 }
 
 pub fn process_targets(cfg: Arc<Config>, verbose: bool) {
-    let mut handles = vec![];
-    let process_parallel = cfg.parallel && cfg.sources.len() > 1;
+    let mut handle_list  = vec![];
+    let thread_num = cfg.threads;
+    let process_parallel = thread_num > 1 && cfg.sources.len() > 1;
+    if verbose && process_parallel { println!("Using {} threads", thread_num)}
+
     for (index, _) in cfg.sources.iter().enumerate() {
         let config = cfg.clone();
         if process_parallel {
+            let handles = &mut handle_list;
             handles.push(thread::spawn(move || process_source(config, index, verbose)));
+            if handles.len() as u8 >= thread_num {
+                while let Some(handle) = handles.pop() {
+                    let _ = handle.join();
+                }
+            }
         } else {
             process_source(config, index, verbose);
         }
     }
-    for handle in handles {
-        handle.join().unwrap();
+    for handle in handle_list {
+       let _= handle.join();
     }
 }
