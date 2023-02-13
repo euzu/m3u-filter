@@ -126,6 +126,8 @@ impl ConfigApi {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Config {
+    #[serde(default = "default_as_false")]
+    pub parallel: bool,
     pub api: ConfigApi,
     pub sources: Vec<ConfigSources>,
     pub working_dir: String,
@@ -204,6 +206,7 @@ impl Config {
 impl Clone for Config {
     fn clone(&self) -> Self {
         Config {
+            parallel: self.parallel,
             api: self.api.clone(),
             sources: self.sources.clone(),
             working_dir: self.working_dir.clone(),

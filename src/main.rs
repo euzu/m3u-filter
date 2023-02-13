@@ -2,6 +2,7 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 
+use std::sync::Arc;
 use clap::Parser;
 use crate::config::Config;
 use crate::mapping::Mappings;
@@ -56,7 +57,6 @@ fn main() {
     let mappings = read_mapping(mappings_file.as_str());
     if verbose && mappings.is_none() { println!("no mapping loaded"); }
     cfg.set_mappings(mappings);
-
     if verbose { println!("working dir: {:?}", &cfg.working_dir); }
 
     if args.server {
@@ -67,7 +67,8 @@ fn main() {
             Err(e) => panic!("cant start server: {}", e)
         };
     } else {
-        m3u_processing::process_targets(&cfg, verbose);
+        let config = Arc::new(cfg);
+        m3u_processing::process_targets(config, verbose);
     }
 }
 

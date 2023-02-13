@@ -25,26 +25,31 @@ For running in cli mode, you need to define a `config.yml` file which can be nex
 `-c` cli argument. It contains the filter, rename and mapping definitions.
 
 Top level entries in the config files are:
-* api
-* working_dir
-* sources
+* `parallel` _optional_
+* `api`
+* `working_dir`
+* `sources`
 
-### 1.1. `api`
+### 1.1. `parallel`
+If you are running on a cpu which has multiple cores, you can set `parallel: true` to handle each source in a thread.
+Default is `false`.
+
+### 1.2. `api`
 `api` contains the `server-mode` settings. To run `m3u-filter` in `server-mode` you need to start it with the `s`cli argument.
 * `api: {host: localhost, port: 8901, web_root: ./web}`
 
-### 1.2. `working_dir`
+### 1.3. `working_dir`
 `working_dir` is the directory where file are written which are given with relative paths.
 * `working_dir: ./data`
 
 With this configuration, you should create a `data` directory next to the executable.
 
-### 1.3. `sources`
+### 1.4. `sources`
 `sources` is a sequence of source definitions, which have two top level entries:
  * `input`
  * `targets`
 
-### 1.3.1 `input`
+### 1.4.1 `input`
 Has two entries, `persist` and `url`.
 
 `input: { persist: ./playlist_{}.m3u, url: http://myserver.net/playlist.m3u }`
@@ -52,7 +57,7 @@ Has two entries, `persist` and `url`.
   - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
   - `url` is the download url or a local filename of the input-source.
 
-### 1.3.2 `targets`
+### 1.4.2 `targets`
 Has the following top level entries:
 * `filename` _mandatory_
 * `sort`  _optional_
@@ -63,24 +68,24 @@ Has the following top level entries:
 * `rename` _optional_
 * `mapping` _optional_
 
-### 1.3.2.1 `filename`
+### 1.4.2.1 `filename`
 Is the filename for the resulting playlist.
 
-### 1.3.2.2 `sort`
+### 1.4.2.2 `sort`
 Has one top level attribute `order` which can be set to `Asc`or `Desc`.
 
-### 1.3.2.3 `output`
+### 1.4.2.3 `output`
 There are two types of targets ```M3u``` and ```Strm```. 
 If the attribute is not specified ```M3u``` is created by default.
 You can set options for each `output` type.
 
 `Strm` output has additional options `underscore_whitespace`, `cleanup` and `kodi_style`.
 
-### 1.3.2.4 `processing_order`
+### 1.4.2.4 `processing_order`
 The processing order (Filter, Rename and Map) can be configured for each target with:
 `processing_order: FRM` (valid values are: FRM, FMR, RFM, RMF, MFR, MRF. default is FRM)
 
-### 1.3.2.5 `options`
+### 1.4.2.5 `options`
 * ignore_logo `true` or `false` 
 * underscore_whitespace `true` or `false`
 * cleanup `true` or `false`
@@ -93,7 +98,7 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 - `cleanup` deletes the directory given at `filename`.
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 
-### 1.3.2.6 `filter`
+### 1.4.2.6 `filter`
 The filter is a string with a filter statement.
 The filter can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
 Filter fields are `Group`, `Title`, `Name` and `Url`.
@@ -102,7 +107,7 @@ Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
 
-### 1.3.2.7 `rename`
+### 1.4.2.7 `rename`
 Has 3 top level entries.
 * `field` can be  `Group`, `Title`, `Name` or `Url`.
 * `new_name` can contain capture groups variables addressed with `$1`,`$2`,... 
@@ -118,12 +123,13 @@ In the above example each entry starting with `DE` will be prefixed with `1.`.
 
 (_Please be aware of the processing order. If you first map, you should match the mapped entries!_)
 
-### 1.3.2.8 `mapping`
+### 1.4.2.8 `mapping`
 `mapping: <list of mapping id's>`
 The mappings are defined in a file `mapping.yml`. The filename can be given as `-m` argument.
 
 ## Example config file
 ```yaml
+parallel: false
 working_dir: ./data
 api:
   host: localhost

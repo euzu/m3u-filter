@@ -1,0 +1,39 @@
+@import '../../scss/theme';
+$toggle-size: 24px;
+
+.sidebar {
+  display: flex;
+  flex-flow: row;
+  justify-content: center;
+  flex-shrink: 1;
+  overflow: hidden;
+  height: 100%;
+
+  .sidebar-content {
+    display: flex;
+    flex-flow: column;
+    justify-content: center;
+    flex-grow: 1;
+    overflow: hidden;
+    height: 100%;
+  }
+  .sidebar-collapsed {
+    max-width: 0;
+    width: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    max-width: $toggle-size;
+    min-width: $toggle-size;
+    width: $toggle-size;
+    color: var(--sidebar-toggle-color);
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--sidebar-toggle-hover-color);
+    }
+  }
+}

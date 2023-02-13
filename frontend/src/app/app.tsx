@@ -11,6 +11,8 @@ import Progress from '../component/progress/progress';
 import PlaylistFilter from "../component/playlist-filter/playlist-filter";
 import {Subject} from "rxjs";
 import PlaylistVideo from "../component/playlist-video/playlist-video";
+import ClipboardViewer from "../component/clipboard-viewer/clipboard-viewer";
+import Sidebar from "../component/sidebar/sidebar";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface AppProps {
@@ -21,6 +23,7 @@ export default function App(props: AppProps) {
     const searchChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
     const [progress, setProgress] = useState<boolean>(false);
     const [playlist, setPlaylist] = useState<PlaylistGroup[]>([]);
+    const clipboardChannelRef = useRef<Subject<string>>(new Subject<string>());
     const viewerRef = useRef<IPlaylistViewer>();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const services = useServices();
@@ -53,22 +56,34 @@ export default function App(props: AppProps) {
     }, [searchChannel]);
 
     const handleProgress = useCallback((value: boolean) => {
-       setProgress(value);
+        setProgress(value);
     }, []);
 
     const handleOnPlay = useCallback((playlistItem: PlaylistItem): void => {
         videoChannel.next(playlistItem);
     }, [videoChannel]);
 
+    const handleOnCopy = useCallback((playlistItem: PlaylistItem): void => {
+        clipboardChannelRef.current.next(playlistItem.url);
+    }, []);
+
     return (
         <div className="app">
             <div className={'app-header'}>m3u-filter</div>
-            <SourceSelector onDownload={handleDownload}/>
-            <PlaylistFilter onFilter={handleFilter}/>
-            <PlaylistViewer ref={viewerRef} playlist={playlist} searchChannel={searchChannel} onProgress={handleProgress} onPlay={handleOnPlay}/>
-            <PlaylistVideo channel={videoChannel}/>
-            <Toolbar onDownload={handleSave}/>
-            <Progress visible={progress}/>
+            <div className={'app-main'}>
+                <Sidebar>
+                    <ClipboardViewer channel={clipboardChannelRef.current}></ClipboardViewer>
+                </Sidebar>
+                <div className={'app-content'}>
+                    <SourceSelector onDownload={handleDownload}/>
+                    <PlaylistFilter onFilter={handleFilter}/>
+                    <PlaylistViewer ref={viewerRef} playlist={playlist} searchChannel={searchChannel}
+                                    onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}/>
+                    <PlaylistVideo channel={videoChannel}/>
+                    <Toolbar onDownload={handleSave}/>
+                    <Progress visible={progress}/>
+                </div>
+            </div>
         </div>
     );
 }

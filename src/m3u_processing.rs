@@ -1,10 +1,12 @@
 extern crate unidecode;
 
 use std::io::Write;
+use std::sync::Arc;
+use std::thread;
 use config::ConfigTarget;
 use chrono::Datelike;
 use unidecode::unidecode;
-use crate::{config, Config, get_playlist, m3u, utils};
+use crate::{config, Config, get_playlist, utils};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::{ValueProvider};
 use crate::m3u::{PlaylistGroup, PlaylistItem};
@@ -17,6 +19,19 @@ struct KodiStyle {
     season: regex::Regex,
     episode: regex::Regex,
     whitespace: regex::Regex,
+}
+
+
+macro_rules! open_file {
+  ($path:expr) => {{
+       match std::fs::File::create($path) {
+                Ok(file) => file,
+                Err(e) => {
+                    println!("cant create file: {:?}", $path);
+                    return Err(e);
+                }
+            }
+    }};
 }
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
@@ -48,24 +63,24 @@ fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
     Some(new_playlist)
 }
 
-pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>, 
-                        target: &config::ConfigTarget, cfg: &config::Config, 
+pub(crate) fn write_m3u(playlist: &Vec<PlaylistGroup>,
+                        target: &ConfigTarget, cfg: &Config,
                         verbose: bool) -> Result<(), std::io::Error> {
-    let pipe : Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> =
+    let pipe: Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> =
         match &target.processing_order {
-        ProcessingOrder::FRM => vec![filter_playlist, rename_playlist, map_playlist],
-        ProcessingOrder::FMR => vec![filter_playlist, map_playlist, rename_playlist],
-        ProcessingOrder::RFM => vec![rename_playlist, filter_playlist, map_playlist],
-        ProcessingOrder::RMF => vec![rename_playlist, map_playlist, filter_playlist],
-        ProcessingOrder::MFR => vec![map_playlist, filter_playlist, rename_playlist],
-        ProcessingOrder::MRF => vec![map_playlist, rename_playlist, filter_playlist]
-    };
+            ProcessingOrder::FRM => vec![filter_playlist, rename_playlist, map_playlist],
+            ProcessingOrder::FMR => vec![filter_playlist, map_playlist, rename_playlist],
+            ProcessingOrder::RFM => vec![rename_playlist, filter_playlist, map_playlist],
+            ProcessingOrder::RMF => vec![rename_playlist, map_playlist, filter_playlist],
+            ProcessingOrder::MFR => vec![map_playlist, filter_playlist, rename_playlist],
+            ProcessingOrder::MRF => vec![map_playlist, rename_playlist, filter_playlist]
+        };
 
-    if verbose { println!("Processing order is {}", &target.processing_order)}
-    
-    let mut new_playlist= playlist.clone();
+    if verbose { println!("Processing order is {}", &target.processing_order) }
+
+    let mut new_playlist = playlist.clone();
     for f in pipe {
-        let r =  f(&new_playlist, &target, verbose);
+        let r = f(&new_playlist, &target, verbose);
         if r.is_some() {
             new_playlist = r.unwrap();
         }
@@ -87,14 +102,7 @@ pub(crate) fn write_m3u(playlist: &Vec<m3u::PlaylistGroup>,
 fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
     match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename))) {
         Some(path) => {
-            let mut m3u_file = match std::fs::File::create(&path) {
-                Ok(file) => file,
-                Err(e) => {
-                    println!("cant create file: {:?}", &path);
-                    return Err(e);
-                }
-            };
-
+            let mut m3u_file = open_file!(&path);
             match check_write(m3u_file.write(b"#EXTM3U\n")) {
                 Ok(_) => (),
                 Err(e) => return Err(e),
@@ -162,13 +170,7 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
                         file_name = kodi_style_rename(&file_name, &style);
                     }
                     let file_path = dir_path.join(format!("{}.strm", file_name));
-                    let mut strm_file = match std::fs::File::create(&file_path) {
-                        Ok(file) => file,
-                        Err(e) => {
-                            println!("cant create file: {:?}", &file_path);
-                            return Err(e);
-                        }
-                    };
+                    let mut strm_file = open_file!(&file_path);
                     match check_write(strm_file.write(pli.url.as_bytes())) {
                         Ok(_) => (),
                         Err(e) => return Err(e),
@@ -246,12 +248,12 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut Vec<PlaylistGroup>) {
 }
 
 
-fn is_valid(pli: &m3u::PlaylistItem, target: &ConfigTarget) -> bool {
+fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli };
     return target.filter(&provider, false);
 }
 
-fn exec_rename(pli: &mut m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRename>>, verbose: bool) {
+fn exec_rename(pli: &mut PlaylistItem, rename: &Option<Vec<config::ConfigRename>>, verbose: bool) {
     match rename {
         Some(renames) => {
             if renames.len() > 0 {
@@ -259,7 +261,7 @@ fn exec_rename(pli: &mut m3u::PlaylistItem, rename: &Option<Vec<config::ConfigRe
                 for r in renames {
                     let value = get_field_value(&result, &r.field);
                     let cap = r.re.as_ref().unwrap().replace_all(value, &r.new_name);
-                    if verbose { println!("Renamed {}={} to {}", &r.field, value, cap)}
+                    if verbose { println!("Renamed {}={} to {}", &r.field, value, cap) }
                     let value = cap.into_owned();
                     set_field_value(&mut result, &r.field, value);
                 }
@@ -273,7 +275,7 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
     match &target.rename {
         Some(renames) => {
             if renames.len() > 0 {
-                let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
+                let mut new_playlist: Vec<PlaylistGroup> = Vec::new();
                 for g in playlist {
                     let mut grp = g.clone();
                     for r in renames {
@@ -292,7 +294,7 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
                     }
                     new_playlist.push(grp);
                 }
-                return Some(new_playlist)
+                return Some(new_playlist);
             }
             None
         }
@@ -303,7 +305,7 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
 fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> PlaylistItem {
     if mapping.mapper.len() > 0 {
         let channel_name = if mapping.match_as_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
-        if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &channel.header.name, &channel_name)};
+        if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &channel.header.name, &channel_name) };
         let provider = ValueProvider { pli: &channel.clone() };
         for m in &mapping.mapper {
             let mut processor = MappingValueProcessor { pli: channel, mapper: m };
@@ -320,7 +322,7 @@ fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> 
 
 fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
     if target._mapping.is_some() {
-        let mut new_playlist: Vec<m3u::PlaylistGroup> = Vec::new();
+        let mut new_playlist: Vec<PlaylistGroup> = Vec::new();
         for g in playlist {
             let mut grp = g.clone();
             let mappings = target._mapping.as_ref().unwrap();
@@ -337,7 +339,7 @@ fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: b
     }
 }
 
-fn get_field_value<'a>(pli: &'a m3u::PlaylistItem, field: &ItemField) -> &'a str {
+fn get_field_value<'a>(pli: &'a PlaylistItem, field: &ItemField) -> &'a str {
     let value = match field {
         ItemField::Group => pli.header.group.as_str(),
         ItemField::Name => pli.header.name.as_str(),
@@ -347,7 +349,7 @@ fn get_field_value<'a>(pli: &'a m3u::PlaylistItem, field: &ItemField) -> &'a str
     value
 }
 
-fn set_field_value(pli: &mut m3u::PlaylistItem, field: &ItemField, value: String) -> () {
+fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) -> () {
     let header = &mut pli.header;
     match field {
         ItemField::Group => header.group = value,
@@ -357,29 +359,49 @@ fn set_field_value(pli: &mut m3u::PlaylistItem, field: &ItemField, value: String
     };
 }
 
-pub fn process_targets(cfg: &Config, verbose: bool) {
-    for source in cfg.sources.iter() {
-        let url_str = source.input.url.as_str();
-        let persist_file: Option<std::path::PathBuf> =
-            if source.input.persist.is_empty() { None } else { utils::prepare_persist_path(source.input.persist.as_str()) };
-        let file_path = utils::get_file_path(&cfg.working_dir, persist_file);
-        if verbose { println!("persist to file: {:?}", match &file_path { Some(fp) => fp.display().to_string(), _=> "".to_string() }); }
-        let result = get_playlist(&cfg.working_dir, url_str, file_path, verbose);
-        match &result {
-            Some(playlist) => {
-                if playlist.is_empty() {
-                    if verbose { println!("Input file is empty") }
-                } else {
-                    if verbose { println!("Input file has {} groups", playlist.len()) }
-                    for target in source.targets.iter() {
-                        match write_m3u(playlist, target, &cfg, verbose) {
-                            Ok(_) => (),
-                            Err(e) => println!("Failed to write file: {}", e)
-                        }
+fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
+    let source = cfg.sources.get(source_idx).unwrap();
+    let url_str = source.input.url.as_str();
+    let persist_file: Option<std::path::PathBuf> =
+        if source.input.persist.is_empty() { None } else { utils::prepare_persist_path(source.input.persist.as_str()) };
+    let file_path = utils::get_file_path(&cfg.working_dir, persist_file);
+    if verbose {
+        println!("persist to file:  {:?}", match &file_path {
+            Some(fp) => fp.display().to_string(),
+            _ => "".to_string()
+        });
+    }
+    let result = get_playlist(&cfg.working_dir, url_str, file_path, verbose);
+    match &result {
+        Some(playlist) => {
+            if playlist.is_empty() {
+                if verbose { println!("Input file is empty") }
+            } else {
+                if verbose { println!("Input file has {} groups", playlist.len()) }
+                for target in source.targets.iter() {
+                    match write_m3u(playlist, target, &cfg, verbose) {
+                        Ok(_) => (),
+                        Err(e) => println!("Failed to write file: {}", e)
                     }
                 }
             }
-            None => ()
         }
+        None => ()
+    }
+}
+
+pub fn process_targets(cfg: Arc<Config>, verbose: bool) {
+    let mut handles = vec![];
+    let process_parallel = cfg.parallel && cfg.sources.len() > 1;
+    for (index, _) in cfg.sources.iter().enumerate() {
+        let config = cfg.clone();
+        if process_parallel {
+            handles.push(thread::spawn(move || process_source(config, index, verbose)));
+        } else {
+            process_source(config, index, verbose);
+        }
+    }
+    for handle in handles {
+        handle.join().unwrap();
     }
 }

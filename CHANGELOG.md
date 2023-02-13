@@ -1,7 +1,8 @@
 # Changelog
-# v0.9.?(2023-02-13)
+# v0.9.?(2023-02-14)
 * Breaking changes, mappings.yml refactored 
-
+* Added `parallel` property to config, which executes different sources in threads.
+* WebUI: Added clipboard collector on left side 
 
 # v0.9.6(2023-01-14)
 * Renamed `mappings.templates` attribute `key` to `name`

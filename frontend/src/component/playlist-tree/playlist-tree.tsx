@@ -12,11 +12,12 @@ export type PlaylistTreeState = { [key: number]: boolean };
 interface PlaylistTreeProps {
     data: PlaylistGroup[];
     state: PlaylistTreeState;
+    onCopy: (playlistItem: PlaylistItem) => void;
     onPlay?: (playlistItem: PlaylistItem) => void;
 }
 
 export default function PlaylistTree(props: PlaylistTreeProps) {
-    const {state, data, onPlay} = props;
+    const {state, data, onCopy, onPlay} = props;
 
     const [, setForceUpdate] = useState(null);
     const expanded = useRef<PlaylistTreeState>({});
@@ -53,13 +54,14 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     const handleClipboardUrl = useCallback((e: any) => {
         const item = getPlaylistItemById(e.target.dataset.item);
         if (item) {
+            onCopy(item);
             copyToClipboard(item.url).pipe(first()).subscribe({
                 next: value => enqueueSnackbar(value ? "URL copied to clipboard" : "Copy to clipboard failed!", {variant: value ? 'success' : 'error'}),
                 error: err => enqueueSnackbar("Copy to clipboard failed!", {variant: 'error'}),
                 complete: noop,
             });
         }
-    }, [enqueueSnackbar, getPlaylistItemById]);
+    }, [enqueueSnackbar, getPlaylistItemById, onCopy]);
 
     const handlePlayUrl = useCallback((e: any) => {
         if (onPlay) {

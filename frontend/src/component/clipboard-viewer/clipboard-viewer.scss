@@ -1,0 +1,47 @@
+@import '../../scss/theme';
+
+$viewer-width: 200px;
+
+.clipboard-viewer {
+  display: flex;
+  flex-grow: 1;
+  flex-flow: column;
+  padding: 8px;
+
+  .clipboard-viewer-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    flex-flow: row nowrap;
+    color: var(--text-color);
+    background-color: var(--toolbar-background-color);
+    padding: 8px 0 8px 0;
+
+    .toolbar-btn {
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: transparent;
+      color: var(--toolbar-button-hover-color);
+      margin-right: 8px;
+      &:hover {
+        background-color: var(--toolbar-button-hover-background-color);
+      }
+    }
+  }
+
+  .clipboard-viewer-content {
+    flex-grow: 1;
+    max-width: $viewer-width;
+    min-width: $viewer-width;
+    color: var(--text-color);
+    overflow: auto;
+    white-space: nowrap;
+    padding: 8px 0 0 0;
+
+    ul {
+        list-style-type: none; /* Remove bullets */
+        padding: 0; /* Remove padding */
+        margin: 0; /* Remove margins */
+    }
+  }
+}

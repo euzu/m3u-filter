@@ -13,4 +13,22 @@
     text-align:center;
     padding-top: 10px;
   }
+
+  .app-main {
+    display: flex;
+    flex-flow: row;
+    justify-content: center;
+    flex-grow: 1;
+    overflow: hidden;
+    height: 100%;
+
+    .app-content {
+      display: flex;
+      flex-flow: column;
+      justify-content: center;
+      flex-grow: 1;
+      overflow: hidden;
+      height: 100%;
+    }
+  }
 }
