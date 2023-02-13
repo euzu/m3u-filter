@@ -6,7 +6,6 @@ $viewer-width: 200px;
   display: flex;
   flex-grow: 1;
   flex-flow: column;
-  padding: 8px;
 
   .clipboard-viewer-toolbar {
     display: flex;
@@ -36,7 +35,7 @@ $viewer-width: 200px;
     color: var(--text-color);
     overflow: auto;
     white-space: nowrap;
-    padding: 8px 0 0 0;
+    padding: 8px;
 
     ul {
         list-style-type: none; /* Remove bullets */
