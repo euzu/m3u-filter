@@ -62,7 +62,7 @@ Has two entries, `persist` and `url`.
 Has the following top level entries:
 * `filename` _mandatory_
 * `sort`  _optional_
-* `output` _optional_ default is `M3u`
+* `output` _optional_ default is `m3u`
 * `processing_order` _optional_ default is `frm`
 * `options` _optional_
 * `filter` _mandatory_,

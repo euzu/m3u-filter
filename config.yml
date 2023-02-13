@@ -5,12 +5,12 @@ sources:
   - input: { persist: 'playlist_1_{}.m3u', url: 'http://myserver.net/playlist.m3u' }
     targets:
       - filename: playlist_1.m3u
-        type: M3u
+        type: m3u
         filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*" OR Group ~ "TF1.*"'
         options: { ignore_logo: true }
         rename:
-          - { field: Group, new_name: 1. DE$1, pattern: ^DE(.*) }
-        sort: { order: Asc }
+          - { field: group, new_name: 1. DE$1, pattern: ^DE(.*) }
+        sort: { order: asc }
         mapping:
           - France TNT
           - France Premium
@@ -18,9 +18,9 @@ sources:
           - Suisse
           - Canada
       - filename: playlist_strm
-        type: Strm
+        type: strm
         filter: 'Group ~ "^tv-shows.*"'
         options: { ignore_logo: true, cleanup: true, underscore_whitespace: false, kodi_style: true }
         rename:
-          - { field: Group, new_name: 1. DE$1, pattern: ^DE(.*) }
-        sort: { order: Asc }
+          - { field: group, new_name: 1. DE$1, pattern: ^DE(.*) }
+        sort: { order: asc }
