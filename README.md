@@ -36,7 +36,7 @@ Don't use too many threads, you should consider max of `cpu cores * 2`.
 Default is `0`.
 
 ### 1.2. `api`
-`api` contains the `server-mode` settings. To run `m3u-filter` in `server-mode` you need to start it with the `s`cli argument.
+`api` contains the `server-mode` settings. To run `m3u-filter` in `server-mode` you need to start it with the `-s`cli argument.
 * `api: {host: localhost, port: 8901, web_root: ./web}`
 
 ### 1.3. `working_dir`
@@ -63,7 +63,7 @@ Has the following top level entries:
 * `filename` _mandatory_
 * `sort`  _optional_
 * `output` _optional_ default is `M3u`
-* `processing_order` _optional_ default is `FRM`
+* `processing_order` _optional_ default is `frm`
 * `options` _optional_
 * `filter` _mandatory_,
 * `rename` _optional_
@@ -73,18 +73,18 @@ Has the following top level entries:
 Is the filename for the resulting playlist.
 
 ### 1.4.2.2 `sort`
-Has one top level attribute `order` which can be set to `Asc`or `Desc`.
+Has one top level attribute `order` which can be set to `asc`or `desc`.
 
 ### 1.4.2.3 `output`
-There are two types of targets ```M3u``` and ```Strm```. 
-If the attribute is not specified ```M3u``` is created by default.
+There are two types of targets ```m3u``` and ```strm```. 
+If the attribute is not specified ```m3u``` is created by default.
 You can set options for each `output` type.
 
-`Strm` output has additional options `underscore_whitespace`, `cleanup` and `kodi_style`.
+`strm` output has additional options `underscore_whitespace`, `cleanup` and `kodi_style`.
 
 ### 1.4.2.4 `processing_order`
 The processing order (Filter, Rename and Map) can be configured for each target with:
-`processing_order: FRM` (valid values are: FRM, FMR, RFM, RMF, MFR, MRF. default is FRM)
+`processing_order: frm` (valid values are: frm, fmr, rfm, rmf, mfr, mrf. default is frm)
 
 ### 1.4.2.5 `options`
 * ignore_logo `true` or `false` 
@@ -92,7 +92,7 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 * cleanup `true` or `false`
 * kodi_style `true` or `false`
 
-`underscore_whitespace`, `cleanup` and `kodi_style` are only valid for `Strm` output.
+`underscore_whitespace`, `cleanup` and `kodi_style` are only valid for `strm` output.
 
 - `ingore_log` logo attributes are ignored to avoid caching logo files on devices.
 - `underscore_whitespace` replaces all whitespaces with `_` in the path.
@@ -110,7 +110,7 @@ but lacks a few features like look around and backreferences.
 
 ### 1.4.2.7 `rename`
 Has 3 top level entries.
-* `field` can be  `Group`, `Title`, `Name` or `Url`.
+* `field` can be  `group`, `title`, `name` or `url`.
 * `new_name` can contain capture groups variables addressed with `$1`,`$2`,... 
 
 `rename` supports capture groups. Each group can be addressed with `$1`, `$2` .. in the `new_name` attribute.
@@ -118,7 +118,7 @@ Has 3 top level entries.
 This could be used for players which do not observe the order and sort themselves.
 ```yaml
 rename:
-  - { field: Group,  pattern: ^DE(.*),  new_name: 1. DE$1 }
+  - { field: group,  pattern: ^DE(.*),  new_name: 1. DE$1 }
 ```
 In the above example each entry starting with `DE` will be prefixed with `1.`.
 
@@ -141,30 +141,30 @@ input:
   persist: ./playlist_{}.m3u
 targets:
   - filename: playlist_1.m3u
-    processing_order: FRM
+    processing_order: frm
     options:
       ignore_logo: true
     sort:
-      order: Asc
+      order: asc
     filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*" 
     rename:
-      - field: Group
+      - field: group
         pattern: ^DE(.*)
         new_name: 1. DE$1
   - filename: playlist_strm
-    output: Strm
+    output: strm
     options:
       ignore_logo: true
       underscore_whitespace: false
       kodi_style: true
       cleanup: true
     sort:
-      order: Asc
+      order: asc
     filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*"
     mapping:
        - France
     rename:
-      - field: Group
+      - field: group
         pattern: ^DE(.*)
         new_name: 1. DE$1
 ```

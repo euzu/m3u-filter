@@ -1,8 +1,13 @@
 use enum_iterator::Sequence;
 
+pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &["name", "title", "group", "id", "chno"];
+pub const MAPPER_PRE_SUFFIX_FIELDS: &[&str] = &["name", "title", "group"];
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub enum TargetType {
+    #[serde(rename = "m3u")]
     M3u,
+    #[serde(rename = "strm")]
     Strm,
 }
 
@@ -17,11 +22,17 @@ impl std::fmt::Display for TargetType {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub enum ProcessingOrder {
+    #[serde(rename = "frm")]
     FRM,
+    #[serde(rename = "fmr")]
     FMR,
+    #[serde(rename = "rfm")]
     RFM,
+    #[serde(rename = "rmf")]
     RMF,
+    #[serde(rename = "mfr")]
     MFR,
+    #[serde(rename = "mrf")]
     MRF
 }
 
@@ -40,9 +51,13 @@ impl std::fmt::Display for ProcessingOrder {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub enum ItemField {
+    #[serde(rename = "group")]
     Group,
+    #[serde(rename = "name")]
     Name,
+    #[serde(rename = "title")]
     Title,
+    #[serde(rename = "url")]
     Url,
 }
 
@@ -59,12 +74,16 @@ impl std::fmt::Display for ItemField {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum FilterMode {
+    #[serde(rename = "discard")]
     Discard,
+    #[serde(rename = "include")]
     Include,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum SortOrder {
+    #[serde(rename = "asc")]
     Asc,
+    #[serde(rename = "desc")]
     Desc,
 }

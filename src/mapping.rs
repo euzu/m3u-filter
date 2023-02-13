@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use regex::Regex;
 use crate::filter::{Filter, get_filter, PatternTemplate, RegexWithCaptures, ValueProcessor};
-use crate::m3u::PlaylistItem;
-use crate::model::ItemField;
+use crate::m3u::{FieldAccessor, PlaylistItem};
+use crate::model::{ItemField, MAPPER_ATTRIBUTE_FIELDS, MAPPER_PRE_SUFFIX_FIELDS};
 
 fn default_as_false() -> bool { false }
 fn default_as_empty_str() -> String { String::from("") }
 fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
-
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct MappingTag {
@@ -79,16 +78,8 @@ impl Clone for Mapper {
 }
 
 macro_rules! valid_property {
-  ($key:expr, [$($constant:expr),*]) => {{
-        let key = $key;
-        loop {
-            $(
-                if key == $constant {
-                   break true;
-                }
-            )*
-            break false;
-          }
+  ($key:expr, $array:expr) => {{
+        $array.contains(&$key)
     }};
 }
 
@@ -99,49 +90,23 @@ pub struct MappingValueProcessor<'a> {
 
 impl MappingValueProcessor<'_> {
     fn get_property(&self, key: &str) -> Option<String> {
-        if "name".eq(key) {
-            return Some(String::from(&self.pli.header.name));
-        } else if "group".eq(key) {
-            return Some(String::from(&self.pli.header.group));
-        } else if "title".eq(key) {
-            return Some(String::from(&self.pli.header.title));
-        } else if "logo".eq(key) {
-            return Some(String::from(&self.pli.header.logo));
-        } else if "id".eq(key) {
-            return Some(String::from(&self.pli.header.id));
-        } else if "chno".eq(key) {
-            return Some(String::from(&self.pli.header.chno));
-        } else {
-            println!("Cant get unknown field {}", key);
+        match self.pli.header.get_field(key) {
+            Some(value) => Some(String::from(value)),
+            _=> None
         }
-        None
     }
 
-
     fn set_property(&mut self, key: &str, value: &String, verbose: bool) {
-        if "name".eq(key) {
-            self.pli.header.name = String::from(value);
-        } else if "group".eq(key) {
-            self.pli.header.group = String::from(value);
-        } else if "title".eq(key) {
-            self.pli.header.title = String::from(value);
-        } else if "logo".eq(key) {
-            self.pli.header.logo = String::from(value);
-        } else if "id".eq(key) {
-            self.pli.header.id = String::from(value);
-        } else if "chno".eq(key) {
-            self.pli.header.chno = String::from(value);
-        } else {
+        if !self.pli.header.set_field(key, value) {
             println!("Cant set unknown field {} to {}", key, value);
-            return;
         }
         if verbose { println!("Property {} set to {}", key, value) }
     }
 
     fn apply_attributes(&mut self, verbose: bool) {
         for (key, value) in &self.mapper.attributes {
-            if valid_property!(key, ["name", "title", "group", "id", "chno"]) &&
-                valid_property!(value, ["name", "title", "group", "id", "chno"]) {
+            if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) &&
+                valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
                 match self.get_property(value) {
                     Some(prop_value) => {
                         self.set_property(key, &prop_value, verbose);
@@ -188,7 +153,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_suffix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
         for (key, value) in &self.mapper.suffix {
-            if valid_property!(key, ["name", "group", "title"]) {
+            if valid_property!(key.as_str(), MAPPER_PRE_SUFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(suffix) => {
                         match self.get_property(key) {
@@ -207,7 +172,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_prefix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
         for (key, value) in &self.mapper.suffix {
-            if valid_property!(key, ["name", "group", "title"]) {
+            if valid_property!(key.as_str(), MAPPER_PRE_SUFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(prefix) => {
                         match self.get_property(key) {
@@ -226,8 +191,8 @@ impl MappingValueProcessor<'_> {
 
     fn apply_assignments(&mut self, verbose: bool) {
         for (key, value) in &self.mapper.assignments {
-            if valid_property!(key, ["name", "title", "group", "id", "chno"]) &&
-                valid_property!(value, ["name", "title", "group", "id", "chno"]) {
+            if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) &&
+                valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
                 match self.get_property(value) {
                     Some(prop_value) => {
                         self.set_property(key, &prop_value, verbose);
