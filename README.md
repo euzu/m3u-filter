@@ -166,7 +166,7 @@ targets:
 Has the root item `mappings` which has the following top level entries:
 * `templates` _optional_
 * `tags` _optional_
-* mapping _mandatory_
+* `mapping` _mandatory_
 
 ### 2.1 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
@@ -188,7 +188,6 @@ Has the following top level entries:
 - `concat`: if you have more than one captures defined this is the join string between them
 - `suffix`: suffix for the tag
 - `prefix`: prefix for the tag
-
 
 ### 2.3 `mapping`
 Has the following top level entries:
@@ -292,12 +291,12 @@ mappings:
         mapper:
           - pattern: 'Name ~ "^TF1$"'
             attributes:
-              name: TF1 $quality,
+              name: TF1
               id: TF1.fr,
               chno: '1',
               logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
             suffix:
-              title: '<tag>'
+              title: '<tag:quality>'
               group: '|FR|TNT'
           - pattern: 'Name ~ "^TF1!delimiter!!quality!*Series[_ ]*Films$"'
             attributes:
@@ -310,6 +309,53 @@ mappings:
 ```
 
 ## 3. Compilation
+
+### Static binary for docker
+#### Install prerequisites
+```
+rustup update
+sudo apt-get install pkg-config musl-tools libssl-dev
+rustup target add x86_64-unknown-linux-musl
+```
+#### Build statically linked binary
+```
+cargo build --target x86_64-unknown-linux-musl --release
+```
+#### Dockerize
+Dockerfile
+```
+FROM scratch
+COPY ./m3u-filter /
+COPY ./config.yml /
+COPY ./web /web
+WORKDIR /
+CMD ["./m3u-filter", "-s", "-c", "./config.yml"]
+```
+Image
+```
+docker build -t m3u-filter .
+```
+docker-compose.yml
+```
+version: '3'
+services:
+  m3u-filter:
+    container_name: m3u-filter
+    image: m3u-filter:latest
+    working_dir: /
+    volumes:
+      - ./data:/data
+    ports:
+      - "8901:8901"
+    restart: unless-stopped
+```
+
+The image should be around 15MB.
+```
+m3u-filter$ docker images
+REPOSITORY                             TAG       IMAGE ID       CREATED        SIZE
+m3u-filter                             latest    c59e1edb9e56   1 day ago     14.6MB
+```
 
 ### Cross compile for windows on linux
 If you want to compile this project on linux for windows, you need to do the following steps.
