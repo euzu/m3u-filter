@@ -201,24 +201,6 @@ impl ValueProcessor for MappingValueProcessor<'_> {
     fn process<'a>(&mut self, _: &ItemField, value: &str, rewc: &RegexWithCaptures, verbose: bool) -> bool {
         let mut captured_values = HashMap::new();
         if rewc.captures.len() > 0 {
-            //-------
-            // let captures_opt = rewc.re.captures(value);
-            // if captures_opt.is_some() {
-            //     let captures = captures_opt.unwrap();
-            //     for capture_name in &rewc.captures {
-            //         let match_opt = captures.name(capture_name.as_str());
-            //         let capture_value = if match_opt.is_some() {
-            //             match_opt.map_or("", |m| m.as_str())
-            //         } else {
-            //             ""
-            //         };
-            //         if verbose { println!("match {}: {}", capture_name, capture_value); }
-            //         captured_values.insert(capture_name, capture_value);
-            //     }
-            // }
-            //------
-
-
             rewc.re.captures_iter(value)
                 .filter(|caps| caps.len() > 1)
                 .for_each(|captures|

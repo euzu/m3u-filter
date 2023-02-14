@@ -1,8 +1,10 @@
 use enum_iterator::all;
 use std::borrow::{Borrow};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use pest::Parser;
 use regex::Regex;
+use petgraph::graph::DiGraph;
 use crate::m3u::PlaylistItem;
 use crate::model::ItemField;
 
@@ -295,15 +297,51 @@ pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>, verbos
     return Filter::Group(Arc::new(Mutex::new(stack)));
 }
 
+fn has_cyclic_dependencies(templates: &Vec<PatternTemplate>) -> bool {
+    let regex = Regex::new("!(.*?)!").unwrap();
+    let mut graph = DiGraph::new();
+    let mut node_ids = HashMap::new();
+    let mut node_names = HashMap::new();
+
+    let mut add_node = |di_graph: &mut DiGraph<_,_>, node_name: &String| match node_ids.get(node_name) {
+        Some(idx) => *idx,
+        _ => {
+            let key = node_name.clone();
+            let idx = di_graph.add_node(node_name.clone());
+            node_names.insert(idx.index(), key.clone());
+            node_ids.insert(key, idx);
+            idx
+        }
+    };
+
+    for template in templates {
+        let node_idx = add_node(&mut graph, &template.name);
+        let mut edges = regex.captures_iter(&template.value)
+            .filter(|caps| caps.len() > 1)
+            .filter_map(|caps| caps.get(1))
+            .map(|caps| String::from(caps.as_str()))
+            .collect::<Vec<String>>();
+        while let Some(edge) = edges.pop() {
+            let edge_idx = add_node(&mut graph, &edge);
+            graph.add_edge(node_idx, edge_idx, ());
+        }
+    }
+    let cycles: Vec<Vec<String>>  = petgraph::algo::tarjan_scc(&graph)
+        .into_iter()
+        .filter(|scc| scc.len() > 1)
+        .map(|scc| scc.iter().map(|&i| node_names.get(&i.index()).unwrap().clone()).collect())
+        .collect();
+    for cyclic in &cycles {
+        println!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "))
+    }
+
+    cycles.len() > 0
+}
+
 pub fn prepare_templates(templates: &mut Vec<PatternTemplate>) {
-    // let regex = Regex::new("!(.*?)!").unwrap();
-    // for template in templates {
-        // let content = regex.captures_iter(&template.value)
-        //     .filter(|caps| caps.len() > 1)
-        //     .filter_map(|caps| caps.get(1))
-        //     .map(|caps| caps.as_str())
-        //     .collect::<Vec<&str>>().join(", ");
-        //println!("content {}", content)
-        // TODO.EU cyclic check and replace
-    //}
+    if has_cyclic_dependencies(templates) {
+        exit("Cyclic dependencies in templates detected!");
+    } else {
+      //
+    }
 }
