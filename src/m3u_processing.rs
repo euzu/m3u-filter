@@ -46,7 +46,7 @@ fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
         if verbose { println!("Filtering group {} with {} items", pg.title, pg.channels.len()) }
         let mut channels = Vec::new();
         for pli in &pg.channels {
-            if is_valid(&pli, &target) {
+            if is_valid(&pli, &target, verbose) {
                 channels.push(pli.clone());
             }
         }
@@ -246,9 +246,9 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut Vec<PlaylistGroup>) {
 }
 
 
-fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
+fn is_valid(pli: &PlaylistItem, target: &ConfigTarget, verbose: bool) -> bool {
     let provider = ValueProvider { pli };
-    return target.filter(&provider, false);
+    return target.filter(&provider, verbose);
 }
 
 fn exec_rename(pli: &mut PlaylistItem, rename: &Option<Vec<config::ConfigRename>>, verbose: bool) {
@@ -319,10 +319,11 @@ fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> 
 }
 
 fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
+    if verbose { println!("Mapping")}
     if target._mapping.is_some() {
         let mut new_playlist: Vec<PlaylistGroup> = Vec::new();
-        for g in playlist {
-            let mut grp = g.clone();
+        for playlist_group in playlist {
+            let mut grp = playlist_group.clone();
             let mappings = target._mapping.as_ref().unwrap();
             for mapping in mappings {
                 if mapping.mapper.len() > 0 {

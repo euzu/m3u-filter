@@ -2,6 +2,7 @@ use enum_iterator::all;
 use std::borrow::{Borrow};
 use std::sync::{Arc, Mutex};
 use pest::Parser;
+use regex::Regex;
 use crate::m3u::PlaylistItem;
 use crate::model::ItemField;
 
@@ -48,6 +49,7 @@ impl Clone for PatternTemplate {
 
 #[derive(Debug)]
 pub struct RegexWithCaptures {
+    pub restr: String,
     pub re: regex::Regex,
     pub captures: Vec<String>,
 }
@@ -55,6 +57,7 @@ pub struct RegexWithCaptures {
 impl Clone for RegexWithCaptures {
     fn clone(&self) -> Self {
         RegexWithCaptures {
+            restr: self.restr.clone(),
             re: self.re.clone(),
             captures: self.captures.clone()
         }
@@ -94,6 +97,7 @@ impl Filter {
                         let value = provider.call(&field);
                         let is_match = rewc.re.is_match(value);
                         if is_match {
+                            if verbose { println!("Match found:  {}={}", &field, &value)}
                             processor.process(field, &value, rewc, verbose);
                         }
                         return is_match
@@ -199,7 +203,7 @@ fn compact_stack(stack: &mut Vec<Arc<Filter>>) {
     }
 }
 
-pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>) -> Filter {
+pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> Filter {
     let mut stack: Vec<Arc<Filter>> = vec![];
     let empty_list = Vec::new();
     let template_list : &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
@@ -265,8 +269,11 @@ pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>) -> Fil
                     exit(format!("cant parse regex: {}", regstr).as_str());
                 }
                 let regexp = re.unwrap();
-                let captures = regexp.capture_names().map(|x| String::from(x.unwrap_or(""))).filter(|x| x.len() > 0).collect::<Vec<String>>();
+                let captures = regexp.capture_names()
+                    .filter_map(|x| x).map(|x| String::from(x)).filter(|x| x.len() > 0).collect::<Vec<String>>();
+                if verbose { println!("Created regex: {} with captures: [{}]", regstr, (&captures).join(", ")) }
                 let  regexp_with_captures = RegexWithCaptures {
+                    restr: regstr,
                     re: regexp,
                     captures
                 };
@@ -286,4 +293,17 @@ pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>) -> Fil
         }
     }
     return Filter::Group(Arc::new(Mutex::new(stack)));
+}
+
+pub fn prepare_templates(templates: &mut Vec<PatternTemplate>) {
+    // let regex = Regex::new("!(.*?)!").unwrap();
+    // for template in templates {
+        // let content = regex.captures_iter(&template.value)
+        //     .filter(|caps| caps.len() > 1)
+        //     .filter_map(|caps| caps.get(1))
+        //     .map(|caps| caps.as_str())
+        //     .collect::<Vec<&str>>().join(", ");
+        //println!("content {}", content)
+        // TODO.EU cyclic check and replace
+    //}
 }

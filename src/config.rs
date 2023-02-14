@@ -1,6 +1,6 @@
 use path_absolutize::*;
 
-use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, ValueProvider};
+use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
 use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType};
@@ -68,8 +68,8 @@ pub struct ConfigTarget {
 }
 
 impl ConfigTarget {
-    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>) -> () {
-        self._filter = Some(get_filter(&self.filter, templates));
+    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> () {
+        self._filter = Some(get_filter(&self.filter, templates, verbose));
         match self.rename.as_mut() {
             Some(renames) => for r in renames {
                 r.prepare();
@@ -86,7 +86,6 @@ impl ConfigTarget {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSources {
     pub input: ConfigInput,
-    pub templates: Option<Vec<PatternTemplate>>,
     pub targets: Vec<ConfigTarget>,
 }
 
@@ -111,7 +110,6 @@ impl ConfigInput {
     }
 }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigApi {
     pub host: String,
@@ -134,6 +132,7 @@ pub struct Config {
     pub api: ConfigApi,
     pub sources: Vec<ConfigSources>,
     pub working_dir: String,
+    pub templates: Option<Vec<PatternTemplate>>,
 }
 
 impl Config {
@@ -162,16 +161,20 @@ impl Config {
         }
     }
 
-    pub(crate) fn prepare(&mut self) {
+    pub(crate) fn prepare(&mut self, verbose: bool) {
         self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
         self.prepare_api_web_root();
+        match &mut self.templates {
+          Some(templates) => prepare_templates(templates),
+            _ => {}
+        };
         for source in &mut self.sources {
             source.prepare();
             for target in &mut source.targets {
-                match &source.templates {
-                    Some(templ) => target.prepare(Some(&templ)),
-                    _ => target.prepare(None)
+                match &self.templates {
+                    Some(templ) => target.prepare(Some(&templ), verbose),
+                    _ => target.prepare(None, verbose)
                 }
             }
         }
@@ -213,6 +216,7 @@ impl Clone for Config {
             api: self.api.clone(),
             sources: self.sources.clone(),
             working_dir: self.working_dir.clone(),
+            templates: self.templates.clone(),
         }
     }
 }
@@ -238,7 +242,6 @@ impl Clone for ConfigSources {
     fn clone(&self) -> Self {
         ConfigSources {
             input: self.input.clone(),
-            templates: self.templates.clone(),
             targets: self.targets.clone(),
         }
     }

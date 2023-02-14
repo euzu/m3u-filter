@@ -3,7 +3,7 @@
 * Breaking changes, mappings.yml refactored 
 * Added `threads` property to config, which executes different sources in threads.
 * WebUI: Added clipboard collector on left side 
-* Renamed Enum Constants  
+* Renamed Enum Constants
   - M3u -> m3u,
   - Strm -> strm 
   - FRM -> frm 
@@ -20,6 +20,7 @@
   - Include -> include 
   - Asc -> asc 
   - Desc -> desc 
+* Added templates to config to use in filters
 
 # v0.9.6(2023-01-14)
 * Renamed `mappings.templates` attribute `key` to `name`

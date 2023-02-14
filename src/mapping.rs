@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use regex::Regex;
-use crate::filter::{Filter, get_filter, PatternTemplate, RegexWithCaptures, ValueProcessor};
+use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
 use crate::m3u::{FieldAccessor, PlaylistItem};
 use crate::model::{ItemField, MAPPER_ATTRIBUTE_FIELDS, MAPPER_PRE_SUFFIX_FIELDS};
 
@@ -52,13 +52,13 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    pub(crate) fn prepare<'a>(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> () {
-        self._filter = Some(get_filter(&self.pattern, templates));
+    pub(crate) fn prepare<'a>(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>, verbose: bool) -> () {
+        self._filter = Some(get_filter(&self.pattern, templates, verbose));
         self._tags = match tags {
             Some(list) => list.clone(),
             _ => vec![]
         };
-        self._tagre = Some(Regex::new("<tag:(:?.*)>").unwrap())
+        self._tagre = Some(Regex::new("<tag:(.*?)>").unwrap())
     }
 }
 
@@ -105,47 +105,39 @@ impl MappingValueProcessor<'_> {
 
     fn apply_attributes(&mut self, verbose: bool) {
         for (key, value) in &self.mapper.attributes {
-            if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) &&
-                valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
-                match self.get_property(value) {
-                    Some(prop_value) => {
-                        self.set_property(key, &prop_value, verbose);
-                    },
-                    _ => {}
-                }
+            if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
+                self.set_property(key, value, verbose);
             }
         }
     }
 
     fn apply_tags(&mut self, value: &String, captures: &HashMap<&String, &str>, verbose: bool) -> Option<String> {
         let mut new_value = String::from(value);
-        for caps in self.mapper._tagre.as_ref().unwrap().captures_iter(value) {
-            match caps.get(1) {
-                Some(cap_name_match) => {
-                    let cap_name = cap_name_match.as_str();
-                    // Found a <tag:name> with existing tag_name
-                    // now find the tag and iterate over the captured values
-                    for mapping_tag in &self.mapper._tags {
-                        if mapping_tag.name.eq(cap_name) {
-                            // we have the right tag, now get all captured values
-                            let mut captured_tag_values : Vec<&str> = Vec::new();
-                            for cap in &mapping_tag.captures {
-                                 match captures.get(&cap) {
-                                     Some(cap_value) => {
-                                         captured_tag_values.push(cap_value);
-                                     },
-                                     _ => {
-                                         if verbose { println!("Cant find any tag match for {}", cap_name) }
-                                         return None
-                                     }
-                                 }
+        let tag_captures = self.mapper._tagre.as_ref().unwrap().captures_iter(value)
+            .filter(|caps| caps.len() > 1)
+            .filter_map(|caps| caps.get(1))
+            .map(|caps| caps.as_str())
+            .collect::<Vec<&str>>();
+
+        for tag_capture in tag_captures {
+            for mapping_tag in &self.mapper._tags {
+                if mapping_tag.name.eq(tag_capture) {
+                    // we have the right tag, now get all captured values
+                    let mut captured_tag_values : Vec<&str> = Vec::new();
+                    for cap in &mapping_tag.captures {
+                        match captures.get(&cap) {
+                            Some(cap_value) => captured_tag_values.push(cap_value),
+                            _ => {
+                                if verbose { println!("Cant find any tag match for {}", tag_capture) }
+                                return None
                             }
-                            // Now we have all our captured values, lets create the tag
-                            new_value = format!("{}{}{}", &mapping_tag.prefix, captured_tag_values.join(&mapping_tag.concat) , &mapping_tag.suffix);
                         }
                     }
+                    // Now we have all our captured values, lets create the tag
+                    new_value = new_value.replace(
+                        format!("<tag:{}>",mapping_tag.name).as_str(),
+                        format!("{}{}{}", &mapping_tag.prefix, captured_tag_values.join(&mapping_tag.concat) , &mapping_tag.suffix).as_str());
                 }
-                _ => {}
             }
         }
         Some(new_value)
@@ -209,19 +201,38 @@ impl ValueProcessor for MappingValueProcessor<'_> {
     fn process<'a>(&mut self, _: &ItemField, value: &str, rewc: &RegexWithCaptures, verbose: bool) -> bool {
         let mut captured_values = HashMap::new();
         if rewc.captures.len() > 0 {
-            let captures_opt = rewc.re.captures(value);
-            if captures_opt.is_some() {
-                let captures = captures_opt.unwrap();
-                for capture_name in &rewc.captures {
-                    let match_opt = captures.name(capture_name.as_str());
-                    let capture_value = if match_opt.is_some() {
-                        match_opt.map_or("", |m| m.as_str())
-                    } else {
-                        ""
-                    };
-                    captured_values.insert(capture_name, capture_value);
-                }
-            }
+            //-------
+            // let captures_opt = rewc.re.captures(value);
+            // if captures_opt.is_some() {
+            //     let captures = captures_opt.unwrap();
+            //     for capture_name in &rewc.captures {
+            //         let match_opt = captures.name(capture_name.as_str());
+            //         let capture_value = if match_opt.is_some() {
+            //             match_opt.map_or("", |m| m.as_str())
+            //         } else {
+            //             ""
+            //         };
+            //         if verbose { println!("match {}: {}", capture_name, capture_value); }
+            //         captured_values.insert(capture_name, capture_value);
+            //     }
+            // }
+            //------
+
+
+            rewc.re.captures_iter(value)
+                .filter(|caps| caps.len() > 1)
+                .for_each(|captures|
+                    for capture_name in &rewc.captures {
+                        let match_opt = captures.name(capture_name.as_str());
+                        let capture_value = if match_opt.is_some() {
+                            match_opt.map_or("", |m| m.as_str())
+                        } else {
+                            ""
+                        };
+                        if verbose { println!("match {}: {}", capture_name, capture_value); }
+                        captured_values.insert(capture_name, capture_value);
+                    }
+                );
         }
         let _ = &MappingValueProcessor::<'_>::apply_attributes(self, verbose);
         let _ = &MappingValueProcessor::<'_>::apply_suffix(self, &captured_values, verbose);
@@ -251,7 +262,8 @@ impl Clone for Mapping {
 }
 
 impl Mapping {
-    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> () {
+    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
+                          tags: Option<&Vec<MappingTag>>, verbose: bool) -> () {
         for mapper in &mut self.mapper {
             let template_list = match templates {
                 Some(templ) => Some(templ),
@@ -261,7 +273,7 @@ impl Mapping {
                 Some(t) => Some(t),
                 _ => None
             };
-            mapper.prepare(template_list, tag_list);
+            mapper.prepare(template_list, tag_list, verbose);
         }
     }
 }
@@ -274,7 +286,11 @@ pub struct MappingDefinition {
 }
 
 impl MappingDefinition {
-    pub(crate) fn prepare(&mut self) {
+    pub(crate) fn prepare(&mut self, verbose: bool) {
+        match &mut self.templates {
+            Some(templates) => prepare_templates(templates),
+            _ => {}
+        };
         for mapping in &mut self.mapping {
             let template_list = match &self.templates {
                 Some(templ) => Some(templ),
@@ -284,7 +300,7 @@ impl MappingDefinition {
                 Some(t) => Some(t),
                 _ => None
             };
-            mapping.prepare(template_list, tag_list);
+            mapping.prepare(template_list, tag_list, verbose);
         }
     }
 }
@@ -305,8 +321,8 @@ pub struct Mappings {
 }
 
 impl Mappings {
-    pub(crate) fn prepare(&mut self) {
-        self.mappings.prepare();
+    pub(crate) fn prepare(&mut self, verbose: bool) {
+        self.mappings.prepare(verbose);
     }
 
     pub(crate) fn get_mapping(&self, mapping_id: &String) -> Option<Mapping> {

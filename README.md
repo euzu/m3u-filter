@@ -28,6 +28,7 @@ Top level entries in the config files are:
 * `threads` _optional_
 * `api`
 * `working_dir`
+* `templates` _optional_
 * `sources`
 
 ### 1.1. `threads`
@@ -45,12 +46,25 @@ Default is `0`.
 
 With this configuration, you should create a `data` directory next to the executable.
 
-### 1.4. `sources`
+### 1.4 `templates`
+If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
+```yaml
+templates:
+  - {name: delimiter, value: '[\s_-]*' }
+  - {name: quality, value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'}
+```
+With this definition you can use `delimiter` and `quality` in your regexp's surrounded with `!` like.
+
+`^.*TF1!delimiter!Series?!delimiter!Films?(!delimiter!!quality!)\s*$`
+
+This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp string.
+
+### 1.5. `sources`
 `sources` is a sequence of source definitions, which have two top level entries:
  * `input`
  * `targets`
 
-### 1.4.1 `input`
+### 1.5.1 `input`
 Has two entries, `persist` and `url`.
 
 `input: { persist: ./playlist_{}.m3u, url: http://myserver.net/playlist.m3u }`
@@ -58,7 +72,7 @@ Has two entries, `persist` and `url`.
   - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
   - `url` is the download url or a local filename of the input-source.
 
-### 1.4.2 `targets`
+### 1.5.2 `targets`
 Has the following top level entries:
 * `filename` _mandatory_
 * `sort`  _optional_
@@ -69,24 +83,24 @@ Has the following top level entries:
 * `rename` _optional_
 * `mapping` _optional_
 
-### 1.4.2.1 `filename`
+### 1.5.2.1 `filename`
 Is the filename for the resulting playlist.
 
-### 1.4.2.2 `sort`
+### 1.5.2.2 `sort`
 Has one top level attribute `order` which can be set to `asc`or `desc`.
 
-### 1.4.2.3 `output`
+### 1.5.2.3 `output`
 There are two types of targets ```m3u``` and ```strm```. 
 If the attribute is not specified ```m3u``` is created by default.
 You can set options for each `output` type.
 
 `strm` output has additional options `underscore_whitespace`, `cleanup` and `kodi_style`.
 
-### 1.4.2.4 `processing_order`
+### 1.5.2.4 `processing_order`
 The processing order (Filter, Rename and Map) can be configured for each target with:
 `processing_order: frm` (valid values are: frm, fmr, rfm, rmf, mfr, mrf. default is frm)
 
-### 1.4.2.5 `options`
+### 1.5.2.5 `options`
 * ignore_logo `true` or `false` 
 * underscore_whitespace `true` or `false`
 * cleanup `true` or `false`
@@ -99,7 +113,7 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 - `cleanup` deletes the directory given at `filename`.
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 
-### 1.4.2.6 `filter`
+### 1.5.2.6 `filter`
 The filter is a string with a filter statement.
 The filter can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
 Filter fields are `Group`, `Title`, `Name` and `Url`.
@@ -108,7 +122,7 @@ Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
 
-### 1.4.2.7 `rename`
+### 1.5.2.7 `rename`
 Has 3 top level entries.
 * `field` can be  `group`, `title`, `name` or `url`.
 * `new_name` can contain capture groups variables addressed with `$1`,`$2`,... 
@@ -124,7 +138,7 @@ In the above example each entry starting with `DE` will be prefixed with `1.`.
 
 (_Please be aware of the processing order. If you first map, you should match the mapped entries!_)
 
-### 1.4.2.8 `mapping`
+### 1.5.2.8 `mapping`
 `mapping: <list of mapping id's>`
 The mappings are defined in a file `mapping.yml`. The filename can be given as `-m` argument.
 
@@ -227,9 +241,6 @@ Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group
 
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
-
-The Regular expressions in the pattern can contain captured variable names like `TF1 $quality`,
-or template variables.
 
 #### 2.3.4.2 `attributes`
 Attributes is a map of key value pairs. Valid keys are:

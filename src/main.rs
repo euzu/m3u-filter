@@ -49,12 +49,12 @@ fn main() {
 
     let default_config_path = utils::get_default_config_path();
     let config_file: String = args.config.unwrap_or(default_config_path);
-    let mut cfg = read_config(config_file.as_str());
+    let mut cfg = read_config(config_file.as_str(), verbose);
 
     let default_mappings_path = utils::get_default_mappings_path();
     let mappings_file: String = args.mapping.unwrap_or(default_mappings_path);
 
-    let mappings = read_mapping(mappings_file.as_str());
+    let mappings = read_mapping(mappings_file.as_str(), verbose);
     if verbose && mappings.is_none() { println!("no mapping loaded"); }
     cfg.set_mappings(mappings);
     if verbose { println!("working dir: {:?}", &cfg.working_dir); }
@@ -72,22 +72,22 @@ fn main() {
     }
 }
 
-fn read_config(config_file: &str) -> Config {
+fn read_config(config_file: &str, verbose: bool) -> Config {
     let mut cfg: config::Config = match serde_yaml::from_reader(utils::open_file(&std::path::PathBuf::from(config_file), true).unwrap()) {
         Ok(result) => result,
         Err(e) => panic!("cant read config file: {}", e)
     };
-    cfg.prepare();
+    cfg.prepare(verbose);
     cfg
 }
 
-fn read_mapping(mapping_file: &str) -> Option<Mappings> {
+fn read_mapping(mapping_file: &str, verbose: bool) -> Option<Mappings> {
     match utils::open_file(&std::path::PathBuf::from(mapping_file), false) {
         Some(file) => {
             let mapping: Result<mapping::Mappings, _> = serde_yaml::from_reader(file);
             match mapping {
                 Ok(mut result) => {
-                    result.prepare();
+                    result.prepare(verbose);
                     Some(result)
                 }
                 Err(err) => {
