@@ -14,10 +14,10 @@
   - RMF -> rmf 
   - MFR -> mfr 
   - MRF -> mrf 
-  - Group -> group 
-  - Name -> name 
-  - Title -> title 
-  - Url -> url 
+  - Group -> group   (Not in filter regular expressions)
+  - Name -> name  (Not in filter regular expressions)
+  - Title -> title  (Not in filter regular expressions)
+  - Url -> url  (Not in filter regular expressions)
   - Discard -> discard 
   - Include -> include 
   - Asc -> asc 
