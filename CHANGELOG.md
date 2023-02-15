@@ -1,5 +1,5 @@
 # Changelog
-# v0.9.?(2023-02-15)
+# v0.9.7(2023-02-15)
 * Breaking changes, mappings.yml refactored 
 * Added `threads` property to config, which executes different sources in threads.
 * WebUI: Added clipboard collector on left side 
