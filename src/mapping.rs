@@ -270,7 +270,7 @@ pub struct MappingDefinition {
 impl MappingDefinition {
     pub(crate) fn prepare(&mut self, verbose: bool) {
         match &mut self.templates {
-            Some(templates) => prepare_templates(templates),
+            Some(templates) =>self.templates = Some(prepare_templates(templates, verbose)),
             _ => {}
         };
         for mapping in &mut self.mapping {

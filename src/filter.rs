@@ -1,12 +1,13 @@
 use enum_iterator::all;
 use std::borrow::{Borrow};
-use std::collections::HashMap;
+use std::collections::{HashMap};
 use std::sync::{Arc, Mutex};
 use pest::Parser;
+use petgraph::algo::toposort;
 use regex::Regex;
-use petgraph::graph::DiGraph;
 use crate::m3u::PlaylistItem;
 use crate::model::ItemField;
+use petgraph::graph::DiGraph;
 
 pub struct ValueProvider<'a> {
     pub(crate) pli: &'a PlaylistItem,
@@ -297,11 +298,12 @@ pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>, verbos
     return Filter::Group(Arc::new(Mutex::new(stack)));
 }
 
-fn has_cyclic_dependencies(templates: &Vec<PatternTemplate>) -> bool {
+fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> (DiGraph<String, ()>, HashMap<usize, String>, HashMap<&String, Vec<String>>, bool) {
     let regex = Regex::new("!(.*?)!").unwrap();
     let mut graph = DiGraph::new();
     let mut node_ids = HashMap::new();
     let mut node_names = HashMap::new();
+    let mut node_deps = HashMap::new();
 
     let mut add_node = |di_graph: &mut DiGraph<_,_>, node_name: &String| match node_ids.get(node_name) {
         Some(idx) => *idx,
@@ -316,15 +318,17 @@ fn has_cyclic_dependencies(templates: &Vec<PatternTemplate>) -> bool {
 
     for template in templates {
         let node_idx = add_node(&mut graph, &template.name);
-        let mut edges = regex.captures_iter(&template.value)
+        let edges = regex.captures_iter(&template.value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| String::from(caps.as_str()))
             .collect::<Vec<String>>();
-        while let Some(edge) = edges.pop() {
+        let mut iter = edges.iter();
+        while let Some(edge) = iter.next() {
             let edge_idx = add_node(&mut graph, &edge);
-            graph.add_edge(node_idx, edge_idx, ());
+            graph.add_edge(edge_idx, node_idx, ());
         }
+        node_deps.insert(&template.name, edges);
     }
     let cycles: Vec<Vec<String>>  = petgraph::algo::tarjan_scc(&graph)
         .into_iter()
@@ -335,13 +339,41 @@ fn has_cyclic_dependencies(templates: &Vec<PatternTemplate>) -> bool {
         println!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "))
     }
 
-    cycles.len() > 0
+    (graph, node_names, node_deps, cycles.len() > 0)
 }
 
-pub fn prepare_templates(templates: &mut Vec<PatternTemplate>) {
-    if has_cyclic_dependencies(templates) {
+pub fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool)  -> Vec<PatternTemplate> {
+    let mut result: Vec<PatternTemplate> = templates.iter().map(|t| t.clone()).collect();
+    let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
+    if cyclic {
         exit("Cyclic dependencies in templates detected!");
     } else {
-      //
+        let mut dep_value_map: HashMap<&String, String> = templates.into_iter().map(|t| (&t.name, t.value.clone())).collect();
+        // Perform a topological sort to get a linear ordering of the nodes
+        let node_indices = toposort(&graph, None).unwrap();
+        let mut indices = node_indices.iter();
+        while let Some(node) = indices.next() {
+            // only nodes with dependencies
+            if graph.edges_directed(*node, petgraph::Incoming).count() > 0 {
+                let node_name = node_map.get(&node.index()).unwrap();
+                match node_deps.get(node_name) {
+                    Some(deps) => {
+                        if verbose { println!("template {}  depends on [{}]", node_name, deps.join(", "))};
+                        let node_template = dep_value_map.get(node_name).unwrap().clone();
+                        for dep_name in deps {
+                            let dep_template = dep_value_map.get(dep_name).unwrap().clone();
+                            let new_templ = node_template.replace(format!("!{}!", dep_name).as_str(), &dep_template);
+                            dep_value_map.insert(node_name, new_templ);
+                        }
+                        let template = result.iter_mut().find(|t| node_name.eq(&t.name)).unwrap();
+                        let new_value = dep_value_map.get(&template.name).unwrap();
+                        template.value = String::from(new_value.as_str());
+                    },
+                    _ => {}
+                }
+            }
+        }
     }
+    if verbose { println!("{:#?}", result); }
+    result
 }

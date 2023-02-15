@@ -1,8 +1,10 @@
 # Changelog
-# v0.9.?(2023-02-14)
+# v0.9.?(2023-02-15)
 * Breaking changes, mappings.yml refactored 
 * Added `threads` property to config, which executes different sources in threads.
 * WebUI: Added clipboard collector on left side 
+* Added templates to config to use in filters
+* Added nested templates, templates can have references to other templates with `!name!`. 
 * Renamed Enum Constants
   - M3u -> m3u,
   - Strm -> strm 
@@ -20,7 +22,6 @@
   - Include -> include 
   - Asc -> asc 
   - Desc -> desc 
-* Added templates to config to use in filters
 
 # v0.9.6(2023-01-14)
 * Renamed `mappings.templates` attribute `key` to `name`

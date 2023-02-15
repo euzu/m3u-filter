@@ -48,6 +48,7 @@ With this configuration, you should create a `data` directory next to the execut
 
 ### 1.4 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
+You can reference other templates in templates with `!name!`.
 ```yaml
 templates:
   - {name: delimiter, value: '[\s_-]*' }
@@ -191,6 +192,7 @@ Has the root item `mappings` which has the following top level entries:
 
 ### 2.1 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
+You can reference other templates in templates with `!name!`;
 ```yaml
 templates:
   - {name: delimiter, value: '[\s_-]*' }

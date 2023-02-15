@@ -166,7 +166,7 @@ impl Config {
         self.api.prepare();
         self.prepare_api_web_root();
         match &mut self.templates {
-          Some(templates) => prepare_templates(templates),
+          Some(templates) => self.templates = Some(prepare_templates(templates, verbose)),
             _ => {}
         };
         for source in &mut self.sources {
