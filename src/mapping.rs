@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
 use crate::m3u::{FieldAccessor, PlaylistItem};
-use crate::model::{ItemField, MAPPER_ATTRIBUTE_FIELDS, MAPPER_PRE_SUFFIX_FIELDS};
+use crate::model::{ItemField, MAPPER_ATTRIBUTE_FIELDS, MAPPER_PREFIX_SUFFIX_FIELDS};
 
 fn default_as_false() -> bool { false }
 fn default_as_empty_str() -> String { String::from("") }
@@ -133,10 +133,15 @@ impl MappingValueProcessor<'_> {
                             }
                         }
                     }
-                    // Now we have all our captured values, lets create the tag
-                    new_value = new_value.replace(
-                        format!("<tag:{}>",mapping_tag.name).as_str(),
-                        format!("{}{}{}", &mapping_tag.prefix, captured_tag_values.join(&mapping_tag.concat) , &mapping_tag.suffix).as_str());
+                    if captured_tag_values.len() > 0 {
+                        let captured_text = captured_tag_values.join(&mapping_tag.concat);
+                        if captured_text.trim().len() > 0 {
+                            // Now we have all our captured values, lets create the tag
+                            new_value = new_value.replace(
+                                format!("<tag:{}>", mapping_tag.name).as_str(),
+                                format!("{}{}{}", &mapping_tag.prefix, captured_text, &mapping_tag.suffix).as_str());
+                        }
+                    }
                 }
             }
         }
@@ -145,7 +150,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_suffix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
         for (key, value) in &self.mapper.suffix {
-            if valid_property!(key.as_str(), MAPPER_PRE_SUFFIX_FIELDS) {
+            if valid_property!(key.as_str(), MAPPER_PREFIX_SUFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(suffix) => {
                         match self.get_property(key) {
@@ -164,7 +169,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_prefix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
         for (key, value) in &self.mapper.prefix {
-            if valid_property!(key.as_str(), MAPPER_PRE_SUFFIX_FIELDS) {
+            if valid_property!(key.as_str(), MAPPER_PREFIX_SUFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(prefix) => {
                         match self.get_property(key) {

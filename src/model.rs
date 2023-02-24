@@ -1,7 +1,7 @@
 use enum_iterator::Sequence;
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &["name", "title", "group", "id", "chno"];
-pub const MAPPER_PRE_SUFFIX_FIELDS: &[&str] = &["name", "title", "group"];
+pub const MAPPER_PREFIX_SUFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub enum TargetType {
