@@ -163,7 +163,7 @@ impl MappingValueProcessor<'_> {
     }
 
     fn apply_prefix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
-        for (key, value) in &self.mapper.suffix {
+        for (key, value) in &self.mapper.prefix {
             if valid_property!(key.as_str(), MAPPER_PRE_SUFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(prefix) => {
