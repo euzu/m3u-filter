@@ -246,12 +246,18 @@ but lacks a few features like look around and backreferences.
 
 #### 2.3.4.2 `attributes`
 Attributes is a map of key value pairs. Valid keys are:
-- name
-- group
-- title
-- logo
-- id
-- chno
+- `id`
+- `chno`
+- `name`
+- `group`
+- `title`
+- `logo`
+- `logo_small`
+- `parent_code`
+- `audio_track`
+- `time_shift`
+- `rec`
+- `source`
 
 If the regexps matches, the given fields will be set to the new value
 
@@ -293,11 +299,18 @@ If the regexps matches, the given fields will be prefixed to field value
 
 #### 2.3.4.5 `assignments`
 Attributes is a map of key value pairs. Valid keys and values are:
-- name
-- group
-- title
-- id
-- chno
+- `id`
+- `chno`
+- `name`
+- `group`
+- `title`
+- `logo`
+- `logo_small`
+- `parent_code`
+- `audio_track`
+- `time_shift`
+- `rec`
+- `source`
 
 Example configuration is:
 ```

@@ -1,4 +1,19 @@
 # Changelog
+# v0.9.8(2023-02-25)
+* Added new fields to mapping attributes and assignments
+  - "name"
+  - "title"
+  - "group"
+  - "id"
+  - "chno"
+  - "logo"
+  - "logo_small"
+  - "parent_code"
+  - "audio_track"
+  - "time_shift"
+  - "rec"
+  - "source"
+
 # v0.9.7(2023-02-15)
 * Breaking changes, mappings.yml refactored 
 * Added `threads` property to config, which executes different sources in threads.

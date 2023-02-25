@@ -1,11 +1,23 @@
 #!/usr/bin/env bash
 
-if [[ -z "$1" ]]; then
-    echo "No argument supplied. First argument should be version number like 1.0.0"
-    exit 1
+if ! command -v cargo-set-version &> /dev/null
+then
+    echo "cargo-set-version could not be found. install it with  'cargo install cargo-edit'"
+    exit
 fi
 
-VERSION=v$1
+#if [[ -z "$1" ]]; then
+#    echo "No argument supplied. First argument should be version number like 1.0.0"
+#    exit 1
+#fi
+
+cd ./frontend || (echo "cant find frontend directory" && exit)
+NEW_VERSION=$(yarn version --patch | grep "New version" | grep -Po "(\d+\.)+\d+")
+cd ..
+cargo-set-version set-version ./Cargo.toml "$NEW_VERSION"
+
+
+VERSION=v$NEW_VERSION
 LIN_DIR=m3u-filter_${VERSION}_linux_x86_64
 WIN_DIR=m3u-filter_${VERSION}_windows_x86_64
 DARWIN_DIR=m3u-filter_${VERSION}_darwin_x86_64

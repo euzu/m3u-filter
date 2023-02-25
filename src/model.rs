@@ -1,6 +1,14 @@
 use enum_iterator::Sequence;
 
-pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &["name", "title", "group", "id", "chno"];
+pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
+    "name", "title", "group", "id", "chno", "logo",
+    "logo_small",
+    "parent_code",
+    "audio_track",
+    "time_shift",
+    "rec",
+    "source",
+];
 pub const MAPPER_PREFIX_SUFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
@@ -33,7 +41,7 @@ pub enum ProcessingOrder {
     #[serde(rename = "mfr")]
     MFR,
     #[serde(rename = "mrf")]
-    MRF
+    MRF,
 }
 
 impl std::fmt::Display for ProcessingOrder {

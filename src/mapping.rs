@@ -5,7 +5,9 @@ use crate::m3u::{FieldAccessor, PlaylistItem};
 use crate::model::{ItemField, MAPPER_ATTRIBUTE_FIELDS, MAPPER_PREFIX_SUFFIX_FIELDS};
 
 fn default_as_false() -> bool { false }
+
 fn default_as_empty_str() -> String { String::from("") }
+
 fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -92,7 +94,7 @@ impl MappingValueProcessor<'_> {
     fn get_property(&self, key: &str) -> Option<String> {
         match self.pli.header.get_field(key) {
             Some(value) => Some(String::from(value)),
-            _=> None
+            _ => None
         }
     }
 
@@ -123,24 +125,26 @@ impl MappingValueProcessor<'_> {
             for mapping_tag in &self.mapper._tags {
                 if mapping_tag.name.eq(tag_capture) {
                     // we have the right tag, now get all captured values
-                    let mut captured_tag_values : Vec<&str> = Vec::new();
+                    let mut captured_tag_values: Vec<&str> = Vec::new();
                     for cap in &mapping_tag.captures {
                         match captures.get(&cap) {
                             Some(cap_value) => captured_tag_values.push(cap_value),
                             _ => {
                                 if verbose { println!("Cant find any tag match for {}", tag_capture) }
-                                return None
+                                return None;
                             }
                         }
                     }
                     if captured_tag_values.len() > 0 {
                         let captured_text = captured_tag_values.join(&mapping_tag.concat);
-                        if captured_text.trim().len() > 0 {
+                        let replacement = if captured_text.trim().len() > 0 {
                             // Now we have all our captured values, lets create the tag
-                            new_value = new_value.replace(
-                                format!("<tag:{}>", mapping_tag.name).as_str(),
-                                format!("{}{}{}", &mapping_tag.prefix, captured_text, &mapping_tag.suffix).as_str());
-                        }
+                            format!("{}{}{}", &mapping_tag.prefix, captured_text, &mapping_tag.suffix)
+                        } else {
+                            // nothing found so replace tag with empty string
+                            String::from("")
+                        };
+                        new_value = new_value.replace(format!("<tag:{}>", mapping_tag.name).as_str(), replacement.as_str());
                     }
                 }
             }
@@ -193,13 +197,12 @@ impl MappingValueProcessor<'_> {
                 match self.get_property(value) {
                     Some(prop_value) => {
                         self.set_property(key, &prop_value, verbose);
-                    },
+                    }
                     _ => {}
                 }
             }
         }
     }
-
 }
 
 impl ValueProcessor for MappingValueProcessor<'_> {
@@ -275,7 +278,7 @@ pub struct MappingDefinition {
 impl MappingDefinition {
     pub(crate) fn prepare(&mut self, verbose: bool) {
         match &mut self.templates {
-            Some(templates) =>self.templates = Some(prepare_templates(templates, verbose)),
+            Some(templates) => self.templates = Some(prepare_templates(templates, verbose)),
             _ => {}
         };
         for mapping in &mut self.mapping {
