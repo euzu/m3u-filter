@@ -6,12 +6,13 @@ use std::thread;
 use config::ConfigTarget;
 use chrono::Datelike;
 use unidecode::unidecode;
-use crate::{config, Config, get_playlist, utils};
+use crate::{config, Config, get_playlist, utils, valid_property};
+use crate::config::{ConfigInput, InputAffix};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::{ValueProvider};
-use crate::m3u::{PlaylistGroup, PlaylistItem};
+use crate::m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::mapping::{Mapping, MappingValueProcessor};
-use crate::model::{ItemField, ProcessingOrder, TargetType};
+use crate::model::{ItemField, AFFIX_FIELDS, ProcessingOrder, TargetType};
 
 macro_rules! open_file {
   ($path:expr) => {{
@@ -61,7 +62,54 @@ fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
     Some(new_playlist)
 }
 
+fn apply_affixes(playlist: &mut Vec<PlaylistGroup>, input: &ConfigInput, verbose: bool) {
+    if input.suffix.is_some() || input.prefix.is_some() {
+        let validate_affix = |a: &Option<InputAffix>| match a {
+            Some(affix) => {
+                valid_property!(&affix.field.as_str(), AFFIX_FIELDS) && affix.value.len() > 0
+            }
+            _ => false
+        };
+
+        let apply_prefix = validate_affix(&input.prefix);
+        let apply_suffix = validate_affix(&input.suffix);
+
+        if apply_prefix || apply_suffix {
+            let get_affix_applied_value = |header: &mut PlaylistItemHeader, affix: &InputAffix, prefix: bool| {
+               if let Some(field_value) = header.get_field(&affix.field.as_str()) {
+                   return if prefix {
+                       format!("{}{}", &affix.value, field_value.as_str())
+                   } else {
+                       format!("{}{}", field_value.as_str(), &affix.value)
+                   }
+               }
+                return String::from(&affix.value)
+            };
+
+            for group in playlist {
+                for channel in &mut group.channels {
+                    if apply_suffix {
+                        if let Some(suffix) = &input.suffix {
+                            let value = get_affix_applied_value(&mut channel.header, suffix, false);
+                            if verbose { println!("Applying input suffix:  {}={}", &suffix.field, &value)}
+                            channel.header.set_field(&suffix.field, &value.as_str());
+                        }
+                    }
+                    if apply_prefix {
+                        if let Some(prefix) = &input.prefix {
+                            let value = get_affix_applied_value(&mut channel.header, prefix, true);
+                            if verbose { println!("Applying input prefix:  {}={}", &prefix.field, &value)}
+                            channel.header.set_field(&prefix.field, &value.as_str());
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub(crate) fn write_m3u(playlist: &Vec<PlaylistGroup>,
+                        input: &ConfigInput,
                         target: &ConfigTarget, cfg: &Config,
                         verbose: bool) -> Result<(), std::io::Error> {
     let pipe: Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> =
@@ -83,6 +131,8 @@ pub(crate) fn write_m3u(playlist: &Vec<PlaylistGroup>,
             new_playlist = r.unwrap();
         }
     }
+
+    apply_affixes(&mut new_playlist, input, verbose);
 
     sort_playlist(target, &mut new_playlist);
     match &target.output {
@@ -319,7 +369,7 @@ fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> 
 }
 
 fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
-    if verbose { println!("Mapping")}
+    if verbose { println!("Mapping") }
     if target._mapping.is_some() {
         let mut new_playlist: Vec<PlaylistGroup> = Vec::new();
         for playlist_group in playlist {
@@ -360,7 +410,8 @@ fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) -> 
 
 fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
     let source = cfg.sources.get(source_idx).unwrap();
-    let url_str = source.input.url.as_str();
+    let input = &source.input;
+    let url_str = input.url.as_str();
     let persist_file: Option<std::path::PathBuf> =
         if source.input.persist.is_empty() { None } else { utils::prepare_persist_path(source.input.persist.as_str()) };
     let file_path = utils::get_file_path(&cfg.working_dir, persist_file);
@@ -378,7 +429,7 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
             } else {
                 if verbose { println!("Input file has {} groups", playlist.len()) }
                 for target in source.targets.iter() {
-                    match write_m3u(playlist, target, &cfg, verbose) {
+                    match write_m3u(playlist, input, target, &cfg, verbose) {
                         Ok(_) => (),
                         Err(e) => println!("Failed to write file: {}", e)
                     }
@@ -390,10 +441,10 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
 }
 
 pub fn process_targets(cfg: Arc<Config>, verbose: bool) {
-    let mut handle_list  = vec![];
+    let mut handle_list = vec![];
     let thread_num = cfg.threads;
     let process_parallel = thread_num > 1 && cfg.sources.len() > 1;
-    if verbose && process_parallel { println!("Using {} threads", thread_num)}
+    if verbose && process_parallel { println!("Using {} threads", thread_num) }
 
     for (index, _) in cfg.sources.iter().enumerate() {
         let config = cfg.clone();
@@ -410,6 +461,6 @@ pub fn process_targets(cfg: Arc<Config>, verbose: bool) {
         }
     }
     for handle in handle_list {
-       let _= handle.join();
+        let _ = handle.join();
     }
 }

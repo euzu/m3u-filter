@@ -13,6 +13,7 @@
   - "time_shift"
   - "rec"
   - "source"
+* Added static suffix and prefix at inpupt source level 
 
 # v0.9.7(2023-02-15)
 * Breaking changes, mappings.yml refactored 

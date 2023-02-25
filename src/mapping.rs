@@ -2,13 +2,9 @@ use std::collections::HashMap;
 use regex::Regex;
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
 use crate::m3u::{FieldAccessor, PlaylistItem};
-use crate::model::{ItemField, MAPPER_ATTRIBUTE_FIELDS, MAPPER_PREFIX_SUFFIX_FIELDS};
-
-fn default_as_false() -> bool { false }
-
-fn default_as_empty_str() -> String { String::from("") }
-
-fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
+use crate::model::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
+                   default_as_empty_str, default_as_false, default_as_empty_map, };
+use crate::valid_property;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct MappingTag {
@@ -77,12 +73,6 @@ impl Clone for Mapper {
             _tagre: self._tagre.clone(),
         }
     }
-}
-
-macro_rules! valid_property {
-  ($key:expr, $array:expr) => {{
-        $array.contains(&$key)
-    }};
 }
 
 pub struct MappingValueProcessor<'a> {
@@ -154,7 +144,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_suffix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
         for (key, value) in &self.mapper.suffix {
-            if valid_property!(key.as_str(), MAPPER_PREFIX_SUFFIX_FIELDS) {
+            if valid_property!(key.as_str(), AFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(suffix) => {
                         match self.get_property(key) {
@@ -173,7 +163,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_prefix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
         for (key, value) in &self.mapper.prefix {
-            if valid_property!(key.as_str(), MAPPER_PREFIX_SUFFIX_FIELDS) {
+            if valid_property!(key.as_str(), AFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(prefix) => {
                         match self.get_property(key) {

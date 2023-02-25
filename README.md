@@ -66,12 +66,19 @@ This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp
  * `targets`
 
 ### 1.5.1 `input`
-Has two entries, `persist` and `url`.
+Has for entries, `persist`, `url`, `prefix`, `suffix`.
 
-`input: { persist: ./playlist_{}.m3u, url: http://myserver.net/playlist.m3u }`
+`input: { persist: ./playlist_{}.m3u, url: http://myserver.net/playlist.m3u, prefix: {field: title, value: '#!# ' }, suffix: {field: title, value: ' +-+' } }`
 
   - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
   - `url` is the download url or a local filename of the input-source.
+  - `prefix` is optional, it is applied to the given field with the given value
+  - `suffix` is optional, it is applied to the given field with the given value
+
+`prefix` and `suffix` is appended after all processing is done, but before sort.
+They have 2 fields:
+  - `field` can be `name` , `group`, `title`
+  - `value` a static text
 
 ### 1.5.2 `targets`
 Has the following top level entries:

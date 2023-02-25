@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use enum_iterator::Sequence;
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
@@ -9,7 +10,24 @@ pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "rec",
     "source",
 ];
-pub const MAPPER_PREFIX_SUFFIX_FIELDS: &[&str] = &["name", "title", "group"];
+pub const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
+
+#[macro_export]
+macro_rules! valid_property {
+  ($key:expr, $array:expr) => {{
+        $array.contains(&$key)
+    }};
+}
+
+
+pub fn default_as_false() -> bool { false }
+
+pub fn default_as_empty_str() -> String { String::from("") }
+
+pub fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
+
+pub fn default_as_zero() -> u8 { 0 }
+
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub enum TargetType {

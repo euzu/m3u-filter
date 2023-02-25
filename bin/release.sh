@@ -12,12 +12,14 @@ fi
 #fi
 
 cd ./frontend || (echo "cant find frontend directory" && exit)
-NEW_VERSION=$(yarn version --patch | grep "New version" | grep -Po "(\d+\.)+\d+")
+NEW_VERSION=$(yarn version --no-git-tag-version --patch | grep "New version" | grep -Po "(\d+\.)+\d+")
 cd ..
-cargo-set-version set-version ./Cargo.toml "$NEW_VERSION"
-
+cargo set-version "$NEW_VERSION"
 
 VERSION=v$NEW_VERSION
+
+echo "building version $NEW_VERSION"
+
 LIN_DIR=m3u-filter_${VERSION}_linux_x86_64
 WIN_DIR=m3u-filter_${VERSION}_windows_x86_64
 DARWIN_DIR=m3u-filter_${VERSION}_darwin_x86_64

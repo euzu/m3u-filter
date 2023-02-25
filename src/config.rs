@@ -3,13 +3,10 @@ use path_absolutize::*;
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
-use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType};
+use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_empty_str, default_as_false};
 use crate::utils;
 use crate::utils::get_working_path;
 
-fn default_as_zero() -> u8 { 0 }
-fn default_as_false() -> bool { false }
-fn default_as_empty_str() -> String { String::from("") }
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -96,10 +93,18 @@ impl ConfigSources {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct InputAffix {
+    pub field: String,
+    pub value: String
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigInput {
     pub url: String,
     #[serde(default = "default_as_empty_str")]
     pub persist: String,
+    pub prefix: Option<InputAffix>,
+    pub suffix: Option<InputAffix>,
 }
 
 impl ConfigInput {
