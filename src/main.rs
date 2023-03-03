@@ -68,7 +68,7 @@ fn main() {
         };
     } else {
         let config = Arc::new(cfg);
-        m3u_processing::process_targets(config, verbose);
+        m3u_processing::process_sources(config, verbose);
     }
 }
 
@@ -99,32 +99,4 @@ fn read_mapping(mapping_file: &str, verbose: bool) -> Option<Mappings> {
         _ => None
     }
 }
-//
-// fn get_arguments<'a>() -> ArgMatches<'a> {
-//     clap::App::new("m3u-filter")
-//         .version("0.9.5")
-//         .author("euzu")
-//         .about("Extended M3U playlist filter")
-//         .arg(clap::Arg::with_name("config")
-//             .short("c")
-//             .long("config")
-//             .takes_value(true)
-//             .help("The config file"))
-//         .arg(clap::Arg::with_name("mapping")
-//             .short("m")
-//             .long("mapping")
-//             .takes_value(true)
-//             .help("The mapping file"))
-//         .arg(clap::Arg::with_name("server")
-//             .short("s")
-//             .long("server")
-//             .takes_value(false)
-//             .help("Starts the api server for web-ui! All other arguments are ignored!"))
-//         .arg(clap::Arg::with_name("verbose")
-//             .short("v")
-//             .long("verbose")
-//             .takes_value(false)
-//             .help("Print  more log!"))
-//         .get_matches()
-// }
 

@@ -3,7 +3,7 @@ use path_absolutize::*;
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
-use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_empty_str, default_as_false};
+use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_empty_str, default_as_false, default_as_true};
 use crate::utils;
 use crate::utils::get_working_path;
 
@@ -48,6 +48,8 @@ pub struct ConfigOptions {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigTarget {
+    #[serde(default = "default_as_true")]
+    pub enabled: bool,
     pub filename: String,
     pub options: Option<ConfigOptions>,
     pub sort: Option<ConfigSort>,
@@ -101,6 +103,8 @@ pub struct InputAffix {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigInput {
     pub url: String,
+    #[serde(default = "default_as_true")]
+    pub enabled: bool,
     #[serde(default = "default_as_empty_str")]
     pub persist: String,
     pub prefix: Option<InputAffix>,
@@ -229,6 +233,7 @@ impl Clone for Config {
 impl Clone for ConfigTarget {
     fn clone(&self) -> Self {
         ConfigTarget {
+            enabled: self.enabled,
             filename: self.filename.clone(),
             options: self.options.as_ref().map(|o| o.clone()),
             sort: self.sort.as_ref().map(|s| s.clone()),

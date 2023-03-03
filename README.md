@@ -41,10 +41,10 @@ Default is `0`.
 * `api: {host: localhost, port: 8901, web_root: ./web}`
 
 ### 1.3. `working_dir`
-`working_dir` is the directory where file are written which are given with relative paths.
+`working_dir` is the directory where files are written which are given with relative paths.
 * `working_dir: ./data`
 
-With this configuration, you should create a `data` directory next to the executable.
+With this configuration, you should create a `data` directory where you execute the binary.
 
 ### 1.4 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
@@ -66,10 +66,11 @@ This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp
  * `targets`
 
 ### 1.5.1 `input`
-Has for entries, `persist`, `url`, `prefix`, `suffix`.
+Has five entries: `enabled`, `persist`, `url`, `prefix`, `suffix`.
 
 `input: { persist: ./playlist_{}.m3u, url: http://myserver.net/playlist.m3u, prefix: {field: title, value: '#!# ' }, suffix: {field: title, value: ' +-+' } }`
 
+  - `enabled` is optional, default is true, if you disable the processing is skipped 
   - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
   - `url` is the download url or a local filename of the input-source.
   - `prefix` is optional, it is applied to the given field with the given value
@@ -82,6 +83,7 @@ They have 2 fields:
 
 ### 1.5.2 `targets`
 Has the following top level entries:
+* `enabled` _optional_ default is `true`, if you disable the processing is skipped
 * `filename` _mandatory_
 * `sort`  _optional_
 * `output` _optional_ default is `m3u`

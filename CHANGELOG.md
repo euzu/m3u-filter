@@ -1,4 +1,9 @@
 # Changelog
+# v0.9.9(2023-03-03)
+* Added optional 'enabled' property to input and target. Default is true.  
+
+
+# Changelog
 # v0.9.8(2023-02-25)
 * Added new fields to mapping attributes and assignments
   - "name"

@@ -20,6 +20,8 @@ macro_rules! valid_property {
 }
 
 
+pub fn default_as_true() -> bool { true }
+
 pub fn default_as_false() -> bool { false }
 
 pub fn default_as_empty_str() -> String { String::from("") }

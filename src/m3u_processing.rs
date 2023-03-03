@@ -411,36 +411,40 @@ fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) -> 
 fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
     let source = cfg.sources.get(source_idx).unwrap();
     let input = &source.input;
-    let url_str = input.url.as_str();
-    let persist_file: Option<std::path::PathBuf> =
-        if source.input.persist.is_empty() { None } else { utils::prepare_persist_path(source.input.persist.as_str()) };
-    let file_path = utils::get_file_path(&cfg.working_dir, persist_file);
-    if verbose {
-        println!("persist to file:  {:?}", match &file_path {
-            Some(fp) => fp.display().to_string(),
-            _ => "".to_string()
-        });
-    }
-    let result = get_playlist(&cfg.working_dir, url_str, file_path, verbose);
-    match &result {
-        Some(playlist) => {
-            if playlist.is_empty() {
-                if verbose { println!("Input file is empty") }
-            } else {
-                if verbose { println!("Input file has {} groups", playlist.len()) }
-                for target in source.targets.iter() {
-                    match write_m3u(playlist, input, target, &cfg, verbose) {
-                        Ok(_) => (),
-                        Err(e) => println!("Failed to write file: {}", e)
+    if input.enabled {
+        let url_str = input.url.as_str();
+        let persist_file: Option<std::path::PathBuf> =
+            if source.input.persist.is_empty() { None } else { utils::prepare_persist_path(source.input.persist.as_str()) };
+        let file_path = utils::get_file_path(&cfg.working_dir, persist_file);
+        if verbose {
+            println!("persist to file:  {:?}", match &file_path {
+                Some(fp) => fp.display().to_string(),
+                _ => "".to_string()
+            });
+        }
+        let result = get_playlist(&cfg.working_dir, url_str, file_path, verbose);
+        match &result {
+            Some(playlist) => {
+                if playlist.is_empty() {
+                    if verbose { println!("Input file is empty") }
+                } else {
+                    if verbose { println!("Input file has {} groups", playlist.len()) }
+                    for target in source.targets.iter() {
+                        if target.enabled {
+                            match write_m3u(playlist, input, target, &cfg, verbose) {
+                                Ok(_) => (),
+                                Err(e) => println!("Failed to write file: {}", e)
+                            }
+                        }
                     }
                 }
             }
+            None => ()
         }
-        None => ()
     }
 }
 
-pub fn process_targets(cfg: Arc<Config>, verbose: bool) {
+pub fn process_sources(cfg: Arc<Config>, verbose: bool) {
     let mut handle_list = vec![];
     let thread_num = cfg.threads;
     let process_parallel = thread_num > 1 && cfg.sources.len() > 1;
