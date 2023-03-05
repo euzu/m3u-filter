@@ -68,7 +68,9 @@ pub struct ConfigTarget {
 
 impl ConfigTarget {
     pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> () {
-        self._filter = Some(get_filter(&self.filter, templates, verbose));
+        let fltr = get_filter(&self.filter, templates, verbose);
+        if verbose { println!("Filter: {}", fltr)}
+        self._filter = Some(fltr);
         match self.rename.as_mut() {
             Some(renames) => for r in renames {
                 r.prepare();

@@ -83,6 +83,15 @@ pub enum BinaryOperator {
     OR,
 }
 
+impl std::fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            BinaryOperator::OR => write!(f, "OR"),
+            BinaryOperator::AND => write!(f, "AND"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Filter {
     Group(Arc<Mutex<Vec<Arc<Filter>>>>),
@@ -141,6 +150,47 @@ impl Filter {
     }
 }
 
+impl std::fmt::Display for Filter {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+                Filter::Comparison(field, regex) => {
+                    let regstr =  match &*regex.lock().unwrap() {
+                        Some(rewc) => {
+                            String::from(&rewc.restr)
+                        },
+                        _ => "".to_string()
+                    };
+                    write!(f, "{} ~ '{}'", field, regstr)
+                }
+                Filter::Group(stmts) => {
+                    let mut vec = vec![];
+                    for stmt in &*stmts.lock().unwrap() {
+                        vec.push(String::from(format!("{}", stmt)))
+                    }
+                    write!(f, "({})",  vec.join(" "))
+                }
+                Filter::UnaryExpression(op, expr) => {
+                    let flt = match op {
+                        UnaryOperator::NOT => {
+                            match &*expr.lock().unwrap() {
+                                Some(e) => format!("{}", e),
+                                _ => "".to_string()
+                            }
+                        }
+                    };
+                    write!(f, "NOT({})", flt)
+                }
+                Filter::BinaryExpression(op, left, right) => {
+                    let rexp = match &*right.lock().unwrap() {
+                        Some(e) => format!("{}", e),
+                        _ => "".to_string()
+                    };
+                    write!(f, "({} {} {})", &*left, op, rexp)
+                }
+        }
+    }
+}
+
 fn exit(msg: &str) {
     println!("{}", msg);
     std::process::exit(1);
@@ -154,6 +204,7 @@ fn merge_with_stack(stack: &mut Vec<Arc<Filter>>, expr: &Arc<Filter>) -> bool {
             match flt {
                 Filter::Group(stmts) => {
                     (*stmts.lock().unwrap()).push(Arc::clone(expr));
+                    return true;
                 }
                 Filter::UnaryExpression(_, value) => {
                     *value.lock().unwrap() = Some(Arc::clone(expr));
@@ -216,8 +267,10 @@ pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>, verbos
         match pair.as_rule() {
             Rule::lparen => {
                 let expr = Filter::Group(Arc::new(Mutex::new(Vec::<Arc<Filter>>::new())));
+                let e = Arc::new(expr);
+                merge_with_stack(&mut stack, &e);
                 compact_stack(&mut stack);
-                stack.push(Arc::new(expr));
+                stack.push(e);
             }
             Rule::rparen => {
                 if stack.len() > 1 {
