@@ -257,12 +257,16 @@ fn compact_stack(stack: &mut Vec<Arc<Filter>>) {
     }
 }
 
-pub fn get_filter(source: &str, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> Filter {
+pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> Filter {
     let mut stack: Vec<Arc<Filter>> = vec![];
     let empty_list = Vec::new();
     let template_list : &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
+    let mut source = String::from(filter_text);
+    for t in template_list {
+        source = source.replace(format!("!{}!", &t.name).as_str(), &t.value);
+    }
 
-    let pairs = FilterParser::parse(Rule::main, source).unwrap_or_else(|e| panic!("{}", e));
+    let pairs = FilterParser::parse(Rule::main, &source).unwrap_or_else(|e| panic!("{}", e));
     for pair in pairs {
         match pair.as_rule() {
             Rule::lparen => {
@@ -412,15 +416,16 @@ pub fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool)  -> Ve
                 match node_deps.get(node_name) {
                     Some(deps) => {
                         if verbose { println!("template {}  depends on [{}]", node_name, deps.join(", "))};
-                        let node_template = dep_value_map.get(node_name).unwrap().clone();
+                        let mut node_template = dep_value_map.get(node_name).unwrap().clone();
                         for dep_name in deps {
                             let dep_template = dep_value_map.get(dep_name).unwrap().clone();
                             let new_templ = node_template.replace(format!("!{}!", dep_name).as_str(), &dep_template);
-                            dep_value_map.insert(node_name, new_templ);
+                            node_template = new_templ;
                         }
+                        dep_value_map.insert(node_name, String::from(&node_template));
                         let template = result.iter_mut().find(|t| node_name.eq(&t.name)).unwrap();
-                        let new_value = dep_value_map.get(&template.name).unwrap();
-                        template.value = String::from(new_value.as_str());
+                        //let new_value = dep_value_map.get(&template.name).unwrap();
+                        template.value = String::from(&node_template);
                     },
                     _ => {}
                 }
