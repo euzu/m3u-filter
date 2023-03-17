@@ -164,19 +164,39 @@ api:
 input:
   url: http://myserver.net/playlist.m3u
   persist: ./playlist_{}.m3u
+templates:
+  - name: PROV1_TR
+    value: >-
+      Group ~ "(?i)^.TR.*Ulusal.*" OR
+      Group ~ "(?i)^.TR.*Dini.*" OR
+      Group ~ "(?i)^.TR.*Haber.*" OR
+      Group ~ "(?i)^.TR.*Belgesel.*"
+  - name: PROV1_DE
+    value: >-
+      Group ~ "^(?i)^.DE.*Nachrichten.*" OR
+      Group ~ "^(?i)^.DE.*Freetv.*" OR
+      Group ~ "^(?i)^.DE.*Dokumentation.*"
+  - name: PROV1_FR
+    value: >-
+      Group ~ "((?i)FR[:|])?(?i)TF1.*" OR
+      Group ~ "((?i)FR[:|])?(?i)France.*"
+  - name: PROV1_ALL
+    value:  "!PROV1_TR! OR !PROV1_DE! OR !PROV1_FR!"
 targets:
-  - filename: playlist_1.m3u
+  - name: pl1
+    filename: playlist_1.m3u
     processing_order: frm
     options:
       ignore_logo: true
     sort:
       order: asc
-    filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*" 
+    filter: "!PROV1_ALL!" 
     rename:
       - field: group
         pattern: ^DE(.*)
         new_name: 1. DE$1
-  - filename: playlist_strm
+  - name: pl1strm
+    filename: playlist_strm
     output: strm
     options:
       ignore_logo: true
@@ -185,7 +205,7 @@ targets:
       cleanup: true
     sort:
       order: asc
-    filter: Group ~ "^DE\s.*" OR Group ~ "^AU\s.*"
+    filter: "!PROV1_ALL!"
     mapping:
        - France
     rename:
