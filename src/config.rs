@@ -8,6 +8,7 @@ use crate::utils;
 use crate::utils::get_working_path;
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
+fn default_as_default() -> String { String::from("default") }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSort {
@@ -50,6 +51,8 @@ pub struct ConfigOptions {
 pub struct ConfigTarget {
     #[serde(default = "default_as_true")]
     pub enabled: bool,
+    #[serde(default = "default_as_default")]
+    pub name: String,
     pub filename: String,
     pub options: Option<ConfigOptions>,
     pub sort: Option<ConfigSort>,
@@ -236,6 +239,7 @@ impl Clone for ConfigTarget {
     fn clone(&self) -> Self {
         ConfigTarget {
             enabled: self.enabled,
+            name: self.name.clone(),
             filename: self.filename.clone(),
             options: self.options.as_ref().map(|o| o.clone()),
             sort: self.sort.as_ref().map(|s| s.clone()),

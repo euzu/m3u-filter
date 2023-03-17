@@ -1,0 +1,11 @@
+version: '3'
+services:
+  m3u-filter:
+    container_name: m3u-filter
+    image: m3u-filter:latest
+    working_dir: /
+    volumes:
+      - ./data:/data
+    ports:
+      - "8901:8901"
+    restart: unless-stopped

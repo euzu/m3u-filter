@@ -84,6 +84,7 @@ They have 2 fields:
 ### 1.5.2 `targets`
 Has the following top level entries:
 * `enabled` _optional_ default is `true`, if you disable the processing is skipped
+* `name` _optional_ default is `default`, currently not implemented, planned for running selective target
 * `filename` _mandatory_
 * `sort`  _optional_
 * `output` _optional_ default is `m3u`

@@ -1,7 +1,12 @@
 # Changelog
+# v1.0(2023-03-17)
+* Fixed template dependency replacement.
+* Added optional 'name' property to target. Default is 'default'.
+* Added Dockerfile
+
+# Changelog
 # v0.9.9(2023-03-03)
 * Added optional 'enabled' property to input and target. Default is true.  
-
 
 # Changelog
 # v0.9.8(2023-02-25)
