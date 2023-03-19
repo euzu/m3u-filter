@@ -73,7 +73,7 @@ Has five entries: `enabled`, `persist`, `url`, `prefix`, `suffix`.
   - `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
   - `enabled` is optional, default is true, if you disable the processing is skipped 
   - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
-  - `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is http://<hostnamr>:<port>
+  - `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is `http://<hostname>:<port>`
   - `username` only mandatory for type `xtream`
   - `pasword`only mandatory for type `xtream`
   - `prefix` is optional, it is applied to the given field with the given value
