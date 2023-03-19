@@ -2,6 +2,9 @@ use std::fs;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use path_absolutize::*;
+use reqwest::header;
+use reqwest::header::{HeaderName, HeaderValue};
+use crate::config::ConfigInput;
 
 pub(crate) fn get_exe_path() -> std::path::PathBuf {
     let default_path = std::path::PathBuf::from("./");
@@ -12,7 +15,7 @@ pub(crate) fn get_exe_path() -> std::path::PathBuf {
                 Ok(f) => f.parent().map_or(default_path, |p| p.to_path_buf()),
                 Err(_) => return exe.parent().map_or(default_path, |p| p.to_path_buf())
             }
-        },
+        }
         Err(_) => default_path
     }
 }
@@ -61,7 +64,7 @@ pub(crate) fn get_working_path(wd: &String) -> String {
             Some(d) => d,
             None => current_dir.join(wd)
         };
-        match rp.canonicalize()  {
+        match rp.canonicalize() {
             Ok(ap) => String::from(ap.to_str().unwrap_or("./")),
             Err(_) => {
                 println!("Path not found {:?}", &rp);
@@ -109,7 +112,7 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
                     } else {
                         None
                     }
-                },
+                }
                 None => None
             };
             match result {
@@ -159,9 +162,9 @@ fn persist_playlist(persist_file: Option<PathBuf>, text: &String, verbose: bool)
     }
 }
 
-pub(crate) fn prepare_persist_path(file_name: &str) -> Option<std::path::PathBuf> {
+pub(crate) fn prepare_persist_path(file_name: &str, date_prefix: &str) -> Option<std::path::PathBuf> {
     let now = chrono::Local::now();
-    let filename = file_name.replace("{}", now.format("%Y%m%d_%H%M%S").to_string().as_str());
+    let filename = file_name.replace("{}", format!("{}{}", date_prefix, now.format("%Y%m%d_%H%M%S").to_string().as_str()).as_str());
     Some(std::path::PathBuf::from(filename))
 }
 
@@ -182,5 +185,52 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
             }
         }
         None => None
+    }
+}
+
+fn download_json_content(input: &ConfigInput, url: url::Url, _persist_file: Option<PathBuf>, verbose: bool) -> Result<serde_json::Value, String> {
+    let mut request = reqwest::blocking::Client::new().get(url);
+    if input.headers.is_empty() {
+        let mut headers = header::HeaderMap::new();
+        for (key, value) in &input.headers {
+            headers.insert(
+                HeaderName::from_bytes(key.as_bytes()).unwrap(),
+                HeaderValue::from_bytes(value.as_bytes()).unwrap(),
+            );
+        }
+        if verbose { println!("Request with headers{:?}", &headers); }
+        request = request.headers(headers);
+    }
+    match request.send() {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.json::<serde_json::Value>() {
+                    Ok(content) => {
+                        //persist_playlist(persist_file, , verbose);
+                        Ok(content)
+                    }
+                    Err(e) => Err(e.to_string())
+                }
+            } else {
+                Err(format!("Request failed: {}", response.status()))
+            }
+        }
+        Err(e) => Err(e.to_string())
+    }
+}
+
+pub(crate) fn get_input_json_content(input: &ConfigInput, _working_dir: &String, url_str: &String, persist_file: Option<PathBuf>, verbose: bool) -> Option<serde_json::Value> {
+    match url_str.parse::<url::Url>() {
+        Ok(url) => match download_json_content(input, url, persist_file, verbose) {
+            Ok(content) => Some(content),
+            Err(e) => {
+                println!("cant download input url: {}  => {}", url_str, e);
+                None
+            }
+        },
+        Err(_) => {
+            println!("malformed input url: {}", url_str);
+            None
+        }
     }
 }

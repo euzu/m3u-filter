@@ -2,9 +2,23 @@ api: { host: 127.0.0.1, port: 8901, web_root: /home/m3u-filter/web }
 threads: 0
 working_dir: /home/m3u-filter/data
 sources:
-  - input: { persist: 'playlist_1_{}.m3u', url: 'http://myserver.net/playlist.m3u' }
+  - input:
+      type: xtream
+      headers:
+        User-Agent: "Mozilla/5.0 (Linux; Tizen 2.3) AppleWebKit/538.1 (KHTML, like Gecko)Version/2.3 TV Safari/538.1"
+        Accept: application/json
+        Accept-Encoding: gzip
+
+      m3u:
+        persist: 'playlist_1_{}.m3u'
+        url: 'http://localhost/playlist.m3u'
+      xtream:
+        url: 'http://localhost:3000'
+        username: test
+        password: test
     targets:
-      - filename: playlist_1.m3u
+      - name: pl1
+        filename: playlist_1.m3u
         type: m3u
         filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*" OR Group ~ "TF1.*"'
         options: { ignore_logo: true }

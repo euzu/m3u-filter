@@ -5,8 +5,8 @@ use actix_files::NamedFile;
 use actix_web::{App, get, HttpRequest, HttpResponse, HttpServer, web};
 
 use crate::api_model::{AppState, PlaylistRequest, ServerConfig};
-use crate::config::Config;
-use crate::service::get_playlist;
+use crate::config::{Config, ConfigInput, InputType};
+use crate::service::get_m3u_playlist;
 
 #[get("/")]
 async fn index(
@@ -21,7 +21,19 @@ pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let result = get_playlist(&_app_state.config.working_dir, &req.url.as_str(), None, false);
+    // TODO refactor this
+    let input = ConfigInput {
+        input_type: InputType::M3u,
+        headers: Default::default(),
+        url: String::from(&req.url),
+        username: "".to_string(),
+        password: "".to_string(),
+        persist: "".to_string(),
+        prefix: None,
+        suffix: None,
+        enabled: true,
+    };
+    let result = get_m3u_playlist(&input, &_app_state.config.working_dir, false);
     HttpResponse::Ok().json(result)
 }
 

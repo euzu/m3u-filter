@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use path_absolutize::*;
+use enum_iterator::Sequence;
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::mapping::Mappings;
@@ -9,6 +11,7 @@ use crate::utils::get_working_path;
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
 fn default_as_default() -> String { String::from("default") }
+fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSort {
@@ -106,18 +109,61 @@ pub struct InputAffix {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ConfigInput {
+pub struct M3uInput {
     pub url: String,
-    #[serde(default = "default_as_true")]
-    pub enabled: bool,
+
+
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
+pub enum InputType {
+    #[serde(rename = "m3u")]
+    M3u,
+    #[serde(rename = "xtream")]
+    Xtream,
+}
+
+fn default_as_type_m3u() -> InputType { InputType::M3u }
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ConfigInput {
+    #[serde(rename = "type", default="default_as_type_m3u")]
+    pub input_type: InputType,
+    #[serde(default = "default_as_empty_map")]
+    pub headers: HashMap<String, String>,
+    pub url: String,
+    #[serde(default = "default_as_empty_str")]
+    pub username: String,
+    #[serde(default = "default_as_empty_str")]
+    pub password: String,
     #[serde(default = "default_as_empty_str")]
     pub persist: String,
     pub prefix: Option<InputAffix>,
     pub suffix: Option<InputAffix>,
+    #[serde(default = "default_as_true")]
+    pub enabled: bool,
 }
 
 impl ConfigInput {
     pub(crate) fn prepare(&mut self) {
+        if self.url.trim().is_empty() {
+            println!("url for input is mandatory");
+            std::process::exit(1);
+        }
+        match self.input_type {
+            InputType::M3u => {
+                if !self.username.trim().is_empty() || !self.password.trim().is_empty() {
+                    println!("for input type m3u: username and password are ignored")
+                }
+            },
+            InputType::Xtream => {
+                if self.username.trim().is_empty() || self.password.trim().is_empty() {
+                    println!("for input type xtream: username and password are mandatory");
+                    std::process::exit(1);
+                }
+            },
+        }
         if self.persist.len() > 0 && self.persist.trim().is_empty() {
             self.persist = String::from("");
         }

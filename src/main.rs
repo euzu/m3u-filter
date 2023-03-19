@@ -6,9 +6,10 @@ use std::sync::Arc;
 use clap::Parser;
 use crate::config::Config;
 use crate::mapping::Mappings;
-use crate::service::get_playlist;
 
 mod m3u;
+mod m3u_processor;
+mod xtream_processor;
 mod config;
 mod mapping;
 mod m3u_processing;

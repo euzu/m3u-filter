@@ -6,13 +6,14 @@ use std::thread;
 use config::ConfigTarget;
 use chrono::Datelike;
 use unidecode::unidecode;
-use crate::{config, Config, get_playlist, utils, valid_property};
-use crate::config::{ConfigInput, InputAffix};
+use crate::{config, Config, utils, valid_property};
+use crate::config::{ConfigInput, InputAffix, InputType};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::{ValueProvider};
 use crate::m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::mapping::{Mapping, MappingValueProcessor};
 use crate::model::{ItemField, AFFIX_FIELDS, ProcessingOrder, TargetType};
+use crate::service::{get_m3u_playlist, get_xtream_playlist};
 
 macro_rules! open_file {
   ($path:expr) => {{
@@ -412,17 +413,10 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
     let source = cfg.sources.get(source_idx).unwrap();
     let input = &source.input;
     if input.enabled {
-        let url_str = input.url.as_str();
-        let persist_file: Option<std::path::PathBuf> =
-            if source.input.persist.is_empty() { None } else { utils::prepare_persist_path(source.input.persist.as_str()) };
-        let file_path = utils::get_file_path(&cfg.working_dir, persist_file);
-        if verbose {
-            println!("persist to file:  {:?}", match &file_path {
-                Some(fp) => fp.display().to_string(),
-                _ => "".to_string()
-            });
-        }
-        let result = get_playlist(&cfg.working_dir, url_str, file_path, verbose);
+        let result = match input.input_type {
+            InputType::M3u => get_m3u_playlist(input,&cfg.working_dir,  verbose),
+            InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir,  verbose),
+        };
         match &result {
             Some(playlist) => {
                 if playlist.is_empty() {
