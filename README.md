@@ -70,9 +70,12 @@ Has five entries: `enabled`, `persist`, `url`, `prefix`, `suffix`.
 
 `input: { persist: ./playlist_{}.m3u, url: http://myserver.net/playlist.m3u, prefix: {field: title, value: '#!# ' }, suffix: {field: title, value: ' +-+' } }`
 
+  - `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
   - `enabled` is optional, default is true, if you disable the processing is skipped 
   - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
-  - `url` is the download url or a local filename of the input-source.
+  - `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is http://<hostnamr>:<port>
+  - `username` only mandatory for type `xtream`
+  - `pasword`only mandatory for type `xtream`
   - `prefix` is optional, it is applied to the given field with the given value
   - `suffix` is optional, it is applied to the given field with the given value
 
