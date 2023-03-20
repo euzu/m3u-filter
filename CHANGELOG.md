@@ -5,7 +5,7 @@
 * Added optional 'name' property to target. Default is 'default'.
 * Added Dockerfile
 * Added xtream support
-* Config changes for input
+* Breaking changes: config changes for input
 
 # Changelog
 # v0.9.8(2023-02-25)
