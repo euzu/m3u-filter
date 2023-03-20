@@ -52,7 +52,7 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     }
 }
 
-fn decode_header(content: &String) -> PlaylistItemHeader {
+fn process_header(content: &String) -> PlaylistItemHeader {
     let mut plih = PlaylistItemHeader {
         id: String::from(""),
         name: String::from(""),
@@ -103,7 +103,7 @@ fn decode_header(content: &String) -> PlaylistItemHeader {
     plih
 }
 
-pub(crate) fn decode(lines: &Vec<String>) -> Vec<PlaylistGroup> {
+pub(crate) fn process(lines: &Vec<String>) -> Vec<PlaylistGroup> {
     let mut groups: std::collections::HashMap<String, Vec<PlaylistItem>> = std::collections::HashMap::new();
     let mut sort_order: Vec<String> = vec![];
     let mut header: Option<String> = None;
@@ -122,7 +122,7 @@ pub(crate) fn decode(lines: &Vec<String>) -> Vec<PlaylistGroup> {
             continue;
         }
         if header.is_some() {
-            let mut item = PlaylistItem { header: decode_header(&header.unwrap()), url: String::from(line) };
+            let mut item = PlaylistItem { header: process_header(&header.unwrap()), url: String::from(line) };
             if group.is_some() && item.header.group.is_empty() {
                 item.header.group = String::from(group.unwrap());
             }

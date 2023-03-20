@@ -1,6 +1,18 @@
 api: { host: 127.0.0.1, port: 8901, web_root: /home/m3u-filter/web }
 threads: 0
 working_dir: /home/m3u-filter/data
+templates:
+  - name: DE_CHAN
+    value: >-
+      Group ~ "(?i)^.DE.*Serien.*" OR
+      Group ~ "(?i)^.TR.*Filme.*" OR
+      Group ~ "(?i)^.TR.*Live.*"
+  - name: FR_CHAN
+    value: Group ~ "^.FR..*"
+  - name: ALL_CHAN
+    value: >-
+      !DE_CHAN! OR
+      !FR_CHAN!
 sources:
   - input:
       type: xtream
@@ -8,19 +20,14 @@ sources:
         User-Agent: "Mozilla/5.0 (Linux; Tizen 2.3) AppleWebKit/538.1 (KHTML, like Gecko)Version/2.3 TV Safari/538.1"
         Accept: application/json
         Accept-Encoding: gzip
-
-      m3u:
-        persist: 'playlist_1_{}.m3u'
-        url: 'http://localhost/playlist.m3u'
-      xtream:
-        url: 'http://localhost:3000'
-        username: test
-        password: test
+      url: 'http://localhost:8080'
+      username: test
+      password: test
     targets:
       - name: pl1
         filename: playlist_1.m3u
         type: m3u
-        filter: 'Group ~ "^DE\s.*" OR Group ~ "TR\s.*" OR Group ~ "TF1.*"'
+        filter: '!ALL_CHAN!'
         options: { ignore_logo: true }
         rename:
           - { field: group, new_name: 1. DE$1, pattern: ^DE(.*) }

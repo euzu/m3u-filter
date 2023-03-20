@@ -22,7 +22,7 @@ pub(crate) fn get_m3u_playlist(input: &ConfigInput, working_dir: &String, verbos
     let url = input.url.as_str();
     let file_path = prepare_file_path(input, working_dir, "", verbose);
     let lines: Option<Vec<String>> = utils::get_input_content(working_dir, url, file_path, verbose);
-    lines.map_or(None, |l| Some(m3u_processor::decode(&l)))
+    lines.map_or(None, |l| Some(m3u_processor::process(&l)))
 }
 
 
@@ -41,9 +41,9 @@ pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String, ver
         let category_file_path = prepare_file_path(input, working_dir, format!("{}_", category).as_str(), verbose);
         let stream_file_path = prepare_file_path(input, working_dir, format!("{}_", stream).as_str(), verbose);
 
-        let category_content: Option<serde_json::Value> = utils::get_input_json_content(input, working_dir, &category_url, category_file_path, verbose);
-        let stream_content: Option<serde_json::Value> = utils::get_input_json_content(input, working_dir, &stream_url, stream_file_path, verbose);
-        let mut sub_playlist = xtream_processor::decode(category_content, stream_content, &stream_base_url);
+        let category_content: Option<serde_json::Value> = utils::get_input_json_content(input, &category_url, category_file_path, verbose);
+        let stream_content: Option<serde_json::Value> = utils::get_input_json_content(input, &stream_url, stream_file_path, verbose);
+        let mut sub_playlist = xtream_processor::process(category_content, stream_content, &stream_base_url);
         while let Some(group) = sub_playlist.pop() {
             playlist.push(group);
         }

@@ -188,7 +188,7 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
     }
 }
 
-fn download_json_content(input: &ConfigInput, url: url::Url, _persist_file: Option<PathBuf>, verbose: bool) -> Result<serde_json::Value, String> {
+fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Option<PathBuf>, verbose: bool) -> Result<serde_json::Value, String> {
     let mut request = reqwest::blocking::Client::new().get(url);
     if input.headers.is_empty() {
         let mut headers = header::HeaderMap::new();
@@ -206,7 +206,7 @@ fn download_json_content(input: &ConfigInput, url: url::Url, _persist_file: Opti
             if response.status().is_success() {
                 match response.json::<serde_json::Value>() {
                     Ok(content) => {
-                        //persist_playlist(persist_file, , verbose);
+                        persist_playlist(persist_file, &serde_json::to_string(&content).unwrap(), verbose);
                         Ok(content)
                     }
                     Err(e) => Err(e.to_string())
@@ -219,7 +219,7 @@ fn download_json_content(input: &ConfigInput, url: url::Url, _persist_file: Opti
     }
 }
 
-pub(crate) fn get_input_json_content(input: &ConfigInput, _working_dir: &String, url_str: &String, persist_file: Option<PathBuf>, verbose: bool) -> Option<serde_json::Value> {
+pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_file: Option<PathBuf>, verbose: bool) -> Option<serde_json::Value> {
     match url_str.parse::<url::Url>() {
         Ok(url) => match download_json_content(input, url, persist_file, verbose) {
             Ok(content) => Some(content),

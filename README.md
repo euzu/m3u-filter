@@ -74,15 +74,39 @@ Has five entries: `enabled`, `persist`, `url`, `prefix`, `suffix`.
   - `enabled` is optional, default is true, if you disable the processing is skipped 
   - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
   - `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is `http://<hostname>:<port>`
+  - `headers` is optional, used only for type `xtream`
   - `username` only mandatory for type `xtream`
   - `pasword`only mandatory for type `xtream`
   - `prefix` is optional, it is applied to the given field with the given value
   - `suffix` is optional, it is applied to the given field with the given value
 
-`prefix` and `suffix` is appended after all processing is done, but before sort.
+`prefix` and `suffix` are appended after all processing is done, but before sort.
 They have 2 fields:
   - `field` can be `name` , `group`, `title`
   - `value` a static text
+
+Example input config for `m3u`
+```
+sources:
+  - input:
+      persist: 'playlist_1_{}.m3u'
+      url: 'http://localhost:8080/get.php?username=test&password=test&type=m3u'
+```
+
+Example input config for `xtream`
+```
+sources:
+  - input:
+      type: xtream
+      headers:
+        User-Agent: "Mozilla/5.0 (Linux; Tizen 2.3) AppleWebKit/538.1 (KHTML, like Gecko)Version/2.3 TV Safari/538.1"
+        Accept: application/json
+        Accept-Encoding: gzip
+      url: 'http://localhost:8080'
+      username: test
+      password: test
+```
+
 
 ### 1.5.2 `targets`
 Has the following top level entries:
