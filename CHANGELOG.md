@@ -1,5 +1,5 @@
 # Changelog
-# v0.9.9(2023-03-17)
+# v0.9.9(2023-03-20)
 * Added optional 'enabled' property to input and target. Default is true.  
 * Fixed template dependency replacement.
 * Added optional 'name' property to target. Default is 'default'.
