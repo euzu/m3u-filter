@@ -192,57 +192,60 @@ api:
   host: localhost
   port: 8901
   web_root: ./web
-input:
-  url: http://myserver.net/playlist.m3u
-  persist: ./playlist_{}.m3u
 templates:
-  - name: PROV1_TR
-    value: >-
-      Group ~ "(?i)^.TR.*Ulusal.*" OR
-      Group ~ "(?i)^.TR.*Dini.*" OR
-      Group ~ "(?i)^.TR.*Haber.*" OR
-      Group ~ "(?i)^.TR.*Belgesel.*"
-  - name: PROV1_DE
-    value: >-
-      Group ~ "^(?i)^.DE.*Nachrichten.*" OR
-      Group ~ "^(?i)^.DE.*Freetv.*" OR
-      Group ~ "^(?i)^.DE.*Dokumentation.*"
-  - name: PROV1_FR
-    value: >-
-      Group ~ "((?i)FR[:|])?(?i)TF1.*" OR
-      Group ~ "((?i)FR[:|])?(?i)France.*"
-  - name: PROV1_ALL
-    value:  "!PROV1_TR! OR !PROV1_DE! OR !PROV1_FR!"
-targets:
-  - name: pl1
-    filename: playlist_1.m3u
-    processing_order: frm
-    options:
-      ignore_logo: true
-    sort:
-      order: asc
-    filter: "!PROV1_ALL!" 
-    rename:
-      - field: group
-        pattern: ^DE(.*)
-        new_name: 1. DE$1
-  - name: pl1strm
-    filename: playlist_strm
-    output: strm
-    options:
-      ignore_logo: true
-      underscore_whitespace: false
-      kodi_style: true
-      cleanup: true
-    sort:
-      order: asc
-    filter: "!PROV1_ALL!"
-    mapping:
-       - France
-    rename:
-      - field: group
-        pattern: ^DE(.*)
-        new_name: 1. DE$1
+- name: PROV1_TR
+  value: >-
+    Group ~ "(?i)^.TR.*Ulusal.*" OR
+    Group ~ "(?i)^.TR.*Dini.*" OR
+    Group ~ "(?i)^.TR.*Haber.*" OR
+    Group ~ "(?i)^.TR.*Belgesel.*"
+- name: PROV1_DE
+  value: >-
+    Group ~ "^(?i)^.DE.*Nachrichten.*" OR
+    Group ~ "^(?i)^.DE.*Freetv.*" OR
+    Group ~ "^(?i)^.DE.*Dokumentation.*"
+- name: PROV1_FR
+  value: >-
+    Group ~ "((?i)FR[:|])?(?i)TF1.*" OR
+    Group ~ "((?i)FR[:|])?(?i)France.*"
+- name: PROV1_ALL
+  value:  "!PROV1_TR! OR !PROV1_DE! OR !PROV1_FR!"
+sources:
+    input:
+      enabled: true
+      url: http://myserver.net/playlist.m3u
+      persist: ./playlist_{}.m3u
+    targets:
+      - name: pl1
+        filename: playlist_1.m3u
+        processing_order: frm
+        options:
+          ignore_logo: true
+        sort:
+          order: asc
+        filter: "!PROV1_ALL!" 
+        rename:
+          - field: group
+            pattern: ^DE(.*)
+            new_name: 1. DE$1
+      - name: pl1strm
+        enabled: false
+        filename: playlist_strm
+        output: strm
+        options:
+          ignore_logo: true
+          underscore_whitespace: false
+          kodi_style: true
+          cleanup: true
+        sort:
+          order: asc
+        filter: "!PROV1_ALL!"
+        mapping:
+           - France
+        rename:
+          - field: group
+            pattern: ^DE(.*)
+            new_name: 1. DE$1
 ```
 
 ## 2. `mapping.yml`
