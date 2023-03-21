@@ -7,7 +7,7 @@ use config::ConfigTarget;
 use chrono::Datelike;
 use unidecode::unidecode;
 use crate::{config, Config, utils, valid_property};
-use crate::config::{ConfigInput, InputAffix, InputType};
+use crate::config::{ConfigInput, InputAffix, InputType, ProcessTargets};
 use crate::model::SortOrder::{Asc, Desc};
 use crate::filter::{ValueProvider};
 use crate::m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
@@ -409,10 +409,10 @@ fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) -> 
     };
 }
 
-fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
+fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>, verbose: bool) {
     let source = cfg.sources.get(source_idx).unwrap();
     let input = &source.input;
-    if input.enabled {
+    if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)){
         let result = match input.input_type {
             InputType::M3u => get_m3u_playlist(input,&cfg.working_dir,  verbose),
             InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir,  verbose),
@@ -424,7 +424,9 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
                 } else {
                     if verbose { println!("Input file has {} groups", playlist.len()) }
                     for target in source.targets.iter() {
-                        if target.enabled {
+                        let should_process = (!user_targets.enabled && target.enabled)
+                            || (user_targets.enabled && user_targets.has_target(target.id));
+                        if should_process {
                             match write_m3u(playlist, input, target, &cfg, verbose) {
                                 Ok(_) => (),
                                 Err(e) => println!("Failed to write file: {}", e)
@@ -438,7 +440,7 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, verbose: bool) {
     }
 }
 
-pub fn process_sources(cfg: Arc<Config>, verbose: bool) {
+pub fn process_sources(cfg: Arc<Config>, user_targets: &ProcessTargets, verbose: bool) {
     let mut handle_list = vec![];
     let thread_num = cfg.threads;
     let process_parallel = thread_num > 1 && cfg.sources.len() > 1;
@@ -446,16 +448,17 @@ pub fn process_sources(cfg: Arc<Config>, verbose: bool) {
 
     for (index, _) in cfg.sources.iter().enumerate() {
         let config = cfg.clone();
+        let usr_targets = Arc::new(user_targets.clone());
         if process_parallel {
             let handles = &mut handle_list;
-            handles.push(thread::spawn(move || process_source(config, index, verbose)));
+            handles.push(thread::spawn(move || process_source(config, index, usr_targets, verbose)));
             if handles.len() as u8 >= thread_num {
                 while let Some(handle) = handles.pop() {
                     let _ = handle.join();
                 }
             }
         } else {
-            process_source(config, index, verbose);
+            process_source(config, index, usr_targets, verbose);
         }
     }
     for handle in handle_list {

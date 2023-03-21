@@ -23,6 +23,7 @@ pub(crate) async fn playlist(
 ) -> HttpResponse {
     // TODO refactor this
     let input = ConfigInput {
+        id: 0,
         input_type: InputType::M3u,
         headers: Default::default(),
         url: String::from(&req.url),
@@ -54,7 +55,8 @@ pub(crate) async fn start_server(cfg: Config) -> futures::io::Result<()> {
     let web_dir = cfg.api.web_root.clone();
     let web_dir_path = PathBuf::from(&web_dir);
     if !web_dir_path.exists() || !web_dir_path.is_dir() {
-        panic!("web_root does not exists or is not an directory: {:?}", &web_dir_path)
+        println!("web_root does not exists or is not an directory: {:?}", &web_dir_path);
+        std::process::exit(1);
     }
 
     let shared_data = web::Data::new(AppState {

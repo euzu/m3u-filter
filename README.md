@@ -24,6 +24,10 @@ The downloaded list only contains *non-selected* entries.
 For running in cli mode, you need to define a `config.yml` file which can be next to the executable or provided with the
 `-c` cli argument. It contains the filter, rename and mapping definitions.
 
+For running specific targets use the `-t` argument like `m3u-filter -t <target_name> -t <other_target_name>`.
+Target names should be provided in the config. The -t option overrides `enabled` attributes of `input` and `target` elements.
+This means, even disabled inputs and targets are processed when the given target name as cli argument matches a target.
+
 Top level entries in the config files are:
 * `threads` _optional_
 * `api`

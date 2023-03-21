@@ -10,8 +10,35 @@ use crate::utils;
 use crate::utils::get_working_path;
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
+
 fn default_as_default() -> String { String::from("default") }
+
 fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
+
+#[derive(Clone)]
+pub struct ProcessTargets {
+    pub enabled: bool,
+    pub inputs: Vec<u16>,
+    pub targets: Vec<u16>,
+}
+
+impl ProcessTargets {
+    pub(crate) fn has_target(&self, tid: u16) -> bool {
+        if let Some(_pos) = self.targets.iter().position(|&x| x == tid) {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn has_input(&self, tid: u16) -> bool {
+        if let Some(_pos) = self.inputs.iter().position(|&x| x == tid) {
+            true
+        } else {
+            false
+        }
+    }
+}
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigSort {
@@ -52,6 +79,8 @@ pub struct ConfigOptions {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConfigTarget {
+    #[serde(skip)]
+    pub id: u16,
     #[serde(default = "default_as_true")]
     pub enabled: bool,
     #[serde(default = "default_as_default")]
@@ -73,9 +102,10 @@ pub struct ConfigTarget {
 }
 
 impl ConfigTarget {
-    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> () {
+    pub(crate) fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> () {
+        self.id = id;
         let fltr = get_filter(&self.filter, templates, verbose);
-        if verbose { println!("Filter: {}", fltr)}
+        if verbose { println!("Filter: {}", fltr) }
         self._filter = Some(fltr);
         match self.rename.as_mut() {
             Some(renames) => for r in renames {
@@ -85,34 +115,27 @@ impl ConfigTarget {
         }
     }
     pub(crate) fn filter(&self, provider: &ValueProvider, verbose: bool) -> bool {
-        let mut processor = MockValueProcessor{};
+        let mut processor = MockValueProcessor {};
         return self._filter.as_ref().unwrap().filter(provider, &mut processor, verbose);
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigSources {
+pub struct ConfigSource {
     pub input: ConfigInput,
     pub targets: Vec<ConfigTarget>,
 }
 
-impl ConfigSources {
-    pub(crate) fn prepare(&mut self) {
-        self.input.prepare();
+impl ConfigSource {
+    pub(crate) fn prepare(&mut self, id: u16) {
+        self.input.prepare(id);
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct InputAffix {
     pub field: String,
-    pub value: String
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct M3uInput {
-    pub url: String,
-
-
+    pub value: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
@@ -125,10 +148,11 @@ pub enum InputType {
 
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigInput {
-    #[serde(rename = "type", default="default_as_type_m3u")]
+    #[serde(skip)]
+    pub id: u16,
+    #[serde(rename = "type", default = "default_as_type_m3u")]
     pub input_type: InputType,
     #[serde(default = "default_as_empty_map")]
     pub headers: HashMap<String, String>,
@@ -146,7 +170,8 @@ pub struct ConfigInput {
 }
 
 impl ConfigInput {
-    pub(crate) fn prepare(&mut self) {
+    pub(crate) fn prepare(&mut self, id: u16) {
+        self.id = id;
         if self.url.trim().is_empty() {
             println!("url for input is mandatory");
             std::process::exit(1);
@@ -156,13 +181,13 @@ impl ConfigInput {
                 if !self.username.trim().is_empty() || !self.password.trim().is_empty() {
                     println!("for input type m3u: username and password are ignored")
                 }
-            },
+            }
             InputType::Xtream => {
                 if self.username.trim().is_empty() || self.password.trim().is_empty() {
                     println!("for input type xtream: username and password are mandatory");
                     std::process::exit(1);
                 }
-            },
+            }
         }
         if self.persist.len() > 0 && self.persist.trim().is_empty() {
             self.persist = String::from("");
@@ -190,7 +215,7 @@ pub struct Config {
     #[serde(default = "default_as_zero")]
     pub threads: u8,
     pub api: ConfigApi,
-    pub sources: Vec<ConfigSources>,
+    pub sources: Vec<ConfigSource>,
     pub working_dir: String,
     pub templates: Option<Vec<PatternTemplate>>,
 }
@@ -210,14 +235,14 @@ impl Config {
                                         target_mappings.push(mapping.unwrap());
                                     }
                                 }
-                                target._mapping = if target_mappings.len() > 0 { Some(target_mappings) } else {  None };
-                            },
-                            _ => {},
+                                target._mapping = if target_mappings.len() > 0 { Some(target_mappings) } else { None };
+                            }
+                            _ => {}
                         }
                     }
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 
@@ -226,16 +251,20 @@ impl Config {
         self.api.prepare();
         self.prepare_api_web_root();
         match &mut self.templates {
-          Some(templates) => self.templates = Some(prepare_templates(templates, verbose)),
+            Some(templates) => self.templates = Some(prepare_templates(templates, verbose)),
             _ => {}
         };
+        let mut source_index: u16 = 1;
+        let mut target_index: u16 = 1;
         for source in &mut self.sources {
-            source.prepare();
+            source.prepare(source_index);
+            source_index += 1;
             for target in &mut source.targets {
                 match &self.templates {
-                    Some(templ) => target.prepare(Some(&templ), verbose),
-                    _ => target.prepare(None, verbose)
+                    Some(templ) => target.prepare(target_index, Some(&templ), verbose),
+                    _ => target.prepare(target_index, None, verbose)
                 }
+                target_index += 1;
             }
         }
     }
@@ -284,6 +313,7 @@ impl Clone for Config {
 impl Clone for ConfigTarget {
     fn clone(&self) -> Self {
         ConfigTarget {
+            id: self.id,
             enabled: self.enabled,
             name: self.name.clone(),
             filename: self.filename.clone(),
@@ -300,9 +330,9 @@ impl Clone for ConfigTarget {
     }
 }
 
-impl Clone for ConfigSources {
+impl Clone for ConfigSource {
     fn clone(&self) -> Self {
-        ConfigSources {
+        ConfigSource {
             input: self.input.clone(),
             targets: self.targets.clone(),
         }
