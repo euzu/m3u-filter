@@ -1,6 +1,6 @@
 # m3u-filter
 
-m3u-filter is a simple application which can filter, rename and map entries out of a playlist in EXTM3U format.
+m3u-filter is a simple application which can filter, rename and map entries out of a playlist in EXTM3U or XTREAM format.
 M3U format is supported by most media and iptv players as a playlist.
 If you have a playlist which contains unwanted entries, you can create filter which include or discard entries
 based on the header information of the playlist entries, you can rename entries or map entries based on regular expressions.
