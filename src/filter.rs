@@ -69,7 +69,7 @@ impl Clone for RegexWithCaptures {
 
 #[derive(Parser)]
 //#[grammar = "filter.pest"]
-#[grammar_inline = "WHITESPACE = _{ \" \" | \"\\t\" }\nfield = { \"Group\" | \"group\" | \"Title\" | \"title\" | \"Name\" | \"name\" | \"Url\" | \"url\" }\nand = {\"AND\" | \"and\"}\nor = {\"OR\" | \"or\"}\nnot = { \"NOT\" | \"not\" }\nregexp = @{ \"\\\"\" ~ ( \"\\\\\\\"\" | (!\"\\\"\" ~ ANY) )* ~ \"\\\"\" }\ncomparison_value = _{ regexp }\ncomparison = { field ~ \"~\" ~ comparison_value }\nbool_op = { and | or}\nexpr_group = { \"(\" ~ expr ~ \")\" }\nexpr = {comparison ~ (bool_op ~ expr)* | expr_group ~ (bool_op ~ expr)* | not ~ expr ~ (bool_op ~ expr)* }\nstmt = { expr  ~ (bool_op ~ expr)* }\nmain = _{ SOI ~ stmt ~ EOI }"]
+#[grammar_inline = "WHITESPACE = _{ \" \" | \"\\t\" }\nfield = { \"Group\" | \"Title\" | \"Name\" | \"Url\" }\nand = {\"AND\" | \"and\"}\nor = {\"OR\" | \"or\"}\nnot = { \"NOT\" | \"not\" }\nregexp = @{ \"\\\"\" ~ ( \"\\\\\\\"\" | (!\"\\\"\" ~ ANY) )* ~ \"\\\"\" }\ncomparison_value = _{ regexp }\ncomparison = { field ~ \"~\" ~ comparison_value }\nbool_op = { and | or}\nexpr_group = { \"(\" ~ expr ~ \")\" }\nexpr = {comparison ~ (bool_op ~ expr)* | expr_group ~ (bool_op ~ expr)* | not ~ expr ~ (bool_op ~ expr)* }\nstmt = { expr  ~ (bool_op ~ expr)* }\nmain = _{ SOI ~ stmt ~ EOI }"]
 
 struct FilterParser;
 
