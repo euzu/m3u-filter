@@ -77,14 +77,14 @@ fn apply_affixes(playlist: &mut Vec<PlaylistGroup>, input: &ConfigInput, verbose
 
         if apply_prefix || apply_suffix {
             let get_affix_applied_value = |header: &mut PlaylistItemHeader, affix: &InputAffix, prefix: bool| {
-               if let Some(field_value) = header.get_field(&affix.field.as_str()) {
-                   return if prefix {
-                       format!("{}{}", &affix.value, field_value.as_str())
-                   } else {
-                       format!("{}{}", field_value.as_str(), &affix.value)
-                   }
-               }
-                return String::from(&affix.value)
+                if let Some(field_value) = header.get_field(&affix.field.as_str()) {
+                    return if prefix {
+                        format!("{}{}", &affix.value, field_value.as_str())
+                    } else {
+                        format!("{}{}", field_value.as_str(), &affix.value)
+                    };
+                }
+                return String::from(&affix.value);
             };
 
             for group in playlist {
@@ -92,14 +92,14 @@ fn apply_affixes(playlist: &mut Vec<PlaylistGroup>, input: &ConfigInput, verbose
                     if apply_suffix {
                         if let Some(suffix) = &input.suffix {
                             let value = get_affix_applied_value(&mut channel.header, suffix, false);
-                            if verbose { println!("Applying input suffix:  {}={}", &suffix.field, &value)}
+                            if verbose { println!("Applying input suffix:  {}={}", &suffix.field, &value) }
                             channel.header.set_field(&suffix.field, &value.as_str());
                         }
                     }
                     if apply_prefix {
                         if let Some(prefix) = &input.prefix {
                             let value = get_affix_applied_value(&mut channel.header, prefix, true);
-                            if verbose { println!("Applying input prefix:  {}={}", &prefix.field, &value)}
+                            if verbose { println!("Applying input prefix:  {}={}", &prefix.field, &value) }
                             channel.header.set_field(&prefix.field, &value.as_str());
                         }
                     }
@@ -400,7 +400,19 @@ fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: b
             }
             new_playlist.push(grp);
         }
-        Some(new_playlist)
+        // if the group names are changed, restructure channels to the right groups
+        // we use
+        let mut new_groups: Vec<PlaylistGroup> = Vec::new();
+        for playlist_group in new_playlist {
+            for channel in &playlist_group.channels {
+                let title = &channel.header.group;
+                match new_groups.iter_mut().find(|x| &*x.title == title) {
+                    Some(grp) => grp.channels.push(channel.clone()),
+                    _ => new_groups.push(PlaylistGroup { title: String::from(title), channels: vec![channel.clone()] })
+                }
+            }
+        }
+        Some(new_groups)
     } else {
         None
     }
@@ -429,10 +441,10 @@ fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) -> 
 fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>, verbose: bool) {
     let source = cfg.sources.get(source_idx).unwrap();
     let input = &source.input;
-    if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)){
+    if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)) {
         let result = match input.input_type {
-            InputType::M3u => get_m3u_playlist(input,&cfg.working_dir,  verbose),
-            InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir,  verbose),
+            InputType::M3u => get_m3u_playlist(input, &cfg.working_dir, verbose),
+            InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir, verbose),
         };
         match &result {
             Some(playlist) => {
