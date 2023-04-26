@@ -1,10 +1,8 @@
 use enum_iterator::all;
-use std::borrow::{Borrow};
 use std::collections::{HashMap};
-use std::sync::{Arc, Mutex};
+use pest::iterators::Pair;
 use pest::Parser;
 use petgraph::algo::toposort;
-use regex::Regex;
 use crate::m3u::PlaylistItem;
 use crate::model::ItemField;
 use petgraph::graph::DiGraph;
@@ -20,7 +18,7 @@ impl<'a> ValueProvider<'a> {
             ItemField::Name => &*self.pli.header.name.as_str(),
             ItemField::Title => &*self.pli.header.title.as_str(),
             ItemField::Url => &*self.pli.url.as_str(),
-        }
+        };
     }
 }
 
@@ -29,6 +27,7 @@ pub trait ValueProcessor {
 }
 
 pub struct MockValueProcessor {}
+
 impl ValueProcessor for MockValueProcessor {
     fn process(&mut self, _: &ItemField, _: &str, _: &RegexWithCaptures, _: bool) -> bool {
         return false;
@@ -45,7 +44,7 @@ impl Clone for PatternTemplate {
     fn clone(&self) -> Self {
         PatternTemplate {
             name: self.name.clone(),
-            value: self.value.clone()
+            value: self.value.clone(),
         }
     }
 }
@@ -62,14 +61,16 @@ impl Clone for RegexWithCaptures {
         RegexWithCaptures {
             restr: self.restr.clone(),
             re: self.re.clone(),
-            captures: self.captures.clone()
+            captures: self.captures.clone(),
         }
     }
 }
 
 
 #[derive(Parser)]
-#[grammar_inline = "field = { \"Group\" | \"Title\" | \"Name\" | \"Url\"}\nand = {\"AND\" | \"and\"}\nor = {\"OR\" | \"or\"}\nnot = { \"NOT\" | \"not\" }\nlparen = { \"(\" }\nrparen = { \")\" }\nregexp_op = _{ \"~\" }\nregexp = @{ \"\\\"\" ~ ( \"\\\\\\\"\" | (!\"\\\"\" ~ ANY) )* ~ \"\\\"\" }\nvalue = _{ regexp }\n\noperator = _{ regexp_op }\nmatch_comparison = _{ field ~ operator ~ value }\npredicate = _{ match_comparison }\nbool_test = _{ predicate | lparen ~ condition ~ rparen }\nbool_factor = _{ not? ~ bool_test }\nbool_term = _{ bool_factor ~ (and ~ bool_factor)* }\ncondition = _{ bool_term ~ (or ~ bool_term)* }\nmain = _{ SOI ~ condition ~ EOI }\nWHITESPACE = _{ \" \" | \"\\t\" }"]
+//#[grammar = "filter.pest"]
+#[grammar_inline = "WHITESPACE = _{ \" \" | \"\\t\" }\nfield = { \"Group\" | \"group\" | \"Title\" | \"title\" | \"Name\" | \"name\" | \"Url\" | \"url\" }\nand = {\"AND\" | \"and\"}\nor = {\"OR\" | \"or\"}\nnot = { \"NOT\" | \"not\" }\nregexp = @{ \"\\\"\" ~ ( \"\\\\\\\"\" | (!\"\\\"\" ~ ANY) )* ~ \"\\\"\" }\ncomparison_value = _{ regexp }\ncomparison = { field ~ \"~\" ~ comparison_value }\nbool_op = { and | or}\nexpr_group = { \"(\" ~ expr ~ \")\" }\nexpr = {comparison ~ (bool_op ~ expr)* | expr_group ~ (bool_op ~ expr)* | not ~ expr ~ (bool_op ~ expr)* }\nstmt = { expr  ~ (bool_op ~ expr)* }\nmain = _{ SOI ~ stmt ~ EOI }"]
+
 struct FilterParser;
 
 #[derive(Debug, Clone)]
@@ -94,56 +95,41 @@ impl std::fmt::Display for BinaryOperator {
 
 #[derive(Debug, Clone)]
 pub enum Filter {
-    Group(Arc<Mutex<Vec<Arc<Filter>>>>),
-    Comparison(ItemField, Arc<Mutex<Option<RegexWithCaptures>>>),
-    UnaryExpression(UnaryOperator, Arc<Mutex<Option<Arc<Filter>>>>),
-    BinaryExpression(BinaryOperator, Arc<Filter>, Arc<Mutex<Option<Arc<Filter>>>>),
+    Group(Box<Filter>),
+    Comparison(ItemField, RegexWithCaptures),
+    UnaryExpression(UnaryOperator, Box<Filter>),
+    BinaryExpression(Box<Filter>, BinaryOperator, Box<Filter>),
 }
 
 impl Filter {
     pub fn filter(&self, provider: &ValueProvider, processor: &mut dyn ValueProcessor, verbose: bool) -> bool {
         match self {
-            Filter::Comparison(field, regex) => {
-                return match &*regex.lock().unwrap() {
-                    Some(rewc) => {
-                        let value = provider.call(&field);
-                        let is_match = rewc.re.is_match(value);
-                        if is_match {
-                            if verbose { println!("Match found:  {}={}", &field, &value)}
-                            processor.process(field, &value, rewc, verbose);
-                        }
-                        return is_match
-                    },
-                    _ => false
-                };
-            },
-            Filter::Group(stmts) => {
-                for stmt in &*stmts.lock().unwrap() {
-                    if !stmt.filter(provider, processor, verbose) {
-                        return false;
-                    }
+            Filter::Comparison(field, rewc) => {
+                let value = provider.call(&field);
+                let is_match = rewc.re.is_match(value);
+                if is_match {
+                    if verbose { println!("Match found:  {}={}", &field, &value) }
+                    processor.process(field, &value, rewc, verbose);
+                }
+                return is_match;
+            }
+            Filter::Group(expr) => {
+                if !expr.filter(provider, processor, verbose) {
+                    return false;
                 }
                 return true;
-            },
+            }
             Filter::UnaryExpression(op, expr) => {
                 match op {
-                    UnaryOperator::NOT => {
-                        match &*expr.lock().unwrap() {
-                            Some(e) => !e.filter(provider, processor, verbose),
-                            _ => false
-                        }
-                    }
+                    UnaryOperator::NOT => !expr.filter(provider, processor, verbose),
                 }
-            },
-            Filter::BinaryExpression(op, left, right) => {
-                return match &*right.lock().unwrap() {
-                    Some(r) => return match op {
-                        BinaryOperator::AND => left.filter(provider, processor, verbose)
-                            && r.filter(provider, processor, verbose),
-                        BinaryOperator::OR => left.filter(provider, processor, verbose)
-                            || r.filter(provider, processor, verbose),
-                    },
-                    _ => false
+            }
+            Filter::BinaryExpression(left, op, right) => {
+                match op {
+                    BinaryOperator::AND => left.filter(provider, processor, verbose)
+                        && right.filter(provider, processor, verbose),
+                    BinaryOperator::OR => left.filter(provider, processor, verbose)
+                        || right.filter(provider, processor, verbose),
                 }
             }
         }
@@ -153,216 +139,208 @@ impl Filter {
 impl std::fmt::Display for Filter {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-                Filter::Comparison(field, regex) => {
-                    let regstr =  match &*regex.lock().unwrap() {
-                        Some(rewc) => {
-                            String::from(&rewc.restr)
-                        },
-                        _ => "".to_string()
-                    };
-                    write!(f, "{} ~ '{}'", field, regstr)
-                }
-                Filter::Group(stmts) => {
-                    let mut vec = vec![];
-                    for stmt in &*stmts.lock().unwrap() {
-                        vec.push(String::from(format!("{}", stmt)))
-                    }
-                    write!(f, "({})",  vec.join(" "))
-                }
-                Filter::UnaryExpression(op, expr) => {
-                    let flt = match op {
-                        UnaryOperator::NOT => {
-                            match &*expr.lock().unwrap() {
-                                Some(e) => format!("{}", e),
-                                _ => "".to_string()
-                            }
-                        }
-                    };
-                    write!(f, "NOT({})", flt)
-                }
-                Filter::BinaryExpression(op, left, right) => {
-                    let rexp = match &*right.lock().unwrap() {
-                        Some(e) => format!("{}", e),
-                        _ => "".to_string()
-                    };
-                    write!(f, "({} {} {})", &*left, op, rexp)
-                }
+            Filter::Comparison(field, rewc) => {
+                write!(f, "{} ~ \"{}\"", field, String::from(&rewc.restr))
+            }
+            Filter::Group(stmt) => {
+                write!(f, "({})", stmt)
+            }
+            Filter::UnaryExpression(op, expr) => {
+                let flt = match op {
+                    UnaryOperator::NOT => format!("NOT {}", expr),
+                };
+                write!(f, "{}", flt)
+            }
+            Filter::BinaryExpression(left, op, right) => {
+                write!(f, "{} {} {}", left, op, right)
+            }
         }
     }
 }
 
-fn exit(msg: &str) {
-    println!("{}", msg);
-    std::process::exit(1);
+macro_rules! exit {
+    ($($arg:tt)*) => {{
+        println!($($arg)*);
+        std::process::exit(1);
+    }};
 }
 
-fn merge_with_stack(stack: &mut Vec<Arc<Filter>>, expr: &Arc<Filter>) -> bool {
-    let item = stack.last();
-    match item {
-        Some(rcflt) => {
-            let flt = rcflt.as_ref();
-            match flt {
-                Filter::Group(stmts) => {
-                    (*stmts.lock().unwrap()).push(Arc::clone(expr));
-                    return true;
+fn get_parser_item_field(expr: Pair<Rule>) -> ItemField {
+    match expr.as_rule() {
+        Rule::field => {
+            let field_text = expr.as_str();
+            for item in all::<ItemField>() {
+                if field_text.eq_ignore_ascii_case(item.to_string().as_str()) {
+                    return item;
                 }
-                Filter::UnaryExpression(_, value) => {
-                    *value.lock().unwrap() = Some(Arc::clone(expr));
-                    return true;
-                }
-                Filter::BinaryExpression(_, _, right) => {
-                    *right.lock().unwrap() = Some(Arc::clone(expr));
-                    return true;
-                }
-                _ => {}
             }
         }
-        None => {}
+        _ => {}
     }
-    return false;
+    exit!("unknown field: {}", expr.as_str());
 }
 
-fn compact_stack(stack: &mut Vec<Arc<Filter>>) {
-    if stack.len() > 1 {
-        match stack.last() {
-            Some(rcflt) => {
-                let flt = rcflt.as_ref();
-                match flt {
-                    Filter::Comparison(_, value) => {
-                        if value.lock().unwrap().is_some() {
-                            let e = &stack.pop().unwrap();
-                            merge_with_stack(stack, e);
-                            compact_stack(stack);
-                        }
-                    }
-                    Filter::BinaryExpression(_, _, value) => {
-                        if value.lock().unwrap().is_some() {
-                            let e = &stack.pop().unwrap();
-                            merge_with_stack(stack, e);
-                            compact_stack(stack);
-                        }
-                    }
-                    Filter::UnaryExpression(_, value) => {
-                        if value.lock().unwrap().is_some() {
-                            let e = &stack.pop().unwrap();
-                            merge_with_stack(stack, e);
-                            compact_stack(stack);
-                        }
-                    }
-                    _ => {}
-                }
+fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose: bool) -> RegexWithCaptures {
+    match expr.as_rule() {
+        Rule::regexp => {
+            let mut parsed_text = String::from(expr.as_str());
+            parsed_text.pop();
+            parsed_text.remove(0);
+            let mut regstr = String::from(parsed_text.as_str());
+            for t in templates {
+                regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
             }
-            None => {}
+            let re = regex::Regex::new(regstr.as_str());
+            if re.is_err() {
+                exit!("cant parse regex: {}", regstr);
+            }
+            let regexp = re.unwrap();
+            let captures = regexp.capture_names()
+                .filter_map(|x| x).map(|x| String::from(x)).filter(|x| x.len() > 0).collect::<Vec<String>>();
+            if verbose { println!("Created regex: {} with captures: [{}]", regstr, (&captures).join(", ")) }
+            return RegexWithCaptures {
+                restr: regstr,
+                re: regexp,
+                captures,
+            };
+        }
+        _ => {}
+    }
+    exit!("unknown field: {}", expr.as_str());
+}
+
+fn get_parser_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose: bool) -> Filter {
+    let mut expr_inner = expr.into_inner();
+    let field = get_parser_item_field(expr_inner.next().unwrap());
+    let regexp = get_parser_regexp(expr_inner.next().unwrap(), templates, verbose);
+    Filter::Comparison(field, regexp)
+}
+
+macro_rules! handle_expr {
+    ($bop: expr, $uop: expr, $stmts: expr, $exp: expr) => {
+        {
+            let result = match $bop {
+                Some(binop) => {
+                    let lhs = $stmts.pop().unwrap();
+                    $bop = None;
+                    Filter::BinaryExpression(Box::new(lhs), binop.clone(), Box::new($exp))
+                },
+                _ => match $uop {
+                    Some(unop) => {
+                        $uop = None;
+                        Filter::UnaryExpression(unop.clone(), Box::new($exp))
+                    },
+                    _ => $exp
+                }
+            };
+            $stmts.push(result);
+        }
+    }
+}
+
+fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose: bool) -> Filter {
+    let mut stmts = Vec::new();
+    let pairs = expr.into_inner();
+    let mut bop: Option<BinaryOperator> = None;
+    let mut uop: Option<UnaryOperator> = None;
+
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::comparison => {
+                handle_expr!(bop, uop, stmts, get_parser_comparison(pair, templates, verbose));
+            }
+            Rule::expr => {
+                handle_expr!(bop, uop, stmts, get_parser_expression(pair, templates, verbose));
+            }
+            Rule::expr_group => {
+                handle_expr!(bop, uop, stmts, Filter::Group(Box::new(get_parser_expression(pair.into_inner().next().unwrap(), templates, verbose))));
+            }
+            Rule::not => {
+                uop = Some(UnaryOperator::NOT);
+            }
+            Rule::bool_op => {
+                bop = Some(get_parser_binary_op(pair.into_inner().next().unwrap()));
+            }
+            _ => {
+                println!("did not expect rule: {:?}", pair)
+            }
+        }
+    }
+    if stmts.len() < 1 || stmts.len() > 1 {
+        exit!("did not expect multiple rule: {:?}", stmts);
+    }
+    stmts.pop().unwrap()
+}
+
+fn get_parser_binary_op(expr: Pair<Rule>) -> BinaryOperator {
+    match expr.as_rule() {
+        Rule::and => BinaryOperator::AND,
+        Rule::or => BinaryOperator::OR,
+        _ => {
+            exit!("Unknown  binray operator {}", expr.as_str());
         }
     }
 }
 
 pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> Filter {
-    let mut stack: Vec<Arc<Filter>> = vec![];
     let empty_list = Vec::new();
-    let template_list : &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
+    let template_list: &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
     let mut source = String::from(filter_text);
     for t in template_list {
         source = source.replace(format!("!{}!", &t.name).as_str(), &t.value);
     }
 
     let pairs = FilterParser::parse(Rule::main, &source).unwrap_or_else(|e| panic!("{}", e));
+
+    let mut result: Option<Filter> = None;
+    let mut op: Option<BinaryOperator> = None;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::lparen => {
-                let expr = Filter::Group(Arc::new(Mutex::new(Vec::<Arc<Filter>>::new())));
-                let e = Arc::new(expr);
-                merge_with_stack(&mut stack, &e);
-                compact_stack(&mut stack);
-                stack.push(e);
-            }
-            Rule::rparen => {
-                if stack.len() > 1 {
-                    stack.pop();
-                }
-            }
-            Rule::not => {
-                compact_stack(&mut stack);
-                let expr = Filter::UnaryExpression(UnaryOperator::NOT, Arc::new(Mutex::new(None)));
-                stack.push(Arc::new(expr));
-            }
-            Rule::and => {
-                let left = stack.pop().unwrap();
-                compact_stack(&mut stack);
-                let expr = Filter::BinaryExpression(BinaryOperator::AND, Arc::clone(&left), Arc::new(Mutex::new(None)));
-                stack.push(Arc::new(expr));
-            }
-            Rule::or => {
-                let left = stack.pop().unwrap();
-                compact_stack(&mut stack);
-                let expr = Filter::BinaryExpression(BinaryOperator::OR, Arc::clone(&left), Arc::new(Mutex::new(None)));
-                stack.push(Arc::new(expr));
-            }
-            Rule::field => {
-                compact_stack(&mut stack);
-
-                let mut field: Option<ItemField> = None;
-                let field_text = pair.as_str();
-                for item in all::<ItemField>() {
-                    if field_text.eq_ignore_ascii_case(item.to_string().as_str()) {
-                        field = Some(item);
-                        break;
+            Rule::stmt => {
+                for expr in pair.into_inner() {
+                    match expr.as_rule() {
+                        Rule::expr => {
+                            let expr = get_parser_expression(expr, template_list, verbose);
+                            match &op {
+                                Some(binop) => {
+                                    result = Some(Filter::BinaryExpression(Box::new(result.unwrap()), binop.clone(), Box::new(expr)));
+                                    op = None;
+                                }
+                                _ => result = Some(expr)
+                            }
+                        }
+                        Rule::bool_op => {
+                            op = Some(get_parser_binary_op(expr.into_inner().next().unwrap()));
+                        }
+                        _ => {
+                            println!("unknown expression {:?}", expr);
+                            //exit(format!("unknown stmt inner: {}", expr.as_str()).as_str());
+                        }
                     }
-                }
-                if field.is_none() {
-                    exit((format!("unknown field: {}", field_text)).as_str());
-                }
-
-                let expr = Filter::Comparison(field.unwrap(), Arc::new(Mutex::new(None)));
-                stack.push(Arc::new(expr));
-            }
-            Rule::regexp => {
-                let mut parsed_text = String::from(pair.as_str());
-                parsed_text.pop();
-                parsed_text.remove(0);
-                let mut regstr = String::from(parsed_text.as_str());
-                for t in template_list {
-                    regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
-                }
-                let re = regex::Regex::new(regstr.as_str());
-                if re.is_err() {
-                    exit(format!("cant parse regex: {}", regstr).as_str());
-                }
-                let regexp = re.unwrap();
-                let captures = regexp.capture_names()
-                    .filter_map(|x| x).map(|x| String::from(x)).filter(|x| x.len() > 0).collect::<Vec<String>>();
-                if verbose { println!("Created regex: {} with captures: [{}]", regstr, (&captures).join(", ")) }
-                let  regexp_with_captures = RegexWithCaptures {
-                    restr: regstr,
-                    re: regexp,
-                    captures
-                };
-                let left = stack.last().unwrap();
-                match left.borrow() {
-                    Filter::Comparison(_, regex) => {
-                            *regex.lock().unwrap() = Some(regexp_with_captures);
-                        compact_stack(&mut stack);
-                    }
-                    _ => {}
                 }
             }
             Rule::EOI => {}
             _ => {
-                exit(format!("unknown: {}", pair.as_str()).as_str());
+                exit!("unknown: {}", pair.as_str());
             }
         }
     }
-    return Filter::Group(Arc::new(Mutex::new(stack)));
+    match result {
+        Some(filter) => filter,
+        _ => {
+            exit!("Unable to parse filter: {}", &filter_text);
+        }
+    }
 }
 
 fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> (DiGraph<String, ()>, HashMap<usize, String>, HashMap<&String, Vec<String>>, bool) {
-    let regex = Regex::new("!(.*?)!").unwrap();
+    let regex = regex::Regex::new("!(.*?)!").unwrap();
     let mut graph = DiGraph::new();
     let mut node_ids = HashMap::new();
     let mut node_names = HashMap::new();
     let mut node_deps = HashMap::new();
 
-    let mut add_node = |di_graph: &mut DiGraph<_,_>, node_name: &String| match node_ids.get(node_name) {
+    let mut add_node = |di_graph: &mut DiGraph<_, _>, node_name: &String| match node_ids.get(node_name) {
         Some(idx) => *idx,
         _ => {
             let key = node_name.clone();
@@ -387,7 +365,7 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> (DiGraph<String, 
         }
         node_deps.insert(&template.name, edges);
     }
-    let cycles: Vec<Vec<String>>  = petgraph::algo::tarjan_scc(&graph)
+    let cycles: Vec<Vec<String>> = petgraph::algo::tarjan_scc(&graph)
         .into_iter()
         .filter(|scc| scc.len() > 1)
         .map(|scc| scc.iter().map(|&i| node_names.get(&i.index()).unwrap().clone()).collect())
@@ -399,11 +377,11 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> (DiGraph<String, 
     (graph, node_names, node_deps, cycles.len() > 0)
 }
 
-pub fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool)  -> Vec<PatternTemplate> {
+pub fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool) -> Vec<PatternTemplate> {
     let mut result: Vec<PatternTemplate> = templates.iter().map(|t| t.clone()).collect();
     let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
     if cyclic {
-        exit("Cyclic dependencies in templates detected!");
+        exit!("Cyclic dependencies in templates detected!");
     } else {
         let mut dep_value_map: HashMap<&String, String> = templates.into_iter().map(|t| (&t.name, t.value.clone())).collect();
         // Perform a topological sort to get a linear ordering of the nodes
@@ -415,7 +393,7 @@ pub fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool)  -> Ve
                 let node_name = node_map.get(&node.index()).unwrap();
                 match node_deps.get(node_name) {
                     Some(deps) => {
-                        if verbose { println!("template {}  depends on [{}]", node_name, deps.join(", "))};
+                        if verbose { println!("template {}  depends on [{}]", node_name, deps.join(", ")) };
                         let mut node_template = dep_value_map.get(node_name).unwrap().clone();
                         for dep_name in deps {
                             let dep_template = dep_value_map.get(dep_name).unwrap().clone();
@@ -426,7 +404,7 @@ pub fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool)  -> Ve
                         let template = result.iter_mut().find(|t| node_name.eq(&t.name)).unwrap();
                         //let new_value = dep_value_map.get(&template.name).unwrap();
                         template.value = String::from(&node_template);
-                    },
+                    }
                     _ => {}
                 }
             }

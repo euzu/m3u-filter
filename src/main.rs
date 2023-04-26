@@ -20,6 +20,7 @@ mod api_model;
 mod service;
 mod filter;
 mod model;
+mod test;
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]

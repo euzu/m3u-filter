@@ -1,19 +1,18 @@
+WHITESPACE = _{ " " | "\t" }
 field = { "Group" | "Title" | "Name" | "Url" }
 and = {"AND" | "and"}
 or = {"OR" | "or"}
 not = { "NOT" | "not" }
-lparen = { "(" }
-rparen = { ")" }
-regexp_op = _{ "~" }
 regexp = @{ "\"" ~ ( "\\\"" | (!"\"" ~ ANY) )* ~ "\"" }
-value = _{ regexp }
+comparison_value = _{ regexp }
+comparison = { field ~ "~" ~ comparison_value }
+bool_op = { and | or}
+expr_group = { "(" ~ expr ~ ")" }
+expr = {
+  comparison ~ (bool_op ~ expr)*
+  | expr_group ~ (bool_op ~ expr)*
+  | not ~ expr ~ (bool_op ~ expr)*
+}
+stmt = { expr  ~ (bool_op ~ expr)* }
+main = _{ SOI ~ stmt ~ EOI }
 
-operator = _{ regexp_op }
-match_comparison = _{ field ~ operator ~ value }
-predicate = _{ match_comparison }
-bool_test = _{ predicate | lparen ~ condition ~ rparen }
-bool_factor = _{ not? ~ bool_test }
-bool_term = _{ bool_factor ~ (and ~ bool_factor)* }
-condition = _{ bool_term ~ (or ~ bool_term)* }
-main = _{ SOI ~ condition ~ EOI }
-WHITESPACE = _{ " " | "\t" }
