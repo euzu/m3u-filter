@@ -108,16 +108,13 @@ impl Filter {
                 let value = provider.call(&field);
                 let is_match = rewc.re.is_match(value);
                 if is_match {
-                    if verbose { println!("Match found:  {}={}", &field, &value) }
+                    if verbose { println!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value) }
                     processor.process(field, &value, rewc, verbose);
                 }
-                return is_match;
+                is_match
             }
             Filter::Group(expr) => {
-                if !expr.filter(provider, processor, verbose) {
-                    return false;
-                }
-                return true;
+                expr.filter(provider, processor, verbose)
             }
             Filter::UnaryExpression(op, expr) => {
                 match op {

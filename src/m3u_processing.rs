@@ -9,7 +9,7 @@ use unidecode::unidecode;
 use crate::{config, Config, utils, valid_property};
 use crate::config::{ConfigInput, InputAffix, InputType, ProcessTargets};
 use crate::model::SortOrder::{Asc, Desc};
-use crate::filter::{ValueProvider};
+use crate::filter::{MockValueProcessor, ValueProvider};
 use crate::m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::mapping::{Mapping, MappingValueProcessor};
 use crate::model::{ItemField, AFFIX_FIELDS, ProcessingOrder, TargetType};
@@ -351,19 +351,36 @@ fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose
     }
 }
 
+macro_rules! apply_pattern {
+    ($pattern:expr, $provider:expr, $processor:expr, $verbose:expr) => {{
+            match $pattern {
+                Some(ptrn) => {
+                    ptrn.filter($provider, $processor, $verbose);
+                },
+                _ => {}
+            };
+    }};
+}
+
 fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> PlaylistItem {
     if mapping.mapper.len() > 0 {
         let channel_name = if mapping.match_as_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
         if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &channel.header.name, &channel_name) };
         let provider = ValueProvider { pli: &channel.clone() };
+        let mut mock_processor = MockValueProcessor {};
+
         for m in &mapping.mapper {
             let mut processor = MappingValueProcessor { pli: channel, mapper: m };
             match &m._filter {
                 Some(filter) => {
-                    filter.filter(&provider, &mut processor, verbose);
+                    if filter.filter(&provider, &mut mock_processor, verbose) {
+                        apply_pattern!(&m._pattern, &provider, &mut processor, verbose);
+                    }
                 }
-                _ => {}
-            }
+                _ => {
+                    apply_pattern!(&m._pattern, &provider, &mut processor, verbose);
+                }
+            };
         }
     }
     return channel.clone();

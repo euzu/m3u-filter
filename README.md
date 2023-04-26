@@ -161,6 +161,8 @@ The filter can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Compar
 Filter fields are `Group`, `Title`, `Name` and `Url`.
 Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group ~ "^AU.*")`
 
+If you use characters like `+ | [ ] ( )` in filters don't forget to escape them!!  
+
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
 
@@ -293,22 +295,32 @@ write regexp without considering chars like `é` and use `e` instead, set this o
 
 ### 2.3.3 `mapper`
 Has the following top level entries:
+* `filter` _optional_
 * `pattern`
 * `attributes`
 * `suffix`
 * `prefix`
 * `assignments`
 
-#### 2.3.4.1 `pattern`
+#### 2.3.4.1 `filter`
+The filter  is a string with a statement (@see filter statements).
+It is optional and allows you to 
+
+#### 2.3.4.2 `pattern`
 The pattern is a string with a statement (@see filter statements).
 The pattern can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
 Filter fields are `Group`, `Title`, `Name` and `Url`.
-Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group ~ "^AU.*")`
+Example filter:  `NOT Title ~ ".*Shopping.*"`
+
+The pattern for the mapper works different from a filter expression.
+A filter evaluates the complete expression and returns a result.
+The mapper pattern evaluates the expression, but matches directly comparisons and processes them immediately.
+To avoid misunderstandings, keep the pattern simply to comparisons.
 
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
 
-#### 2.3.4.2 `attributes`
+#### 2.3.4.3 `attributes`
 Attributes is a map of key value pairs. Valid keys are:
 - `id`
 - `chno`
@@ -325,7 +337,7 @@ Attributes is a map of key value pairs. Valid keys are:
 
 If the regexps matches, the given fields will be set to the new value
 
-#### 2.3.4.3 `suffix`
+#### 2.3.4.4 `suffix`
 Suffix is a map of key value pairs. Valid keys are
 - name
 - group
@@ -343,7 +355,7 @@ In this example there must be 2 tag definitions `quality` and `group`.
 
 If the regexps matches, the given fields will be appended to field value
 
-#### 2.3.4.4 `prefix`
+#### 2.3.4.5 `prefix`
 Suffix is a map of key value pairs. Valid keys are
 - name
 - group
@@ -361,7 +373,7 @@ In this example there must be 2 tag definitions `quality` and `group`.
 
 If the regexps matches, the given fields will be prefixed to field value
 
-#### 2.3.4.5 `assignments`
+#### 2.3.4.6 `assignments`
 Attributes is a map of key value pairs. Valid keys and values are:
 - `id`
 - `chno`

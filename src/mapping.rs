@@ -32,6 +32,7 @@ impl Clone for MappingTag {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Mapper {
+    pub filter: Option<String>,
     pub pattern: String,
     #[serde(default = "default_as_empty_map")]
     attributes: HashMap<String, String>,
@@ -44,6 +45,8 @@ pub struct Mapper {
     #[serde(skip_serializing, skip_deserializing)]
     pub(crate) _filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
+    pub(crate) _pattern: Option<Filter>,
+    #[serde(skip_serializing, skip_deserializing)]
     pub _tags: Vec<MappingTag>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _tagre: Option<Regex>,
@@ -51,7 +54,13 @@ pub struct Mapper {
 
 impl Mapper {
     pub(crate) fn prepare<'a>(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>, verbose: bool) -> () {
-        self._filter = Some(get_filter(&self.pattern, templates, verbose));
+        self._pattern = Some(get_filter(&self.pattern, templates, verbose));
+        match &self.filter {
+            Some(flt) => {
+                self._filter = Some(get_filter(&flt, templates, verbose));
+            },
+            _ => self._filter = None
+        }
         self._tags = match tags {
             Some(list) => list.clone(),
             _ => vec![]
@@ -63,12 +72,14 @@ impl Mapper {
 impl Clone for Mapper {
     fn clone(&self) -> Self {
         Mapper {
+            filter: self.filter.clone(),
             pattern: self.pattern.clone(),
             attributes: self.attributes.clone(),
             suffix: self.suffix.clone(),
             prefix: self.prefix.clone(),
             assignments: self.assignments.clone(),
             _filter: self._filter.clone(),
+            _pattern: self._pattern.clone(),
             _tags: self._tags.clone(),
             _tagre: self._tagre.clone(),
         }
