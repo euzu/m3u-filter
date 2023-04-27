@@ -18,7 +18,7 @@ cargo set-version "$NEW_VERSION"
 
 VERSION=v$NEW_VERSION
 
-echo "building version $NEW_VERSION"
+echo "building version $VERSION"
 
 LIN_DIR=m3u-filter_${VERSION}_linux_x86_64
 WIN_DIR=m3u-filter_${VERSION}_windows_x86_64
