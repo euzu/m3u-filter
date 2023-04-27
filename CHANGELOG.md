@@ -4,6 +4,7 @@
 * Added filter to mapper definition.
 * Refactored filter parsing.
 * Fixed sort after mapping group names.
+* Refactored mapping, fixed reading unmodified initial values in mapping loop from ValueProvider, because of cloned channel
 
 # v0.9.9(2023-03-20)
 * Added optional 'enabled' property to input and target. Default is true.  
