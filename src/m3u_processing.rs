@@ -1,7 +1,8 @@
 extern crate unidecode;
 
+use std::cell::RefCell;
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::{Arc};
 use std::thread;
 use config::ConfigTarget;
 use chrono::Datelike;
@@ -9,7 +10,7 @@ use unidecode::unidecode;
 use crate::{config, Config, utils, valid_property};
 use crate::config::{ConfigInput, InputAffix, InputType, ProcessTargets};
 use crate::model::SortOrder::{Asc, Desc};
-use crate::filter::{MockValueProcessor, ValueProvider};
+use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::mapping::{Mapping, MappingValueProcessor};
 use crate::model::{ItemField, AFFIX_FIELDS, ProcessingOrder, TargetType};
@@ -41,14 +42,14 @@ fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     }
 }
 
-fn filter_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
+fn filter_playlist(playlist: &mut Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
     if verbose { println!("Filtering {} groups", playlist.len()) }
     let mut new_playlist = Vec::new();
-    for pg in playlist {
+    for pg in playlist.iter_mut() {
         if verbose { println!("Filtering group {} with {} items", pg.title, pg.channels.len()) }
         let mut channels = Vec::new();
-        for pli in &pg.channels {
-            if is_valid(&pli, &target, verbose) {
+        for pli in pg.channels.iter_mut() {
+            if is_valid(pli, &target, verbose) {
                 channels.push(pli.clone());
             }
         }
@@ -91,16 +92,16 @@ fn apply_affixes(playlist: &mut Vec<PlaylistGroup>, input: &ConfigInput, verbose
                 for channel in &mut group.channels {
                     if apply_suffix {
                         if let Some(suffix) = &input.suffix {
-                            let value = get_affix_applied_value(&mut channel.header, suffix, false);
+                            let value = get_affix_applied_value(&mut channel.header.borrow_mut(), suffix, false);
                             if verbose { println!("Applying input suffix:  {}={}", &suffix.field, &value) }
-                            channel.header.set_field(&suffix.field, &value.as_str());
+                            channel.header.borrow_mut().set_field(&suffix.field, &value.as_str());
                         }
                     }
                     if apply_prefix {
                         if let Some(prefix) = &input.prefix {
-                            let value = get_affix_applied_value(&mut channel.header, prefix, true);
+                            let value = get_affix_applied_value(&mut channel.header.borrow_mut(), prefix, true);
                             if verbose { println!("Applying input prefix:  {}={}", &prefix.field, &value) }
-                            channel.header.set_field(&prefix.field, &value.as_str());
+                            channel.header.borrow_mut().set_field(&prefix.field, &value.as_str());
                         }
                     }
                 }
@@ -109,11 +110,11 @@ fn apply_affixes(playlist: &mut Vec<PlaylistGroup>, input: &ConfigInput, verbose
     }
 }
 
-pub(crate) fn write_m3u(playlist: &Vec<PlaylistGroup>,
+pub(crate) fn write_m3u(playlist: &mut Vec<PlaylistGroup>,
                         input: &ConfigInput,
                         target: &ConfigTarget, cfg: &Config,
                         verbose: bool) -> Result<(), std::io::Error> {
-    let pipe: Vec<fn(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> =
+    let pipe: Vec<fn(playlist: &mut Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>>> =
         match &target.processing_order {
             ProcessingOrder::FRM => vec![filter_playlist, rename_playlist, map_playlist],
             ProcessingOrder::FMR => vec![filter_playlist, map_playlist, rename_playlist],
@@ -127,7 +128,7 @@ pub(crate) fn write_m3u(playlist: &Vec<PlaylistGroup>,
 
     let mut new_playlist = playlist.clone();
     for f in pipe {
-        let r = f(&new_playlist, &target, verbose);
+        let r = f(&mut new_playlist, &target, verbose);
         if r.is_some() {
             new_playlist = r.unwrap();
         }
@@ -200,7 +201,7 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
             };
             for pg in new_playlist {
                 for pli in &pg.channels {
-                    let dir_path = path.join(sanitize_for_filename(&pli.header.group, underscore_whitespace));
+                    let dir_path = path.join(sanitize_for_filename(&pli.header.borrow().group, underscore_whitespace));
                     match std::fs::create_dir_all(&dir_path) {
                         Err(e) => {
                             println!("cant create directory: {:?}", &path);
@@ -208,7 +209,7 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
                         }
                         _ => {}
                     };
-                    let mut file_name = sanitize_for_filename(&pli.header.title, underscore_whitespace);
+                    let mut file_name = sanitize_for_filename(&pli.header.borrow().title, underscore_whitespace);
                     if kodi_style {
                         let style = KodiStyle {
                             season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
@@ -297,8 +298,8 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut Vec<PlaylistGroup>) {
 }
 
 
-fn is_valid(pli: &PlaylistItem, target: &ConfigTarget, verbose: bool) -> bool {
-    let provider = ValueProvider { pli };
+fn is_valid(pli: &mut PlaylistItem, target: &ConfigTarget, verbose: bool) -> bool {
+    let provider = ValueProvider { pli: RefCell::new(pli) };
     return target.filter(&provider, verbose);
 }
 
@@ -309,7 +310,7 @@ fn exec_rename(pli: &mut PlaylistItem, rename: &Option<Vec<config::ConfigRename>
                 let mut result = pli;
                 for r in renames {
                     let value = get_field_value(&result, &r.field);
-                    let cap = r.re.as_ref().unwrap().replace_all(value, &r.new_name);
+                    let cap = r.re.as_ref().unwrap().replace_all(value.as_str(), &r.new_name);
                     if verbose { println!("Renamed {}={} to {}", &r.field, value, cap) }
                     let value = cap.into_owned();
                     set_field_value(&mut result, &r.field, value);
@@ -320,7 +321,7 @@ fn exec_rename(pli: &mut PlaylistItem, rename: &Option<Vec<config::ConfigRename>
     }
 }
 
-fn rename_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
+fn rename_playlist(playlist: &mut Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
     match &target.rename {
         Some(renames) => {
             if renames.len() > 0 {
@@ -362,15 +363,18 @@ macro_rules! apply_pattern {
     }};
 }
 
-fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> PlaylistItem {
+fn map_channel(channel: &PlaylistItem, mapping: &Mapping, verbose: bool) -> PlaylistItem {
     if mapping.mapper.len() > 0 {
-        let channel_name = if mapping.match_as_ascii { unidecode(&channel.header.name) } else { String::from(&channel.header.name) };
-        if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &channel.header.name, &channel_name) };
-        let provider = ValueProvider { pli: &channel.clone() };
+        let header = channel.header.borrow();
+        let channel_name = if mapping.match_as_ascii { unidecode(&header.name) } else { String::from(&header.name) };
+        if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &header.name, &channel_name) };
+        drop(header);
+        let ref_chan = RefCell::new(channel);
+        let provider = ValueProvider { pli:  ref_chan.clone()};
         let mut mock_processor = MockValueProcessor {};
 
         for m in &mapping.mapper {
-            let mut processor = MappingValueProcessor { pli: channel, mapper: m };
+            let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: RefCell::new(m) };
             match &m._filter {
                 Some(filter) => {
                     if filter.filter(&provider, &mut mock_processor, verbose) {
@@ -386,7 +390,7 @@ fn map_channel(channel: &mut PlaylistItem, mapping: &Mapping, verbose: bool) -> 
     return channel.clone();
 }
 
-fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
+fn map_playlist(playlist: &mut Vec<PlaylistGroup>, target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
     if verbose { println!("Mapping") }
     if target._mapping.is_some() {
         let mut new_playlist: Vec<PlaylistGroup> = Vec::new();
@@ -405,7 +409,7 @@ fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: b
         let mut new_groups: Vec<PlaylistGroup> = Vec::new();
         for playlist_group in new_playlist {
             for channel in &playlist_group.channels {
-                let title = &channel.header.group;
+                let title = &channel.header.borrow().group;
                 match new_groups.iter_mut().find(|x| &*x.title == title) {
                     Some(grp) => grp.channels.push(channel.clone()),
                     _ => new_groups.push(PlaylistGroup { title: String::from(title), channels: vec![channel.clone()] })
@@ -418,35 +422,15 @@ fn map_playlist(playlist: &Vec<PlaylistGroup>, target: &ConfigTarget, verbose: b
     }
 }
 
-fn get_field_value<'a>(pli: &'a PlaylistItem, field: &ItemField) -> &'a str {
-    let value = match field {
-        ItemField::Group => pli.header.group.as_str(),
-        ItemField::Name => pli.header.name.as_str(),
-        ItemField::Title => pli.header.title.as_str(),
-        ItemField::Url => pli.url.as_str(),
-    };
-    value
-}
-
-fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) -> () {
-    let header = &mut pli.header;
-    match field {
-        ItemField::Group => header.group = value,
-        ItemField::Name => header.name = value,
-        ItemField::Title => header.title = value,
-        ItemField::Url => {}
-    };
-}
-
 fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>, verbose: bool) {
     let source = cfg.sources.get(source_idx).unwrap();
     let input = &source.input;
     if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)) {
-        let result = match input.input_type {
+        let mut result = match input.input_type {
             InputType::M3u => get_m3u_playlist(input, &cfg.working_dir, verbose),
             InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir, verbose),
         };
-        match &result {
+        match result.as_mut() {
             Some(playlist) => {
                 if playlist.is_empty() {
                     if verbose { println!("Input file is empty") }

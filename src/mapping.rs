@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use regex::Regex;
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
@@ -87,27 +88,30 @@ impl Clone for Mapper {
 }
 
 pub struct MappingValueProcessor<'a> {
-    pub(crate) pli: &'a mut PlaylistItem,
-    pub(crate) mapper: &'a Mapper,
+    pub(crate) pli: RefCell<&'a PlaylistItem>,
+    pub(crate) mapper: RefCell<&'a Mapper>,
 }
 
 impl MappingValueProcessor<'_> {
     fn get_property(&self, key: &str) -> Option<String> {
-        match self.pli.header.get_field(key) {
+        match self.pli.borrow().header.borrow().get_field(key) {
             Some(value) => Some(String::from(value)),
             _ => None
         }
     }
 
     fn set_property(&mut self, key: &str, value: &String, verbose: bool) {
-        if !self.pli.header.set_field(key, value) {
+        if !self.pli.borrow().header.borrow_mut().set_field(key, value) {
             println!("Cant set unknown field {} to {}", key, value);
         }
         if verbose { println!("Property {} set to {}", key, value) }
     }
 
     fn apply_attributes(&mut self, verbose: bool) {
-        for (key, value) in &self.mapper.attributes {
+        let mapper = self.mapper.borrow();
+        let attributes =  &mapper.attributes;
+        drop(mapper);
+        for (key, value) in attributes {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
                 self.set_property(key, value, verbose);
             }
@@ -116,14 +120,14 @@ impl MappingValueProcessor<'_> {
 
     fn apply_tags(&mut self, value: &String, captures: &HashMap<&String, &str>, verbose: bool) -> Option<String> {
         let mut new_value = String::from(value);
-        let tag_captures = self.mapper._tagre.as_ref().unwrap().captures_iter(value)
+        let tag_captures = self.mapper.borrow()._tagre.as_ref().unwrap().captures_iter(value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| caps.as_str())
             .collect::<Vec<&str>>();
 
         for tag_capture in tag_captures {
-            for mapping_tag in &self.mapper._tags {
+            for mapping_tag in &self.mapper.borrow()._tags {
                 if mapping_tag.name.eq(tag_capture) {
                     // we have the right tag, now get all captured values
                     let mut captured_tag_values: Vec<&str> = Vec::new();
@@ -154,7 +158,11 @@ impl MappingValueProcessor<'_> {
     }
 
     fn apply_suffix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
-        for (key, value) in &self.mapper.suffix {
+        let mapper = self.mapper.borrow();
+        let suffix =  &mapper.suffix;
+        drop(mapper);
+
+        for (key, value) in suffix {
             if valid_property!(key.as_str(), AFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(suffix) => {
@@ -173,7 +181,10 @@ impl MappingValueProcessor<'_> {
     }
 
     fn apply_prefix(&mut self, captures: &HashMap<&String, &str>, verbose: bool) {
-        for (key, value) in &self.mapper.prefix {
+        let mapper = self.mapper.borrow();
+        let prefix =  &mapper.prefix;
+        drop(mapper);
+        for (key, value) in prefix {
             if valid_property!(key.as_str(), AFFIX_FIELDS) {
                 match self.apply_tags(value, captures, verbose) {
                     Some(prefix) => {
@@ -192,7 +203,10 @@ impl MappingValueProcessor<'_> {
     }
 
     fn apply_assignments(&mut self, verbose: bool) {
-        for (key, value) in &self.mapper.assignments {
+        let mapper = self.mapper.borrow();
+        let assignments =  &mapper.assignments;
+        drop(mapper);
+        for (key, value) in assignments {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) &&
                 valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
                 match self.get_property(value) {

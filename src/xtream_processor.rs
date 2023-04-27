@@ -104,7 +104,7 @@ pub(crate) fn process(category: Option<serde_json::Value>, streams: Option<serde
                         let mut grp = group.borrow_mut();
                         let title = String::from(&grp.category_name);
                         let item = PlaylistItem {
-                            header: PlaylistItemHeader {
+                            header: RefCell::new(PlaylistItemHeader {
                                 id: stream.stream_id.to_string(),
                                 name: String::from(&stream.name),
                                 logo: String::from(&stream.stream_icon),
@@ -117,7 +117,7 @@ pub(crate) fn process(category: Option<serde_json::Value>, streams: Option<serde
                                 rec: "".to_string(),
                                 source: String::from(&stream.direct_source),
                                 chno: stream.num.to_string(),
-                            },
+                            }),
                             url: format!("{}/{}", stream_base_url, stream.stream_id),
                         };
                         grp.add(item);

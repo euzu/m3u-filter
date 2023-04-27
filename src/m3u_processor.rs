@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 
 fn token_value(it: &mut std::str::Chars) -> String {
@@ -122,11 +123,11 @@ pub(crate) fn process(lines: &Vec<String>) -> Vec<PlaylistGroup> {
             continue;
         }
         if header.is_some() {
-            let mut item = PlaylistItem { header: process_header(&header.unwrap()), url: String::from(line) };
-            if group.is_some() && item.header.group.is_empty() {
-                item.header.group = String::from(group.unwrap());
+            let item = PlaylistItem { header: RefCell::new(process_header(&header.unwrap())), url: String::from(line) };
+            if group.is_some() && item.header.borrow().group.is_empty() {
+                item.header.borrow_mut().group = String::from(group.unwrap());
             }
-            let key = String::from(&item.header.group);
+            let key = String::from(&item.header.borrow().group);
             // let key2 = String::from(&item.header.group);
             match groups.entry(key.clone()) {
                 std::collections::hash_map::Entry::Vacant(e) => {

@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use serde::{Deserialize, Serialize};
 use crate::config::ConfigOptions;
 // https://de.wikipedia.org/wiki/M3U
@@ -42,6 +43,7 @@ impl FieldAccessor for PlaylistItemHeader {
             _ => None
         }
     }
+
     fn set_field(&mut self, field: &str, value: &str) -> bool {
         let val = String::from(value);
         return match field {
@@ -64,38 +66,39 @@ impl FieldAccessor for PlaylistItemHeader {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistItem {
-    pub header: PlaylistItemHeader,
+    pub header: RefCell<PlaylistItemHeader>,
     pub url: String,
 }
 
 impl PlaylistItem {
     pub(crate) fn to_m3u(&self, options: &Option<ConfigOptions>) -> String {
+        let header = self.header.borrow();
         let ignore_logo = options.as_ref().map_or(false, |o| o.ignore_logo);
-        let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"", self.header.id, self.header.name, self.header.group);
-        if !self.header.chno.is_empty() {
-            line = format!("{} tvg-chno=\"{}\"", line, self.header.chno);
+        let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"", header.id, header.name, header.group);
+        if !header.chno.is_empty() {
+            line = format!("{} tvg-chno=\"{}\"", line, header.chno);
         }
         if !ignore_logo {
-            if !self.header.logo.is_empty() {
-                line = format!("{} tvg-logo=\"{}\"", line, self.header.logo);
+            if !header.logo.is_empty() {
+                line = format!("{} tvg-logo=\"{}\"", line, header.logo);
             }
-            if !self.header.logo_small.is_empty() {
-                line = format!("{} tvg-logo-small=\"{}\"", line, self.header.logo_small);
+            if !header.logo_small.is_empty() {
+                line = format!("{} tvg-logo-small=\"{}\"", line, header.logo_small);
             }
         }
-        if !self.header.parent_code.is_empty() {
-            line = format!("{} parent-code=\"{}\"", line, self.header.parent_code);
+        if !header.parent_code.is_empty() {
+            line = format!("{} parent-code=\"{}\"", line, header.parent_code);
         }
-        if !self.header.audio_track.is_empty() {
-            line = format!("{} audio-track=\"{}\"", line, self.header.audio_track);
+        if !header.audio_track.is_empty() {
+            line = format!("{} audio-track=\"{}\"", line, header.audio_track);
         }
-        if !self.header.time_shift.is_empty() {
-            line = format!("{} timeschift=\"{}\"", line, self.header.time_shift);
+        if !header.time_shift.is_empty() {
+            line = format!("{} timeschift=\"{}\"", line, header.time_shift);
         }
-        if !self.header.rec.is_empty() {
-            line = format!("{} rec=\"{}\"", line, self.header.rec);
+        if !header.rec.is_empty() {
+            line = format!("{} rec=\"{}\"", line, header.rec);
         }
-        format!("{},{}\n{}", line, self.header.title, self.url)
+        format!("{},{}\n{}", line, header.title, self.url)
     }
 }
 

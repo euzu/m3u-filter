@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use enum_iterator::all;
 use std::collections::{HashMap};
 use pest::iterators::Pair;
@@ -7,18 +8,36 @@ use crate::m3u::PlaylistItem;
 use crate::model::ItemField;
 use petgraph::graph::DiGraph;
 
+
+pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
+    let header = pli.header.borrow();
+    let value = match field {
+        ItemField::Group => header.group.as_str(),
+        ItemField::Name => header.name.as_str(),
+        ItemField::Title => header.title.as_str(),
+        ItemField::Url => pli.url.as_str(),
+    };
+    String::from(value)
+}
+
+pub fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) -> () {
+    let header = &mut pli.header.borrow_mut();
+    match field {
+        ItemField::Group => header.group = value,
+        ItemField::Name => header.name = value,
+        ItemField::Title => header.title = value,
+        ItemField::Url => {}
+    };
+}
+
 pub struct ValueProvider<'a> {
-    pub(crate) pli: &'a PlaylistItem,
+    pub(crate) pli: RefCell<&'a PlaylistItem>,
 }
 
 impl<'a> ValueProvider<'a> {
-    fn call(&self, field: &'a ItemField) -> &str {
-        return match field {
-            ItemField::Group => &*self.pli.header.group.as_str(),
-            ItemField::Name => &*self.pli.header.name.as_str(),
-            ItemField::Title => &*self.pli.header.title.as_str(),
-            ItemField::Url => &*self.pli.url.as_str(),
-        };
+    fn call(&self, field: & ItemField) -> String {
+        let pli = *self.pli.borrow();
+        get_field_value(pli, field)
     }
 }
 
@@ -106,7 +125,7 @@ impl Filter {
         match self {
             Filter::Comparison(field, rewc) => {
                 let value = provider.call(&field);
-                let is_match = rewc.re.is_match(value);
+                let is_match = rewc.re.is_match(value.as_str());
                 if is_match {
                     if verbose { println!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value) }
                     processor.process(field, &value, rewc, verbose);
