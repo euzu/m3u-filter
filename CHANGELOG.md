@@ -1,5 +1,5 @@
 # Changelog
-# v1.0.0(2023-03-21)
+# v1.0.0(2023-04-27)
 * Added target argument for command line. `m3u-filter -t <target_name> -t <target_name>`. Target names should be provided in the config.
 * Added filter to mapper definition.
 * Refactored filter parsing.
