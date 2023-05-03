@@ -14,7 +14,7 @@ async fn index(
     _app_state: web::Data<AppState>,
 ) -> std::io::Result<NamedFile> {
     let path: PathBuf = [_app_state.config.api.web_root.clone(), String::from("index.html")].iter().collect();
-    Ok(NamedFile::open(path)?)
+    NamedFile::open(path)
 }
 
 pub(crate) async fn playlist(

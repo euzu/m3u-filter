@@ -46,7 +46,7 @@ impl FieldAccessor for PlaylistItemHeader {
 
     fn set_field(&mut self, field: &str, value: &str) -> bool {
         let val = String::from(value);
-        return match field {
+        match field {
             "id" => { self.id = val; true},
             "name" =>  { self.name = val; true }
             "logo" =>  { self.logo = val; true }

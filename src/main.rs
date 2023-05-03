@@ -130,7 +130,7 @@ fn main() {
 }
 
 fn read_config(config_file: &str, verbose: bool) -> Config {
-    let mut cfg: config::Config = match serde_yaml::from_reader(utils::open_file(&std::path::PathBuf::from(config_file), true).unwrap()) {
+    let mut cfg: Config = match serde_yaml::from_reader(utils::open_file(&std::path::PathBuf::from(config_file), true).unwrap()) {
         Ok(result) => result,
         Err(e) => {
             println!("cant read config file: {}", e);
@@ -144,7 +144,7 @@ fn read_config(config_file: &str, verbose: bool) -> Config {
 fn read_mapping(mapping_file: &str, verbose: bool) -> Option<Mappings> {
     match utils::open_file(&std::path::PathBuf::from(mapping_file), false) {
         Some(file) => {
-            let mapping: Result<mapping::Mappings, _> = serde_yaml::from_reader(file);
+            let mapping: Result<Mappings, _> = serde_yaml::from_reader(file);
             match mapping {
                 Ok(mut result) => {
                     result.prepare(verbose);

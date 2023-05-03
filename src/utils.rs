@@ -6,7 +6,7 @@ use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
 use crate::config::ConfigInput;
 
-pub(crate) fn get_exe_path() -> std::path::PathBuf {
+pub(crate) fn get_exe_path() -> PathBuf {
     let default_path = std::path::PathBuf::from("./");
     let current_exe = std::env::current_exe();
     match current_exe {
@@ -21,7 +21,7 @@ pub(crate) fn get_exe_path() -> std::path::PathBuf {
 }
 
 pub(crate) fn get_default_config_path() -> String {
-    let path: std::path::PathBuf = get_exe_path();
+    let path: PathBuf = get_exe_path();
     let config_path = path.join("config.yml");
     String::from(if config_path.exists() {
         config_path.to_str().unwrap_or("./config.yml")
@@ -31,7 +31,7 @@ pub(crate) fn get_default_config_path() -> String {
 }
 
 pub(crate) fn get_default_mappings_path() -> String {
-    let path: std::path::PathBuf = get_exe_path();
+    let path: PathBuf = get_exe_path();
     let mappings_path = path.join("mapping.yml");
     String::from(if mappings_path.exists() {
         mappings_path.to_str().unwrap_or("./mapping.yml")
@@ -46,7 +46,7 @@ pub(crate) fn get_working_path(wd: &String) -> String {
         String::from(current_dir.to_str().unwrap_or("."))
     } else {
         let work_path = std::path::PathBuf::from(wd);
-        let wdpath = match std::fs::metadata(&work_path) {
+        let wdpath = match fs::metadata(&work_path) {
             Ok(md) => {
                 if md.is_dir() && !md.permissions().readonly() {
                     match work_path.canonicalize() {
@@ -74,8 +74,8 @@ pub(crate) fn get_working_path(wd: &String) -> String {
     }
 }
 
-pub(crate) fn open_file(file_name: &PathBuf, mandatory: bool) -> Option<std::fs::File> {
-    match std::fs::File::open(file_name) {
+pub(crate) fn open_file(file_name: &PathBuf, mandatory: bool) -> Option<fs::File> {
+    match fs::File::open(file_name) {
         Ok(file) => Some(file),
         Err(_) => {
             if mandatory {
@@ -87,7 +87,7 @@ pub(crate) fn open_file(file_name: &PathBuf, mandatory: bool) -> Option<std::fs:
     }
 }
 
-pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<std::path::PathBuf>, verbose: bool) -> Option<Vec<String>> {
+pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<PathBuf>, verbose: bool) -> Option<Vec<String>> {
     match url_str.parse::<url::Url>() {
         Ok(url) => match download_content(url, persist_file, verbose) {
             Ok(content) => Some(content),
@@ -97,13 +97,13 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
             }
         }
         Err(_) => {
-            let file_path = get_file_path(&working_dir, Some(PathBuf::from(url_str)));
+            let file_path = get_file_path(working_dir, Some(PathBuf::from(url_str)));
             let result = match &file_path {
                 Some(file) => {
                     if file.exists() {
-                        if persist_file.is_some() {
+                        if let Some(..) = persist_file {
                             let to_file = &persist_file.unwrap();
-                            match std::fs::copy(file, to_file) {
+                            match fs::copy(file, to_file) {
                                 Ok(_) => {}
                                 Err(e) => println!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e),
                             }
@@ -133,7 +133,7 @@ fn download_content(url: url::Url, persist_file: Option<PathBuf>, verbose: bool)
                 match response.text_with_charset("utf8") {
                     Ok(text) => {
                         persist_playlist(persist_file, &text, verbose);
-                        let result = text.lines().map(|l| String::from(l)).collect();
+                        let result = text.lines().map(String::from).collect();
                         Ok(result)
                     }
                     Err(e) => Err(e.to_string())
@@ -147,22 +147,19 @@ fn download_content(url: url::Url, persist_file: Option<PathBuf>, verbose: bool)
 }
 
 fn persist_playlist(persist_file: Option<PathBuf>, text: &String, verbose: bool) {
-    match persist_file {
-        Some(path_buf) => {
-            let filename = &path_buf.to_str().unwrap_or("?");
-            match std::fs::File::create(&path_buf) {
-                Ok(mut file) => match file.write_all(text.as_bytes()) {
-                    Ok(_) => if verbose { println!("persisted: {}", filename) },
-                    Err(e) => println!("failed to persist file {}, {}", filename, e)
-                },
+    if let Some(path_buf) = persist_file {
+        let filename = &path_buf.to_str().unwrap_or("?");
+        match fs::File::create(&path_buf) {
+            Ok(mut file) => match file.write_all(text.as_bytes()) {
+                Ok(_) => if verbose { println!("persisted: {}", filename) },
                 Err(e) => println!("failed to persist file {}, {}", filename, e)
-            }
+            },
+            Err(e) => println!("failed to persist file {}, {}", filename, e)
         }
-        None => {}
     }
 }
 
-pub(crate) fn prepare_persist_path(file_name: &str, date_prefix: &str) -> Option<std::path::PathBuf> {
+pub(crate) fn prepare_persist_path(file_name: &str, date_prefix: &str) -> Option<PathBuf> {
     let now = chrono::Local::now();
     let filename = file_name.replace("{}", format!("{}{}", date_prefix, now.format("%Y%m%d_%H%M%S").to_string().as_str()).as_str());
     Some(std::path::PathBuf::from(filename))

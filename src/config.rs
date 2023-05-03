@@ -24,19 +24,11 @@ pub struct ProcessTargets {
 
 impl ProcessTargets {
     pub(crate) fn has_target(&self, tid: u16) -> bool {
-        if let Some(_pos) = self.targets.iter().position(|&x| x == tid) {
-            true
-        } else {
-            false
-        }
+        matches!(self.targets.iter().position(|&x| x == tid), Some(_pos))
     }
 
     pub(crate) fn has_input(&self, tid: u16) -> bool {
-        if let Some(_pos) = self.inputs.iter().position(|&x| x == tid) {
-            true
-        } else {
-            false
-        }
+        matches!(self.inputs.iter().position(|&x| x == tid), Some(_pos))
     }
 }
 
@@ -55,7 +47,7 @@ pub struct ConfigRename {
 }
 
 impl ConfigRename {
-    pub(crate) fn prepare(&mut self) -> () {
+    pub(crate) fn prepare(&mut self) {
         let re = regex::Regex::new(&self.pattern);
         if re.is_err() {
             println!("cant parse regex: {}", &self.pattern);
@@ -102,16 +94,13 @@ pub struct ConfigTarget {
 }
 
 impl ConfigTarget {
-    pub(crate) fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> () {
+    pub(crate) fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>, verbose: bool) {
         self.id = id;
         let fltr = get_filter(&self.filter, templates, verbose);
         if verbose { println!("Filter: {}", fltr) }
         self._filter = Some(fltr);
-        match self.rename.as_mut() {
-            Some(renames) => for r in renames {
-                r.prepare();
-            },
-            _ => {}
+        if let Some(renames) = self.rename.as_mut() {
+            renames.iter_mut().for_each(|r| r.prepare());
         }
     }
     pub(crate) fn filter(&self, provider: &ValueProvider, verbose: bool) -> bool {
@@ -189,7 +178,7 @@ impl ConfigInput {
                 }
             }
         }
-        if self.persist.len() > 0 && self.persist.trim().is_empty() {
+        if !self.persist.is_empty() && self.persist.trim().is_empty() {
             self.persist = String::from("");
         }
     }
@@ -222,27 +211,21 @@ pub struct Config {
 
 impl Config {
     pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) {
-        match mappings {
-            Some(mapping_list) => {
-                for source in &mut self.sources {
-                    for target in &mut source.targets {
-                        match &target.mapping {
-                            Some(mapping_ids) => {
-                                let mut target_mappings = Vec::new();
-                                for mapping_id in mapping_ids {
-                                    let mapping = mapping_list.get_mapping(mapping_id);
-                                    if mapping.is_some() {
-                                        target_mappings.push(mapping.unwrap());
-                                    }
-                                }
-                                target._mapping = if target_mappings.len() > 0 { Some(target_mappings) } else { None };
+        if let Some(mapping_list) = mappings {
+            for source in &mut self.sources {
+                for target in &mut source.targets {
+                    if let Some(mapping_ids) = &target.mapping {
+                        let mut target_mappings = Vec::new();
+                        for mapping_id in mapping_ids {
+                            let mapping = mapping_list.get_mapping(mapping_id);
+                            if let Some(..) = mapping {
+                                target_mappings.push(mapping.unwrap());
                             }
-                            _ => {}
                         }
+                        target._mapping = if !target_mappings.is_empty() { Some(target_mappings) } else { None };
                     }
                 }
             }
-            _ => {}
         }
     }
 
@@ -250,10 +233,7 @@ impl Config {
         self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
         self.prepare_api_web_root();
-        match &mut self.templates {
-            Some(templates) => self.templates = Some(prepare_templates(templates, verbose)),
-            _ => {}
-        };
+        if let Some(templates) = &mut self.templates { self.templates = Some(prepare_templates(templates, verbose)) };
         let mut source_index: u16 = 1;
         let mut target_index: u16 = 1;
         for source in &mut self.sources {
@@ -261,7 +241,7 @@ impl Config {
             source_index += 1;
             for target in &mut source.targets {
                 match &self.templates {
-                    Some(templ) => target.prepare(target_index, Some(&templ), verbose),
+                    Some(templ) => target.prepare(target_index, Some(templ), verbose),
                     _ => target.prepare(target_index, None, verbose)
                 }
                 target_index += 1;
@@ -279,7 +259,7 @@ impl Config {
                 }
                 if !wrpb2.exists() {
                     let cwd = std::env::current_dir();
-                    if cwd.is_ok() {
+                    if let Ok(..) = cwd {
                         wrpb2 = cwd.unwrap().join(&self.api.web_root);
                     }
                 }
@@ -317,8 +297,8 @@ impl Clone for ConfigTarget {
             enabled: self.enabled,
             name: self.name.clone(),
             filename: self.filename.clone(),
-            options: self.options.as_ref().map(|o| o.clone()),
-            sort: self.sort.as_ref().map(|s| s.clone()),
+            options: self.options.as_ref().cloned(),
+            sort: self.sort.as_ref().cloned(),
             filter: self.filter.clone(),
             output: self.output.clone(),
             rename: self.rename.clone(),

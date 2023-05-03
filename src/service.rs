@@ -22,7 +22,7 @@ pub(crate) fn get_m3u_playlist(input: &ConfigInput, working_dir: &String, verbos
     let url = input.url.as_str();
     let file_path = prepare_file_path(input, working_dir, "", verbose);
     let lines: Option<Vec<String>> = utils::get_input_content(working_dir, url, file_path, verbose);
-    lines.map_or(None, |l| Some(m3u_processor::process(&l)))
+    lines.map(|l| m3u_processor::process(&l))
 }
 
 

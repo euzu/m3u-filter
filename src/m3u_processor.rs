@@ -12,39 +12,34 @@ fn token_value(it: &mut std::str::Chars) -> String {
 
 fn get_value(it: &mut std::str::Chars) -> String {
     let mut result: Vec<char> = vec![];
-    while let Some(oc) = it.next() {
+    for oc in it.by_ref() {
         if oc == '"' {
             break;
         }
         result.push(oc);
     }
-    String::from(result.iter().collect::<String>())
+    result.iter().collect::<String>()
 }
 
 fn token_till(it: &mut std::str::Chars, stop_char: char) -> Option<String> {
     let mut result: Vec<char> = vec![];
-    loop {
-        match it.next() {
-            Some(ch) => {
-                if ch == stop_char {
-                    break;
-                } else if ch.is_whitespace() && result.is_empty() {
-                    continue;
-                } else {
-                    result.push(ch);
-                }
-            }
-            None => break,
+    for ch in it.by_ref() {
+        if ch == stop_char {
+            break;
+        } else if ch.is_whitespace() && result.is_empty() {
+            continue;
+        } else {
+            result.push(ch);
         }
     }
-    if !result.is_empty() { Some(String::from(result.iter().collect::<String>())) } else { None }
+    if !result.is_empty() { Some(result.iter().collect::<String>()) } else { None }
 }
 
 fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     loop {
         match it.next() {
             Some(c) => {
-                if !(c == '-' || c == '+' || c.is_digit(10)) {
+                if !(c == '-' || c == '+' || c.is_ascii_digit()) {
                     return Some(c);
                 }
             }
@@ -74,16 +69,16 @@ fn process_header(content: &String) -> PlaylistItemHeader {
     if line_token == Some(String::from("#EXTINF")) {
         let mut c = skip_digit(&mut it);
         loop {
-            if !c.is_some() {
+            if c.is_none() {
                 break;
             }
             match c.unwrap() {
                 ',' => plih.title = get_value(&mut it),
                 _ => {
                     let token = token_till(&mut it, '=');
-                    if token != None {
+                    if let Some(t) = token {
                         let value = token_value(&mut it);
-                        match token.unwrap().as_str() {
+                        match t.as_str() {
                             "tvg-id" => plih.id = value,
                             "tvg-name" => plih.name = value,
                             "group-title" => if !value.is_empty() { plih.group = value },
@@ -119,13 +114,13 @@ pub(crate) fn process(lines: &Vec<String>) -> Vec<PlaylistGroup> {
             group = Some(String::from(&line[8..]));
             continue;
         }
-        if line.starts_with("#") {
+        if line.starts_with('#') {
             continue;
         }
-        if header.is_some() {
+        if let Some(..) = header {
             let item = PlaylistItem { header: RefCell::new(process_header(&header.unwrap())), url: String::from(line) };
             if group.is_some() && item.header.borrow().group.is_empty() {
-                item.header.borrow_mut().group = String::from(group.unwrap());
+                item.header.borrow_mut().group = group.unwrap();
             }
             let key = String::from(&item.header.borrow().group);
             // let key2 = String::from(&item.header.group);
@@ -148,7 +143,7 @@ pub(crate) fn process(lines: &Vec<String>) -> Vec<PlaylistGroup> {
     result.sort_by(|f, s| {
         let i1 = sort_order.iter().position(|r| r == &f.title).unwrap();
         let i2 = sort_order.iter().position(|r| r == &s.title).unwrap();
-        return i1.cmp(&i2);
+        i1.cmp(&i2)
     });
     result
 }

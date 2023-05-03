@@ -20,7 +20,7 @@ pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
     String::from(value)
 }
 
-pub fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) -> () {
+pub fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) {
     let header = &mut pli.header.borrow_mut();
     match field {
         ItemField::Group => header.group = value,
@@ -124,7 +124,7 @@ impl Filter {
     pub fn filter(&self, provider: &ValueProvider, processor: &mut dyn ValueProcessor, verbose: bool) -> bool {
         match self {
             Filter::Comparison(field, rewc) => {
-                let value = provider.call(&field);
+                let value = provider.call(field);
                 let is_match = rewc.re.is_match(value.as_str());
                 if is_match {
                     if verbose { println!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value) }
@@ -182,45 +182,39 @@ macro_rules! exit {
 }
 
 fn get_parser_item_field(expr: Pair<Rule>) -> ItemField {
-    match expr.as_rule() {
-        Rule::field => {
-            let field_text = expr.as_str();
-            for item in all::<ItemField>() {
-                if field_text.eq_ignore_ascii_case(item.to_string().as_str()) {
-                    return item;
-                }
+    if expr.as_rule() == Rule::field {
+        let field_text = expr.as_str();
+        for item in all::<ItemField>() {
+            if field_text.eq_ignore_ascii_case(item.to_string().as_str()) {
+                return item;
             }
         }
-        _ => {}
     }
     exit!("unknown field: {}", expr.as_str());
 }
 
 fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose: bool) -> RegexWithCaptures {
-    match expr.as_rule() {
-        Rule::regexp => {
-            let mut parsed_text = String::from(expr.as_str());
-            parsed_text.pop();
-            parsed_text.remove(0);
-            let mut regstr = String::from(parsed_text.as_str());
-            for t in templates {
-                regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
-            }
-            let re = regex::Regex::new(regstr.as_str());
-            if re.is_err() {
-                exit!("cant parse regex: {}", regstr);
-            }
-            let regexp = re.unwrap();
-            let captures = regexp.capture_names()
-                .filter_map(|x| x).map(|x| String::from(x)).filter(|x| x.len() > 0).collect::<Vec<String>>();
-            if verbose { println!("Created regex: {} with captures: [{}]", regstr, (&captures).join(", ")) }
-            return RegexWithCaptures {
-                restr: regstr,
-                re: regexp,
-                captures,
-            };
+    if expr.as_rule() == Rule::regexp {
+        let mut parsed_text = String::from(expr.as_str());
+        parsed_text.pop();
+        parsed_text.remove(0);
+        let mut regstr = String::from(parsed_text.as_str());
+        for t in templates {
+            regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
         }
-        _ => {}
+        let re = regex::Regex::new(regstr.as_str());
+        if re.is_err() {
+            exit!("cant parse regex: {}", regstr);
+        }
+        let regexp = re.unwrap();
+        let captures = regexp.capture_names()
+            .flatten().map(String::from).filter(|x| !x.is_empty()).collect::<Vec<String>>();
+        if verbose { println!("Created regex: {} with captures: [{}]", regstr, captures.join(", ")) }
+        return RegexWithCaptures {
+            restr: regstr,
+            re: regexp,
+            captures,
+        };
     }
     exit!("unknown field: {}", expr.as_str());
 }
@@ -282,7 +276,7 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, ver
             }
         }
     }
-    if stmts.len() < 1 || stmts.len() > 1 {
+    if stmts.is_empty() || stmts.len() > 1 {
         exit!("did not expect multiple rule: {:?}", stmts);
     }
     stmts.pop().unwrap()
@@ -349,7 +343,9 @@ pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>, v
     }
 }
 
-fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> (DiGraph<String, ()>, HashMap<usize, String>, HashMap<&String, Vec<String>>, bool) {
+type GraphDependency<'a > = (DiGraph<String, ()>, HashMap<usize, String>, HashMap<&'a String, Vec<String>>, bool);
+
+fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
     let regex = regex::Regex::new("!(.*?)!").unwrap();
     let mut graph = DiGraph::new();
     let mut node_ids = HashMap::new();
@@ -374,9 +370,9 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> (DiGraph<String, 
             .filter_map(|caps| caps.get(1))
             .map(|caps| String::from(caps.as_str()))
             .collect::<Vec<String>>();
-        let mut iter = edges.iter();
-        while let Some(edge) = iter.next() {
-            let edge_idx = add_node(&mut graph, &edge);
+        let iter = edges.iter();
+        for edge in iter {
+            let edge_idx = add_node(&mut graph, edge);
             graph.add_edge(edge_idx, node_idx, ());
         }
         node_deps.insert(&template.name, edges);
@@ -390,38 +386,35 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> (DiGraph<String, 
         println!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "))
     }
 
-    (graph, node_names, node_deps, cycles.len() > 0)
+    (graph, node_names, node_deps, !cycles.is_empty())
 }
 
 pub fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool) -> Vec<PatternTemplate> {
-    let mut result: Vec<PatternTemplate> = templates.iter().map(|t| t.clone()).collect();
+    let mut result: Vec<PatternTemplate> = templates.to_vec();
     let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
     if cyclic {
         exit!("Cyclic dependencies in templates detected!");
     } else {
-        let mut dep_value_map: HashMap<&String, String> = templates.into_iter().map(|t| (&t.name, t.value.clone())).collect();
+        let mut dep_value_map: HashMap<&String, String> = templates.iter().map(|t| (&t.name, t.value.clone())).collect();
         // Perform a topological sort to get a linear ordering of the nodes
         let node_indices = toposort(&graph, None).unwrap();
-        let mut indices = node_indices.iter();
-        while let Some(node) = indices.next() {
+        let indices = node_indices.iter();
+        for node in indices {
             // only nodes with dependencies
             if graph.edges_directed(*node, petgraph::Incoming).count() > 0 {
                 let node_name = node_map.get(&node.index()).unwrap();
-                match node_deps.get(node_name) {
-                    Some(deps) => {
-                        if verbose { println!("template {}  depends on [{}]", node_name, deps.join(", ")) };
-                        let mut node_template = dep_value_map.get(node_name).unwrap().clone();
-                        for dep_name in deps {
-                            let dep_template = dep_value_map.get(dep_name).unwrap().clone();
-                            let new_templ = node_template.replace(format!("!{}!", dep_name).as_str(), &dep_template);
-                            node_template = new_templ;
-                        }
-                        dep_value_map.insert(node_name, String::from(&node_template));
-                        let template = result.iter_mut().find(|t| node_name.eq(&t.name)).unwrap();
-                        //let new_value = dep_value_map.get(&template.name).unwrap();
-                        template.value = String::from(&node_template);
+                if let Some(deps) = node_deps.get(node_name) {
+                    if verbose { println!("template {}  depends on [{}]", node_name, deps.join(", ")) };
+                    let mut node_template = dep_value_map.get(node_name).unwrap().clone();
+                    for dep_name in deps {
+                        let dep_template = dep_value_map.get(dep_name).unwrap().clone();
+                        let new_templ = node_template.replace(format!("!{}!", dep_name).as_str(), &dep_template);
+                        node_template = new_templ;
                     }
-                    _ => {}
+                    dep_value_map.insert(node_name, String::from(&node_template));
+                    let template = result.iter_mut().find(|t| node_name.eq(&t.name)).unwrap();
+                    //let new_value = dep_value_map.get(&template.name).unwrap();
+                    template.value = String::from(&node_template);
                 }
             }
         }

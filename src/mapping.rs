@@ -54,11 +54,11 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    pub(crate) fn prepare<'a>(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>, verbose: bool) -> () {
+    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>, verbose: bool) {
         self._pattern = Some(get_filter(&self.pattern, templates, verbose));
         match &self.filter {
             Some(flt) => {
-                self._filter = Some(get_filter(&flt, templates, verbose));
+                self._filter = Some(get_filter(flt, templates, verbose));
             },
             _ => self._filter = None
         }
@@ -94,10 +94,7 @@ pub struct MappingValueProcessor<'a> {
 
 impl MappingValueProcessor<'_> {
     fn get_property(&self, key: &str) -> Option<String> {
-        match self.pli.borrow().header.borrow().get_field(key) {
-            Some(value) => Some(String::from(value)),
-            _ => None
-        }
+        self.pli.borrow().header.borrow().get_field(key).map(String::from)
     }
 
     fn set_property(&mut self, key: &str, value: &String, verbose: bool) {
@@ -140,9 +137,9 @@ impl MappingValueProcessor<'_> {
                             }
                         }
                     }
-                    if captured_tag_values.len() > 0 {
+                    if !captured_tag_values.is_empty() {
                         let captured_text = captured_tag_values.join(&mapping_tag.concat);
-                        let replacement = if captured_text.trim().len() > 0 {
+                        let replacement = if !captured_text.trim().is_empty() {
                             // Now we have all our captured values, lets create the tag
                             format!("{}{}{}", &mapping_tag.prefix, captured_text, &mapping_tag.suffix)
                         } else {
@@ -164,17 +161,11 @@ impl MappingValueProcessor<'_> {
 
         for (key, value) in suffix {
             if valid_property!(key.as_str(), AFFIX_FIELDS) {
-                match self.apply_tags(value, captures, verbose) {
-                    Some(suffix) => {
-                        match self.get_property(key) {
-                            Some(old_value) => {
-                                let new_value = format!("{}{}", &old_value, suffix);
-                                self.set_property(key, &new_value, verbose);
-                            }
-                            _ => {}
-                        }
+                if let Some(suffix) = self.apply_tags(value, captures, verbose) {
+                    if let Some(old_value) = self.get_property(key) {
+                        let new_value = format!("{}{}", &old_value, suffix);
+                        self.set_property(key, &new_value, verbose);
                     }
-                    _ => {}
                 }
             }
         }
@@ -186,17 +177,11 @@ impl MappingValueProcessor<'_> {
         drop(mapper);
         for (key, value) in prefix {
             if valid_property!(key.as_str(), AFFIX_FIELDS) {
-                match self.apply_tags(value, captures, verbose) {
-                    Some(prefix) => {
-                        match self.get_property(key) {
-                            Some(old_value) => {
-                                let new_value = format!("{}{}", prefix, &old_value);
-                                self.set_property(key, &new_value, verbose);
-                            }
-                            _ => {}
-                        }
+                if let Some(prefix) = self.apply_tags(value, captures, verbose) {
+                    if let Some(old_value) = self.get_property(key) {
+                        let new_value = format!("{}{}", prefix, &old_value);
+                        self.set_property(key, &new_value, verbose);
                     }
-                    _ => {}
                 }
             }
         }
@@ -209,11 +194,8 @@ impl MappingValueProcessor<'_> {
         for (key, value) in assignments {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) &&
                 valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
-                match self.get_property(value) {
-                    Some(prop_value) => {
-                        self.set_property(key, &prop_value, verbose);
-                    }
-                    _ => {}
+                if let Some(prop_value) = self.get_property(value) {
+                    self.set_property(key, &prop_value, verbose);
                 }
             }
         }
@@ -223,7 +205,7 @@ impl MappingValueProcessor<'_> {
 impl ValueProcessor for MappingValueProcessor<'_> {
     fn process<'a>(&mut self, _: &ItemField, value: &str, rewc: &RegexWithCaptures, verbose: bool) -> bool {
         let mut captured_values = HashMap::new();
-        if rewc.captures.len() > 0 {
+        if !rewc.captures.is_empty() {
             rewc.re.captures_iter(value)
                 .filter(|caps| caps.len() > 1)
                 .for_each(|captures|
@@ -268,17 +250,9 @@ impl Clone for Mapping {
 
 impl Mapping {
     pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
-                          tags: Option<&Vec<MappingTag>>, verbose: bool) -> () {
+                          tags: Option<&Vec<MappingTag>>, verbose: bool) {
         for mapper in &mut self.mapper {
-            let template_list = match templates {
-                Some(templ) => Some(templ),
-                _ => None
-            };
-            let tag_list = match tags {
-                Some(t) => Some(t),
-                _ => None
-            };
-            mapper.prepare(template_list, tag_list, verbose);
+            mapper.prepare(templates, tags, verbose);
         }
     }
 }
@@ -292,10 +266,7 @@ pub struct MappingDefinition {
 
 impl MappingDefinition {
     pub(crate) fn prepare(&mut self, verbose: bool) {
-        match &mut self.templates {
-            Some(templates) => self.templates = Some(prepare_templates(templates, verbose)),
-            _ => {}
-        };
+        if let Some(templates) = &mut self.templates { self.templates = Some(prepare_templates(templates, verbose)) };
         for mapping in &mut self.mapping {
             let template_list = match &self.templates {
                 Some(templ) => Some(templ),

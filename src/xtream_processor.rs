@@ -10,7 +10,7 @@ fn null_to_default<'de, D, T>(d: D) -> Result<T, D::Error>
         T: Default + Deserialize<'de>,
 {
     let opt = Option::deserialize(d)?;
-    let val = opt.unwrap_or_else(T::default);
+    let val = opt.unwrap_or_default();
     Ok(val)
 }
 
@@ -99,30 +99,27 @@ pub(crate) fn process(category: Option<serde_json::Value>, streams: Option<serde
             }
 
             for stream in streams {
-                match  group_map.get(stream.category_id.as_str()) {
-                    Some(group) => {
-                        let mut grp = group.borrow_mut();
-                        let title = String::from(&grp.category_name);
-                        let item = PlaylistItem {
-                            header: RefCell::new(PlaylistItemHeader {
-                                id: stream.stream_id.to_string(),
-                                name: String::from(&stream.name),
-                                logo: String::from(&stream.stream_icon),
-                                logo_small: "".to_string(),
-                                group: title,
-                                title: String::from(&stream.name),
-                                parent_code: "".to_string(),
-                                audio_track: "".to_string(),
-                                time_shift: "".to_string(),
-                                rec: "".to_string(),
-                                source: String::from(&stream.direct_source),
-                                chno: stream.num.to_string(),
-                            }),
-                            url: format!("{}/{}", stream_base_url, stream.stream_id),
-                        };
-                        grp.add(item);
-                    }
-                    None => {}
+                if let Some(group) = group_map.get(stream.category_id.as_str()) {
+                    let mut grp = group.borrow_mut();
+                    let title = String::from(&grp.category_name);
+                    let item = PlaylistItem {
+                        header: RefCell::new(PlaylistItemHeader {
+                            id: stream.stream_id.to_string(),
+                            name: String::from(&stream.name),
+                            logo: String::from(&stream.stream_icon),
+                            logo_small: "".to_string(),
+                            group: title,
+                            title: String::from(&stream.name),
+                            parent_code: "".to_string(),
+                            audio_track: "".to_string(),
+                            time_shift: "".to_string(),
+                            rec: "".to_string(),
+                            source: String::from(&stream.direct_source),
+                            chno: stream.num.to_string(),
+                        }),
+                        url: format!("{}/{}", stream_base_url, stream.stream_id),
+                    };
+                    grp.add(item);
                 }
             }
 
