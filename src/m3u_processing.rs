@@ -139,8 +139,8 @@ pub(crate) fn write_m3u(playlist: &mut [PlaylistGroup],
     apply_affixes(&mut new_playlist, input, verbose);
 
     sort_playlist(target, &mut new_playlist);
-    if let Some(output_type) = &target.output {
-        if let TargetType::Strm = output_type { return write_strm_playlist(&target, &cfg, &mut new_playlist) }
+    if let Some(TargetType::Strm) = &target.output {
+         return write_strm_playlist(target, cfg, &mut new_playlist)
     }
     write_m3u_playlist(target, cfg, &mut new_playlist)
 }
