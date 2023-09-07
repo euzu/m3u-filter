@@ -31,7 +31,9 @@ sources:
         options: { ignore_logo: true }
         rename:
           - { field: group, new_name: 1. DE$1, pattern: ^DE(.*) }
-        sort: { order: asc }
+        sort:
+          groups:
+            order: asc
         mapping:
           - France TNT
           - France Premium
@@ -44,4 +46,6 @@ sources:
         options: { ignore_logo: true, cleanup: true, underscore_whitespace: false, kodi_style: true }
         rename:
           - { field: group, new_name: 1. DE$1, pattern: ^DE(.*) }
-        sort: { order: asc }
+        sort:
+          groups:
+            order: asc
