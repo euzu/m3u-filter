@@ -1,4 +1,8 @@
 # Changelog
+# v1.0.1(2023-09-07)
+* Refactored sorting. Sorting channels inside group now possible
+
+# Changelog
 # v1.0.0(2023-04-27)
 * Added target argument for command line. `m3u-filter -t <target_name> -t <target_name>`. Target names should be provided in the config.
 * Added filter to mapper definition.

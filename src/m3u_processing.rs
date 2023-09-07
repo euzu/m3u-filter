@@ -271,13 +271,40 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
 
 fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
     if let Some(sort) = &target.sort {
-        new_playlist.sort_by(|a, b| {
-            let ordering = a.title.partial_cmp(&b.title).unwrap();
-            match sort.order {
-                Asc => ordering,
-                Desc => ordering.reverse()
-            }
-        });
+        let match_as_ascii = &sort.match_as_ascii;
+        if let Some(group_sort) = &sort.groups {
+            new_playlist.sort_by(|a, b| {
+                let value_a = if *match_as_ascii { unidecode(&a.title) } else { String::from(&a.title) };
+                let value_b = if *match_as_ascii { unidecode(&b.title) } else { String::from(&b.title) };
+                let ordering = value_a.partial_cmp(&value_b).unwrap();
+                match group_sort.order {
+                    Asc => ordering,
+                    Desc => ordering.reverse()
+                }
+            });
+        }
+        if let Some(channel_sorts) = &sort.channels {
+                channel_sorts.iter().for_each(|channel_sort| {
+                    let regexp = channel_sort.re.as_ref().unwrap();
+                    new_playlist.iter_mut().for_each(|group| {
+                        let group_title = if *match_as_ascii { unidecode(&group.title) } else { String::from(&group.title) };
+                        let is_match = regexp.is_match(group_title.as_str());
+                        if is_match {
+                            group.channels.sort_by(|a, b| {
+                                let raw_value_a = get_field_value(a, &channel_sort.field);
+                                let raw_value_b = get_field_value(b, &channel_sort.field);
+                                let value_a = if *match_as_ascii { unidecode(&raw_value_a) } else { raw_value_a };
+                                let value_b = if *match_as_ascii { unidecode(&raw_value_b) } else { raw_value_b };
+                                let ordering = value_a.partial_cmp(&value_b).unwrap();
+                                match channel_sort.order {
+                                    Asc => ordering,
+                                    Desc => ordering.reverse()
+                                }
+                            });
+                    }
+                });
+            });
+        }
     }
 }
 

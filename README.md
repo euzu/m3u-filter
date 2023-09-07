@@ -129,7 +129,20 @@ Has the following top level entries:
 Is the filename for the resulting playlist.
 
 ### 1.5.2.2 `sort`
-Has one top level attribute `order` which can be set to `asc`or `desc`.
+Has three top level attributes
+* `match_as_ascii` _optional_ default is `false`
+* `groups`
+* `channels`
+
+#### `groups` 
+has one top level attribute `order` which can be set to `asc`or `desc`.
+#### `channels` 
+is a list of sort configurations for groups. Each configuration has 3 top level entries.
+* `field` can be  `group`, `title`, `name` or `url`.
+* `group_pattern` is a regular expression like `'^TR.:\s?(.*)'` which is matched against group title.
+* `order` can be `asc` or `desc`
+
+The pattern should be selected taking into account the processing sequence.
 
 ### 1.5.2.3 `output`
 There are two types of targets ```m3u``` and ```strm```. 
@@ -167,8 +180,9 @@ The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
 
 ### 1.5.2.7 `rename`
-Has 3 top level entries.
+Is a List of rename configurations. Each configuration has 3 top level entries.
 * `field` can be  `group`, `title`, `name` or `url`.
+* `pattern` is a regular expression like `'^TR.:\s?(.*)'`
 * `new_name` can contain capture groups variables addressed with `$1`,`$2`,... 
 
 `rename` supports capture groups. Each group can be addressed with `$1`, `$2` .. in the `new_name` attribute.

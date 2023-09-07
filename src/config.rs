@@ -33,8 +33,44 @@ impl ProcessTargets {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigSort {
+pub struct ConfigSortGroup {
     pub order: SortOrder,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ConfigSortChannel {
+    pub field: ItemField, // channel field
+    pub group_pattern: String, // match against group title
+    pub order: SortOrder,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub re: Option<regex::Regex>,
+}
+
+impl ConfigSortChannel {
+    pub(crate) fn prepare(&mut self) {
+        let re = regex::Regex::new(&self.group_pattern);
+        if re.is_err() {
+            println!("cant parse regex: {}", &self.group_pattern);
+            std::process::exit(1);
+        }
+        self.re = Some(re.unwrap());
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ConfigSort {
+    #[serde(default = "default_as_false")]
+    pub match_as_ascii: bool,
+    pub groups: Option<ConfigSortGroup>,
+    pub channels: Option<Vec<ConfigSortChannel>>,
+}
+
+impl ConfigSort {
+    pub(crate) fn prepare(&mut self) {
+        if let Some(channels) = self.channels.as_mut() {
+            channels.iter_mut().for_each(|r| r.prepare());
+        }
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -101,6 +137,9 @@ impl ConfigTarget {
         self._filter = Some(fltr);
         if let Some(renames) = self.rename.as_mut() {
             renames.iter_mut().for_each(|r| r.prepare());
+        }
+        if let Some(sort) = self.sort.as_mut() {
+            sort.prepare();
         }
     }
     pub(crate) fn filter(&self, provider: &ValueProvider, verbose: bool) -> bool {
@@ -298,7 +337,7 @@ impl Clone for ConfigTarget {
             name: self.name.clone(),
             filename: self.filename.clone(),
             options: self.options.as_ref().cloned(),
-            sort: self.sort.as_ref().cloned(),
+            sort: self.sort.clone(),
             filter: self.filter.clone(),
             output: self.output.clone(),
             rename: self.rename.clone(),
@@ -330,10 +369,32 @@ impl Clone for ConfigOptions {
     }
 }
 
+impl Clone for ConfigSortGroup {
+    fn clone(&self) -> Self {
+        ConfigSortGroup {
+            order: self.order.clone(),
+        }
+    }
+}
+
+impl Clone for ConfigSortChannel {
+    fn clone(&self) -> Self {
+        ConfigSortChannel {
+            field: self.field.clone(),
+            group_pattern: self.group_pattern.clone(),
+            order: self.order.clone(),
+            re: None,
+        }
+    }
+}
+
+
 impl Clone for ConfigSort {
     fn clone(&self) -> Self {
         ConfigSort {
-            order: self.order.clone(),
+            match_as_ascii: self.match_as_ascii,
+            groups: self.groups.clone(),
+            channels: self.channels.clone(),
         }
     }
 }
