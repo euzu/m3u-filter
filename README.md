@@ -144,6 +144,14 @@ is a list of sort configurations for groups. Each configuration has 3 top level 
 
 The pattern should be selected taking into account the processing sequence.
 
+```yml
+sort:
+  groups:
+    order: asc
+  channels:
+    - { field: name,  group_pattern: '^DE.*',  order: asc }
+```
+
 ### 1.5.2.3 `output`
 There are two types of targets ```m3u``` and ```strm```. 
 If the attribute is not specified ```m3u``` is created by default.
