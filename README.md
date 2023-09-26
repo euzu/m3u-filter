@@ -272,6 +272,30 @@ sources:
             new_name: 1. DE$1
 ```
 
+### 1.6 `video_suffix`
+video_suffix a optional list.
+
+It is possible to define video file endings to assign the playlist entry to the xtream cluster video.
+If no suffix is given, default suffixes are: 
+
+```yaml
+video_suffix:
+  - .mkv
+  - .mp4
+  - .avi
+```
+
+### 1.7 `schedule`
+Schedule is optional.
+Format is
+```yaml
+#   sec  min   hour   day of month   month   day of week   year
+schedule: "0  0  8,12,16,20,22,1  *  *  *  *"
+```
+
+At the given times the complete processing is started. Do not start it every second or minute.
+You could be banned from your server.
+
 ## 2. `mapping.yml`
 Has the root item `mappings` which has the following top level entries:
 * `templates` _optional_

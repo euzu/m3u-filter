@@ -1,8 +1,12 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_web::{App, get, HttpRequest, HttpResponse, HttpServer, web};
+use chrono::{Local};
+use cron::Schedule;
+use std::str::FromStr;
 
 use crate::api_model::{AppState, PlaylistRequest, ServerConfig};
 use crate::config::{Config, ConfigInput, InputType};
@@ -34,7 +38,7 @@ pub(crate) async fn playlist(
         suffix: None,
         enabled: true,
     };
-    let result = get_m3u_playlist(&input, &_app_state.config.working_dir, false);
+    let result = get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir, false);
     HttpResponse::Ok().json(result)
 }
 
@@ -59,9 +63,19 @@ pub(crate) async fn start_server(cfg: Config) -> futures::io::Result<()> {
         std::process::exit(1);
     }
 
+    let schedule= cfg.schedule.clone();
+
+    // Scheduler
+    if let Some(expression) = schedule {
+        actix_rt::spawn(async move {
+            start_scheduler(&expression).await
+        });
+    }
+
     let shared_data = web::Data::new(AppState {
         config: cfg,
     });
+    // Web Server
     HttpServer::new(move || App::new()
         .wrap(Cors::default()
             .supports_credentials()
@@ -83,4 +97,21 @@ pub(crate) async fn start_server(cfg: Config) -> futures::io::Result<()> {
         .run().await
     //
     // .service(actix_files::Files::new("/static", ".").show_files_listing())
+}
+
+async fn start_scheduler(expression: &String) -> ! {
+    let schedule = Schedule::from_str(expression).unwrap();
+    let offset = *Local::now().offset();
+    loop {
+        let mut upcoming = schedule.upcoming(offset).take(1);
+        actix_rt::time::sleep(Duration::from_millis(500)).await;
+        let local = &Local::now();
+
+        if let Some(datetime) = upcoming.next() {
+            if datetime.timestamp() <= local.timestamp() {
+
+                // Do what you want
+            }
+        }
+    }
 }

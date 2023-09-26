@@ -1,5 +1,6 @@
 use std::cell::RefCell;
-use crate::m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader};
+use crate::config::Config;
+use crate::m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
 
 fn token_value(it: &mut std::str::Chars) -> String {
     if let Some(oc) = it.next() {
@@ -48,8 +49,8 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     }
 }
 
-fn process_header(content: &String) -> PlaylistItemHeader {
-    let mut plih = PlaylistItemHeader {
+fn create_empty_playlistitem_header(content: &String) -> PlaylistItemHeader {
+    return PlaylistItemHeader {
         id: String::from(""),
         name: String::from(""),
         logo: String::from(""),
@@ -62,8 +63,12 @@ fn process_header(content: &String) -> PlaylistItemHeader {
         rec: String::from(""),
         source: String::from(content),
         chno: String::from(""),
+        xtream_cluster: XtreamCluster::LIVE
     };
+}
 
+fn process_header(video_suffixes: &Vec<&str>,content: &String, url: String) -> PlaylistItemHeader {
+    let mut plih = create_empty_playlistitem_header(content);
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':');
     if line_token == Some(String::from("#EXTINF")) {
@@ -96,14 +101,30 @@ fn process_header(content: &String) -> PlaylistItemHeader {
             c = it.next();
         }
     }
+
+    for suffix in video_suffixes {
+       if url.ends_with(suffix) {
+           // TODO find Series based on group or configured names
+           plih.xtream_cluster = XtreamCluster::VIDEO;
+           break;
+       }
+    }
     plih
 }
 
-pub(crate) fn process(lines: &Vec<String>) -> Vec<PlaylistGroup> {
+
+
+pub(crate) fn process(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup> {
     let mut groups: std::collections::HashMap<String, Vec<PlaylistItem>> = std::collections::HashMap::new();
     let mut sort_order: Vec<String> = vec![];
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
+
+    let video_suffixes = if let Some(suffixes) = &cfg.video_suffix {
+        suffixes.iter().map(|s| s.as_str()).collect()
+    } else {
+        vec![".mp4", ".mkv", ".avi"]
+    };
 
     for line in lines {
         if line.starts_with("#EXTINF") {
@@ -118,7 +139,7 @@ pub(crate) fn process(lines: &Vec<String>) -> Vec<PlaylistGroup> {
             continue;
         }
         if let Some(..) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(&header.unwrap())), url: String::from(line) };
+            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header.unwrap(), String::from(line))), url: String::from(line) };
             if group.is_some() && item.header.borrow().group.is_empty() {
                 item.header.borrow_mut().group = group.unwrap();
             }

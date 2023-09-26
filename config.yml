@@ -1,6 +1,12 @@
 api: { host: 127.0.0.1, port: 8901, web_root: /home/m3u-filter/web }
 threads: 0
 working_dir: /home/m3u-filter/data
+video_suffix:
+  - .mkv
+  - .mp4
+  - .avi
+# sec  min   hour   day of month   month   day of week   year
+schedule: "0  0  8,12,16,20,22,1  *  *  *  *"
 templates:
   - name: DE_CHAN
     value: >-

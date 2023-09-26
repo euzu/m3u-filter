@@ -3,7 +3,6 @@ extern crate pest;
 extern crate pest_derive;
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use clap::Parser;
 use crate::config::{Config, ConfigSource, ProcessTargets};
 use crate::mapping::Mappings;
@@ -36,7 +35,6 @@ struct Args {
     #[arg(short, long)]
     target: Option<Vec<String>>,
 
-
     /// The mapping file
     #[arg(short, long)]
     mapping: Option<String>,
@@ -51,22 +49,21 @@ struct Args {
 }
 
 fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> ProcessTargets {
-
     let mut enabled = true;
     let mut inputs: Vec<u16> = vec![];
     let mut targets: Vec<u16> = vec![];
     if let Some(user_targets) = target_args {
-        let mut check_targets: HashMap<String, u16> =   user_targets.iter().map(|t| (t.to_lowercase(), 0)).collect();
+        let mut check_targets: HashMap<String, u16> = user_targets.iter().map(|t| (t.to_lowercase(), 0)).collect();
         for source in sources {
             let mut target_added = false;
             for target in &source.targets {
-                for user_target  in user_targets {
+                for user_target in user_targets {
                     let key = user_target.to_lowercase();
                     if target.name.eq_ignore_ascii_case(key.as_str()) {
                         targets.push(target.id);
                         target_added = true;
                         if let Some(value) = check_targets.get(key.as_str()) {
-                            check_targets.insert(key, value+1);
+                            check_targets.insert(key, value + 1);
                         }
                     }
                 }
@@ -76,23 +73,22 @@ fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSourc
             }
         }
 
-        let missing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)|  *v == 0).map(|(k, _)| k.to_string()).collect();
+        let missing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v == 0).map(|(k, _)| k.to_string()).collect();
         if !missing_targets.is_empty() {
             println!("No target found for {}", missing_targets.join(", "));
             std::process::exit(1);
         }
-        let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)|  *v != 0).map(|(k, _)| k.to_string()).collect();
+        let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
         println!("Processing targets {}", processing_targets.join(", "));
-
     } else {
         enabled = false;
     }
 
-   ProcessTargets {
-       enabled,
-       inputs,
-       targets,
-   }
+    ProcessTargets {
+        enabled,
+        inputs,
+        targets,
+    }
 }
 
 fn main() {
@@ -124,8 +120,7 @@ fn main() {
             }
         };
     } else {
-        let config = Arc::new(cfg);
-        m3u_processing::process_sources(config, &targets, verbose);
+        m3u_processing::process_sources(cfg, &targets, verbose);
     }
 }
 

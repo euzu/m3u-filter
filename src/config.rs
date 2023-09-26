@@ -246,6 +246,8 @@ pub struct Config {
     pub sources: Vec<ConfigSource>,
     pub working_dir: String,
     pub templates: Option<Vec<PatternTemplate>>,
+    pub video_suffix : Option<Vec<String>>,
+    pub schedule: Option<String>,
 }
 
 impl Config {
@@ -325,6 +327,8 @@ impl Clone for Config {
             sources: self.sources.clone(),
             working_dir: self.working_dir.clone(),
             templates: self.templates.clone(),
+            video_suffix : self.video_suffix.clone(),
+            schedule : self.schedule.clone(),
         }
     }
 }

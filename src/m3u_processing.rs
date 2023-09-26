@@ -427,7 +427,7 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
     let input = &source.input;
     if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)) {
         let mut result = match input.input_type {
-            InputType::M3u => get_m3u_playlist(input, &cfg.working_dir, verbose),
+            InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir, verbose),
             InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir, verbose),
         };
         if let Some(playlist) = result.as_mut() {
@@ -450,7 +450,8 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
     }
 }
 
-pub fn process_sources(cfg: Arc<Config>, user_targets: &ProcessTargets, verbose: bool) {
+pub fn process_sources(c: Config, user_targets: &ProcessTargets, verbose: bool) {
+    let cfg = Arc::new(c);
     let mut handle_list = vec![];
     let thread_num = cfg.threads;
     let process_parallel = thread_num > 1 && cfg.sources.len() > 1;

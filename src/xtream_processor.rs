@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use serde::{Deserialize, Deserializer};
-use crate::m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader};
+use crate::m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
 use crate::model::{default_as_empty_str};
 
 fn null_to_default<'de, D, T>(d: D) -> Result<T, D::Error>
@@ -88,7 +88,7 @@ fn process_streams(streams: Option<serde_json::Value>) -> Vec<XtreamStream> {
     }
 }
 
-pub(crate) fn process(category: Option<serde_json::Value>, streams: Option<serde_json::Value>, stream_base_url: &String) -> Vec<PlaylistGroup> {
+pub(crate) fn process(xtream_cluster: &XtreamCluster, category: Option<serde_json::Value>, streams: Option<serde_json::Value>, stream_base_url: &String) -> Vec<PlaylistGroup> {
     let mut categories = process_category(category);
     if !categories.is_empty() {
         let streams = process_streams(streams);
@@ -116,6 +116,7 @@ pub(crate) fn process(category: Option<serde_json::Value>, streams: Option<serde
                             rec: "".to_string(),
                             source: String::from(&stream.direct_source),
                             chno: stream.num.to_string(),
+                            xtream_cluster: xtream_cluster.clone()
                         }),
                         url: format!("{}/{}", stream_base_url, stream.stream_id),
                     };

@@ -1,4 +1,8 @@
 # Changelog
+# v1.0.2(2023-10-??)
+* Added scheduler to update lists in server mode.
+* Added Xtream Cluster Live, Video, Series. M3u Playlist cluster guessing through video file endings.
+
 # v1.0.1(2023-09-07)
 * Refactored sorting. Sorting channels inside group now possible
 

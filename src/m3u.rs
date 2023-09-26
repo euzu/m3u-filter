@@ -1,8 +1,19 @@
 use std::cell::RefCell;
 use serde::{Deserialize, Serialize};
 use crate::config::ConfigOptions;
+
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
+
+
+#[derive(Debug, Clone)]
+pub enum XtreamCluster {
+    LIVE = 1,
+    VIDEO = 2,
+    SERIES = 3
+}
+
+pub fn default_stream_cluster() -> XtreamCluster { XtreamCluster::LIVE }
 
 pub trait FieldAccessor {
     fn get_field(&self, field: &str) -> Option<&String>;
@@ -23,6 +34,8 @@ pub struct PlaylistItemHeader {
     pub rec: String,
     pub source: String,
     pub chno: String,
+    #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
+    pub xtream_cluster: XtreamCluster,
 }
 
 impl FieldAccessor for PlaylistItemHeader {
