@@ -7,9 +7,11 @@ use actix_web::{App, get, HttpRequest, HttpResponse, HttpServer, web};
 use chrono::{Local};
 use cron::Schedule;
 use std::str::FromStr;
+use actix_web::web::Data;
 
 use crate::api_model::{AppState, PlaylistRequest, ServerConfig};
-use crate::config::{Config, ConfigInput, InputType};
+use crate::config::{Config, ConfigInput, InputType, ProcessTargets};
+use crate::m3u_processing;
 use crate::service::get_m3u_playlist;
 
 #[get("/")]
@@ -53,7 +55,7 @@ pub(crate) async fn config(
 }
 
 #[actix_web::main]
-pub(crate) async fn start_server(cfg: Config) -> futures::io::Result<()> {
+pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets, verbose: bool) -> futures::io::Result<()> {
     let host = cfg.api.host.clone();
     let port = cfg.api.port;
     let web_dir = cfg.api.web_root.clone();
@@ -65,16 +67,21 @@ pub(crate) async fn start_server(cfg: Config) -> futures::io::Result<()> {
 
     let schedule= cfg.schedule.clone();
 
-    // Scheduler
-    if let Some(expression) = schedule {
-        actix_rt::spawn(async move {
-            start_scheduler(&expression).await
-        });
-    }
 
     let shared_data = web::Data::new(AppState {
         config: cfg,
+        targets,
+        verbose
     });
+
+    // Scheduler
+    if let Some(expression) = schedule {
+        let cloned_data = shared_data.clone();
+        actix_rt::spawn(async move {
+            start_scheduler(&expression, cloned_data).await
+        });
+    }
+
     // Web Server
     HttpServer::new(move || App::new()
         .wrap(Cors::default()
@@ -99,7 +106,7 @@ pub(crate) async fn start_server(cfg: Config) -> futures::io::Result<()> {
     // .service(actix_files::Files::new("/static", ".").show_files_listing())
 }
 
-async fn start_scheduler(expression: &String) -> ! {
+async fn start_scheduler(expression: &String, data: Data<AppState>) -> ! {
     let schedule = Schedule::from_str(expression).unwrap();
     let offset = *Local::now().offset();
     loop {
@@ -109,8 +116,7 @@ async fn start_scheduler(expression: &String) -> ! {
 
         if let Some(datetime) = upcoming.next() {
             if datetime.timestamp() <= local.timestamp() {
-
-                // Do what you want
+                m3u_processing::process_sources((&data.config).clone(), &data.targets, data.verbose);
             }
         }
     }

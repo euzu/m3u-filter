@@ -450,17 +450,17 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
     }
 }
 
-pub fn process_sources(c: Config, user_targets: &ProcessTargets, verbose: bool) {
-    let cfg = Arc::new(c);
+pub fn process_sources(cfg: Config, user_targets: &ProcessTargets, verbose: bool) {
+    let config = Arc::new(cfg);
     let mut handle_list = vec![];
-    let thread_num = cfg.threads;
-    let process_parallel = thread_num > 1 && cfg.sources.len() > 1;
+    let thread_num = config.threads;
+    let process_parallel = thread_num > 1 && config.sources.len() > 1;
     if verbose && process_parallel { println!("Using {} threads", thread_num) }
 
-    for (index, _) in cfg.sources.iter().enumerate() {
-        let config = cfg.clone();
+    for (index, _) in config.sources.iter().enumerate() {
+        let cfg_clone = config.clone();
         let usr_targets = Arc::new(user_targets.clone());
-        let process = move || process_source(config, index, usr_targets, verbose);
+        let process = move || process_source(cfg_clone, index, usr_targets, verbose);
         if process_parallel {
             let handles = &mut handle_list;
             handles.push(thread::spawn(process));

@@ -112,7 +112,7 @@ fn main() {
     if args.server {
         if verbose { println!("web_root: {}", &cfg.api.web_root); }
         println!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
-        match api::start_server(cfg) {
+        match api::start_server(cfg, targets, verbose) {
             Ok(_) => {}
             Err(e) => {
                 println!("cant start server: {}", e);
