@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use serde::{Deserialize, Deserializer};
-use crate::m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
-use crate::model::{default_as_empty_str};
+use crate::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
+use crate::model_config::{default_as_empty_str};
 
 fn null_to_default<'de, D, T>(d: D) -> Result<T, D::Error>
     where
@@ -14,8 +14,8 @@ fn null_to_default<'de, D, T>(d: D) -> Result<T, D::Error>
     Ok(val)
 }
 
-pub fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
-pub fn default_as_zero() -> i32 { 0 }
+pub(crate) fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
+pub(crate) fn default_as_zero() -> i32 { 0 }
 
 #[derive(Deserialize)]
 struct XtreamCategory {
@@ -88,7 +88,7 @@ fn process_streams(streams: Option<serde_json::Value>) -> Vec<XtreamStream> {
     }
 }
 
-pub(crate) fn process(xtream_cluster: &XtreamCluster, category: Option<serde_json::Value>, streams: Option<serde_json::Value>, stream_base_url: &String) -> Vec<PlaylistGroup> {
+pub(crate) fn parse_xtream(xtream_cluster: &XtreamCluster, category: Option<serde_json::Value>, streams: Option<serde_json::Value>, stream_base_url: &String) -> Vec<PlaylistGroup> {
     let mut categories = process_category(category);
     if !categories.is_empty() {
         let streams = process_streams(streams);

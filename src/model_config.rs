@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use enum_iterator::Sequence;
 
-pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
+pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
     "logo_small",
     "parent_code",
@@ -10,7 +10,7 @@ pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "rec",
     "source",
 ];
-pub const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
+pub(crate) const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 
 #[macro_export]
 macro_rules! valid_property {
@@ -20,19 +20,19 @@ macro_rules! valid_property {
 }
 
 
-pub fn default_as_true() -> bool { true }
+pub(crate) fn default_as_true() -> bool { true }
 
-pub fn default_as_false() -> bool { false }
+pub(crate) fn default_as_false() -> bool { false }
 
-pub fn default_as_empty_str() -> String { String::from("") }
+pub(crate) fn default_as_empty_str() -> String { String::from("") }
 
-pub fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
+pub(crate) fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
 
-pub fn default_as_zero() -> u8 { 0 }
+pub(crate) fn default_as_zero() -> u8 { 0 }
 
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
-pub enum TargetType {
+pub(crate) enum TargetType {
     #[serde(rename = "m3u")]
     M3u,
     #[serde(rename = "strm")]
@@ -49,7 +49,7 @@ impl std::fmt::Display for TargetType {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
-pub enum ProcessingOrder {
+pub(crate) enum ProcessingOrder {
     #[serde(rename = "frm")]
     FRM,
     #[serde(rename = "fmr")]
@@ -78,7 +78,7 @@ impl std::fmt::Display for ProcessingOrder {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
-pub enum ItemField {
+pub(crate) enum ItemField {
     #[serde(rename = "group")]
     Group,
     #[serde(rename = "name")]
@@ -101,7 +101,7 @@ impl std::fmt::Display for ItemField {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum FilterMode {
+pub(crate) enum FilterMode {
     #[serde(rename = "discard")]
     Discard,
     #[serde(rename = "include")]
@@ -109,7 +109,7 @@ pub enum FilterMode {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum SortOrder {
+pub(crate) enum SortOrder {
     #[serde(rename = "asc")]
     Asc,
     #[serde(rename = "desc")]

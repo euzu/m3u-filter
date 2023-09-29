@@ -2,23 +2,24 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 
-use std::collections::HashMap;
 use clap::Parser;
-use crate::config::{Config, ConfigSource, ProcessTargets};
+use crate::config::{Config, validate_targets};
 use crate::mapping::Mappings;
 
-mod m3u;
-mod m3u_processor;
-mod xtream_processor;
-mod config;
-mod mapping;
-mod m3u_processing;
-mod utils;
 mod api;
-mod api_model;
-mod service;
+mod config;
 mod filter;
-mod model;
+mod m3u_parser;
+mod m3u_repository;
+mod mapping;
+mod model_api;
+mod model_config;
+mod model_m3u;
+mod playlist_processor;
+mod repository;
+mod download;
+mod utils;
+mod xtream_parser;
 mod test;
 
 #[derive(Parser)]
@@ -48,51 +49,7 @@ struct Args {
     verbose: bool,
 }
 
-fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> ProcessTargets {
-    let mut enabled = true;
-    let mut inputs: Vec<u16> = vec![];
-    let mut targets: Vec<u16> = vec![];
-    if let Some(user_targets) = target_args {
-        let mut check_targets: HashMap<String, u16> = user_targets.iter().map(|t| (t.to_lowercase(), 0)).collect();
-        for source in sources {
-            let mut target_added = false;
-            for target in &source.targets {
-                for user_target in user_targets {
-                    let key = user_target.to_lowercase();
-                    if target.name.eq_ignore_ascii_case(key.as_str()) {
-                        targets.push(target.id);
-                        target_added = true;
-                        if let Some(value) = check_targets.get(key.as_str()) {
-                            check_targets.insert(key, value + 1);
-                        }
-                    }
-                }
-            }
-            if target_added {
-                inputs.push(source.input.id);
-            }
-        }
-
-        let missing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v == 0).map(|(k, _)| k.to_string()).collect();
-        if !missing_targets.is_empty() {
-            println!("No target found for {}", missing_targets.join(", "));
-            std::process::exit(1);
-        }
-        let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
-        println!("Processing targets {}", processing_targets.join(", "));
-    } else {
-        enabled = false;
-    }
-
-    ProcessTargets {
-        enabled,
-        inputs,
-        targets,
-    }
-}
-
 fn main() {
-    //let args = get_arguments();
     let args = Args::parse();
     let verbose = args.verbose;
 
@@ -120,7 +77,7 @@ fn main() {
             }
         };
     } else {
-        m3u_processing::process_sources(cfg, &targets, verbose);
+        playlist_processor::process_sources(cfg, &targets, verbose);
     }
 }
 

@@ -34,3 +34,4 @@ enum-iterator = "1.3"
 unidecode = "0"
 petgraph = "0"
 openssl = { version = "*", features = ["vendored"] } #https://docs.rs/openssl/0.10.34/openssl/#vendored
+polodb_core = "4.4.0"

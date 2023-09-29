@@ -1,27 +1,27 @@
 use std::cell::RefCell;
 use serde::{Deserialize, Serialize};
-use crate::config::ConfigOptions;
+use crate::config::{ConfigOptions};
 
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
 
 #[derive(Debug, Clone)]
-pub enum XtreamCluster {
+pub(crate) enum XtreamCluster {
     LIVE = 1,
     VIDEO = 2,
     SERIES = 3
 }
 
-pub fn default_stream_cluster() -> XtreamCluster { XtreamCluster::LIVE }
+pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::LIVE }
 
-pub trait FieldAccessor {
+pub(crate) trait FieldAccessor {
     fn get_field(&self, field: &str) -> Option<&String>;
     fn set_field(&mut self, field: &str, value: &str) -> bool;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlaylistItemHeader {
+pub(crate) struct PlaylistItemHeader {
     pub id: String,
     pub name: String,
     pub logo: String,
@@ -78,13 +78,13 @@ impl FieldAccessor for PlaylistItemHeader {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlaylistItem {
+pub(crate) struct PlaylistItem {
     pub header: RefCell<PlaylistItemHeader>,
     pub url: String,
 }
 
 impl PlaylistItem {
-    pub(crate) fn to_m3u(&self, options: &Option<ConfigOptions>) -> String {
+    pub fn to_m3u(&self, options: &Option<ConfigOptions>) -> String {
         let header = self.header.borrow();
         let ignore_logo = options.as_ref().map_or(false, |o| o.ignore_logo);
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"", header.id, header.name, header.group);
@@ -116,7 +116,7 @@ impl PlaylistItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlaylistGroup {
+pub(crate) struct PlaylistGroup {
     pub title: String,
     pub channels: Vec<PlaylistItem>,
 }

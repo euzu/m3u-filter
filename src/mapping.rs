@@ -2,13 +2,13 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use regex::Regex;
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
-use crate::m3u::{FieldAccessor, PlaylistItem};
-use crate::model::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
-                   default_as_empty_str, default_as_false, default_as_empty_map, };
+use crate::model_m3u::{FieldAccessor, PlaylistItem};
+use crate::model_config::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
+                          default_as_empty_str, default_as_false, default_as_empty_map, };
 use crate::valid_property;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct MappingTag {
+pub(crate) struct MappingTag {
     pub name: String,
     pub captures: Vec<String>,
     #[serde(default = "default_as_empty_str")]
@@ -32,7 +32,7 @@ impl Clone for MappingTag {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct Mapper {
+pub(crate) struct Mapper {
     pub filter: Option<String>,
     pub pattern: String,
     #[serde(default = "default_as_empty_map")]
@@ -54,7 +54,7 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>, verbose: bool) {
+    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>, verbose: bool) {
         self._pattern = Some(get_filter(&self.pattern, templates, verbose));
         match &self.filter {
             Some(flt) => {
@@ -87,9 +87,9 @@ impl Clone for Mapper {
     }
 }
 
-pub struct MappingValueProcessor<'a> {
-    pub(crate) pli: RefCell<&'a PlaylistItem>,
-    pub(crate) mapper: RefCell<&'a Mapper>,
+pub(crate) struct MappingValueProcessor<'a> {
+    pub pli: RefCell<&'a PlaylistItem>,
+    pub mapper: RefCell<&'a Mapper>,
 }
 
 impl MappingValueProcessor<'_> {
@@ -231,7 +231,7 @@ impl ValueProcessor for MappingValueProcessor<'_> {
 
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct Mapping {
+pub(crate) struct Mapping {
     pub id: String,
     #[serde(default = "default_as_false")]
     pub match_as_ascii: bool,
@@ -249,7 +249,7 @@ impl Clone for Mapping {
 }
 
 impl Mapping {
-    pub(crate) fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
+    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
                           tags: Option<&Vec<MappingTag>>, verbose: bool) {
         for mapper in &mut self.mapper {
             mapper.prepare(templates, tags, verbose);
@@ -258,14 +258,14 @@ impl Mapping {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct MappingDefinition {
+pub(crate) struct MappingDefinition {
     pub templates: Option<Vec<PatternTemplate>>,
     pub tags: Option<Vec<MappingTag>>,
     pub mapping: Vec<Mapping>,
 }
 
 impl MappingDefinition {
-    pub(crate) fn prepare(&mut self, verbose: bool) {
+    pub fn prepare(&mut self, verbose: bool) {
         if let Some(templates) = &mut self.templates { self.templates = Some(prepare_templates(templates, verbose)) };
         for mapping in &mut self.mapping {
             let template_list = match &self.templates {
@@ -292,16 +292,16 @@ impl Clone for MappingDefinition {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct Mappings {
+pub(crate) struct Mappings {
     pub mappings: MappingDefinition,
 }
 
 impl Mappings {
-    pub(crate) fn prepare(&mut self, verbose: bool) {
+    pub fn prepare(&mut self, verbose: bool) {
         self.mappings.prepare(verbose);
     }
 
-    pub(crate) fn get_mapping(&self, mapping_id: &String) -> Option<Mapping> {
+    pub fn get_mapping(&self, mapping_id: &String) -> Option<Mapping> {
         for mapping in &self.mappings.mapping {
             if mapping.id.eq(mapping_id) {
                 return Some(mapping.clone());

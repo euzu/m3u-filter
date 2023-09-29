@@ -5,7 +5,7 @@ use enum_iterator::Sequence;
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
-use crate::model::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_empty_str, default_as_false, default_as_true};
+use crate::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_empty_str, default_as_false, default_as_true};
 use crate::utils;
 use crate::utils::get_working_path;
 
@@ -16,29 +16,29 @@ fn default_as_default() -> String { String::from("default") }
 fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
 
 #[derive(Clone)]
-pub struct ProcessTargets {
+pub(crate) struct ProcessTargets {
     pub enabled: bool,
     pub inputs: Vec<u16>,
     pub targets: Vec<u16>,
 }
 
 impl ProcessTargets {
-    pub(crate) fn has_target(&self, tid: u16) -> bool {
+    pub fn has_target(&self, tid: u16) -> bool {
         matches!(self.targets.iter().position(|&x| x == tid), Some(_pos))
     }
 
-    pub(crate) fn has_input(&self, tid: u16) -> bool {
+    pub fn has_input(&self, tid: u16) -> bool {
         matches!(self.inputs.iter().position(|&x| x == tid), Some(_pos))
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigSortGroup {
+pub(crate) struct ConfigSortGroup {
     pub order: SortOrder,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigSortChannel {
+pub(crate) struct ConfigSortChannel {
     pub field: ItemField, // channel field
     pub group_pattern: String, // match against group title
     pub order: SortOrder,
@@ -58,7 +58,7 @@ impl ConfigSortChannel {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigSort {
+pub(crate) struct ConfigSort {
     #[serde(default = "default_as_false")]
     pub match_as_ascii: bool,
     pub groups: Option<ConfigSortGroup>,
@@ -74,7 +74,7 @@ impl ConfigSort {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigRename {
+pub(crate) struct ConfigRename {
     pub field: ItemField,
     pub pattern: String,
     pub new_name: String,
@@ -83,7 +83,7 @@ pub struct ConfigRename {
 }
 
 impl ConfigRename {
-    pub(crate) fn prepare(&mut self) {
+    pub fn prepare(&mut self) {
         let re = regex::Regex::new(&self.pattern);
         if re.is_err() {
             println!("cant parse regex: {}", &self.pattern);
@@ -94,7 +94,7 @@ impl ConfigRename {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigOptions {
+pub(crate) struct ConfigOptions {
     #[serde(default = "default_as_false")]
     pub ignore_logo: bool,
     #[serde(default = "default_as_false")]
@@ -106,7 +106,7 @@ pub struct ConfigOptions {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigTarget {
+pub(crate) struct ConfigTarget {
     #[serde(skip)]
     pub id: u16,
     #[serde(default = "default_as_true")]
@@ -130,7 +130,7 @@ pub struct ConfigTarget {
 }
 
 impl ConfigTarget {
-    pub(crate) fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>, verbose: bool) {
+    pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>, verbose: bool) {
         self.id = id;
         let fltr = get_filter(&self.filter, templates, verbose);
         if verbose { println!("Filter: {}", fltr) }
@@ -142,32 +142,32 @@ impl ConfigTarget {
             sort.prepare();
         }
     }
-    pub(crate) fn filter(&self, provider: &ValueProvider, verbose: bool) -> bool {
+    pub fn filter(&self, provider: &ValueProvider, verbose: bool) -> bool {
         let mut processor = MockValueProcessor {};
         return self._filter.as_ref().unwrap().filter(provider, &mut processor, verbose);
     }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ConfigSource {
+pub(crate) struct ConfigSource {
     pub input: ConfigInput,
     pub targets: Vec<ConfigTarget>,
 }
 
 impl ConfigSource {
-    pub(crate) fn prepare(&mut self, id: u16) {
+    pub fn prepare(&mut self, id: u16) {
         self.input.prepare(id);
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct InputAffix {
+pub(crate) struct InputAffix {
     pub field: String,
     pub value: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
-pub enum InputType {
+pub(crate) enum InputType {
     #[serde(rename = "m3u")]
     M3u,
     #[serde(rename = "xtream")]
@@ -177,7 +177,7 @@ pub enum InputType {
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ConfigInput {
+pub(crate) struct ConfigInput {
     #[serde(skip)]
     pub id: u16,
     #[serde(rename = "type", default = "default_as_type_m3u")]
@@ -198,7 +198,7 @@ pub struct ConfigInput {
 }
 
 impl ConfigInput {
-    pub(crate) fn prepare(&mut self, id: u16) {
+    pub fn prepare(&mut self, id: u16) {
         self.id = id;
         if self.url.trim().is_empty() {
             println!("url for input is mandatory");
@@ -224,14 +224,14 @@ impl ConfigInput {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ConfigApi {
+pub(crate) struct ConfigApi {
     pub host: String,
     pub port: u16,
     pub web_root: String,
 }
 
 impl ConfigApi {
-    pub(crate) fn prepare(&mut self) {
+    pub fn prepare(&mut self) {
         if self.web_root.is_empty() {
             self.web_root = String::from("./web");
         }
@@ -239,7 +239,7 @@ impl ConfigApi {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct Config {
+pub(crate) struct Config {
     #[serde(default = "default_as_zero")]
     pub threads: u8,
     pub api: ConfigApi,
@@ -251,7 +251,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) {
+    pub fn set_mappings(&mut self, mappings: Option<Mappings>) {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
                 for target in &mut source.targets {
@@ -270,7 +270,7 @@ impl Config {
         }
     }
 
-    pub(crate) fn prepare(&mut self, verbose: bool) {
+    pub fn prepare(&mut self, verbose: bool) {
         self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
         self.prepare_api_web_root();
@@ -411,5 +411,49 @@ impl Clone for ConfigRename {
             new_name: self.new_name.clone(),
             re: None,
         }
+    }
+}
+
+
+pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> ProcessTargets {
+    let mut enabled = true;
+    let mut inputs: Vec<u16> = vec![];
+    let mut targets: Vec<u16> = vec![];
+    if let Some(user_targets) = target_args {
+        let mut check_targets: HashMap<String, u16> = user_targets.iter().map(|t| (t.to_lowercase(), 0)).collect();
+        for source in sources {
+            let mut target_added = false;
+            for target in &source.targets {
+                for user_target in user_targets {
+                    let key = user_target.to_lowercase();
+                    if target.name.eq_ignore_ascii_case(key.as_str()) {
+                        targets.push(target.id);
+                        target_added = true;
+                        if let Some(value) = check_targets.get(key.as_str()) {
+                            check_targets.insert(key, value + 1);
+                        }
+                    }
+                }
+            }
+            if target_added {
+                inputs.push(source.input.id);
+            }
+        }
+
+        let missing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v == 0).map(|(k, _)| k.to_string()).collect();
+        if !missing_targets.is_empty() {
+            println!("No target found for {}", missing_targets.join(", "));
+            std::process::exit(1);
+        }
+        let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
+        println!("Processing targets {}", processing_targets.join(", "));
+    } else {
+        enabled = false;
+    }
+
+    ProcessTargets {
+        enabled,
+        inputs,
+        targets,
     }
 }

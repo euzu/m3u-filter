@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use crate::config::Config;
-use crate::m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
+use crate::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
 
 fn token_value(it: &mut std::str::Chars) -> String {
     if let Some(oc) = it.next() {
@@ -50,7 +50,7 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
 }
 
 fn create_empty_playlistitem_header(content: &String) -> PlaylistItemHeader {
-    return PlaylistItemHeader {
+    PlaylistItemHeader {
         id: String::from(""),
         name: String::from(""),
         logo: String::from(""),
@@ -64,7 +64,7 @@ fn create_empty_playlistitem_header(content: &String) -> PlaylistItemHeader {
         source: String::from(content),
         chno: String::from(""),
         xtream_cluster: XtreamCluster::LIVE
-    };
+    }
 }
 
 fn process_header(video_suffixes: &Vec<&str>,content: &String, url: String) -> PlaylistItemHeader {
@@ -114,7 +114,7 @@ fn process_header(video_suffixes: &Vec<&str>,content: &String, url: String) -> P
 
 
 
-pub(crate) fn process(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup> {
+pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup> {
     let mut groups: std::collections::HashMap<String, Vec<PlaylistItem>> = std::collections::HashMap::new();
     let mut sort_order: Vec<String> = vec![];
     let mut header: Option<String> = None;

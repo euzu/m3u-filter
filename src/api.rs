@@ -9,10 +9,10 @@ use cron::Schedule;
 use std::str::FromStr;
 use actix_web::web::Data;
 
-use crate::api_model::{AppState, PlaylistRequest, ServerConfig};
+use crate::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::config::{Config, ConfigInput, InputType, ProcessTargets};
-use crate::m3u_processing;
-use crate::service::get_m3u_playlist;
+use crate::playlist_processor;
+use crate::download::get_m3u_playlist;
 
 #[get("/")]
 async fn index(
@@ -116,7 +116,7 @@ async fn start_scheduler(expression: &String, data: Data<AppState>) -> ! {
 
         if let Some(datetime) = upcoming.next() {
             if datetime.timestamp() <= local.timestamp() {
-                m3u_processing::process_sources((&data.config).clone(), &data.targets, data.verbose);
+                playlist_processor::process_sources((&data.config).clone(), &data.targets, data.verbose);
             }
         }
     }

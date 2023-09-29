@@ -4,12 +4,12 @@ use std::collections::{HashMap};
 use pest::iterators::Pair;
 use pest::Parser;
 use petgraph::algo::toposort;
-use crate::m3u::PlaylistItem;
-use crate::model::ItemField;
+use crate::model_m3u::PlaylistItem;
+use crate::model_config::ItemField;
 use petgraph::graph::DiGraph;
 
 
-pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
+pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
     let header = pli.header.borrow();
     let value = match field {
         ItemField::Group => header.group.as_str(),
@@ -20,7 +20,7 @@ pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
     String::from(value)
 }
 
-pub fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) {
+pub(crate) fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) {
     let header = &mut pli.header.borrow_mut();
     match field {
         ItemField::Group => header.group = value,
@@ -30,7 +30,7 @@ pub fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String)
     };
 }
 
-pub struct ValueProvider<'a> {
+pub(crate) struct ValueProvider<'a> {
     pub(crate) pli: RefCell<&'a PlaylistItem>,
 }
 
@@ -41,11 +41,11 @@ impl<'a> ValueProvider<'a> {
     }
 }
 
-pub trait ValueProcessor {
+pub(crate) trait ValueProcessor {
     fn process(&mut self, field: &ItemField, value: &str, rewc: &RegexWithCaptures, verbose: bool) -> bool;
 }
 
-pub struct MockValueProcessor {}
+pub(crate) struct MockValueProcessor {}
 
 impl ValueProcessor for MockValueProcessor {
     fn process(&mut self, _: &ItemField, _: &str, _: &RegexWithCaptures, _: bool) -> bool {
@@ -54,7 +54,7 @@ impl ValueProcessor for MockValueProcessor {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct PatternTemplate {
+pub(crate) struct PatternTemplate {
     pub name: String,
     pub value: String,
 }
@@ -69,7 +69,7 @@ impl Clone for PatternTemplate {
 }
 
 #[derive(Debug)]
-pub struct RegexWithCaptures {
+pub(crate) struct RegexWithCaptures {
     pub restr: String,
     pub re: regex::Regex,
     pub captures: Vec<String>,
@@ -93,12 +93,12 @@ impl Clone for RegexWithCaptures {
 struct FilterParser;
 
 #[derive(Debug, Clone)]
-pub enum UnaryOperator {
+pub(crate) enum UnaryOperator {
     NOT
 }
 
 #[derive(Debug, Clone)]
-pub enum BinaryOperator {
+pub(crate) enum BinaryOperator {
     AND,
     OR,
 }
@@ -113,7 +113,7 @@ impl std::fmt::Display for BinaryOperator {
 }
 
 #[derive(Debug, Clone)]
-pub enum Filter {
+pub(crate) enum Filter {
     Group(Box<Filter>),
     Comparison(ItemField, RegexWithCaptures),
     UnaryExpression(UnaryOperator, Box<Filter>),
@@ -292,7 +292,7 @@ fn get_parser_binary_op(expr: Pair<Rule>) -> BinaryOperator {
     }
 }
 
-pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> Filter {
+pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> Filter {
     let empty_list = Vec::new();
     let template_list: &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
     let mut source = String::from(filter_text);
@@ -389,7 +389,7 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
     (graph, node_names, node_deps, !cycles.is_empty())
 }
 
-pub fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool) -> Vec<PatternTemplate> {
+pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool) -> Vec<PatternTemplate> {
     let mut result: Vec<PatternTemplate> = templates.to_vec();
     let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
     if cyclic {

@@ -10,7 +10,7 @@ pub(crate) struct AppState {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct PlaylistRequest {
-   pub(crate) url: String,
+   pub url: String,
 }
 
 impl From<web::Json<PlaylistRequest>> for PlaylistRequest {
