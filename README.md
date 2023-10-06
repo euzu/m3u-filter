@@ -70,9 +70,7 @@ This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp
  * `targets`
 
 ### 1.5.1 `input`
-Has five entries: `enabled`, `persist`, `url`, `prefix`, `suffix`.
-
-`input: { persist: ./playlist_{}.m3u, url: http://myserver.net/playlist.m3u, prefix: {field: title, value: '#!# ' }, suffix: {field: title, value: ' +-+' } }`
+Has the following attributes:
 
   - `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
   - `enabled` is optional, default is true, if you disable the processing is skipped 
@@ -83,6 +81,9 @@ Has five entries: `enabled`, `persist`, `url`, `prefix`, `suffix`.
   - `pasword`only mandatory for type `xtream`
   - `prefix` is optional, it is applied to the given field with the given value
   - `suffix` is optional, it is applied to the given field with the given value
+
+`persist` should be different for `m3u` and `xtream` types. For `m3u` use full filename like `./playlist_{}.m3u`.
+For `xtream` use a prefix like `./playlist_`
 
 `prefix` and `suffix` are appended after all processing is done, but before sort.
 They have 2 fields:
@@ -102,6 +103,7 @@ Example input config for `xtream`
 sources:
   - input:
       type: xtream
+      persist: 'playlist_1_1{}.m3u'
       headers:
         User-Agent: "Mozilla/5.0 (Linux; Tizen 2.3) AppleWebKit/538.1 (KHTML, like Gecko)Version/2.3 TV Safari/538.1"
         Accept: application/json
@@ -115,8 +117,9 @@ sources:
 ### 1.5.2 `targets`
 Has the following top level entries:
 * `enabled` _optional_ default is `true`, if you disable the processing is skipped
-* `name` _optional_ default is `default`, currently not implemented, planned for running selective target
-* `filename` _mandatory_
+* `name` _optional_ default is `default`, if not default it has to be unique, for running selective targets
+* `publish` _optional_ default is false,  only required if type is `xtream`, otherwise ignored. If true the contents can be published through xtream proxy. 
+* `filename` _mandatory_ if type `m3u` or `publish`= false, otherwise _optional_
 * `sort`  _optional_
 * `output` _optional_ default is `m3u`
 * `processing_order` _optional_ default is `frm`
@@ -125,8 +128,11 @@ Has the following top level entries:
 * `rename` _optional_
 * `mapping` _optional_
 
-### 1.5.2.1 `filename`
-Is the filename for the resulting playlist.
+### 1.5.2.1 `publish` and `filename`
+
+`publish` only required if type is `xtream`, otherwise it is ignored.
+If true the contents can be published through xtream proxy.
+`filename` is the file for resulting playlist. It is _mandatory_ if type `m3u` or `publish`= false 
 
 ### 1.5.2.2 `sort`
 Has three top level attributes

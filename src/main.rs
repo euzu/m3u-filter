@@ -19,6 +19,7 @@ mod playlist_processor;
 mod repository;
 mod download;
 mod utils;
+mod messaging;
 mod xtream_parser;
 mod test;
 

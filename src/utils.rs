@@ -5,6 +5,7 @@ use path_absolutize::*;
 use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
 use crate::config::ConfigInput;
+use crate::messaging::send_message;
 
 pub(crate) fn get_exe_path() -> PathBuf {
     let default_path = std::path::PathBuf::from("./");
@@ -93,6 +94,7 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
             Ok(content) => Some(content),
             Err(e) => {
                 println!("cant download input url: {}  => {}", url_str, e);
+                send_message(format!("Failed to download: {}", url_str).as_str());
                 None
             }
         }
@@ -118,7 +120,9 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
             match result {
                 Some(file) => Some(file),
                 None => {
-                    println!("cant read input url: {:?}", &file_path.unwrap());
+                    let msg = format!("cant read input url: {:?}", &file_path.unwrap());
+                    println!("{}", msg);
+                    send_message(msg.as_str());
                     None
                 }
             }
@@ -132,7 +136,9 @@ fn download_content(url: url::Url, persist_file: Option<PathBuf>, verbose: bool)
             if response.status().is_success() {
                 match response.text_with_charset("utf8") {
                     Ok(text) => {
-                        persist_playlist(persist_file, &text, verbose);
+                        if persist_file.is_some() {
+                            persist_playlist(persist_file, &text, verbose);
+                        }
                         let result = text.lines().map(String::from).collect();
                         Ok(result)
                     }
@@ -203,7 +209,9 @@ fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Optio
             if response.status().is_success() {
                 match response.json::<serde_json::Value>() {
                     Ok(content) => {
-                        persist_playlist(persist_file, &serde_json::to_string(&content).unwrap(), verbose);
+                        if persist_file.is_some() {
+                            persist_playlist(persist_file, &serde_json::to_string(&content).unwrap(), verbose);
+                        }
                         Ok(content)
                     }
                     Err(e) => Err(e.to_string())

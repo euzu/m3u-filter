@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use enum_iterator::Sequence;
 
 pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
-    "name", "title", "group", "id", "chno", "logo",
+    "name", "title", "group", "id", "logo",
     "logo_small",
     "parent_code",
     "audio_track",

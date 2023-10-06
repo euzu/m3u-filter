@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use path_absolutize::*;
 use enum_iterator::Sequence;
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
-use crate::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_empty_str, default_as_false, default_as_true};
+use crate::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_false, default_as_true};
 use crate::utils;
 use crate::utils::get_working_path;
 
@@ -39,8 +39,10 @@ pub(crate) struct ConfigSortGroup {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigSortChannel {
-    pub field: ItemField, // channel field
-    pub group_pattern: String, // match against group title
+    pub field: ItemField,
+    // channel field
+    pub group_pattern: String,
+    // match against group title
     pub order: SortOrder,
     #[serde(skip_serializing, skip_deserializing)]
     pub re: Option<regex::Regex>,
@@ -113,7 +115,9 @@ pub(crate) struct ConfigTarget {
     pub enabled: bool,
     #[serde(default = "default_as_default")]
     pub name: String,
-    pub filename: String,
+    #[serde(default = "default_as_false")]
+    pub publish: bool,
+    pub filename: Option<String>,
     pub options: Option<ConfigOptions>,
     pub sort: Option<ConfigSort>,
     pub filter: String,
@@ -185,12 +189,9 @@ pub(crate) struct ConfigInput {
     #[serde(default = "default_as_empty_map")]
     pub headers: HashMap<String, String>,
     pub url: String,
-    #[serde(default = "default_as_empty_str")]
-    pub username: String,
-    #[serde(default = "default_as_empty_str")]
-    pub password: String,
-    #[serde(default = "default_as_empty_str")]
-    pub persist: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub persist: Option<String>,
     pub prefix: Option<InputAffix>,
     pub suffix: Option<InputAffix>,
     #[serde(default = "default_as_true")]
@@ -204,21 +205,33 @@ impl ConfigInput {
             println!("url for input is mandatory");
             std::process::exit(1);
         }
+        if let Some(user_name) = &self.username {
+            if user_name.trim().is_empty() {
+                self.username = None;
+            }
+        }
+        if let Some(password) = &self.password {
+            if password.trim().is_empty() {
+                self.password = None;
+            }
+        }
         match self.input_type {
             InputType::M3u => {
-                if !self.username.trim().is_empty() || !self.password.trim().is_empty() {
+                if self.username.is_none() || self.password.is_none() {
                     println!("for input type m3u: username and password are ignored")
                 }
             }
             InputType::Xtream => {
-                if self.username.trim().is_empty() || self.password.trim().is_empty() {
+                if self.username.is_none() || self.password.is_none() {
                     println!("for input type xtream: username and password are mandatory");
                     std::process::exit(1);
                 }
             }
         }
-        if !self.persist.is_empty() && self.persist.trim().is_empty() {
-            self.persist = String::from("");
+        if let Some(persist_path) = &self.persist {
+            if persist_path.trim().is_empty() {
+                self.persist = None;
+            }
         }
     }
 }
@@ -246,7 +259,7 @@ pub(crate) struct Config {
     pub sources: Vec<ConfigSource>,
     pub working_dir: String,
     pub templates: Option<Vec<PatternTemplate>>,
-    pub video_suffix : Option<Vec<String>>,
+    pub video_suffix: Option<Vec<String>>,
     pub schedule: Option<String>,
 }
 
@@ -254,7 +267,17 @@ impl Config {
     pub fn set_mappings(&mut self, mappings: Option<Mappings>) {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
+                let is_m3u = matches!(source.input.input_type, InputType::M3u);
                 for target in &mut source.targets {
+                    if is_m3u && target.filename.is_none() {
+                        println!("filename is required for m3u type: {}", target.name);
+                        std::process::exit(1);
+                    }
+                    if !is_m3u && target.filename.is_none() && !target.publish {
+                        println!("filename or publish is required for xtream type: {}", target.name);
+                        std::process::exit(1);
+                    }
+
                     if let Some(mapping_ids) = &target.mapping {
                         let mut target_mappings = Vec::new();
                         for mapping_id in mapping_ids {
@@ -275,12 +298,26 @@ impl Config {
         self.api.prepare();
         self.prepare_api_web_root();
         if let Some(templates) = &mut self.templates { self.templates = Some(prepare_templates(templates, verbose)) };
+        // prepare sources and set id's
+        let mut target_names_check = HashSet::<String>::new();
+        let default_target_name = default_as_default();
         let mut source_index: u16 = 1;
         let mut target_index: u16 = 1;
         for source in &mut self.sources {
             source.prepare(source_index);
             source_index += 1;
             for target in &mut source.targets {
+                // check target name is unique
+                let target_name = target.name.clone();
+                if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
+                    if target_names_check.contains(target_name.as_str()) {
+                        println!("target names should be unique: {}", target_name);
+                        std::process::exit(1);
+                    } else {
+                        target_names_check.insert(target_name);
+                    }
+                }
+                // prepare templaes
                 match &self.templates {
                     Some(templ) => target.prepare(target_index, Some(templ), verbose),
                     _ => target.prepare(target_index, None, verbose)
@@ -327,8 +364,8 @@ impl Clone for Config {
             sources: self.sources.clone(),
             working_dir: self.working_dir.clone(),
             templates: self.templates.clone(),
-            video_suffix : self.video_suffix.clone(),
-            schedule : self.schedule.clone(),
+            video_suffix: self.video_suffix.clone(),
+            schedule: self.schedule.clone(),
         }
     }
 }
@@ -339,6 +376,7 @@ impl Clone for ConfigTarget {
             id: self.id,
             enabled: self.enabled,
             name: self.name.clone(),
+            publish: self.publish,
             filename: self.filename.clone(),
             options: self.options.as_ref().cloned(),
             sort: self.sort.clone(),
@@ -414,7 +452,13 @@ impl Clone for ConfigRename {
     }
 }
 
-
+/// Returns the targets that were specified as parameters.
+/// If invalid targets are found, the program will be terminated.
+/// The return value has `enabled` set to true, if selective targets should be processed, otherwise false.
+///
+/// * `target_args` the program parameters given with `-target` parameter.
+/// * `sources` configured sources in config file
+///
 pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> ProcessTargets {
     let mut enabled = true;
     let mut inputs: Vec<u16> = vec![];

@@ -90,7 +90,7 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
 }
 
 fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
-    if let Some(path) = utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename))) {
+    if let Some(path) = utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename.as_ref().unwrap()))) {
         let mut m3u_file = open_file!(&path);
         match check_write(m3u_file.write(b"#EXTM3U\n")) {
             Ok(_) => (),
@@ -118,7 +118,7 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
     let cleanup = target.options.as_ref().map_or(false, |o| o.cleanup);
     let kodi_style = target.options.as_ref().map_or(false, |o| o.kodi_style);
 
-    if let Some(path) = utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename))) {
+    if let Some(path) = utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename.as_ref().unwrap()))) {
         if cleanup {
             let _ = std::fs::remove_dir_all(&path);
         }

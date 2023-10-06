@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use crate::config::{ConfigOptions};
 
 // https://de.wikipedia.org/wiki/M3U
@@ -33,9 +34,10 @@ pub(crate) struct PlaylistItemHeader {
     pub time_shift: String,
     pub rec: String,
     pub source: String,
-    pub chno: String,
     #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
     pub xtream_cluster: XtreamCluster,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub additional_properties: Option<Vec<(String, Value)>>,
 }
 
 impl FieldAccessor for PlaylistItemHeader {
@@ -52,7 +54,6 @@ impl FieldAccessor for PlaylistItemHeader {
             "time_shift" => Some(&self.time_shift),
             "rec" => Some(&self.rec),
             "source" => Some(&self.source),
-            "chno" => Some(&self.chno),
             _ => None
         }
     }
@@ -71,7 +72,6 @@ impl FieldAccessor for PlaylistItemHeader {
             "time_shift" =>  { self.time_shift = val; true }
             "rec" =>  { self.rec = val; true }
             "source" =>  { self.source = val; true }
-            "chno" =>  { self.chno = val; true }
             _ => false
         }
     }
@@ -88,9 +88,9 @@ impl PlaylistItem {
         let header = self.header.borrow();
         let ignore_logo = options.as_ref().map_or(false, |o| o.ignore_logo);
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"", header.id, header.name, header.group);
-        if !header.chno.is_empty() {
-            line = format!("{} tvg-chno=\"{}\"", line, header.chno);
-        }
+
+        // line = format!("{} tvg-chno=\"{}\"", line, header.chno);
+
         if !ignore_logo {
             if !header.logo.is_empty() {
                 line = format!("{} tvg-logo=\"{}\"", line, header.logo);
@@ -117,6 +117,9 @@ impl PlaylistItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistGroup {
+    pub id: i32,
     pub title: String,
     pub channels: Vec<PlaylistItem>,
+    #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
+    pub xtream_cluster: XtreamCluster,
 }

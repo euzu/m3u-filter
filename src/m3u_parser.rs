@@ -62,8 +62,8 @@ fn create_empty_playlistitem_header(content: &String) -> PlaylistItemHeader {
         time_shift: String::from(""),
         rec: String::from(""),
         source: String::from(content),
-        chno: String::from(""),
-        xtream_cluster: XtreamCluster::LIVE
+        xtream_cluster: XtreamCluster::LIVE,
+        additional_properties: None,
     }
 }
 
@@ -158,8 +158,11 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
     }
 
     let mut result: Vec<PlaylistGroup> = vec![];
-    for (key, value) in groups {
-        result.push(PlaylistGroup { title: key, channels: value });
+    let mut grp_id: i32 = 0;
+    for (key, channels) in groups {
+        grp_id += 1;
+        let cluster = channels.first().map(|pli| pli.header.borrow().xtream_cluster.clone());
+        result.push(PlaylistGroup { id: grp_id, xtream_cluster: cluster.unwrap(), title: key, channels });
     }
     result.sort_by(|f, s| {
         let i1 = sort_order.iter().position(|r| r == &f.title).unwrap();

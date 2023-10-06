@@ -14,6 +14,7 @@ use crate::model_m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemH
 use crate::mapping::{Mapping, MappingValueProcessor};
 use crate::model_config::{ItemField, AFFIX_FIELDS, ProcessingOrder};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
+use crate::repository::save_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget, verbose: bool) -> Option<Vec<PlaylistGroup>> {
     if verbose { println!("Filtering {} groups", playlist.len()) }
@@ -29,8 +30,10 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget, verbos
         if verbose { println!("Filtered group {} has now {} items", pg.title, channels.len()) }
         if !channels.is_empty() {
             new_playlist.push(PlaylistGroup {
+                id: pg.id,
                 title: pg.title.clone(),
                 channels,
+                xtream_cluster: pg.xtream_cluster.clone(),
             });
         }
     });
@@ -98,23 +101,23 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
             });
         }
         if let Some(channel_sorts) = &sort.channels {
-                channel_sorts.iter().for_each(|channel_sort| {
-                    let regexp = channel_sort.re.as_ref().unwrap();
-                    new_playlist.iter_mut().for_each(|group| {
-                        let group_title = if *match_as_ascii { unidecode(&group.title) } else { String::from(&group.title) };
-                        let is_match = regexp.is_match(group_title.as_str());
-                        if is_match {
-                            group.channels.sort_by(|a, b| {
-                                let raw_value_a = get_field_value(a, &channel_sort.field);
-                                let raw_value_b = get_field_value(b, &channel_sort.field);
-                                let value_a = if *match_as_ascii { unidecode(&raw_value_a) } else { raw_value_a };
-                                let value_b = if *match_as_ascii { unidecode(&raw_value_b) } else { raw_value_b };
-                                let ordering = value_a.partial_cmp(&value_b).unwrap();
-                                match channel_sort.order {
-                                    Asc => ordering,
-                                    Desc => ordering.reverse()
-                                }
-                            });
+            channel_sorts.iter().for_each(|channel_sort| {
+                let regexp = channel_sort.re.as_ref().unwrap();
+                new_playlist.iter_mut().for_each(|group| {
+                    let group_title = if *match_as_ascii { unidecode(&group.title) } else { String::from(&group.title) };
+                    let is_match = regexp.is_match(group_title.as_str());
+                    if is_match {
+                        group.channels.sort_by(|a, b| {
+                            let raw_value_a = get_field_value(a, &channel_sort.field);
+                            let raw_value_b = get_field_value(b, &channel_sort.field);
+                            let value_a = if *match_as_ascii { unidecode(&raw_value_a) } else { raw_value_a };
+                            let value_b = if *match_as_ascii { unidecode(&raw_value_b) } else { raw_value_b };
+                            let ordering = value_a.partial_cmp(&value_b).unwrap();
+                            match channel_sort.order {
+                                Asc => ordering,
+                                Desc => ordering.reverse()
+                            }
+                        });
                     }
                 });
             });
@@ -187,7 +190,7 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping, verbose: bool) -> Play
         if verbose && mapping.match_as_ascii { println!("Decoded {} for matching to {}", &header.name, &channel_name) };
         drop(header);
         let ref_chan = RefCell::new(channel);
-        let provider = ValueProvider { pli:  ref_chan.clone()};
+        let provider = ValueProvider { pli: ref_chan.clone() };
         let mut mock_processor = MockValueProcessor {};
 
         for m in &mapping.mapper {
@@ -214,19 +217,28 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget, verbose: 
             let mut grp = playlist_group.clone();
             let mappings = target._mapping.as_ref().unwrap();
             mappings.iter().filter(|mapping| !mapping.mapper.is_empty()).for_each(|mapping|
-                   grp.channels = grp.channels.iter_mut().map(|chan| map_channel(chan, mapping, verbose)).collect());
+                grp.channels = grp.channels.iter_mut().map(|chan| map_channel(chan, mapping, verbose)).collect());
             grp
         }).collect();
 
         // if the group names are changed, restructure channels to the right groups
         // we use
         let mut new_groups: Vec<PlaylistGroup> = Vec::new();
+        let mut grp_id: i32 = 0;
         for playlist_group in new_playlist {
             for channel in &playlist_group.channels {
+                let cluster = &channel.header.borrow().xtream_cluster;
                 let title = &channel.header.borrow().group;
                 match new_groups.iter_mut().find(|x| &*x.title == title) {
                     Some(grp) => grp.channels.push(channel.clone()),
-                    _ => new_groups.push(PlaylistGroup { title: String::from(title), channels: vec![channel.clone()] })
+                    _ => {
+                        grp_id += 1;
+                        new_groups.push(PlaylistGroup {
+                            id: grp_id,
+                            title: String::from(title),
+                            channels: vec![channel.clone()],
+                            xtream_cluster:  cluster.clone()})
+                    }
                 }
             }
         }
@@ -322,5 +334,22 @@ pub(crate) fn process_playlist(playlist: &mut [PlaylistGroup],
     apply_affixes(&mut new_playlist, input, verbose);
 
     sort_playlist(target, &mut new_playlist);
-    write_playlist(target, cfg, &mut new_playlist)
+    let publish = target.publish;
+    if target.filename.is_some() {
+        let result = write_playlist(target, cfg, &mut new_playlist);
+        match &result {
+            Ok(..) => {},
+            Err(e) => {
+                println!("failed to write {:?}", e);
+            }
+        }
+        if !publish {
+            return result;
+        }
+    }
+
+    if target.publish {
+        return save_playlist(target, cfg, &mut new_playlist);
+    }
+    Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Persisting playlist failed: {}", &target.name)))
 }
