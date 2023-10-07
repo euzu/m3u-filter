@@ -151,7 +151,7 @@ get_live_streams ->
 const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::LIVE, "get_live_categories", "get_live_streams"),
     (XtreamCluster::VIDEO, "get_vod_categories", "get_vod_streams"),
-    (XtreamCluster::SERIES, "get_live_categories", "get_series")];
+    (XtreamCluster::SERIES, "get_series_categories", "get_series")];
 
 pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String, verbose: bool) -> Option<Vec<PlaylistGroup>> {
     let mut playlist: Vec<PlaylistGroup> = Vec::new();

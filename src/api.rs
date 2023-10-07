@@ -13,6 +13,7 @@ use crate::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::config::{Config, ConfigInput, InputType, ProcessTargets};
 use crate::playlist_processor;
 use crate::download::get_m3u_playlist;
+use crate::xtream_player_api::xtream_player_api;
 
 #[get("/")]
 async fn index(
@@ -65,13 +66,13 @@ pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets, verbose: 
         std::process::exit(1);
     }
 
-    let schedule= cfg.schedule.clone();
+    let schedule = cfg.schedule.clone();
 
 
     let shared_data = web::Data::new(AppState {
         config: cfg,
         targets,
-        verbose
+        verbose,
     });
 
     // Scheduler
@@ -96,7 +97,7 @@ pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets, verbose: 
             web::scope("/api/v1")
                 .route("/playlist", web::post().to(playlist))
                 .route("/config", web::get().to(config))
-        )
+        ).service(xtream_player_api)
         .service(index)
         .service(actix_files::Files::new("/", web_dir.clone()))
     )

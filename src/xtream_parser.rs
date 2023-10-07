@@ -1,10 +1,13 @@
-use std::cell::RefCell;
+use std::cell::{RefCell};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 use serde::{Deserialize, Deserializer};
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use crate::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
 use crate::model_config::{default_as_empty_str};
+
+fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
 
 fn null_to_default<'de, D, T>(d: D) -> Result<T, D::Error>
     where
@@ -16,7 +19,40 @@ fn null_to_default<'de, D, T>(d: D) -> Result<T, D::Error>
     Ok(val)
 }
 
-fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
+fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error>
+    where
+        D: Deserializer<'de>,
+{
+    // we define a local enum type inside of the function
+    // because it is untagged, serde will deserialize as the first variant
+    // that it can
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum MaybeNumber<U> {
+        // if it can be parsed as Option<T>, it will be
+        Value(Option<U>),
+        // otherwise try parsing as a string
+        NumberString(String),
+    }
+
+    // deserialize into local enum
+    let value: MaybeNumber<T> = Deserialize::deserialize(deserializer)?;
+    match value {
+        // if parsed as T or None, return that
+        MaybeNumber::Value(value) => Ok(value),
+
+        // (if it is any other string)
+        MaybeNumber::NumberString(string) => {
+            match serde_json::from_str::<T>(string.as_str()) {
+                Ok(val) => Ok(Some(val)),
+                Err(_) => Ok(None)
+            }
+        }
+    }
+}
+
 
 #[derive(Deserialize)]
 struct XtreamCategory {
@@ -37,13 +73,13 @@ impl XtreamCategory {
 
 #[derive(Deserialize)]
 struct XtreamStream {
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub name: String,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub category_id: String,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub stream_id: Option<i32>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub series_id: Option<i32>,
     #[serde(default = "default_as_empty_str", deserialize_with = "null_to_default")]
     pub stream_icon: String,
@@ -51,39 +87,59 @@ struct XtreamStream {
     pub direct_source: String,
 
     // optional attributes
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
+    backdrop_path: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "null_to_default")]
     added: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     cast: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     container_extension: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     director: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     episode_run_time: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     genre: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     plot: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_number_from_string")]
     rating: Option<f32>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_number_from_string")]
     rating_5based: Option<f32>,
+    #[serde(default, deserialize_with = "null_to_default")]
     release_date: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     stream_type: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     title: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     year: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     youtube_trailer: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "null_to_default")]
     epg_channel_id: Option<String>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_number_from_string")]
     tv_archive: Option<i32>,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_number_from_string")]
     tv_archive_duration: Option<i32>,
+}
+
+macro_rules! add_str_property_if_exists {
+    ($vec:expr, $prop:expr, $prop_name:expr) => {
+       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::String(v.to_string()))));
+    }
+}
+macro_rules! add_i64_property_if_exists {
+    ($vec:expr, $prop:expr, $prop_name:expr) => {
+       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from_f64(f64::from(*v)).unwrap()))));
+    }
+}
+
+macro_rules! add_f64_property_if_exists {
+    ($vec:expr, $prop:expr, $prop_name:expr) => {
+       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from_f64(f64::from(*v)).unwrap()))));
+    }
 }
 
 impl XtreamStream {
@@ -93,23 +149,28 @@ impl XtreamStream {
 
     pub(crate) fn get_additional_properties(&self) -> Option<Vec<(String, Value)>> {
         let mut result = vec![];
-        self.added.as_ref().map(|v| result.push((String::from("added"), Value::String(v.to_string()))));
-        self.cast.as_ref().map(|v| result.push((String::from("cast"), Value::String(v.to_string()))));
-        self.container_extension.as_ref().map(|v| result.push((String::from("container_extension"), Value::String(v.to_string()))));
-        self.director.as_ref().map(|v| result.push((String::from("director"), Value::String(v.to_string()))));
-        self.episode_run_time.as_ref().map(|v| result.push((String::from("episode_run_time"), Value::String(v.to_string()))));
-        self.genre.as_ref().map(|v| result.push((String::from("genre"), Value::String(v.to_string()))));
-        self.plot.as_ref().map(|v| result.push((String::from("plot"), Value::String(v.to_string()))));
-        self.rating.as_ref().map(|v| result.push((String::from("rating"), Value::Number(serde_json::value::Number::from_f64(f64::from(*v)).unwrap()))));
-        self.rating_5based.as_ref().map(|v| result.push((String::from("rating_5based"), Value::Number(serde_json::value::Number::from_f64(f64::from(*v)).unwrap()))));
-        self.release_date.as_ref().map(|v| result.push((String::from("release_date"), Value::String(v.to_string()))));
-        self.stream_type.as_ref().map(|v| result.push((String::from("stream_type"), Value::String(v.to_string()))));
-        self.title.as_ref().map(|v| result.push((String::from("title"), Value::String(v.to_string()))));
-        self.year.as_ref().map(|v| result.push((String::from("year"), Value::String(v.to_string()))));
-        self.youtube_trailer.as_ref().map(|v| result.push((String::from("youtube_trailer"), Value::String(v.to_string()))));
-        self.epg_channel_id.as_ref().map(|v| result.push((String::from("epg_channel_id"), Value::String(v.to_string()))));
-        self.tv_archive.as_ref().map(|v| result.push((String::from("tv_archive"), Value::Number(serde_json::value::Number::from(i64::from(*v))))));
-        self.tv_archive_duration.as_ref().map(|v| result.push((String::from("tv_archive_duration"), Value::Number(serde_json::value::Number::from(i64::from(*v))))));
+        if let Some(bdpath) = self.backdrop_path.as_ref() {
+            if !bdpath.is_empty() {
+                result.push((String::from("backdrop_path"), Value::String(String::from(bdpath.get(0).unwrap()))));
+            }
+        }
+        add_str_property_if_exists!(result, self.added, "added");
+        add_str_property_if_exists!(result, self.cast, "cast");
+        add_str_property_if_exists!(result, self.container_extension, "container_extension");
+        add_str_property_if_exists!(result, self.director, "director");
+        add_str_property_if_exists!(result, self.episode_run_time, "episode_run_time");
+        add_str_property_if_exists!(result, self.genre, "genre");
+        add_str_property_if_exists!(result, self.plot, "plot");
+        add_f64_property_if_exists!(result, self.rating, "rating");
+        add_f64_property_if_exists!(result, self.rating_5based, "rating_5based");
+        add_str_property_if_exists!(result, self.release_date, "release_date");
+        add_str_property_if_exists!(result, self.stream_type, "stream_type");
+        add_str_property_if_exists!(result, self.title, "title");
+        add_str_property_if_exists!(result, self.year, "year");
+        add_str_property_if_exists!(result, self.youtube_trailer, "youtube_trailer");
+        add_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
+        add_i64_property_if_exists!(result, self.tv_archive, "tv_archive");
+        add_i64_property_if_exists!(result, self.tv_archive_duration, "tv_archive_duration");
         if result.is_empty() { None } else { Some(result) }
     }
 }
@@ -130,13 +191,13 @@ fn process_category(category: Option<serde_json::Value>) -> Vec<XtreamCategory> 
 }
 
 
-fn process_streams(streams: Option<serde_json::Value>) -> Vec<XtreamStream> {
+fn process_streams(xtream_cluster: &XtreamCluster, streams: Option<serde_json::Value>) -> Vec<XtreamStream> {
     match streams {
         Some(value) => {
             match serde_json::from_value::<Vec<XtreamStream>>(value) {
                 Ok(stream_list) => stream_list,
                 Err(err) => {
-                    println!("Failed to process streams {}", &err);
+                    println!("Failed to process streams {:?}: {}", xtream_cluster, &err);
                     vec![]
                 }
             }
@@ -148,7 +209,7 @@ fn process_streams(streams: Option<serde_json::Value>) -> Vec<XtreamStream> {
 pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluster, category: Option<serde_json::Value>, streams: Option<serde_json::Value>, stream_base_url: &String) -> Vec<PlaylistGroup> {
     let mut categories = process_category(category);
     if !categories.is_empty() {
-        let streams = process_streams(streams);
+        let streams = process_streams(xtream_cluster, streams);
         if !streams.is_empty() {
             let mut group_map = HashMap::<String, RefCell<XtreamCategory>>::new();
             while let Some(category) = categories.pop() {

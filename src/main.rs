@@ -22,6 +22,7 @@ mod utils;
 mod messaging;
 mod xtream_parser;
 mod test;
+mod xtream_player_api;
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
