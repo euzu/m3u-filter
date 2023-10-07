@@ -53,36 +53,17 @@ impl ValueProcessor for MockValueProcessor {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct PatternTemplate {
     pub name: String,
     pub value: String,
 }
 
-impl Clone for PatternTemplate {
-    fn clone(&self) -> Self {
-        PatternTemplate {
-            name: self.name.clone(),
-            value: self.value.clone(),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct RegexWithCaptures {
     pub restr: String,
     pub re: regex::Regex,
     pub captures: Vec<String>,
-}
-
-impl Clone for RegexWithCaptures {
-    fn clone(&self) -> Self {
-        RegexWithCaptures {
-            restr: self.restr.clone(),
-            re: self.re.clone(),
-            captures: self.captures.clone(),
-        }
-    }
 }
 
 

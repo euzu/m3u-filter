@@ -7,7 +7,7 @@ use crate::model_config::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
                           default_as_empty_str, default_as_false, default_as_empty_map, };
 use crate::valid_property;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MappingTag {
     pub name: String,
     pub captures: Vec<String>,
@@ -19,19 +19,7 @@ pub(crate) struct MappingTag {
     pub suffix: String,
 }
 
-impl Clone for MappingTag {
-    fn clone(&self) -> Self {
-        MappingTag {
-            name: self.name.clone(),
-            captures: self.captures.clone(),
-            concat: self.concat.clone(),
-            prefix: self.prefix.clone(),
-            suffix: self.suffix.clone(),
-        }
-    }
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Mapper {
     pub filter: Option<String>,
     pub pattern: String,
@@ -67,23 +55,6 @@ impl Mapper {
             _ => vec![]
         };
         self._tagre = Some(Regex::new("<tag:(.*?)>").unwrap())
-    }
-}
-
-impl Clone for Mapper {
-    fn clone(&self) -> Self {
-        Mapper {
-            filter: self.filter.clone(),
-            pattern: self.pattern.clone(),
-            attributes: self.attributes.clone(),
-            suffix: self.suffix.clone(),
-            prefix: self.prefix.clone(),
-            assignments: self.assignments.clone(),
-            _filter: self._filter.clone(),
-            _pattern: self._pattern.clone(),
-            _tags: self._tags.clone(),
-            _tagre: self._tagre.clone(),
-        }
     }
 }
 
@@ -230,7 +201,7 @@ impl ValueProcessor for MappingValueProcessor<'_> {
 }
 
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Mapping {
     pub id: String,
     #[serde(default = "default_as_false")]
@@ -238,15 +209,6 @@ pub(crate) struct Mapping {
     pub mapper: Vec<Mapper>,
 }
 
-impl Clone for Mapping {
-    fn clone(&self) -> Self {
-        Mapping {
-            id: self.id.clone(),
-            match_as_ascii: self.match_as_ascii,
-            mapper: self.mapper.clone(),
-        }
-    }
-}
 
 impl Mapping {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
@@ -257,7 +219,7 @@ impl Mapping {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MappingDefinition {
     pub templates: Option<Vec<PatternTemplate>>,
     pub tags: Option<Vec<MappingTag>>,
@@ -281,17 +243,7 @@ impl MappingDefinition {
     }
 }
 
-impl Clone for MappingDefinition {
-    fn clone(&self) -> Self {
-        MappingDefinition {
-            templates: self.templates.clone(),
-            tags: self.tags.clone(),
-            mapping: self.mapping.clone(),
-        }
-    }
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Mappings {
     pub mappings: MappingDefinition,
 }
@@ -311,10 +263,3 @@ impl Mappings {
     }
 }
 
-impl Clone for Mappings {
-    fn clone(&self) -> Self {
-        Mappings {
-            mappings: self.mappings.clone(),
-        }
-    }
-}

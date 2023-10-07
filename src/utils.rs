@@ -21,24 +21,28 @@ pub(crate) fn get_exe_path() -> PathBuf {
     }
 }
 
-pub(crate) fn get_default_config_path() -> String {
+fn get_default_file_path(file: String) -> String {
     let path: PathBuf = get_exe_path();
-    let config_path = path.join("config.yml");
+    let working_dir_file = format!("./{}", file);
+    let config_path = path.join(file);
     String::from(if config_path.exists() {
-        config_path.to_str().unwrap_or("./config.yml")
+        config_path.to_str().unwrap_or(working_dir_file.as_str())
     } else {
-        "./config.yml"
+        working_dir_file.as_str()
     })
 }
 
+
+pub(crate) fn get_default_config_path() -> String {
+    get_default_file_path("config.yml".to_string())
+}
+
 pub(crate) fn get_default_mappings_path() -> String {
-    let path: PathBuf = get_exe_path();
-    let mappings_path = path.join("mapping.yml");
-    String::from(if mappings_path.exists() {
-        mappings_path.to_str().unwrap_or("./mapping.yml")
-    } else {
-        "./mapping.yml"
-    })
+    get_default_file_path("mapping.yml".to_string())
+}
+
+pub(crate) fn get_default_user_path() -> String {
+    get_default_file_path("user.yml".to_string())
 }
 
 pub(crate) fn get_working_path(wd: &String) -> String {

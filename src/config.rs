@@ -6,6 +6,7 @@ use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, pre
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
 use crate::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_false, default_as_true};
+use crate::user::{User};
 use crate::utils;
 use crate::utils::get_working_path;
 
@@ -32,12 +33,12 @@ impl ProcessTargets {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigSortGroup {
     pub order: SortOrder,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigSortChannel {
     pub field: ItemField,
     // channel field
@@ -59,7 +60,7 @@ impl ConfigSortChannel {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigSort {
     #[serde(default = "default_as_false")]
     pub match_as_ascii: bool,
@@ -75,7 +76,7 @@ impl ConfigSort {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigRename {
     pub field: ItemField,
     pub pattern: String,
@@ -95,7 +96,7 @@ impl ConfigRename {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigOptions {
     #[serde(default = "default_as_false")]
     pub ignore_logo: bool,
@@ -107,7 +108,7 @@ pub(crate) struct ConfigOptions {
     pub kodi_style: bool,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigTarget {
     #[serde(skip)]
     pub id: u16,
@@ -152,7 +153,7 @@ impl ConfigTarget {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigSource {
     pub input: ConfigInput,
     pub targets: Vec<ConfigTarget>,
@@ -251,7 +252,7 @@ impl ConfigApi {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Config {
     #[serde(default = "default_as_zero")]
     pub threads: u8,
@@ -261,9 +262,22 @@ pub(crate) struct Config {
     pub templates: Option<Vec<PatternTemplate>>,
     pub video_suffix: Option<Vec<String>>,
     pub schedule: Option<String>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _user: Option<User>,
 }
 
 impl Config {
+    pub fn set_user(&mut self, user: Option<User>) {
+        self._user = user;
+    }
+
+    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<String> {
+        match &self._user {
+            Some(user) => user.get_target_name(username, password),
+            _ => None
+        }
+    }
+
     pub fn set_mappings(&mut self, mappings: Option<Mappings>) {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
@@ -352,102 +366,6 @@ impl Config {
                     //     println!("web_root directory does not exists {:?}", wrpb2)
                 }
             }
-        }
-    }
-}
-
-impl Clone for Config {
-    fn clone(&self) -> Self {
-        Config {
-            threads: self.threads,
-            api: self.api.clone(),
-            sources: self.sources.clone(),
-            working_dir: self.working_dir.clone(),
-            templates: self.templates.clone(),
-            video_suffix: self.video_suffix.clone(),
-            schedule: self.schedule.clone(),
-        }
-    }
-}
-
-impl Clone for ConfigTarget {
-    fn clone(&self) -> Self {
-        ConfigTarget {
-            id: self.id,
-            enabled: self.enabled,
-            name: self.name.clone(),
-            publish: self.publish,
-            filename: self.filename.clone(),
-            options: self.options.as_ref().cloned(),
-            sort: self.sort.clone(),
-            filter: self.filter.clone(),
-            output: self.output.clone(),
-            rename: self.rename.clone(),
-            mapping: self.mapping.clone(),
-            processing_order: self.processing_order.clone(),
-            _filter: self._filter.clone(),
-            _mapping: self._mapping.clone(),
-        }
-    }
-}
-
-impl Clone for ConfigSource {
-    fn clone(&self) -> Self {
-        ConfigSource {
-            input: self.input.clone(),
-            targets: self.targets.clone(),
-        }
-    }
-}
-
-impl Clone for ConfigOptions {
-    fn clone(&self) -> Self {
-        ConfigOptions {
-            ignore_logo: self.ignore_logo,
-            underscore_whitespace: self.underscore_whitespace,
-            cleanup: self.cleanup,
-            kodi_style: self.kodi_style,
-        }
-    }
-}
-
-impl Clone for ConfigSortGroup {
-    fn clone(&self) -> Self {
-        ConfigSortGroup {
-            order: self.order.clone(),
-        }
-    }
-}
-
-impl Clone for ConfigSortChannel {
-    fn clone(&self) -> Self {
-        ConfigSortChannel {
-            field: self.field.clone(),
-            group_pattern: self.group_pattern.clone(),
-            order: self.order.clone(),
-            re: None,
-        }
-    }
-}
-
-
-impl Clone for ConfigSort {
-    fn clone(&self) -> Self {
-        ConfigSort {
-            match_as_ascii: self.match_as_ascii,
-            groups: self.groups.clone(),
-            channels: self.channels.clone(),
-        }
-    }
-}
-
-impl Clone for ConfigRename {
-    fn clone(&self) -> Self {
-        ConfigRename {
-            field: self.field.clone(),
-            pattern: self.pattern.clone(),
-            new_name: self.new_name.clone(),
-            re: None,
         }
     }
 }
