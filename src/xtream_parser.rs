@@ -151,7 +151,7 @@ impl XtreamStream {
         let mut result = vec![];
         if let Some(bdpath) = self.backdrop_path.as_ref() {
             if !bdpath.is_empty() {
-                result.push((String::from("backdrop_path"), Value::String(String::from(bdpath.get(0).unwrap()))));
+                result.push((String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.get(0).unwrap()))]))));
             }
         }
         add_str_property_if_exists!(result, self.added, "added");

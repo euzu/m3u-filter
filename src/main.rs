@@ -137,7 +137,7 @@ fn read_mapping(mapping_file: &str, verbose: bool) -> Option<Mappings> {
     }
 }
 
-fn read_user(user_file: &str, _verbose: bool) -> Option<User> {
+fn read_user(user_file: &str, verbose: bool) -> Option<User> {
     match utils::open_file(&std::path::PathBuf::from(user_file), false) {
         Some(file) => {
             let mapping: Result<User, _> = serde_yaml::from_reader(file);
