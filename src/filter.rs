@@ -5,8 +5,8 @@ use log::{debug, error};
 use pest::iterators::Pair;
 use pest::Parser;
 use petgraph::algo::toposort;
-use crate::model_m3u::PlaylistItem;
-use crate::model_config::ItemField;
+use crate::model::model_m3u::PlaylistItem;
+use crate::model::model_config::ItemField;
 use petgraph::graph::DiGraph;
 use crate::exit;
 

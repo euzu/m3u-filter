@@ -1,11 +1,11 @@
 use std::cell::{RefCell};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use crate::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
-use crate::model_config::{default_as_empty_str};
+use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
+use crate::model::model_config::{default_as_empty_str};
 use log::{error};
 
 fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
@@ -44,11 +44,11 @@ fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     }
 }
 
-fn value_to_string_array(value : &Vec<Value>) -> Option<Vec<String>> {
+fn value_to_string_array(value: &Vec<Value>) -> Option<Vec<String>> {
     Some(value.iter().map(|i| value_to_string(i)).filter(|i| i.is_some()).map(|i| i.unwrap()).collect())
 }
 
-fn value_to_string(v : &Value) -> Option<String> {
+fn value_to_string(v: &Value) -> Option<String> {
     match v {
         Value::Bool(value) => Some(value.to_string()),
         Value::Number(value) => Some(value.to_string()),
@@ -65,7 +65,7 @@ fn deserialize_as_option_string<'de, D>(deserializer: D) -> Result<Option<String
 
     match &value {
         Value::String(s) => Ok(Some(s.clone())),
-        _ => Ok(Some(value.to_string())),
+        _ => Ok(None),
     }
 }
 
@@ -108,7 +108,7 @@ impl XtreamCategory {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct XtreamStream {
     #[serde(default, deserialize_with = "deserialize_as_string")]
     pub name: String,
@@ -141,9 +141,9 @@ struct XtreamStream {
     #[serde(default, deserialize_with = "deserialize_as_option_string")]
     plot: Option<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    rating: Option<f32>,
+    rating: Option<f64>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    rating_5based: Option<f32>,
+    rating_5based: Option<f64>,
     #[serde(default, deserialize_with = "deserialize_as_option_string")]
     release_date: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_string")]
@@ -169,7 +169,7 @@ macro_rules! add_str_property_if_exists {
 }
 macro_rules! add_i64_property_if_exists {
     ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from_f64(f64::from(*v)).unwrap()))));
+       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from(i64::from(*v))))));
     }
 }
 

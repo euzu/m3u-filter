@@ -5,7 +5,7 @@ use log::{debug, error};
 use path_absolutize::*;
 use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
-use crate::config::ConfigInput;
+use crate::model::config::ConfigInput;
 use crate::messaging::send_message;
 
 #[macro_export]
@@ -51,8 +51,8 @@ pub(crate) fn get_default_mappings_path() -> String {
     get_default_file_path("mapping.yml".to_string())
 }
 
-pub(crate) fn get_default_user_path() -> String {
-    get_default_file_path("user.yml".to_string())
+pub(crate) fn get_default_api_proxy_config_path() -> String {
+    get_default_file_path("api-proxy.yml".to_string())
 }
 
 pub(crate) fn get_working_path(wd: &String) -> String {

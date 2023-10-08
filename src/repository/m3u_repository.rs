@@ -1,9 +1,9 @@
-use crate::config::{Config, ConfigTarget};
-use crate::model_m3u::PlaylistGroup;
+use crate::model::config::{Config, ConfigTarget};
+use crate::model::model_m3u::PlaylistGroup;
 use crate::utils;
 use std::io::Write;
 use chrono::Datelike;
-use crate::model_config::TargetType;
+use crate::model::model_config::TargetType;
 use log::{error};
 
 macro_rules! open_file {

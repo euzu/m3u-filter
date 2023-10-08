@@ -6,19 +6,13 @@ use env_logger::{Builder};
 use log::{debug, error, info, LevelFilter, warn};
 
 use clap::Parser;
-use crate::config::{Config, validate_targets};
-use crate::mapping::Mappings;
-use crate::user::User;
+use crate::model::api_proxy::ApiProxyConfig;
+use crate::model::config::{Config, validate_targets};
+use crate::model::mapping::Mappings;
 
-mod api;
-mod config;
+mod model;
 mod filter;
 mod m3u_parser;
-mod m3u_repository;
-mod mapping;
-mod model_api;
-mod model_config;
-mod model_m3u;
 mod playlist_processor;
 mod repository;
 mod download;
@@ -26,8 +20,7 @@ mod utils;
 mod messaging;
 mod xtream_parser;
 mod test;
-mod xtream_player_api;
-mod user;
+mod api;
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
@@ -48,8 +41,8 @@ struct Args {
     mapping: Option<String>,
 
     /// The user file
-    #[arg(short, long)]
-    user: Option<String>,
+    #[arg(short, long = "api-proxy")]
+    api_proxy: Option<String>,
 
     /// Run in server mode
     #[arg(short, long, default_value_t = false, default_missing_value = "true")]
@@ -75,10 +68,10 @@ fn main() {
     read_mappings(args.mapping, &mut cfg);
 
     if args.server {
-        read_users(args.user, &mut cfg);
+        read_api_proxy_config(args.api_proxy, &mut cfg);
         debug!("web_root: {}", &cfg.api.web_root);
         info!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
-        match api::start_server(cfg, targets) {
+        match api::main_api::start_server(cfg, targets) {
             Ok(_) => {}
             Err(e) => {
                 exit!("cant start server: {}", e);
@@ -111,14 +104,19 @@ fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) {
     cfg.set_mappings(mappings);
 }
 
-fn read_users(args_user: Option<String>, cfg: &mut Config) {
-    let user_file: String = args_user.unwrap_or(utils::get_default_user_path());
+fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
+    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(utils::get_default_api_proxy_config_path());
 
-    let user = read_user(user_file.as_str());
-    if user.is_none() {
-        warn!("cant read user file: {}", user_file.as_str());
+    let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str());
+    if api_proxy_config.is_none() {
+        if cfg.has_published_targets() {
+            exit!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
+        } else {
+            warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
+        }
+    } else {
+        cfg.set_api_proxy(api_proxy_config);
     }
-    cfg.set_user(user);
 }
 
 
@@ -152,17 +150,17 @@ fn read_mapping(mapping_file: &str) -> Option<Mappings> {
     }
 }
 
-fn read_user(user_file: &str) -> Option<User> {
-    match utils::open_file(&std::path::PathBuf::from(user_file), false) {
+fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
+    match utils::open_file(&std::path::PathBuf::from(api_proxy_file), false) {
         Some(file) => {
-            let mapping: Result<User, _> = serde_yaml::from_reader(file);
+            let mapping: Result<ApiProxyConfig, _> = serde_yaml::from_reader(file);
             match mapping {
                 Ok(result) => {
                     result.prepare();
                     Some(result)
                 }
                 Err(err) => {
-                    error!("cant read user file: {}", err);
+                    error!("cant read api-proxy-config file: {}", err);
                     None
                 }
             }

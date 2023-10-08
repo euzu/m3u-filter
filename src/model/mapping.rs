@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use log::{debug, error};
 use regex::Regex;
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
-use crate::model_m3u::{FieldAccessor, PlaylistItem};
-use crate::model_config::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
+use crate::model::model_m3u::{FieldAccessor, PlaylistItem};
+use crate::model::model_config::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
                           default_as_empty_str, default_as_false, default_as_empty_map, };
 use crate::valid_property;
 

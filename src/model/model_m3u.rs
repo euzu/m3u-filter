@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::config::{ConfigOptions};
+use crate::model::config::ConfigOptions;
 
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html

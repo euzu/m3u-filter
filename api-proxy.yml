@@ -1,0 +1,12 @@
+server:
+  protocol: http
+  ip: 102.168.9.3
+  http_port: 80
+  https_port:
+  rtmp_port:
+  timezone: Europe/Paris
+  message: Welcome to m3u-filter
+user:
+  - target: pl1
+    credentials:
+      - {username: x3452, password: ztrhgrGZrt83hjerter}

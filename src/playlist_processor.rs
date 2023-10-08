@@ -4,18 +4,16 @@ use std::cell::RefCell;
 use std::sync::{Arc};
 use std::thread;
 use log::{debug, error};
-use config::ConfigTarget;
 use unidecode::unidecode;
-use crate::{config, Config, valid_property};
-use crate::config::{ConfigInput, InputAffix, InputType, ProcessTargets};
-use crate::model_config::SortOrder::{Asc, Desc};
+use crate::{model::config, Config, valid_property};
+use crate::model::config::{ConfigInput, ConfigTarget, InputAffix, InputType, ProcessTargets};
+use crate::model::model_config::{SortOrder::{Asc, Desc}, ItemField, AFFIX_FIELDS, ProcessingOrder};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
-use crate::m3u_repository::write_playlist;
-use crate::model_m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
-use crate::mapping::{Mapping, MappingValueProcessor};
-use crate::model_config::{ItemField, AFFIX_FIELDS, ProcessingOrder};
+use crate::repository::m3u_repository::write_playlist;
+use crate::model::model_m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
+use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
-use crate::repository::save_playlist;
+use crate::repository::xtream_repository::xtream_save_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
     debug!("Filtering {} groups", playlist.len());
@@ -349,7 +347,7 @@ pub(crate) fn process_playlist(playlist: &mut [PlaylistGroup],
     }
 
     if target.publish {
-        return save_playlist(target, cfg, &mut new_playlist);
+        return xtream_save_playlist(target, cfg, &mut new_playlist);
     }
     Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Persisting playlist failed: {}", &target.name)))
 }

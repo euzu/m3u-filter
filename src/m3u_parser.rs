@@ -1,6 +1,6 @@
 use std::cell::RefCell;
-use crate::config::Config;
-use crate::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
+use crate::model::config::Config;
+use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
 
 fn token_value(it: &mut std::str::Chars) -> String {
     if let Some(oc) = it.next() {

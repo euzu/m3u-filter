@@ -4,11 +4,11 @@ use enum_iterator::Sequence;
 use log::{debug, error};
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
-use crate::mapping::Mappings;
-use crate::mapping::Mapping;
-use crate::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_false, default_as_true};
-use crate::user::{User};
+use crate::model::mapping::Mappings;
+use crate::model::mapping::Mapping;
+use crate::model::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_false, default_as_true};
 use crate::{exit, utils};
+use crate::model::api_proxy::ApiProxyConfig;
 use crate::utils::get_working_path;
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
@@ -260,17 +260,29 @@ pub(crate) struct Config {
     pub video_suffix: Option<Vec<String>>,
     pub schedule: Option<String>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _user: Option<User>,
+    pub _api_proxy: Option<ApiProxyConfig>,
 }
 
 impl Config {
-    pub fn set_user(&mut self, user: Option<User>) {
-        self._user = user;
+
+    pub(crate) fn has_published_targets(&self) -> bool {
+        for source in &self.sources {
+            for target in &source.targets {
+                if target.publish {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) {
+        self._api_proxy = api_proxy;
     }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<String> {
-        match &self._user {
-            Some(user) => user.get_target_name(username, password),
+        match &self._api_proxy {
+            Some(api_proxy) => api_proxy.get_target_name(username, password),
             _ => None
         }
     }

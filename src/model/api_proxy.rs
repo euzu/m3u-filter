@@ -1,3 +1,7 @@
+use std::collections::{HashSet};
+use crate::exit;
+use log::{error};
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UserCredentials {
     pub username: String,
@@ -11,6 +15,7 @@ pub(crate) struct TargetUser {
 }
 
 impl TargetUser {
+
     pub fn get_target_name(&self, username: &str, password: &str) -> Option<String> {
         if self.credentials.iter().find(|c| c.username.eq_ignore_ascii_case(username) && c.password.eq(password)).is_some() {
             return Some(self.target.clone());
@@ -20,13 +25,35 @@ impl TargetUser {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct User {
+pub(crate) struct ServerInfo {
+    pub protocol: String,
+    pub ip: String,
+    pub http_port: u16,
+    pub https_port: u16,
+    pub rtmp_port: u16,
+    pub timezone: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct ApiProxyConfig {
+    pub server: ServerInfo,
     pub user: Vec<TargetUser>,
 }
 
-impl User {
+impl ApiProxyConfig {
+
     pub fn prepare(&self) {
-        // TODO check if username is unique, a user can only access one target
+        let mut usernames = HashSet::new();
+        for target_user in &self.user {
+            for user in &target_user.credentials {
+                if usernames.contains(&user.username) {
+                    exit!("Non unique username found {}", &user.username);
+                } else {
+                    usernames.insert(user.username.to_string());
+                }
+            }
+        }
     }
 
     pub fn get_target_name(&self, username: &str, password: &str) -> Option<String> {

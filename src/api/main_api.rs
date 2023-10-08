@@ -7,13 +7,14 @@ use actix_web::{App, get, HttpRequest, HttpResponse, HttpServer, web};
 use chrono::{Local};
 use cron::Schedule;
 use std::str::FromStr;
+use actix_web::middleware::Logger;
 use actix_web::web::Data;
 
-use crate::model_api::{AppState, PlaylistRequest, ServerConfig};
-use crate::config::{Config, ConfigInput, InputType, ProcessTargets};
+use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
+use crate::model::config::{Config, ConfigInput, InputType, ProcessTargets};
 use crate::{exit, playlist_processor};
 use crate::download::get_m3u_playlist;
-use crate::xtream_player_api::xtream_player_api;
+use crate::api::xtream_player_api::xtream_player_api;
 use log::{error};
 
 #[get("/")]
@@ -84,6 +85,7 @@ pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets) -> future
 
     // Web Server
     HttpServer::new(move || App::new()
+        .wrap(Logger::default())
         .wrap(Cors::default()
             .supports_credentials()
             .allow_any_origin()
