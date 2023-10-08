@@ -4,13 +4,14 @@ use crate::utils;
 use std::io::Write;
 use chrono::Datelike;
 use crate::model_config::TargetType;
+use log::{error};
 
 macro_rules! open_file {
   ($path:expr) => {{
        match std::fs::File::create($path) {
                 Ok(file) => file,
                 Err(e) => {
-                    println!("cant create file: {:?}", $path);
+                    error!("cant create file: {:?}", $path);
                     return Err(e);
                 }
             }
@@ -123,14 +124,14 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
             let _ = std::fs::remove_dir_all(&path);
         }
         if let Err(e) = std::fs::create_dir_all(&path) {
-            println!("cant create directory: {:?}", &path);
+            error!("cant create directory: {:?}", &path);
             return Err(e);
         };
         for pg in new_playlist {
             for pli in &pg.channels {
                 let dir_path = path.join(sanitize_for_filename(&pli.header.borrow().group, underscore_whitespace));
                 if let Err(e) = std::fs::create_dir_all(&dir_path) {
-                    println!("cant create directory: {:?}", &path);
+                    error!("cant create directory: {:?}", &path);
                     return Err(e);
                 };
                 let mut file_name = sanitize_for_filename(&pli.header.borrow().title, underscore_whitespace);

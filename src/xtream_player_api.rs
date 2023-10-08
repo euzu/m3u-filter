@@ -28,7 +28,9 @@ pub(crate) async fn xtream_player_api(
                 _ => Err(std::io::Error::new(std::io::ErrorKind::Unsupported, format!("Cant find collection: {}/{}", target, &api_req.action))),
             } {
                 Ok(file_path) => {
-                    let file = actix_files::NamedFile::open_async(file_path).await.unwrap().set_content_type(mime::APPLICATION_JSON);
+                    let file = actix_files::NamedFile::open_async(file_path).await.unwrap()
+                        .set_content_type(mime::APPLICATION_JSON)
+                        .disable_content_disposition();
                     file.into_response(&req)
                 }
                 Err(_) => HttpResponse::BadRequest().finish()

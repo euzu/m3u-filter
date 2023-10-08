@@ -11,9 +11,10 @@ use actix_web::web::Data;
 
 use crate::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::config::{Config, ConfigInput, InputType, ProcessTargets};
-use crate::playlist_processor;
+use crate::{exit, playlist_processor};
 use crate::download::get_m3u_playlist;
 use crate::xtream_player_api::xtream_player_api;
+use log::{error};
 
 #[get("/")]
 async fn index(
@@ -41,7 +42,7 @@ pub(crate) async fn playlist(
         suffix: None,
         enabled: true,
     };
-    let result = get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir, false);
+    let result = get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir);
     HttpResponse::Ok().json(result)
 }
 
@@ -56,14 +57,13 @@ pub(crate) async fn config(
 }
 
 #[actix_web::main]
-pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets, verbose: bool) -> futures::io::Result<()> {
+pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets) -> futures::io::Result<()> {
     let host = cfg.api.host.clone();
     let port = cfg.api.port;
     let web_dir = cfg.api.web_root.clone();
     let web_dir_path = PathBuf::from(&web_dir);
     if !web_dir_path.exists() || !web_dir_path.is_dir() {
-        println!("web_root does not exists or is not an directory: {:?}", &web_dir_path);
-        std::process::exit(1);
+        exit!("web_root does not exists or is not an directory: {:?}", &web_dir_path);
     }
 
     let schedule = cfg.schedule.clone();
@@ -72,7 +72,6 @@ pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets, verbose: 
     let shared_data = web::Data::new(AppState {
         config: cfg,
         targets,
-        verbose,
     });
 
     // Scheduler
@@ -117,7 +116,7 @@ async fn start_scheduler(expression: &String, data: Data<AppState>) -> ! {
 
         if let Some(datetime) = upcoming.next() {
             if datetime.timestamp() <= local.timestamp() {
-                playlist_processor::process_sources((&data.config).clone(), &data.targets, data.verbose);
+                playlist_processor::process_sources((&data.config).clone(), &data.targets);
             }
         }
     }

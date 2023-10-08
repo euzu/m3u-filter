@@ -1,3 +1,3 @@
-pub(crate) fn send_message(msg: &str) {
+pub(crate) fn send_message(_msg: &str) {
 
 }

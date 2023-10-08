@@ -6,18 +6,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use crate::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
 use crate::model_config::{default_as_empty_str};
+use log::{error};
 
 fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
-
-fn null_to_default<'de, D, T>(d: D) -> Result<T, D::Error>
-    where
-        D: Deserializer<'de>,
-        T: Default + Deserialize<'de>,
-{
-    let opt = Option::deserialize(d)?;
-    let val = opt.unwrap_or_default();
-    Ok(val)
-}
 
 fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     deserializer: D,
@@ -53,12 +44,58 @@ fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     }
 }
 
+fn value_to_string_array(value : &Vec<Value>) -> Option<Vec<String>> {
+    Some(value.iter().map(|i| value_to_string(i)).filter(|i| i.is_some()).map(|i| i.unwrap()).collect())
+}
+
+fn value_to_string(v : &Value) -> Option<String> {
+    match v {
+        Value::Bool(value) => Some(value.to_string()),
+        Value::Number(value) => Some(value.to_string()),
+        Value::String(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn deserialize_as_option_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+    where
+        D: Deserializer<'de>,
+{
+    let value: Value = Deserialize::deserialize(deserializer)?;
+
+    match &value {
+        Value::String(s) => Ok(Some(s.clone())),
+        _ => Ok(Some(value.to_string())),
+    }
+}
+
+fn deserialize_as_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: Deserializer<'de>,
+{
+    let value: Value = Deserialize::deserialize(deserializer)?;
+
+    match &value {
+        Value::String(s) => Ok(s.clone()),
+        _ => Ok(value.to_string()),
+    }
+}
+
+fn deserialize_as_string_array<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+    where
+        D: Deserializer<'de>,
+{
+    Value::deserialize(deserializer).map(|v| match v {
+        Value::Array(value) => value_to_string_array(&value),
+        _ => None,
+    })
+}
 
 #[derive(Deserialize)]
 struct XtreamCategory {
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(deserialize_with = "deserialize_as_string")]
     pub category_id: String,
-    #[serde(deserialize_with = "null_to_default")]
+    #[serde(deserialize_with = "deserialize_as_string")]
     pub category_name: String,
     //pub parent_id: i32,
     #[serde(default = "default_as_empty_list")]
@@ -73,51 +110,51 @@ impl XtreamCategory {
 
 #[derive(Deserialize)]
 struct XtreamStream {
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_string")]
     pub name: String,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_string")]
     pub category_id: String,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub stream_id: Option<i32>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub series_id: Option<i32>,
-    #[serde(default = "default_as_empty_str", deserialize_with = "null_to_default")]
+    #[serde(default = "default_as_empty_str", deserialize_with = "deserialize_as_string")]
     pub stream_icon: String,
-    #[serde(default = "default_as_empty_str", deserialize_with = "null_to_default")]
+    #[serde(default = "default_as_empty_str", deserialize_with = "deserialize_as_string")]
     pub direct_source: String,
 
     // optional attributes
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_string_array")]
     backdrop_path: Option<Vec<String>>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     added: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     cast: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     container_extension: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     director: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     episode_run_time: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     genre: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     plot: Option<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     rating: Option<f32>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     rating_5based: Option<f32>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     release_date: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     stream_type: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     title: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     year: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     youtube_trailer: Option<String>,
-    #[serde(default, deserialize_with = "null_to_default")]
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     epg_channel_id: Option<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     tv_archive: Option<i32>,
@@ -181,7 +218,7 @@ fn process_category(category: Option<serde_json::Value>) -> Vec<XtreamCategory> 
             match serde_json::from_value::<Vec<XtreamCategory>>(value) {
                 Ok(category_list) => category_list,
                 Err(err) => {
-                    println!("Failed to process categories {}", &err);
+                    error!("Failed to process categories {}", &err);
                     vec![]
                 }
             }
@@ -197,7 +234,7 @@ fn process_streams(xtream_cluster: &XtreamCluster, streams: Option<serde_json::V
             match serde_json::from_value::<Vec<XtreamStream>>(value) {
                 Ok(stream_list) => stream_list,
                 Err(err) => {
-                    println!("Failed to process streams {:?}: {}", xtream_cluster, &err);
+                    error!("Failed to process streams {:?}: {}", xtream_cluster, &err);
                     vec![]
                 }
             }

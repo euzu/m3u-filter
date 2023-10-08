@@ -487,7 +487,19 @@ mappings:
               group: '|FR|TNT'
 ```
 
-## 3. Compilation
+## 3. User
+If you use the proxy functionality, 
+you need to create a `user.yml` configuration.
+
+```yaml
+user:
+  - target: pl1
+    credentials:
+      - {username: xtream, password: xtream.secret}
+
+```
+
+## 4. Compilation
 
 ### Static binary for docker
 #### Install prerequisites
@@ -555,7 +567,7 @@ Compile it with:
 cargo build --release --target x86_64-pc-windows-gnu
 ```
 
-## 4. The EXTM3U format is an extension of the M3U format.
+## 5. The EXTM3U format is an extension of the M3U format.
 m3u has become almost a standard for the formation of playlists of media players and media devices.
 
 A file in the EXTM3U format is a text file with the extension m3u or m3u8.

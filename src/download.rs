@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 use std::sync::atomic::AtomicI32;
+use log::debug;
 use crate::{m3u_parser, utils, xtream_parser};
 use crate::config::{Config, ConfigInput};
 use crate::model_m3u::{PlaylistGroup, XtreamCluster};
 
-fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str, verbose: bool) -> Option<PathBuf> {
+fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str) -> Option<PathBuf> {
     let persist_file: Option<PathBuf> =
         match &input.persist {
             Some(persist_path) => utils::prepare_persist_path(persist_path.as_str(), action),
@@ -12,22 +13,20 @@ fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str, ve
         };
     if persist_file.is_some() {
         let file_path = utils::get_file_path(working_dir, persist_file);
-        if verbose {
-            println!("persist to file:  {:?}", match &file_path {
-                Some(fp) => fp.display().to_string(),
-                _ => "".to_string()
-            });
-        }
+        debug!("persist to file:  {:?}", match &file_path {
+            Some(fp) => fp.display().to_string(),
+            _ => "".to_string()
+        });
         file_path
     } else {
         None
     }
 }
 
-pub(crate) fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String, verbose: bool) -> Option<Vec<PlaylistGroup>> {
+pub(crate) fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> Option<Vec<PlaylistGroup>> {
     let url = input.url.as_str();
-    let file_path = prepare_file_path(input, working_dir, "", verbose);
-    let lines: Option<Vec<String>> = utils::get_input_content(working_dir, url, file_path, verbose);
+    let file_path = prepare_file_path(input, working_dir, "");
+    let lines: Option<Vec<String>> = utils::get_input_content(working_dir, url, file_path);
     lines.map(|l| m3u_parser::parse_m3u(cfg, &l))
 }
 
@@ -153,7 +152,7 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::VIDEO, "get_vod_categories", "get_vod_streams"),
     (XtreamCluster::SERIES, "get_series_categories", "get_series")];
 
-pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String, verbose: bool) -> Option<Vec<PlaylistGroup>> {
+pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> Option<Vec<PlaylistGroup>> {
     let mut playlist: Vec<PlaylistGroup> = Vec::new();
     let username = input.username.as_ref().unwrap().clone();
     let password = input.password.as_ref().unwrap().clone();
@@ -164,11 +163,11 @@ pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String, ver
     for (xtream_cluster, category, stream) in &ACTIONS {
         let category_url = format!("{}&action={}", base_url, category);
         let stream_url = format!("{}&action={}", base_url, stream);
-        let category_file_path = prepare_file_path(input, working_dir, format!("{}_", category).as_str(), verbose);
-        let stream_file_path = prepare_file_path(input, working_dir, format!("{}_", stream).as_str(), verbose);
+        let category_file_path = prepare_file_path(input, working_dir, format!("{}_", category).as_str());
+        let stream_file_path = prepare_file_path(input, working_dir, format!("{}_", stream).as_str());
 
-        let category_content: Option<serde_json::Value> = utils::get_input_json_content(input, &category_url, category_file_path, verbose);
-        let stream_content: Option<serde_json::Value> = utils::get_input_json_content(input, &stream_url, stream_file_path, verbose);
+        let category_content: Option<serde_json::Value> = utils::get_input_json_content(input, &category_url, category_file_path);
+        let stream_content: Option<serde_json::Value> = utils::get_input_json_content(input, &stream_url, stream_file_path);
         let mut sub_playlist = xtream_parser::parse_xtream(&category_id_cnt, xtream_cluster, category_content, stream_content, &stream_base_url);
         while let Some(group) = sub_playlist.pop() {
             playlist.push(group);

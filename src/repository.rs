@@ -9,6 +9,7 @@ use crate::config::{Config, ConfigTarget};
 use crate::messaging::send_message;
 use crate::model_m3u::{PlaylistGroup, XtreamCluster};
 use crate::utils;
+use log::{error};
 
 pub(crate) static COL_CAT_LIVE: &str = "cat_live";
 pub(crate) static COL_CAT_SERIES: &str = "cat_series";
@@ -58,6 +59,10 @@ fn write_to_file<T>(file: &PathBuf, value: &T) -> Result<(), Error>
 
 fn get_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
     utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(" ", "_"))))
+}
+
+fn get_collection_path(path: &PathBuf, collection: &str) -> PathBuf {
+    path.join(format!("{}.json", collection))
 }
 
 pub(crate) fn save_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
@@ -119,17 +124,17 @@ pub(crate) fn save_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut 
         }
 
         for (col_path, data) in [
-            (&path.join(COL_CAT_LIVE), &cat_live_col),
-            (&path.join(COL_CAT_VOD), &cat_vod_col),
-            (&path.join(COL_CAT_SERIES), &cat_series_col),
-            (&path.join(COL_LIVE), &live_col),
-            (&path.join(COL_VOD), &vod_col),
-            (&path.join(COL_SERIES), &series_col)] {
-            match write_to_file(col_path, data) {
+            (get_collection_path(&path, COL_CAT_LIVE), &cat_live_col),
+            (get_collection_path(&path, COL_CAT_VOD), &cat_vod_col),
+            (get_collection_path(&path, COL_CAT_SERIES), &cat_series_col),
+            (get_collection_path(&path, COL_LIVE), &live_col),
+            (get_collection_path(&path, COL_VOD), &vod_col),
+            (get_collection_path(&path, COL_SERIES), &series_col)] {
+            match write_to_file(&col_path, data) {
                 Ok(()) => {}
                 Err(err) => {
                     failed = true;
-                    println!("Persisting collection failed: {}: {}", &col_path.clone().into_os_string().into_string().unwrap(), err);
+                    error!("Persisting collection failed: {}: {}", &col_path.clone().into_os_string().into_string().unwrap(), err);
                 }
             }
         }
@@ -145,10 +150,10 @@ pub(crate) fn save_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut 
 
 pub(crate) fn get_all(cfg: &Config, target_name: &str, collection_name: &str) -> Result<PathBuf, Error> {
     if let Some(path) = get_storage_path(&cfg, target_name) {
-        let col_path = path.join(collection_name);
+        let col_path = get_collection_path(&path, collection_name);
         if col_path.exists() {
             return Ok(col_path);
         }
     }
-    return Err(Error::new(std::io::ErrorKind::Other, format!("Cant find collection: {}/{}", target_name, collection_name)));
+    Err(Error::new(std::io::ErrorKind::Other, format!("Cant find collection: {}/{}", target_name, collection_name)))
 }

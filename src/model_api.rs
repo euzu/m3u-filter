@@ -5,7 +5,6 @@ use crate::config::{Config, ProcessTargets};
 pub(crate) struct AppState {
     pub config: Config,
     pub targets: ProcessTargets,
-    pub verbose: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

@@ -1,11 +1,21 @@
 use std::fs;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
+use log::{debug, error};
 use path_absolutize::*;
 use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
 use crate::config::ConfigInput;
 use crate::messaging::send_message;
+
+#[macro_export]
+macro_rules! exit {
+    ($($arg:tt)*) => {{
+        error!($($arg)*);
+        std::process::exit(1);
+    }};
+}
+
 
 pub(crate) fn get_exe_path() -> PathBuf {
     let default_path = std::path::PathBuf::from("./");
@@ -59,7 +69,7 @@ pub(crate) fn get_working_path(wd: &String) -> String {
                         Err(_) => None
                     }
                 } else {
-                    println!("Path not found {:?}", &work_path);
+                    error!("Path not found {:?}", &work_path);
                     None
                 }
             }
@@ -72,7 +82,7 @@ pub(crate) fn get_working_path(wd: &String) -> String {
         match rp.canonicalize() {
             Ok(ap) => String::from(ap.to_str().unwrap_or("./")),
             Err(_) => {
-                println!("Path not found {:?}", &rp);
+                error!("Path not found {:?}", &rp);
                 String::from("./")
             }
         }
@@ -84,20 +94,19 @@ pub(crate) fn open_file(file_name: &PathBuf, mandatory: bool) -> Option<fs::File
         Ok(file) => Some(file),
         Err(_) => {
             if mandatory {
-                println!("cant open file: {:?}", file_name);
-                std::process::exit(1);
+                exit!("cant open file: {:?}", file_name);
             }
             None
         }
     }
 }
 
-pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<PathBuf>, verbose: bool) -> Option<Vec<String>> {
+pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<PathBuf>) -> Option<Vec<String>> {
     match url_str.parse::<url::Url>() {
-        Ok(url) => match download_content(url, persist_file, verbose) {
+        Ok(url) => match download_content(url, persist_file) {
             Ok(content) => Some(content),
             Err(e) => {
-                println!("cant download input url: {}  => {}", url_str, e);
+                error!("cant download input url: {}  => {}", url_str, e);
                 send_message(format!("Failed to download: {}", url_str).as_str());
                 None
             }
@@ -111,7 +120,7 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
                             let to_file = &persist_file.unwrap();
                             match fs::copy(file, to_file) {
                                 Ok(_) => {}
-                                Err(e) => println!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e),
+                                Err(e) => error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e),
                             }
                         };
                         Some(std::io::BufReader::new(open_file(file, true).unwrap()).lines().map(|l| l.unwrap()).collect())
@@ -125,7 +134,7 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
                 Some(file) => Some(file),
                 None => {
                     let msg = format!("cant read input url: {:?}", &file_path.unwrap());
-                    println!("{}", msg);
+                    error!("{}", msg);
                     send_message(msg.as_str());
                     None
                 }
@@ -134,14 +143,14 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
     }
 }
 
-fn download_content(url: url::Url, persist_file: Option<PathBuf>, verbose: bool) -> Result<Vec<String>, String> {
+fn download_content(url: url::Url, persist_file: Option<PathBuf>) -> Result<Vec<String>, String> {
     match reqwest::blocking::get(url) {
         Ok(response) => {
             if response.status().is_success() {
                 match response.text_with_charset("utf8") {
                     Ok(text) => {
                         if persist_file.is_some() {
-                            persist_playlist(persist_file, &text, verbose);
+                            persist_playlist(persist_file, &text);
                         }
                         let result = text.lines().map(String::from).collect();
                         Ok(result)
@@ -156,15 +165,15 @@ fn download_content(url: url::Url, persist_file: Option<PathBuf>, verbose: bool)
     }
 }
 
-fn persist_playlist(persist_file: Option<PathBuf>, text: &String, verbose: bool) {
+fn persist_playlist(persist_file: Option<PathBuf>, text: &String) {
     if let Some(path_buf) = persist_file {
         let filename = &path_buf.to_str().unwrap_or("?");
         match fs::File::create(&path_buf) {
             Ok(mut file) => match file.write_all(text.as_bytes()) {
-                Ok(_) => if verbose { println!("persisted: {}", filename) },
-                Err(e) => println!("failed to persist file {}, {}", filename, e)
+                Ok(_) => debug!("persisted: {}", filename),
+                Err(e) => error!("failed to persist file {}, {}", filename, e)
             },
-            Err(e) => println!("failed to persist file {}, {}", filename, e)
+            Err(e) => error!("failed to persist file {}, {}", filename, e)
         }
     }
 }
@@ -183,7 +192,7 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
                 match pb.join(&p).absolutize() {
                     Ok(os) => Some(PathBuf::from(os)),
                     Err(e) => {
-                        println!("path is not relative {:?}", e);
+                        error!("path is not relative {:?}", e);
                         Some(p)
                     }
                 }
@@ -195,7 +204,7 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
     }
 }
 
-fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Option<PathBuf>, verbose: bool) -> Result<serde_json::Value, String> {
+fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Option<PathBuf>) -> Result<serde_json::Value, String> {
     let mut request = reqwest::blocking::Client::new().get(url);
     if input.headers.is_empty() {
         let mut headers = header::HeaderMap::new();
@@ -205,7 +214,7 @@ fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Optio
                 HeaderValue::from_bytes(value.as_bytes()).unwrap(),
             );
         }
-        if verbose { println!("Request with headers{:?}", &headers); }
+        debug!("Request with headers{:?}", &headers);
         request = request.headers(headers);
     }
     match request.send() {
@@ -214,7 +223,7 @@ fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Optio
                 match response.json::<serde_json::Value>() {
                     Ok(content) => {
                         if persist_file.is_some() {
-                            persist_playlist(persist_file, &serde_json::to_string(&content).unwrap(), verbose);
+                            persist_playlist(persist_file, &serde_json::to_string(&content).unwrap());
                         }
                         Ok(content)
                     }
@@ -228,17 +237,17 @@ fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Optio
     }
 }
 
-pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_file: Option<PathBuf>, verbose: bool) -> Option<serde_json::Value> {
+pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_file: Option<PathBuf>) -> Option<serde_json::Value> {
     match url_str.parse::<url::Url>() {
-        Ok(url) => match download_json_content(input, url, persist_file, verbose) {
+        Ok(url) => match download_json_content(input, url, persist_file) {
             Ok(content) => Some(content),
             Err(e) => {
-                println!("cant download input url: {}  => {}", url_str, e);
+                error!("cant download input url: {}  => {}", url_str, e);
                 None
             }
         },
         Err(_) => {
-            println!("malformed input url: {}", url_str);
+            error!("malformed input url: {}", url_str);
             None
         }
     }

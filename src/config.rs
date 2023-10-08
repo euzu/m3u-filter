@@ -1,13 +1,14 @@
 use std::collections::{HashMap, HashSet};
 use path_absolutize::*;
 use enum_iterator::Sequence;
+use log::{debug, error};
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::mapping::Mappings;
 use crate::mapping::Mapping;
 use crate::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_false, default_as_true};
 use crate::user::{User};
-use crate::utils;
+use crate::{exit, utils};
 use crate::utils::get_working_path;
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
@@ -53,8 +54,7 @@ impl ConfigSortChannel {
     pub(crate) fn prepare(&mut self) {
         let re = regex::Regex::new(&self.group_pattern);
         if re.is_err() {
-            println!("cant parse regex: {}", &self.group_pattern);
-            std::process::exit(1);
+            exit!("cant parse regex: {}", &self.group_pattern);
         }
         self.re = Some(re.unwrap());
     }
@@ -89,8 +89,7 @@ impl ConfigRename {
     pub fn prepare(&mut self) {
         let re = regex::Regex::new(&self.pattern);
         if re.is_err() {
-            println!("cant parse regex: {}", &self.pattern);
-            std::process::exit(1);
+            exit!("cant parse regex: {}", &self.pattern);
         }
         self.re = Some(re.unwrap());
     }
@@ -135,10 +134,10 @@ pub(crate) struct ConfigTarget {
 }
 
 impl ConfigTarget {
-    pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>, verbose: bool) {
+    pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) {
         self.id = id;
-        let fltr = get_filter(&self.filter, templates, verbose);
-        if verbose { println!("Filter: {}", fltr) }
+        let fltr = get_filter(&self.filter, templates);
+        debug!("Filter: {}", fltr);
         self._filter = Some(fltr);
         if let Some(renames) = self.rename.as_mut() {
             renames.iter_mut().for_each(|r| r.prepare());
@@ -147,9 +146,9 @@ impl ConfigTarget {
             sort.prepare();
         }
     }
-    pub fn filter(&self, provider: &ValueProvider, verbose: bool) -> bool {
+    pub fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
-        return self._filter.as_ref().unwrap().filter(provider, &mut processor, verbose);
+        return self._filter.as_ref().unwrap().filter(provider, &mut processor);
     }
 }
 
@@ -203,8 +202,7 @@ impl ConfigInput {
     pub fn prepare(&mut self, id: u16) {
         self.id = id;
         if self.url.trim().is_empty() {
-            println!("url for input is mandatory");
-            std::process::exit(1);
+            exit!("url for input is mandatory");
         }
         if let Some(user_name) = &self.username {
             if user_name.trim().is_empty() {
@@ -219,13 +217,12 @@ impl ConfigInput {
         match self.input_type {
             InputType::M3u => {
                 if self.username.is_none() || self.password.is_none() {
-                    println!("for input type m3u: username and password are ignored")
+                    error!("for input type m3u: username and password are ignored")
                 }
             }
             InputType::Xtream => {
                 if self.username.is_none() || self.password.is_none() {
-                    println!("for input type xtream: username and password are mandatory");
-                    std::process::exit(1);
+                    exit!("for input type xtream: username and password are mandatory");
                 }
             }
         }
@@ -284,12 +281,10 @@ impl Config {
                 let is_m3u = matches!(source.input.input_type, InputType::M3u);
                 for target in &mut source.targets {
                     if is_m3u && target.filename.is_none() {
-                        println!("filename is required for m3u type: {}", target.name);
-                        std::process::exit(1);
+                        exit!("filename is required for m3u type: {}", target.name);
                     }
                     if !is_m3u && target.filename.is_none() && !target.publish {
-                        println!("filename or publish is required for xtream type: {}", target.name);
-                        std::process::exit(1);
+                        exit!("filename or publish is required for xtream type: {}", target.name);
                     }
 
                     if let Some(mapping_ids) = &target.mapping {
@@ -307,11 +302,11 @@ impl Config {
         }
     }
 
-    pub fn prepare(&mut self, verbose: bool) {
+    pub fn prepare(&mut self) {
         self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
         self.prepare_api_web_root();
-        if let Some(templates) = &mut self.templates { self.templates = Some(prepare_templates(templates, verbose)) };
+        if let Some(templates) = &mut self.templates { self.templates = Some(prepare_templates(templates)) };
         // prepare sources and set id's
         let mut target_names_check = HashSet::<String>::new();
         let default_target_name = default_as_default();
@@ -325,16 +320,15 @@ impl Config {
                 let target_name = target.name.clone();
                 if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
                     if target_names_check.contains(target_name.as_str()) {
-                        println!("target names should be unique: {}", target_name);
-                        std::process::exit(1);
+                        exit!("target names should be unique: {}", target_name);
                     } else {
                         target_names_check.insert(target_name);
                     }
                 }
                 // prepare templaes
                 match &self.templates {
-                    Some(templ) => target.prepare(target_index, Some(templ), verbose),
-                    _ => target.prepare(target_index, None, verbose)
+                    Some(templ) => target.prepare(target_index, Some(templ)),
+                    _ => target.prepare(target_index, None)
                 }
                 target_index += 1;
             }
@@ -359,11 +353,11 @@ impl Config {
                     match wrpb2.absolutize() {
                         Ok(os) => self.api.web_root = String::from(os.to_str().unwrap()),
                         Err(e) => {
-                            println!("failed to absolutize web_root {:?}", e);
+                            error!("failed to absolutize web_root {:?}", e);
                         }
                     }
                     // } else {
-                    //     println!("web_root directory does not exists {:?}", wrpb2)
+                    //     error!("web_root directory does not exists {:?}", wrpb2)
                 }
             }
         }
@@ -404,11 +398,10 @@ pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<
 
         let missing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v == 0).map(|(k, _)| k.to_string()).collect();
         if !missing_targets.is_empty() {
-            println!("No target found for {}", missing_targets.join(", "));
-            std::process::exit(1);
+            exit!("No target found for {}", missing_targets.join(", "));
         }
         let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
-        println!("Processing targets {}", processing_targets.join(", "));
+        debug!("Processing targets {}", processing_targets.join(", "));
     } else {
         enabled = false;
     }

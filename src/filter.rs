@@ -1,12 +1,14 @@
 use std::cell::RefCell;
 use enum_iterator::all;
 use std::collections::{HashMap};
+use log::{debug, error};
 use pest::iterators::Pair;
 use pest::Parser;
 use petgraph::algo::toposort;
 use crate::model_m3u::PlaylistItem;
 use crate::model_config::ItemField;
 use petgraph::graph::DiGraph;
+use crate::exit;
 
 
 pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
@@ -42,13 +44,13 @@ impl<'a> ValueProvider<'a> {
 }
 
 pub(crate) trait ValueProcessor {
-    fn process(&mut self, field: &ItemField, value: &str, rewc: &RegexWithCaptures, verbose: bool) -> bool;
+    fn process(&mut self, field: &ItemField, value: &str, rewc: &RegexWithCaptures) -> bool;
 }
 
 pub(crate) struct MockValueProcessor {}
 
 impl ValueProcessor for MockValueProcessor {
-    fn process(&mut self, _: &ItemField, _: &str, _: &RegexWithCaptures, _: bool) -> bool {
+    fn process(&mut self, _: &ItemField, _: &str, _: &RegexWithCaptures) -> bool {
         return false;
     }
 }
@@ -102,31 +104,31 @@ pub(crate) enum Filter {
 }
 
 impl Filter {
-    pub fn filter(&self, provider: &ValueProvider, processor: &mut dyn ValueProcessor, verbose: bool) -> bool {
+    pub fn filter(&self, provider: &ValueProvider, processor: &mut dyn ValueProcessor) -> bool {
         match self {
             Filter::Comparison(field, rewc) => {
                 let value = provider.call(field);
                 let is_match = rewc.re.is_match(value.as_str());
                 if is_match {
-                    if verbose { println!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value) }
-                    processor.process(field, &value, rewc, verbose);
+                    debug!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);
+                    processor.process(field, &value, rewc);
                 }
                 is_match
             }
             Filter::Group(expr) => {
-                expr.filter(provider, processor, verbose)
+                expr.filter(provider, processor)
             }
             Filter::UnaryExpression(op, expr) => {
                 match op {
-                    UnaryOperator::NOT => !expr.filter(provider, processor, verbose),
+                    UnaryOperator::NOT => !expr.filter(provider, processor),
                 }
             }
             Filter::BinaryExpression(left, op, right) => {
                 match op {
-                    BinaryOperator::AND => left.filter(provider, processor, verbose)
-                        && right.filter(provider, processor, verbose),
-                    BinaryOperator::OR => left.filter(provider, processor, verbose)
-                        || right.filter(provider, processor, verbose),
+                    BinaryOperator::AND => left.filter(provider, processor)
+                        && right.filter(provider, processor),
+                    BinaryOperator::OR => left.filter(provider, processor)
+                        || right.filter(provider, processor),
                 }
             }
         }
@@ -155,13 +157,6 @@ impl std::fmt::Display for Filter {
     }
 }
 
-macro_rules! exit {
-    ($($arg:tt)*) => {{
-        println!($($arg)*);
-        std::process::exit(1);
-    }};
-}
-
 fn get_parser_item_field(expr: Pair<Rule>) -> ItemField {
     if expr.as_rule() == Rule::field {
         let field_text = expr.as_str();
@@ -174,7 +169,7 @@ fn get_parser_item_field(expr: Pair<Rule>) -> ItemField {
     exit!("unknown field: {}", expr.as_str());
 }
 
-fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose: bool) -> RegexWithCaptures {
+fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> RegexWithCaptures {
     if expr.as_rule() == Rule::regexp {
         let mut parsed_text = String::from(expr.as_str());
         parsed_text.pop();
@@ -190,7 +185,7 @@ fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose
         let regexp = re.unwrap();
         let captures = regexp.capture_names()
             .flatten().map(String::from).filter(|x| !x.is_empty()).collect::<Vec<String>>();
-        if verbose { println!("Created regex: {} with captures: [{}]", regstr, captures.join(", ")) }
+        debug!("Created regex: {} with captures: [{}]", regstr, captures.join(", "));
         return RegexWithCaptures {
             restr: regstr,
             re: regexp,
@@ -200,10 +195,10 @@ fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose
     exit!("unknown field: {}", expr.as_str());
 }
 
-fn get_parser_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose: bool) -> Filter {
+fn get_parser_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Filter {
     let mut expr_inner = expr.into_inner();
     let field = get_parser_item_field(expr_inner.next().unwrap());
-    let regexp = get_parser_regexp(expr_inner.next().unwrap(), templates, verbose);
+    let regexp = get_parser_regexp(expr_inner.next().unwrap(), templates);
     Filter::Comparison(field, regexp)
 }
 
@@ -229,7 +224,7 @@ macro_rules! handle_expr {
     }
 }
 
-fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, verbose: bool) -> Filter {
+fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Filter {
     let mut stmts = Vec::new();
     let pairs = expr.into_inner();
     let mut bop: Option<BinaryOperator> = None;
@@ -238,13 +233,13 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, ver
     for pair in pairs {
         match pair.as_rule() {
             Rule::comparison => {
-                handle_expr!(bop, uop, stmts, get_parser_comparison(pair, templates, verbose));
+                handle_expr!(bop, uop, stmts, get_parser_comparison(pair, templates));
             }
             Rule::expr => {
-                handle_expr!(bop, uop, stmts, get_parser_expression(pair, templates, verbose));
+                handle_expr!(bop, uop, stmts, get_parser_expression(pair, templates));
             }
             Rule::expr_group => {
-                handle_expr!(bop, uop, stmts, Filter::Group(Box::new(get_parser_expression(pair.into_inner().next().unwrap(), templates, verbose))));
+                handle_expr!(bop, uop, stmts, Filter::Group(Box::new(get_parser_expression(pair.into_inner().next().unwrap(), templates))));
             }
             Rule::not => {
                 uop = Some(UnaryOperator::NOT);
@@ -253,7 +248,7 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, ver
                 bop = Some(get_parser_binary_op(pair.into_inner().next().unwrap()));
             }
             _ => {
-                println!("did not expect rule: {:?}", pair)
+                error!("did not expect rule: {:?}", pair)
             }
         }
     }
@@ -273,7 +268,7 @@ fn get_parser_binary_op(expr: Pair<Rule>) -> BinaryOperator {
     }
 }
 
-pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>, verbose: bool) -> Filter {
+pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -> Filter {
     let empty_list = Vec::new();
     let template_list: &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
     let mut source = String::from(filter_text);
@@ -291,7 +286,7 @@ pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTempla
                 for expr in pair.into_inner() {
                     match expr.as_rule() {
                         Rule::expr => {
-                            let expr = get_parser_expression(expr, template_list, verbose);
+                            let expr = get_parser_expression(expr, template_list);
                             match &op {
                                 Some(binop) => {
                                     result = Some(Filter::BinaryExpression(Box::new(result.unwrap()), binop.clone(), Box::new(expr)));
@@ -304,7 +299,7 @@ pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTempla
                             op = Some(get_parser_binary_op(expr.into_inner().next().unwrap()));
                         }
                         _ => {
-                            println!("unknown expression {:?}", expr);
+                            error!("unknown expression {:?}", expr);
                             //exit(format!("unknown stmt inner: {}", expr.as_str()).as_str());
                         }
                     }
@@ -364,13 +359,13 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
         .map(|scc| scc.iter().map(|&i| node_names.get(&i.index()).unwrap().clone()).collect())
         .collect();
     for cyclic in &cycles {
-        println!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "))
+        error!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "))
     }
 
     (graph, node_names, node_deps, !cycles.is_empty())
 }
 
-pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool) -> Vec<PatternTemplate> {
+pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Vec<PatternTemplate> {
     let mut result: Vec<PatternTemplate> = templates.to_vec();
     let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
     if cyclic {
@@ -385,7 +380,7 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool)
             if graph.edges_directed(*node, petgraph::Incoming).count() > 0 {
                 let node_name = node_map.get(&node.index()).unwrap();
                 if let Some(deps) = node_deps.get(node_name) {
-                    if verbose { println!("template {}  depends on [{}]", node_name, deps.join(", ")) };
+                    debug!("template {}  depends on [{}]", node_name, deps.join(", "));
                     let mut node_template = dep_value_map.get(node_name).unwrap().clone();
                     for dep_name in deps {
                         let dep_template = dep_value_map.get(dep_name).unwrap().clone();
@@ -400,6 +395,6 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>, verbose: bool)
             }
         }
     }
-    if verbose { println!("{:#?}", result); }
+    debug!("{:#?}", result);
     result
 }

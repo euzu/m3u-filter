@@ -35,3 +35,5 @@ unidecode = "0"
 petgraph = "0"
 openssl = { version = "*", features = ["vendored"] } #https://docs.rs/openssl/0.10.34/openssl/#vendored
 mime = "0.3.17"
+log = "0.4.20"
+env_logger = "0.10.0"
