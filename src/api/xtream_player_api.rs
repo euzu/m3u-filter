@@ -1,6 +1,7 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
 use actix_web::{HttpResponse, web, get, HttpRequest};
+use actix_web::http::header::{CACHE_CONTROL, HeaderValue};
 use chrono::{Duration, Local};
 use crate::api::model_api::{AppState, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::model::config::Config;
@@ -15,8 +16,8 @@ fn get_user_info(user_name: &str, cfg: &Config) -> XtreamAuthorizationResponse {
             active_cons: 0,
             allowed_output_formats: Vec::from(["ts".to_string()]),
             auth: 1,
-            created_at: (now - Duration::days(365)).timestamp(),
-            exp_date: (now + Duration::days(365)).timestamp(),
+            created_at: (now - Duration::days(365)).timestamp(), // fake
+            exp_date: (now + Duration::days(365)).timestamp(),// fake
             is_trial: 0,
             max_connections: 1,
             message: server.message.to_string(),
@@ -33,7 +34,7 @@ fn get_user_info(user_name: &str, cfg: &Config) -> XtreamAuthorizationResponse {
             timezone: server.timezone.to_string(),
             timestamp_now: now.timestamp(),
             time_now: now.format("%Y-%m-%d %H:%M:%S").to_string(),
-        }
+        },
     }
 }
 
@@ -70,7 +71,10 @@ pub(crate) async fn xtream_player_api(
                     let file = actix_files::NamedFile::open_async(file_path).await.unwrap()
                         .set_content_type(mime::APPLICATION_JSON)
                         .disable_content_disposition();
-                    file.into_response(&req)
+                    let mut result = file.into_response(&req);
+                    let headers = result.headers_mut();
+                    headers.insert(CACHE_CONTROL, HeaderValue::from_bytes("no-cache".as_bytes()).unwrap());
+                    result
                 }
                 Err(_) => HttpResponse::BadRequest().finish()
             }

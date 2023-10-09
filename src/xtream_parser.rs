@@ -1,7 +1,7 @@
 use std::cell::{RefCell};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
@@ -133,11 +133,15 @@ struct XtreamStream {
     #[serde(default, deserialize_with = "deserialize_as_option_string")]
     container_extension: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_string")]
+    cover: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
     director: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_string")]
     episode_run_time: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_string")]
     genre: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_as_option_string")]
+    last_modified: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_string")]
     plot: Option<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
@@ -194,9 +198,11 @@ impl XtreamStream {
         add_str_property_if_exists!(result, self.added, "added");
         add_str_property_if_exists!(result, self.cast, "cast");
         add_str_property_if_exists!(result, self.container_extension, "container_extension");
+        add_str_property_if_exists!(result, self.cover, "cover");
         add_str_property_if_exists!(result, self.director, "director");
         add_str_property_if_exists!(result, self.episode_run_time, "episode_run_time");
         add_str_property_if_exists!(result, self.genre, "genre");
+        add_str_property_if_exists!(result, self.last_modified, "last_modified");
         add_str_property_if_exists!(result, self.plot, "plot");
         add_f64_property_if_exists!(result, self.rating, "rating");
         add_f64_property_if_exists!(result, self.rating_5based, "rating_5based");
