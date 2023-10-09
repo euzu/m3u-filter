@@ -65,6 +65,7 @@ fn deserialize_as_option_string<'de, D>(deserializer: D) -> Result<Option<String
 
     match &value {
         Value::String(s) => Ok(Some(s.clone())),
+        Value::Number(s) => Ok(Some(s.to_string())),
         _ => Ok(None),
     }
 }

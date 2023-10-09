@@ -24,10 +24,10 @@ const LIVE_STREAM_FIELDS: &[&str] = &[
 ];
 
 const VIDEO_STREAM_FIELDS: &[&str] = &[
-    "release_date",
+    "release_date", "cast",
     "director", "episode_run_time", "genre",
     "stream_type", "title", "year", "youtube_trailer",
-    "plot", "rating_5based", "stream_icon",
+    "plot", "rating_5based", "stream_icon", "container_extension"
 ];
 
 const SERIES_STREAM_FIELDS: &[&str] = &[
