@@ -62,7 +62,7 @@ fn create_empty_playlistitem_header(content: &String) -> PlaylistItemHeader {
         time_shift: String::from(""),
         rec: String::from(""),
         source: String::from(content),
-        xtream_cluster: XtreamCluster::LIVE,
+        xtream_cluster: XtreamCluster::Live,
         additional_properties: None,
     }
 }
@@ -105,7 +105,7 @@ fn process_header(video_suffixes: &Vec<&str>,content: &String, url: String) -> P
     for suffix in video_suffixes {
        if url.ends_with(suffix) {
            // TODO find Series based on group or configured names
-           plih.xtream_cluster = XtreamCluster::VIDEO;
+           plih.xtream_cluster = XtreamCluster::Video;
            break;
        }
     }
@@ -138,10 +138,12 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
         if line.starts_with('#') {
             continue;
         }
-        if let Some(..) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header.unwrap(), String::from(line))), url: String::from(line) };
-            if group.is_some() && item.header.borrow().group.is_empty() {
-                item.header.borrow_mut().group = group.unwrap();
+        if let Some(header_value) = header {
+            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value, String::from(line))), url: String::from(line) };
+            if let Some(group_value) = group {
+                if item.header.borrow().group.is_empty() {
+                    item.header.borrow_mut().group = group_value;
+                }
             }
             let key = String::from(&item.header.borrow().group);
             // let key2 = String::from(&item.header.group);
@@ -158,9 +160,7 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
     }
 
     let mut result: Vec<PlaylistGroup> = vec![];
-    let mut grp_id: i32 = 0;
-    for (key, channels) in groups {
-        grp_id += 1;
+    for (grp_id, (key, channels)) in (1_i32..).zip(groups.into_iter()) {
         let cluster = channels.first().map(|pli| pli.header.borrow().xtream_cluster.clone());
         result.push(PlaylistGroup { id: grp_id, xtream_cluster: cluster.unwrap(), title: key, channels });
     }

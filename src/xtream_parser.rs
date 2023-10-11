@@ -1,12 +1,14 @@
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
+
+use log::error;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+
+use crate::model::model_config::default_as_empty_str;
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
-use crate::model::model_config::{default_as_empty_str};
-use log::{error};
 
 fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
 
@@ -44,8 +46,8 @@ fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     }
 }
 
-fn value_to_string_array(value: &Vec<Value>) -> Option<Vec<String>> {
-    Some(value.iter().map(|i| value_to_string(i)).filter(|i| i.is_some()).map(|i| i.unwrap()).collect())
+fn value_to_string_array(value: &[Value]) -> Option<Vec<String>> {
+    Some(value.iter().filter_map(value_to_string).collect())
 }
 
 fn value_to_string(v: &Value) -> Option<String> {

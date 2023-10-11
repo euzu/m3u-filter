@@ -9,12 +9,12 @@ use crate::model::config::ConfigOptions;
 
 #[derive(Debug, Clone)]
 pub(crate) enum XtreamCluster {
-    LIVE = 1,
-    VIDEO = 2,
-    SERIES = 3
+    Live = 1,
+    Video = 2,
+    Series = 3
 }
 
-pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::LIVE }
+pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::Live }
 
 pub(crate) trait FieldAccessor {
     fn get_field(&self, field: &str) -> Option<&String>;

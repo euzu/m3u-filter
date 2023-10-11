@@ -311,12 +311,12 @@ pub(crate) fn process_playlist(playlist: &mut [PlaylistGroup],
                                target: &ConfigTarget, cfg: &Config) -> Result<(), std::io::Error> {
     let pipe: ProcessingPipe =
         match &target.processing_order {
-            ProcessingOrder::FRM => vec![filter_playlist, rename_playlist, map_playlist],
-            ProcessingOrder::FMR => vec![filter_playlist, map_playlist, rename_playlist],
-            ProcessingOrder::RFM => vec![rename_playlist, filter_playlist, map_playlist],
-            ProcessingOrder::RMF => vec![rename_playlist, map_playlist, filter_playlist],
-            ProcessingOrder::MFR => vec![map_playlist, filter_playlist, rename_playlist],
-            ProcessingOrder::MRF => vec![map_playlist, rename_playlist, filter_playlist]
+            ProcessingOrder::Frm => vec![filter_playlist, rename_playlist, map_playlist],
+            ProcessingOrder::Fmr => vec![filter_playlist, map_playlist, rename_playlist],
+            ProcessingOrder::Rfm => vec![rename_playlist, filter_playlist, map_playlist],
+            ProcessingOrder::Rmf => vec![rename_playlist, map_playlist, filter_playlist],
+            ProcessingOrder::Mfr => vec![map_playlist, filter_playlist, rename_playlist],
+            ProcessingOrder::Mrf => vec![map_playlist, rename_playlist, filter_playlist]
         };
 
     debug!("Processing order is {}", &target.processing_order);

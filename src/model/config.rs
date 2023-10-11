@@ -11,7 +11,7 @@ use crate::{exit, utils};
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::utils::get_working_path;
 
-fn default_as_frm() -> ProcessingOrder { ProcessingOrder::FRM }
+fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 
 fn default_as_default() -> String { String::from("default") }
 
@@ -303,8 +303,8 @@ impl Config {
                         let mut target_mappings = Vec::new();
                         for mapping_id in mapping_ids {
                             let mapping = mapping_list.get_mapping(mapping_id);
-                            if let Some(..) = mapping {
-                                target_mappings.push(mapping.unwrap());
+                            if let Some(mappings) = mapping {
+                                target_mappings.push(mappings);
                             }
                         }
                         target._mapping = if !target_mappings.is_empty() { Some(target_mappings) } else { None };
@@ -357,8 +357,8 @@ impl Config {
                 }
                 if !wrpb2.exists() {
                     let cwd = std::env::current_dir();
-                    if let Ok(..) = cwd {
-                        wrpb2 = cwd.unwrap().join(&self.api.web_root);
+                    if let Ok(cwd_path) = cwd {
+                        wrpb2 = cwd_path.join(&self.api.web_root);
                     }
                 }
                 if wrpb2.exists() {

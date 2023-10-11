@@ -116,8 +116,8 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
             let result = match &file_path {
                 Some(file) => {
                     if file.exists() {
-                        if let Some(..) = persist_file {
-                            let to_file = &persist_file.unwrap();
+                        if let Some(persist_file_value) = persist_file {
+                            let to_file = &persist_file_value;
                             match fs::copy(file, to_file) {
                                 Ok(_) => {}
                                 Err(e) => error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e),

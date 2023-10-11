@@ -51,7 +51,7 @@ pub(crate) struct MockValueProcessor {}
 
 impl ValueProcessor for MockValueProcessor {
     fn process(&mut self, _: &ItemField, _: &str, _: &RegexWithCaptures) -> bool {
-        return false;
+        false
     }
 }
 
@@ -77,20 +77,20 @@ struct FilterParser;
 
 #[derive(Debug, Clone)]
 pub(crate) enum UnaryOperator {
-    NOT
+    Not
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum BinaryOperator {
-    AND,
-    OR,
+    And,
+    Or,
 }
 
 impl std::fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            BinaryOperator::OR => write!(f, "OR"),
-            BinaryOperator::AND => write!(f, "AND"),
+            BinaryOperator::Or => write!(f, "OR"),
+            BinaryOperator::And => write!(f, "AND"),
         }
     }
 }
@@ -120,14 +120,14 @@ impl Filter {
             }
             Filter::UnaryExpression(op, expr) => {
                 match op {
-                    UnaryOperator::NOT => !expr.filter(provider, processor),
+                    UnaryOperator::Not => !expr.filter(provider, processor),
                 }
             }
             Filter::BinaryExpression(left, op, right) => {
                 match op {
-                    BinaryOperator::AND => left.filter(provider, processor)
+                    BinaryOperator::And => left.filter(provider, processor)
                         && right.filter(provider, processor),
-                    BinaryOperator::OR => left.filter(provider, processor)
+                    BinaryOperator::Or => left.filter(provider, processor)
                         || right.filter(provider, processor),
                 }
             }
@@ -146,7 +146,7 @@ impl std::fmt::Display for Filter {
             }
             Filter::UnaryExpression(op, expr) => {
                 let flt = match op {
-                    UnaryOperator::NOT => format!("NOT {}", expr),
+                    UnaryOperator::Not => format!("NOT {}", expr),
                 };
                 write!(f, "{}", flt)
             }
@@ -242,7 +242,7 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> 
                 handle_expr!(bop, uop, stmts, Filter::Group(Box::new(get_parser_expression(pair.into_inner().next().unwrap(), templates))));
             }
             Rule::not => {
-                uop = Some(UnaryOperator::NOT);
+                uop = Some(UnaryOperator::Not);
             }
             Rule::bool_op => {
                 bop = Some(get_parser_binary_op(pair.into_inner().next().unwrap()));
@@ -260,8 +260,8 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> 
 
 fn get_parser_binary_op(expr: Pair<Rule>) -> BinaryOperator {
     match expr.as_rule() {
-        Rule::and => BinaryOperator::AND,
-        Rule::or => BinaryOperator::OR,
+        Rule::and => BinaryOperator::And,
+        Rule::or => BinaryOperator::Or,
         _ => {
             exit!("Unknown  binray operator {}", expr.as_str());
         }

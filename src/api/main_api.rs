@@ -108,7 +108,7 @@ pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets) -> future
     // .service(actix_files::Files::new("/static", ".").show_files_listing())
 }
 
-async fn start_scheduler(expression: &String, data: Data<AppState>) -> ! {
+async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
     let schedule = Schedule::from_str(expression).unwrap();
     let offset = *Local::now().offset();
     loop {
@@ -118,7 +118,7 @@ async fn start_scheduler(expression: &String, data: Data<AppState>) -> ! {
 
         if let Some(datetime) = upcoming.next() {
             if datetime.timestamp() <= local.timestamp() {
-                playlist_processor::process_sources((&data.config).clone(), &data.targets);
+                playlist_processor::process_sources((data.config).clone(), &data.targets);
             }
         }
     }

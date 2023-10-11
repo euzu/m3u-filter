@@ -82,7 +82,7 @@ fn main() {
     }
 }
 
-fn init_logger(log_level: &String) {
+fn init_logger(log_level: &str) {
     let mut log_builder = Builder::new();
     // Set the log level based on the parsed value
     match log_level.to_lowercase().as_str() {

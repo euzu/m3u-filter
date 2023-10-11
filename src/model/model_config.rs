@@ -51,28 +51,28 @@ impl std::fmt::Display for TargetType {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub(crate) enum ProcessingOrder {
     #[serde(rename = "frm")]
-    FRM,
+    Frm,
     #[serde(rename = "fmr")]
-    FMR,
+    Fmr,
     #[serde(rename = "rfm")]
-    RFM,
+    Rfm,
     #[serde(rename = "rmf")]
-    RMF,
+    Rmf,
     #[serde(rename = "mfr")]
-    MFR,
+    Mfr,
     #[serde(rename = "mrf")]
-    MRF,
+    Mrf,
 }
 
 impl std::fmt::Display for ProcessingOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ProcessingOrder::FRM => write!(f, "filter, rename, map"),
-            ProcessingOrder::FMR => write!(f, "filter, map, rename"),
-            ProcessingOrder::RFM => write!(f, "rename, filter, map"),
-            ProcessingOrder::RMF => write!(f, "rename, map, filter"),
-            ProcessingOrder::MFR => write!(f, "map, filter, rename"),
-            ProcessingOrder::MRF => write!(f, "map, rename, filter"),
+            ProcessingOrder::Frm => write!(f, "filter, rename, map"),
+            ProcessingOrder::Fmr => write!(f, "filter, map, rename"),
+            ProcessingOrder::Rfm => write!(f, "rename, filter, map"),
+            ProcessingOrder::Rmf => write!(f, "rename, map, filter"),
+            ProcessingOrder::Mfr => write!(f, "map, filter, rename"),
+            ProcessingOrder::Mrf => write!(f, "map, rename, filter"),
         }
     }
 }

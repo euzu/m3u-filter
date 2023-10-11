@@ -3,7 +3,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Error, Write};
 use std::iter::FromIterator;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use crate::model::config::{Config, ConfigTarget};
@@ -76,10 +76,10 @@ fn write_to_file<T>(file: &PathBuf, value: &T) -> Result<(), Error>
 }
 
 fn get_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
-    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(" ", "_"))))
+    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(' ', "_"))))
 }
 
-fn get_collection_path(path: &PathBuf, collection: &str) -> PathBuf {
+fn get_collection_path(path: &Path, collection: &str) -> PathBuf {
     path.join(format!("{}.json", collection))
 }
 
@@ -103,9 +103,9 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
         for plg in playlist {
             if !&plg.channels.is_empty() {
                 match &plg.xtream_cluster {
-                    XtreamCluster::LIVE => &mut cat_live_col,
-                    XtreamCluster::SERIES => &mut cat_series_col,
-                    XtreamCluster::VIDEO => &mut cat_vod_col,
+                    XtreamCluster::Live => &mut cat_live_col,
+                    XtreamCluster::Series => &mut cat_series_col,
+                    XtreamCluster::Video => &mut cat_vod_col,
                 }.push(
                     json!({
                     "category_id": format!("{}", &plg.id),
@@ -127,18 +127,18 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
 
                     let stream_id = Value::Number(serde_json::Number::from(header.id.parse::<i32>().unwrap()));
                     match header.xtream_cluster {
-                        XtreamCluster::LIVE => {
+                        XtreamCluster::Live => {
                             document.insert("stream_id".to_string(), stream_id);
                             document.insert("direct_source".to_string(), Value::String(header.source.clone()));
                             document.insert("thumbnail".to_string(), Value::String(header.logo_small.clone()));
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
                         }
-                        XtreamCluster::VIDEO => {
+                        XtreamCluster::Video => {
                             document.insert("stream_id".to_string(), stream_id);
                             document.insert("direct_source".to_string(), Value::String(header.source.clone()));
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
                         }
-                        XtreamCluster::SERIES => {
+                        XtreamCluster::Series => {
                             document.insert("series_id".to_string(), stream_id);
                         }
                     };
@@ -150,23 +150,23 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
                     }
 
                     match header.xtream_cluster {
-                        XtreamCluster::LIVE => {
+                        XtreamCluster::Live => {
                             append_mandatory_fields(&mut document, LIVE_STREAM_FIELDS);
                         }
-                        XtreamCluster::VIDEO => {
+                        XtreamCluster::Video => {
                             append_mandatory_fields(&mut document, VIDEO_STREAM_FIELDS);
                         }
-                        XtreamCluster::SERIES => {
-                            append_prepared_series_header(&header, &mut document);
+                        XtreamCluster::Series => {
+                            append_prepared_series_properties(header, &mut document);
                             append_mandatory_fields(&mut document, SERIES_STREAM_FIELDS);
                             append_release_date(&mut document);
                         }
                     };
 
                     match header.xtream_cluster {
-                        XtreamCluster::LIVE => &mut live_col,
-                        XtreamCluster::SERIES => &mut series_col,
-                        XtreamCluster::VIDEO => &mut vod_col,
+                        XtreamCluster::Live => &mut live_col,
+                        XtreamCluster::Series => &mut series_col,
+                        XtreamCluster::Video => &mut vod_col,
                     }.push(Value::Object(document));
                 }
             }
@@ -197,7 +197,7 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
     Ok(())
 }
 
-fn append_prepared_series_header(header: &Ref<PlaylistItemHeader>, document: &mut Map<String, Value>) {
+fn append_prepared_series_properties(header: &Ref<PlaylistItemHeader>, document: &mut Map<String, Value>) {
     if let Some(add_props) = &header.additional_properties {
         match add_props.iter().find(|(key, _)| key.eq("rating")) {
             Some((_, value)) => {
@@ -215,6 +215,7 @@ fn append_prepared_series_header(header: &Ref<PlaylistItemHeader>, document: &mu
 }
 
 fn append_release_date(document: &mut Map<String, Value>) {
+    // Do we really need releaseDate ?
     let has_release_date_1 = document.contains_key("release_date");
     let has_release_date_2 = document.contains_key("releaseDate");
     if !(has_release_date_1 && has_release_date_2) {
@@ -243,7 +244,7 @@ fn append_mandatory_fields(document: &mut Map<String, Value>, fields: &[&str]) {
 }
 
 pub(crate) fn xtream_get_all(cfg: &Config, target_name: &str, collection_name: &str) -> Result<PathBuf, Error> {
-    if let Some(path) = get_storage_path(&cfg, target_name) {
+    if let Some(path) = get_storage_path(cfg, target_name) {
         let col_path = get_collection_path(&path, collection_name);
         if col_path.exists() {
             return Ok(col_path);

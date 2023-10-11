@@ -17,7 +17,7 @@ pub(crate) struct TargetUser {
 impl TargetUser {
 
     pub fn get_target_name(&self, username: &str, password: &str) -> Option<String> {
-        if self.credentials.iter().find(|c| c.username.eq_ignore_ascii_case(username) && c.password.eq(password)).is_some() {
+        if self.credentials.iter().any(|c| c.username.eq_ignore_ascii_case(username) && c.password.eq(password)) {
             return Some(self.target.clone());
         }
         None
