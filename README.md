@@ -1,16 +1,34 @@
 # m3u-filter
 
-m3u-filter is a simple application which can filter, rename and map entries out of a playlist in EXTM3U or XTREAM format.
-M3U format is supported by most media and iptv players as a playlist.
+m3u-filter is a simple application which can:
+  - filter, rename, map and sort entries out of a playlist in EXTM3U or XTREAM format.
+  - act as simple xtream server after processing entries
+  - can schedule updates in server mode
+  - can run as cli-command for serving processed playlists through web-server like nginx or apache.
+  - can process multiple inputs and can create multiple files from this input files trough target definitions.
+  - can define multiple targets for filtering if you want to create multiple playlists from a big playlist.
+
+```
+  ----------                               |----> playlist_1  
+ |  M3U_URL | --> filter|map|rename|sort --|----> playlist_2 (optional)
+  ----------                               |----> playlist_3 (optional)
+```
+
+```
+                                                                                    [define users for each playlist] 
+                                                                                              ^
+  ------------                               |----> m3u playlist (optional)                   |
+ | XTREAM_URL | --> filter|map|rename|sort --|----> xtream playlist_1 (optional) --> publish in server mode for user 
+  ------------                               |----> xtream playlist_2 (optional)
+```
+
 If you have a playlist which contains unwanted entries, you can create filter which include or discard entries
 based on the header information of the playlist entries, you can rename entries or map entries based on regular expressions.
 Currently, filter and rename operations support group, name and title fields.
 
 You can run m3u-filter as command line application to update your playlists (manually or as cron job), or you can 
-run it in server mode and open the web-ui to see the contents of the playlist, filter/search content and save the filtered groups as a new playlist.
-
-m3u-filter can process multiple inputs and can create multiple files from this input files trough target definitions. 
-You can define multiple targets for filtering if you want to create multiple playlists from a big playlist.
+run it in server mode and open the web-ui to see the contents of the playlist, filter/search content and save 
+the filtered groups as a new playlist.
 
 ## Starting in server mode for Web-UI
 If you want to see the contents of a playlist, you can simply start with the `-s` (`--server`)
