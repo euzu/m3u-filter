@@ -7,6 +7,9 @@ m3u-filter is a simple application which can:
   - can run as cli-command for serving processed playlists through web-server like nginx or apache.
   - can process multiple inputs and can create multiple files from this input files trough target definitions.
   - can define multiple targets for filtering if you want to create multiple playlists from a big playlist.
+  - use regular expressions for matching
+  - define filter as statements like `filter: (Group ~ "^FR.*") AND NOT(Group ~ "^XXX.*" OR Group ~ ".*SERIES.*" OR Group ~".*MOVIES.*")`
+  - DRY - define templates and use them, don't repeat yourself
 
 ```
   ----------                               |----> playlist_1  
