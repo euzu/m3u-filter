@@ -3,14 +3,14 @@ extern crate unidecode;
 use std::cell::RefCell;
 use std::sync::{Arc};
 use std::thread;
-use log::{debug, error};
+use log::{debug, error, info};
 use unidecode::unidecode;
 use crate::{model::config, Config, valid_property};
-use crate::model::config::{ConfigInput, ConfigTarget, InputAffix, InputType, ProcessTargets};
+use crate::model::config::{ConfigTarget, InputAffix, InputType, ProcessTargets};
 use crate::model::model_config::{SortOrder::{Asc, Desc}, ItemField, AFFIX_FIELDS, ProcessingOrder};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::repository::m3u_repository::write_playlist;
-use crate::model::model_m3u::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
+use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
 use crate::repository::xtream_repository::xtream_save_playlist;
@@ -39,50 +39,53 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
     Some(new_playlist)
 }
 
-fn apply_affixes(playlist: &mut [PlaylistGroup], input: &ConfigInput) {
-    if input.suffix.is_some() || input.prefix.is_some() {
-        let validate_affix = |a: &Option<InputAffix>| match a {
-            Some(affix) => {
-                valid_property!(&affix.field.as_str(), AFFIX_FIELDS) && !affix.value.is_empty()
-            }
-            _ => false
-        };
-
-        let apply_prefix = validate_affix(&input.prefix);
-        let apply_suffix = validate_affix(&input.suffix);
-
-        if apply_prefix || apply_suffix {
-            let get_affix_applied_value = |header: &mut PlaylistItemHeader, affix: &InputAffix, prefix: bool| {
-                if let Some(field_value) = header.get_field(affix.field.as_str()) {
-                    return if prefix {
-                        format!("{}{}", &affix.value, field_value.as_str())
-                    } else {
-                        format!("{}{}", field_value.as_str(), &affix.value)
-                    };
+fn apply_affixes(fetched_playlists: &mut [FetchedPlaylist]) {
+    fetched_playlists.iter_mut().for_each(|fetched_playlist| {
+        let FetchedPlaylist { input, playlist } = fetched_playlist;
+        if input.suffix.is_some() || input.prefix.is_some() {
+            let validate_affix = |a: &Option<InputAffix>| match a {
+                Some(affix) => {
+                    valid_property!(&affix.field.as_str(), AFFIX_FIELDS) && !affix.value.is_empty()
                 }
-                String::from(&affix.value)
+                _ => false
             };
 
-            playlist.iter_mut().for_each(|group| {
-                group.channels.iter_mut().for_each(|channel| {
-                    if apply_suffix {
-                        if let Some(suffix) = &input.suffix {
-                            let value = get_affix_applied_value(&mut channel.header.borrow_mut(), suffix, false);
-                            debug!("Applying input suffix:  {}={}", &suffix.field, &value);
-                            channel.header.borrow_mut().set_field(&suffix.field, value.as_str());
-                        }
+            let apply_prefix = validate_affix(&input.prefix);
+            let apply_suffix = validate_affix(&input.suffix);
+
+            if apply_prefix || apply_suffix {
+                let get_affix_applied_value = |header: &mut PlaylistItemHeader, affix: &InputAffix, prefix: bool| {
+                    if let Some(field_value) = header.get_field(affix.field.as_str()) {
+                        return if prefix {
+                            format!("{}{}", &affix.value, field_value.as_str())
+                        } else {
+                            format!("{}{}", field_value.as_str(), &affix.value)
+                        };
                     }
-                    if apply_prefix {
-                        if let Some(prefix) = &input.prefix {
-                            let value = get_affix_applied_value(&mut channel.header.borrow_mut(), prefix, true);
-                            debug!("Applying input prefix:  {}={}", &prefix.field, &value);
-                            channel.header.borrow_mut().set_field(&prefix.field, value.as_str());
+                    String::from(&affix.value)
+                };
+
+                playlist.iter_mut().for_each(|group| {
+                    group.channels.iter_mut().for_each(|channel| {
+                        if apply_suffix {
+                            if let Some(suffix) = &input.suffix {
+                                let value = get_affix_applied_value(&mut channel.header.borrow_mut(), suffix, false);
+                                debug!("Applying input suffix:  {}={}", &suffix.field, &value);
+                                channel.header.borrow_mut().set_field(&suffix.field, value.as_str());
+                            }
                         }
-                    }
+                        if apply_prefix {
+                            if let Some(prefix) = &input.prefix {
+                                let value = get_affix_applied_value(&mut channel.header.borrow_mut(), prefix, true);
+                                debug!("Applying input prefix:  {}={}", &prefix.field, &value);
+                                channel.header.borrow_mut().set_field(&prefix.field, value.as_str());
+                            }
+                        }
+                    });
                 });
-            });
+            }
         }
-    }
+    });
 }
 
 fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
@@ -247,31 +250,55 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
     }
 }
 
+// If no input is enabled but the user set the target as command line argument,
+// we force the input to be enabled.
+// If there are enabled input, then only these are used.
+fn is_input_enabled(enabled_inputs: usize, input_enabled: bool, input_id: u16, user_targets: &Arc<ProcessTargets>) -> bool {
+    if enabled_inputs == 0 {
+        return user_targets.enabled && user_targets.has_input(input_id);
+    }
+    input_enabled
+}
+
 fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) {
     let source = cfg.sources.get(source_idx).unwrap();
-    let input = &source.input;
-    if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)) {
-        let mut result = match input.input_type {
-            InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir),
-            InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir),
-        };
-        if let Some(playlist) = result.as_mut() {
-            if playlist.is_empty() {
-                debug!("Input file is empty");
-            } else {
-                debug!("Input file has {} groups", playlist.len());
-                source.targets.iter().for_each(|target| {
-                    let should_process = (!user_targets.enabled && target.enabled)
-                        || (user_targets.enabled && user_targets.has_target(target.id));
-                    if should_process {
-                        match process_playlist(playlist, input, target, &cfg) {
-                            Ok(_) => (),
-                            Err(e) => error!("Failed to write file: {}", e)
+    let mut all_playlist = Vec::new();
+    let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
+    for input in &source.inputs {
+        //if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)) {
+        if is_input_enabled(enabled_inputs, input.enabled, input.id, &user_targets) {
+            let result = match input.input_type {
+                InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir),
+                InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir),
+            };
+            if let Some(playlist) = result {
+                if !playlist.is_empty() {
+                    all_playlist.push(
+                        FetchedPlaylist {
+                            input: input.clone(),
+                            playlist
                         }
-                    }
-                });
+                    );
+                } else {
+                    info!("source is empty {}", input.url);
+                }
             }
         }
+    }
+    if all_playlist.is_empty() {
+        debug!("Input is empty");
+    } else {
+        debug!("Input has {} groups", all_playlist.len());
+        source.targets.iter().for_each(|target| {
+            let should_process = (!user_targets.enabled && target.enabled)
+                || (user_targets.enabled && user_targets.has_target(target.id));
+            if should_process {
+                match process_playlist(&mut all_playlist, target, &cfg) {
+                    Ok(_) => (),
+                    Err(e) => error!("Failed to write file: {}", e)
+                }
+            }
+        });
     }
 }
 
@@ -306,8 +333,7 @@ pub(crate) fn process_sources(cfg: Config, user_targets: &ProcessTargets) {
 
 type ProcessingPipe = Vec<fn(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>>>;
 
-pub(crate) fn process_playlist(playlist: &mut [PlaylistGroup],
-                               input: &ConfigInput,
+pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
                                target: &ConfigTarget, cfg: &Config) -> Result<(), std::io::Error> {
     let pipe: ProcessingPipe =
         match &target.processing_order {
@@ -321,33 +347,43 @@ pub(crate) fn process_playlist(playlist: &mut [PlaylistGroup],
 
     debug!("Processing order is {}", &target.processing_order);
 
-    let mut new_playlist = playlist.to_owned();
-    for f in pipe {
-        let r = f(&mut new_playlist, target);
-        if let Some(v) = r {
-            new_playlist = v;
-        }
-    }
-
-    apply_affixes(&mut new_playlist, input);
-
-    sort_playlist(target, &mut new_playlist);
-    let publish = target.publish;
-    if target.filename.is_some() {
-        let result = write_playlist(target, cfg, &mut new_playlist);
-        match &result {
-            Ok(..) => {},
-            Err(e) => {
-                error!("failed to write {:?}", e);
+    playlists.iter_mut().for_each(|pl| {
+        for f in &pipe {
+            let r = f(&mut pl.playlist, target);
+            if let Some(v) = r {
+                pl.playlist = v;
             }
         }
-        if !publish {
-            return result;
-        }
-    }
+    });
 
-    if target.publish {
-        return xtream_save_playlist(target, cfg, &mut new_playlist);
+    apply_affixes(playlists);
+    let mut new_playlist = Vec::new();
+    playlists.iter_mut().for_each(|fp| {
+        fp.playlist.drain(..).for_each(|group| new_playlist.push(group));
+    });
+
+    if !new_playlist.is_empty() {
+        sort_playlist(target, &mut new_playlist);
+        let publish = target.publish;
+        if target.filename.is_some() {
+            let result = write_playlist(target, cfg, &mut new_playlist);
+            match &result {
+                Ok(..) => {},
+                Err(e) => {
+                    error!("failed to write {:?}", e);
+                }
+            }
+            if !publish {
+                return result;
+            }
+        }
+
+        if target.publish {
+            return xtream_save_playlist(target, cfg, &mut new_playlist);
+        }
+        Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Persisting playlist failed: {}", &target.name)))
+    } else {
+        info!("Playlist is empty");
+        Ok(())
     }
-    Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Persisting playlist failed: {}", &target.name)))
 }

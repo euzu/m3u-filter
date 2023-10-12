@@ -1,21 +1,21 @@
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
 
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_web::{App, get, HttpRequest, HttpResponse, HttpServer, web};
-use chrono::{Local};
-use cron::Schedule;
-use std::str::FromStr;
 use actix_web::middleware::Logger;
 use actix_web::web::Data;
+use chrono::Local;
+use cron::Schedule;
+use log::error;
 
-use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
-use crate::model::config::{Config, ConfigInput, InputType, ProcessTargets};
 use crate::{exit, playlist_processor};
-use crate::download::get_m3u_playlist;
+use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::api::xtream_player_api::xtream_player_api;
-use log::{error};
+use crate::download::get_m3u_playlist;
+use crate::model::config::{Config, ConfigInput, InputType, ProcessTargets};
 
 #[get("/")]
 async fn index(
@@ -50,7 +50,9 @@ pub(crate) async fn playlist(
 pub(crate) async fn config(
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let sources: Vec<String> = _app_state.config.sources.iter().map(|t| t.input.url.clone()).collect();
+    let sources: Vec<String> = _app_state.config.sources.iter()
+        .flat_map(|t| t.inputs.iter())
+        .map(|i| i.url.clone()).collect();
     let result = ServerConfig {
         sources
     };

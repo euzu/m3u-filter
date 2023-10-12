@@ -4,6 +4,7 @@
 * Added Xtream Cluster Live, Video, Series. M3u Playlist cluster guessing through video file endings.
 * Added api-proxy config for xtream proxy, to define server info and user credentials
 * Added Xtream Api Endpoints.
+* Added multiple input support 
 
 # v1.0.1(2023-09-07)
 * Refactored sorting. Sorting channels inside group now possible

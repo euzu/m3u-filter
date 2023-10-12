@@ -2,19 +2,21 @@
 
 m3u-filter is a simple application which can:
   - filter, rename, map and sort entries out of a playlist in EXTM3U or XTREAM format.
+  - merge multiple sources into one playlist
   - act as simple xtream server after processing entries
   - can schedule updates in server mode
   - can run as cli-command for serving processed playlists through web-server like nginx or apache.
   - can process multiple inputs and can create multiple files from this input files trough target definitions.
   - can define multiple targets for filtering if you want to create multiple playlists from a big playlist.
   - use regular expressions for matching
-  - define filter as statements like `filter: (Group ~ "^FR.*") AND NOT(Group ~ "^XXX.*" OR Group ~ ".*SERIES.*" OR Group ~".*MOVIES.*")`
+  - define filter as statements like `filter: (Group ~ "^FR.*") AND NOT(Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~".*MOVIES.*")`
   - DRY - define templates and use them, don't repeat yourself
 
 ```
-  ----------                               |----> playlist_1  
- |  M3U_URL | --> filter|map|rename|sort --|----> playlist_2 (optional)
-  ----------                               |----> playlist_3 (optional)
+  ------------                               |----> playlist_1  
+ |  M3U_URL_1 | --> filter|map|rename|sort --|----> playlist_2 (optional)
+ |  M3U_URL_2 | (optional)
+  ------------                               |----> playlist_3 (optional)
 ```
 
 ```
@@ -87,11 +89,13 @@ This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp
 
 ### 1.5. `sources`
 `sources` is a sequence of source definitions, which have two top level entries:
- * `input`
+ * `inputs`
  * `targets`
 
-### 1.5.1 `input`
-Has the following attributes:
+### 1.5.1 `inputs`
+`inputs` is a list of sources.
+
+Each input has the following attributes:
 
   - `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
   - `enabled` is optional, default is true, if you disable the processing is skipped 
@@ -114,16 +118,24 @@ They have 2 fields:
 Example input config for `m3u`
 ```
 sources:
-  - input:
+ inputs:
+    - url: 'test-input.m3u'
+      enabled: false
       persist: 'playlist_1_{}.m3u'
-      url: 'http://localhost:8080/get.php?username=test&password=test&type=m3u'
+    - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ad.m3u'
+    - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/au.m3u'
+    - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/za.m3u'
+  targets:
+  - name: test
+    filename: test.m3u
+
 ```
 
 Example input config for `xtream`
 ```
 sources:
-  - input:
-      type: xtream
+  inputs:
+    - type: xtream
       persist: 'playlist_1_1{}.m3u'
       headers:
         User-Agent: "Mozilla/5.0 (Linux; Tizen 2.3) AppleWebKit/538.1 (KHTML, like Gecko)Version/2.3 TV Safari/538.1"
@@ -262,10 +274,10 @@ templates:
 - name: PROV1_ALL
   value:  "!PROV1_TR! OR !PROV1_DE! OR !PROV1_FR!"
 sources:
-    input:
-      enabled: true
-      url: http://myserver.net/playlist.m3u
-      persist: ./playlist_{}.m3u
+    inputs:
+      - enabled: true
+        url: http://myserver.net/playlist.m3u
+        persist: ./playlist_{}.m3u
     targets:
       - name: pl1
         filename: playlist_1.m3u

@@ -83,7 +83,7 @@ fn get_collection_path(path: &Path, collection: &str) -> PathBuf {
     path.join(format!("{}.json", collection))
 }
 
-pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
+pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), std::io::Error> {
     let mut failed = false;
     if let Some(path) = get_storage_path(cfg, &target.name) {
         if fs::create_dir_all(&path).is_err() {

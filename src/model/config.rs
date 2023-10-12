@@ -154,13 +154,13 @@ impl ConfigTarget {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigSource {
-    pub input: ConfigInput,
+    pub inputs: Vec<ConfigInput>,
     pub targets: Vec<ConfigTarget>,
 }
 
 impl ConfigSource {
     pub fn prepare(&mut self, id: u16) {
-        self.input.prepare(id);
+        self.inputs.iter_mut().for_each(|i| i.prepare(id));
     }
 }
 
@@ -217,7 +217,7 @@ impl ConfigInput {
         match self.input_type {
             InputType::M3u => {
                 if self.username.is_none() || self.password.is_none() {
-                    error!("for input type m3u: username and password are ignored")
+                    debug!("for input type m3u: username and password are ignored")
                 }
             }
             InputType::Xtream => {
@@ -290,24 +290,26 @@ impl Config {
     pub fn set_mappings(&mut self, mappings: Option<Mappings>) {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
-                let is_m3u = matches!(source.input.input_type, InputType::M3u);
-                for target in &mut source.targets {
-                    if is_m3u && target.filename.is_none() {
-                        exit!("filename is required for m3u type: {}", target.name);
-                    }
-                    if !is_m3u && target.filename.is_none() && !target.publish {
-                        exit!("filename or publish is required for xtream type: {}", target.name);
-                    }
-
-                    if let Some(mapping_ids) = &target.mapping {
-                        let mut target_mappings = Vec::new();
-                        for mapping_id in mapping_ids {
-                            let mapping = mapping_list.get_mapping(mapping_id);
-                            if let Some(mappings) = mapping {
-                                target_mappings.push(mappings);
-                            }
+                for input in &source.inputs {
+                    let is_m3u = matches!(input.input_type, InputType::M3u);
+                    for target in &mut source.targets {
+                        if is_m3u && target.filename.is_none() {
+                            exit!("filename is required for m3u type: {}", target.name);
                         }
-                        target._mapping = if !target_mappings.is_empty() { Some(target_mappings) } else { None };
+                        if !is_m3u && target.filename.is_none() && !target.publish {
+                            exit!("filename or publish is required for xtream type: {}", target.name);
+                        }
+
+                        if let Some(mapping_ids) = &target.mapping {
+                            let mut target_mappings = Vec::new();
+                            for mapping_id in mapping_ids {
+                                let mapping = mapping_list.get_mapping(mapping_id);
+                                if let Some(mappings) = mapping {
+                                    target_mappings.push(mappings);
+                                }
+                            }
+                            target._mapping = if !target_mappings.is_empty() { Some(target_mappings) } else { None };
+                        }
                     }
                 }
             }
@@ -404,7 +406,7 @@ pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<
                 }
             }
             if target_added {
-                inputs.push(source.input.id);
+                source.inputs.iter().map(|i| i.id).for_each(|id| inputs.push(id));
             }
         }
 

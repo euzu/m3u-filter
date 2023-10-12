@@ -1,11 +1,16 @@
 use std::cell::RefCell;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::model::config::ConfigOptions;
+use crate::model::config::{ConfigInput, ConfigOptions};
 
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
+#[derive(Debug, Clone)]
+pub(crate) struct FetchedPlaylist {
+    pub input: ConfigInput,
+    pub playlist: Vec<PlaylistGroup>,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) enum XtreamCluster {
