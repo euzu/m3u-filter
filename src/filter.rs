@@ -346,7 +346,7 @@ pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTempla
                 }
             }
         }
-        Err(err) => return create_m3u_filter_error_result!("{}", err)
+        Err(err) => create_m3u_filter_error_result!("{}", err)
     }
 }
 
