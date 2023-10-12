@@ -384,7 +384,7 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
         }
         create_m3u_filter_error_result!("Persisting playlist failed: {}", &target.name)
     } else {
-        info!("Playlist is empty");
+        info!("Playlist is empty: {}", &target.name);
         Ok(())
     }
 }
