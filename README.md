@@ -11,6 +11,7 @@ m3u-filter is a simple application which can:
   - use regular expressions for matching
   - define filter as statements like `filter: (Group ~ "^FR.*") AND NOT(Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~".*MOVIES.*")`
   - DRY - define templates and use them, don't repeat yourself
+  - Send a telegram bot message when something goes wrong
 
 ```
   ------------                               |----> playlist_1  
@@ -52,11 +53,13 @@ Target names should be provided in the config. The -t option overrides `enabled`
 This means, even disabled inputs and targets are processed when the given target name as cli argument matches a target.
 
 Top level entries in the config files are:
-* `threads` _optional_
 * `api`
 * `working_dir`
 * `templates` _optional_
 * `sources`
+* `threads` _optional_
+* `messaging`  _optional_
+* `video_suffix` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -311,7 +314,21 @@ sources:
             new_name: 1. DE$1
 ```
 
-### 1.6 `video_suffix`
+
+### 1.6 `messaging`
+`messaging` is an optional configuration for receiving messages.
+Currently only telegram is supported.
+```yaml
+messaging:
+  telegram:
+    bot_token: '<telegram bot token>'
+    chat_ids:
+      - '<telegram chat id>'
+```
+
+For more information: [Telegram bots](https://core.telegram.org/bots/tutorial)
+
+### 1.7 `video_suffix`
 video_suffix a optional list.
 
 It is possible to define video file endings to assign the playlist entry to the xtream cluster video.

@@ -37,3 +37,4 @@ openssl = { version = "*", features = ["vendored"] } #https://docs.rs/openssl/0.
 mime = "0.3.17"
 log = "0.4.20"
 env_logger = "0.10.0"
+rustelebot = "0.3.2"

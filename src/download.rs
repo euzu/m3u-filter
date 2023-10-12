@@ -26,7 +26,7 @@ fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str) ->
 pub(crate) fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> Option<Vec<PlaylistGroup>> {
     let url = input.url.as_str();
     let file_path = prepare_file_path(input, working_dir, "");
-    let lines: Option<Vec<String>> = utils::get_input_content(working_dir, url, file_path);
+    let lines: Option<Vec<String>> = utils::get_input_content(cfg, working_dir, url, file_path);
     lines.map(|l| m3u_parser::parse_m3u(cfg, &l))
 }
 

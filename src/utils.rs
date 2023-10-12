@@ -5,7 +5,7 @@ use log::{debug, error};
 use path_absolutize::*;
 use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
-use crate::model::config::ConfigInput;
+use crate::model::config::{Config, ConfigInput};
 use crate::messaging::send_message;
 
 #[macro_export]
@@ -101,13 +101,13 @@ pub(crate) fn open_file(file_name: &PathBuf, mandatory: bool) -> Option<fs::File
     }
 }
 
-pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<PathBuf>) -> Option<Vec<String>> {
+pub(crate) fn get_input_content(cfg: &Config, working_dir: &String, url_str: &str, persist_file: Option<PathBuf>) -> Option<Vec<String>> {
     match url_str.parse::<url::Url>() {
         Ok(url) => match download_content(url, persist_file) {
             Ok(content) => Some(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", url_str, e);
-                send_message(format!("Failed to download: {}", url_str).as_str());
+                send_message(&cfg.messaging, format!("Failed to download: {}", url_str).as_str());
                 None
             }
         }
@@ -135,7 +135,7 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
                 None => {
                     let msg = format!("cant read input url: {:?}", &file_path.unwrap());
                     error!("{}", msg);
-                    send_message(msg.as_str());
+                    send_message(&cfg.messaging, msg.as_str());
                     None
                 }
             }

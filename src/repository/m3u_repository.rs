@@ -159,7 +159,7 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
 pub(crate) fn write_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut Vec<PlaylistGroup>) -> Result<(), std::io::Error> {
     let mut new_playlist = playlist.to_owned();
     if let Some(TargetType::Strm) = &target.output {
-        return write_strm_playlist(target, cfg, &mut new_playlist)
+        return write_strm_playlist(target, cfg, &mut new_playlist);
     }
     write_m3u_playlist(target, cfg, &mut new_playlist)
 }

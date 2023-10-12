@@ -88,7 +88,7 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
     if let Some(path) = get_storage_path(cfg, &target.name) {
         if fs::create_dir_all(&path).is_err() {
             let msg = format!("Failed to save, can't create directory {}", &path.into_os_string().into_string().unwrap());
-            send_message(msg.as_str());
+            send_message(&cfg.messaging, msg.as_str());
             return Err(Error::new(std::io::ErrorKind::Other, msg));
         }
 
@@ -192,7 +192,7 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
     }
 
     if failed {
-        send_message(format!("Something went wrong persisting target {}", &target.name).as_str());
+        send_message(&cfg.messaging, format!("Something went wrong persisting target {}", &target.name).as_str());
     }
     Ok(())
 }

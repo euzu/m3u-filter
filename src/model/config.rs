@@ -250,6 +250,17 @@ impl ConfigApi {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct TelegramMessagingConfig {
+    pub bot_token: String,
+    pub chat_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct MessagingConfig {
+    pub telegram: Option<TelegramMessagingConfig>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Config {
     #[serde(default = "default_as_zero")]
     pub threads: u8,
@@ -259,6 +270,7 @@ pub(crate) struct Config {
     pub templates: Option<Vec<PatternTemplate>>,
     pub video_suffix: Option<Vec<String>>,
     pub schedule: Option<String>,
+    pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _api_proxy: Option<ApiProxyConfig>,
 }
