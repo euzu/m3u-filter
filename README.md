@@ -1,8 +1,8 @@
 # m3u-filter
 
 m3u-filter is a simple application which can:
-  - filter, rename, map and sort entries out of a playlist in EXTM3U or XTREAM format.
-  - merge multiple sources into one playlist
+  - filter, rename, map and sort entries out of a playlist in EXTM3U, XTREAM or Kodi format.
+  - merge multiple sources into playlist(s)
   - act as simple xtream server after processing entries
   - can schedule updates in server mode
   - can run as cli-command for serving processed playlists through web-server like nginx or apache.
@@ -116,7 +116,7 @@ They have 2 fields:
   - `value` a static text
 
 Example input config for `m3u`
-```
+```yaml
 sources:
  inputs:
     - url: 'test-input.m3u'
@@ -132,7 +132,7 @@ sources:
 ```
 
 Example input config for `xtream`
-```
+```yaml
 sources:
   inputs:
     - type: xtream
