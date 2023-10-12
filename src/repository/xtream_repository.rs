@@ -120,7 +120,7 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
                         ("category_id".to_string(), Value::String(format!("{}", &plg.id))),
                         ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(plg.id.to_owned()))]))),
                         ("name".to_string(), Value::String(header.name.clone())),
-                        ("num".to_string(), Value::Number(serde_json::Number::from(channel_num.clone()))),
+                        ("num".to_string(), Value::Number(serde_json::Number::from(channel_num))),
                         ("title".to_string(), Value::String(header.title.clone())),
                         ("stream_icon".to_string(), Value::String(header.logo.clone())),
                     ]);
