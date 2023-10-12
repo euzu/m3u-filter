@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
@@ -9,9 +10,8 @@ use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use chrono::Local;
 use cron::Schedule;
-use log::error;
 
-use crate::{exit, playlist_processor};
+use crate::{playlist_processor};
 use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::api::xtream_player_api::xtream_player_api;
 use crate::download::get_m3u_playlist;
@@ -66,7 +66,7 @@ pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets) -> future
     let web_dir = cfg.api.web_root.clone();
     let web_dir_path = PathBuf::from(&web_dir);
     if !web_dir_path.exists() || !web_dir_path.is_dir() {
-        exit!("web_root does not exists or is not an directory: {:?}", &web_dir_path);
+        return Err(std::io::Error::new(ErrorKind::NotFound, format!("web_root does not exists or is not an directory: {:?}", &web_dir_path)));
     }
 
     let schedule = cfg.schedule.clone();

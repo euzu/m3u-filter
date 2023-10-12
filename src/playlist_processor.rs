@@ -5,7 +5,7 @@ use std::sync::{Arc};
 use std::thread;
 use log::{debug, error, info};
 use unidecode::unidecode;
-use crate::{model::config, Config, valid_property};
+use crate::{model::config, Config, valid_property, create_m3u_filter_error_result};
 use crate::model::config::{ConfigTarget, InputAffix, InputType, ProcessTargets};
 use crate::model::model_config::{SortOrder::{Asc, Desc}, ItemField, AFFIX_FIELDS, ProcessingOrder};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
@@ -13,6 +13,7 @@ use crate::repository::m3u_repository::write_playlist;
 use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
+use crate::m3u_filter_error::M3uFilterError;
 use crate::repository::xtream_repository::xtream_save_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
@@ -334,7 +335,7 @@ pub(crate) fn process_sources(cfg: Config, user_targets: &ProcessTargets) {
 type ProcessingPipe = Vec<fn(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>>>;
 
 pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
-                               target: &ConfigTarget, cfg: &Config) -> Result<(), std::io::Error> {
+                               target: &ConfigTarget, cfg: &Config) -> Result<(), M3uFilterError> {
     let pipe: ProcessingPipe =
         match &target.processing_order {
             ProcessingOrder::Frm => vec![filter_playlist, rename_playlist, map_playlist],
@@ -381,7 +382,7 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
         if target.publish {
             return xtream_save_playlist(target, cfg, &mut new_playlist);
         }
-        Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Persisting playlist failed: {}", &target.name)))
+        create_m3u_filter_error_result!("Persisting playlist failed: {}", &target.name)
     } else {
         info!("Playlist is empty");
         Ok(())

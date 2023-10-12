@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use log::{debug, error};
 use regex::Regex;
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
+use crate::m3u_filter_error::M3uFilterError;
 use crate::model::model_m3u::{FieldAccessor, PlaylistItem};
 use crate::model::model_config::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
-                          default_as_empty_str, default_as_false, default_as_empty_map, };
-use crate::valid_property;
+                                 default_as_empty_str, default_as_false, default_as_empty_map, };
+use crate::{handle_m3u_filter_error_result, valid_property};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MappingTag {
@@ -43,19 +44,28 @@ pub(crate) struct Mapper {
 }
 
 impl Mapper {
-    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) {
-        self._pattern = Some(get_filter(&self.pattern, templates));
-        match &self.filter {
-            Some(flt) => {
-                self._filter = Some(get_filter(flt, templates));
-            },
-            _ => self._filter = None
+    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
+        match get_filter(&self.pattern, templates) {
+            Ok(pattern) => {
+                self._pattern = Some(pattern);
+                match &self.filter {
+                    Some(flt) => {
+                        match get_filter(flt, templates) {
+                            Ok(filter) => self._filter = Some(filter),
+                            Err(err) => return Err(err),
+                        }
+                    }
+                    _ => self._filter = None
+                }
+                self._tags = match tags {
+                    Some(list) => list.clone(),
+                    _ => vec![]
+                };
+                self._tagre = Some(Regex::new("<tag:(.*?)>").unwrap());
+                Ok(())
+            }
+            Err(err) => Err(err)
         }
-        self._tags = match tags {
-            Some(list) => list.clone(),
-            _ => vec![]
-        };
-        self._tagre = Some(Regex::new("<tag:(.*?)>").unwrap())
     }
 }
 
@@ -78,7 +88,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_attributes(&mut self) {
         let mapper = self.mapper.borrow();
-        let attributes =  &mapper.attributes;
+        let attributes = &mapper.attributes;
         drop(mapper);
         for (key, value) in attributes {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
@@ -128,7 +138,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_suffix(&mut self, captures: &HashMap<&String, &str>) {
         let mapper = self.mapper.borrow();
-        let suffix =  &mapper.suffix;
+        let suffix = &mapper.suffix;
         drop(mapper);
 
         for (key, value) in suffix {
@@ -145,7 +155,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_prefix(&mut self, captures: &HashMap<&String, &str>) {
         let mapper = self.mapper.borrow();
-        let prefix =  &mapper.prefix;
+        let prefix = &mapper.prefix;
         drop(mapper);
         for (key, value) in prefix {
             if valid_property!(key.as_str(), AFFIX_FIELDS) {
@@ -161,7 +171,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_assignments(&mut self) {
         let mapper = self.mapper.borrow();
-        let assignments =  &mapper.assignments;
+        let assignments = &mapper.assignments;
         drop(mapper);
         for (key, value) in assignments {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) &&
@@ -213,10 +223,11 @@ pub(crate) struct Mapping {
 
 impl Mapping {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
-                          tags: Option<&Vec<MappingTag>>) {
+                   tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
         for mapper in &mut self.mapper {
-            mapper.prepare(templates, tags);
+            handle_m3u_filter_error_result!(mapper.prepare(templates, tags));
         }
+        Ok(())
     }
 }
 
@@ -228,8 +239,16 @@ pub(crate) struct MappingDefinition {
 }
 
 impl MappingDefinition {
-    pub fn prepare(&mut self) {
-        if let Some(templates) = &mut self.templates { self.templates = Some(prepare_templates(templates)) };
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        if let Some(templates) = &mut self.templates {
+            match prepare_templates(templates) {
+                Ok(tmplts) => {
+                    self.templates = Some(tmplts);
+                }
+                Err(err) => return Err(err),
+            }
+
+        };
         for mapping in &mut self.mapping {
             let template_list = match &self.templates {
                 Some(templ) => Some(templ),
@@ -239,8 +258,9 @@ impl MappingDefinition {
                 Some(t) => Some(t),
                 _ => None
             };
-            mapping.prepare(template_list, tag_list);
+            handle_m3u_filter_error_result!(mapping.prepare(template_list, tag_list));
         }
+        Ok(())
     }
 }
 
@@ -250,8 +270,8 @@ pub(crate) struct Mappings {
 }
 
 impl Mappings {
-    pub fn prepare(&mut self) {
-        self.mappings.prepare();
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        self.mappings.prepare()
     }
 
     pub fn get_mapping(&self, mapping_id: &String) -> Option<Mapping> {

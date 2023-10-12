@@ -1,6 +1,5 @@
 use std::collections::{HashSet};
-use crate::exit;
-use log::{error};
+use crate::m3u_filter_error::M3uFilterError;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UserCredentials {
@@ -43,16 +42,22 @@ pub(crate) struct ApiProxyConfig {
 
 impl ApiProxyConfig {
 
-    pub fn prepare(&self) {
+    pub fn prepare(&self) -> Result<(), M3uFilterError>{
         let mut usernames = HashSet::new();
+        let mut errors = Vec::new();
         for target_user in &self.user {
             for user in &target_user.credentials {
                 if usernames.contains(&user.username) {
-                    exit!("Non unique username found {}", &user.username);
+                    errors.push(format!("Non unique username found {}", &user.username));
                 } else {
                     usernames.insert(user.username.to_string());
                 }
             }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(M3uFilterError::new(errors.join("\n")))
         }
     }
 

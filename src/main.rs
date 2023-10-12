@@ -2,14 +2,16 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 extern crate env_logger;
+
 use env_logger::{Builder};
-use log::{debug, error, info, LevelFilter, warn};
+use log::{debug, error, info, LevelFilter};
 
 use clap::Parser;
-use crate::model::api_proxy::ApiProxyConfig;
+use crate::config_reader::{read_api_proxy_config, read_config, read_mappings};
 use crate::model::config::{Config, validate_targets};
-use crate::model::mapping::Mappings;
 
+mod m3u_filter_error;
+mod config_reader;
 mod model;
 mod filter;
 mod m3u_parser;
@@ -59,16 +61,18 @@ fn main() {
 
     let default_config_path = utils::get_default_config_path();
     let config_file: String = args.config.unwrap_or(default_config_path);
-    let mut cfg = read_config(config_file.as_str());
-    let targets = validate_targets(&args.target, &cfg.sources);
+    let mut cfg = read_config(config_file.as_str()).unwrap_or_else(|err|  exit!("{}", err));
+    let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err|  exit!("{}", err));
 
 
     info!("working dir: {:?}", &cfg.working_dir);
 
-    read_mappings(args.mapping, &mut cfg);
+    if let Err(err) = read_mappings(args.mapping, &mut cfg) {
+        exit!("{}", err);
+    }
 
     if args.server {
-        read_api_proxy_config(args.api_proxy, &mut cfg);
+        if let Err(err) = read_api_proxy_config(args.api_proxy, &mut cfg) { exit!("{}", err) };
         debug!("web_root: {}", &cfg.api.web_root);
         info!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
         match api::main_api::start_server(cfg, targets) {
@@ -96,75 +100,4 @@ fn init_logger(log_level: &str) {
     log_builder.init();
 }
 
-fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) {
-    let mappings_file: String = args_mapping.unwrap_or(utils::get_default_mappings_path());
 
-    let mappings = read_mapping(mappings_file.as_str());
-    if mappings.is_none() { debug!("no mapping loaded"); }
-    cfg.set_mappings(mappings);
-}
-
-fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
-    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(utils::get_default_api_proxy_config_path());
-
-    let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str());
-    if api_proxy_config.is_none() {
-        if cfg.has_published_targets() {
-            exit!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
-        } else {
-            warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
-        }
-    } else {
-        cfg.set_api_proxy(api_proxy_config);
-    }
-}
-
-
-fn read_config(config_file: &str) -> Config {
-    let mut cfg: Config = match serde_yaml::from_reader(utils::open_file(&std::path::PathBuf::from(config_file), true).unwrap()) {
-        Ok(result) => result,
-        Err(e) => {
-            exit!("cant read config file: {}", e);
-        }
-    };
-    cfg.prepare();
-    cfg
-}
-
-fn read_mapping(mapping_file: &str) -> Option<Mappings> {
-    match utils::open_file(&std::path::PathBuf::from(mapping_file), false) {
-        Some(file) => {
-            let mapping: Result<Mappings, _> = serde_yaml::from_reader(file);
-            match mapping {
-                Ok(mut result) => {
-                    result.prepare();
-                    Some(result)
-                }
-                Err(err) => {
-                    error!("cant read mapping file: {}", err);
-                    None
-                }
-            }
-        }
-        _ => None
-    }
-}
-
-fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
-    match utils::open_file(&std::path::PathBuf::from(api_proxy_file), false) {
-        Some(file) => {
-            let mapping: Result<ApiProxyConfig, _> = serde_yaml::from_reader(file);
-            match mapping {
-                Ok(result) => {
-                    result.prepare();
-                    Some(result)
-                }
-                Err(err) => {
-                    error!("cant read api-proxy-config file: {}", err);
-                    None
-                }
-            }
-        }
-        _ => None
-    }
-}

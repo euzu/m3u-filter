@@ -7,7 +7,8 @@ use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, pre
 use crate::model::mapping::Mappings;
 use crate::model::mapping::Mapping;
 use crate::model::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_false, default_as_true};
-use crate::{exit, utils};
+use crate::{utils};
+use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::utils::get_working_path;
 
@@ -16,6 +17,41 @@ fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 fn default_as_default() -> String { String::from("default") }
 
 fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
+
+#[macro_export]
+macro_rules! create_m3u_filter_error_result {
+     ($($arg:tt)*) => {
+        Err(M3uFilterError::new(format!($($arg)*)))
+    }
+}
+
+#[macro_export]
+macro_rules! handle_m3u_filter_error_result_list {
+    ($result: expr) => {
+        let errors = $result
+            .filter_map(|result| {
+                if let Err(err) = result {
+                    Some(err.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+        if !&errors.is_empty() {
+            return Err(M3uFilterError::new(errors.join("\n")));
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! handle_m3u_filter_error_result {
+    ($result: expr) => {
+        if let Err(err) = $result {
+            return Err(M3uFilterError::new(err.to_string()));
+        }
+    }
+}
+
 
 #[derive(Clone)]
 pub(crate) struct ProcessTargets {
@@ -51,12 +87,13 @@ pub(crate) struct ConfigSortChannel {
 }
 
 impl ConfigSortChannel {
-    pub(crate) fn prepare(&mut self) {
+    pub(crate) fn prepare(&mut self) -> Result<(), M3uFilterError> {
         let re = regex::Regex::new(&self.group_pattern);
         if re.is_err() {
-            exit!("cant parse regex: {}", &self.group_pattern);
+            return create_m3u_filter_error_result!("cant parse regex: {}", &self.group_pattern);
         }
         self.re = Some(re.unwrap());
+        Ok(())
     }
 }
 
@@ -69,10 +106,11 @@ pub(crate) struct ConfigSort {
 }
 
 impl ConfigSort {
-    pub(crate) fn prepare(&mut self) {
+    pub(crate) fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if let Some(channels) = self.channels.as_mut() {
-            channels.iter_mut().for_each(|r| r.prepare());
+            handle_m3u_filter_error_result_list!(channels.iter_mut().map(|r| r.prepare()));
         }
+        Ok(())
     }
 }
 
@@ -86,12 +124,13 @@ pub(crate) struct ConfigRename {
 }
 
 impl ConfigRename {
-    pub fn prepare(&mut self) {
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         let re = regex::Regex::new(&self.pattern);
         if re.is_err() {
-            exit!("cant parse regex: {}", &self.pattern);
+            return create_m3u_filter_error_result!("cant parse regex: {}", &self.pattern);
         }
         self.re = Some(re.unwrap());
+        Ok(())
     }
 }
 
@@ -134,16 +173,21 @@ pub(crate) struct ConfigTarget {
 }
 
 impl ConfigTarget {
-    pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) {
+    pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
         self.id = id;
-        let fltr = get_filter(&self.filter, templates);
-        debug!("Filter: {}", fltr);
-        self._filter = Some(fltr);
-        if let Some(renames) = self.rename.as_mut() {
-            renames.iter_mut().for_each(|r| r.prepare());
-        }
-        if let Some(sort) = self.sort.as_mut() {
-            sort.prepare();
+        match get_filter(&self.filter, templates) {
+            Ok(fltr) => {
+                debug!("Filter: {}", fltr);
+                self._filter = Some(fltr);
+                if let Some(renames) = self.rename.as_mut() {
+                    handle_m3u_filter_error_result_list!(renames.iter_mut().map(|r| r.prepare()));
+                }
+                if let Some(sort) = self.sort.as_mut() {
+                    handle_m3u_filter_error_result!(sort.prepare());
+                }
+                Ok(())
+            },
+            Err(err) => Err(err),
         }
     }
     pub fn filter(&self, provider: &ValueProvider) -> bool {
@@ -159,8 +203,9 @@ pub(crate) struct ConfigSource {
 }
 
 impl ConfigSource {
-    pub fn prepare(&mut self, id: u16) {
-        self.inputs.iter_mut().for_each(|i| i.prepare(id));
+    pub fn prepare(&mut self, id: u16) -> Result<(), M3uFilterError> {
+        handle_m3u_filter_error_result_list!(self.inputs.iter_mut().map(|i| i.prepare(id)));
+        Ok(())
     }
 }
 
@@ -199,10 +244,10 @@ pub(crate) struct ConfigInput {
 }
 
 impl ConfigInput {
-    pub fn prepare(&mut self, id: u16) {
+    pub fn prepare(&mut self, id: u16) -> Result<(), M3uFilterError>{
         self.id = id;
         if self.url.trim().is_empty() {
-            exit!("url for input is mandatory");
+            return Err(M3uFilterError::new("url for input is mandatory".to_string()));
         }
         if let Some(user_name) = &self.username {
             if user_name.trim().is_empty() {
@@ -222,7 +267,7 @@ impl ConfigInput {
             }
             InputType::Xtream => {
                 if self.username.is_none() || self.password.is_none() {
-                    exit!("for input type xtream: username and password are mandatory");
+                    return Err(M3uFilterError::new("for input type xtream: username and password are mandatory".to_string()));
                 }
             }
         }
@@ -231,6 +276,7 @@ impl ConfigInput {
                 self.persist = None;
             }
         }
+        Ok(())
     }
 }
 
@@ -276,7 +322,6 @@ pub(crate) struct Config {
 }
 
 impl Config {
-
     pub(crate) fn has_published_targets(&self) -> bool {
         for source in &self.sources {
             for target in &source.targets {
@@ -299,17 +344,17 @@ impl Config {
         }
     }
 
-    pub fn set_mappings(&mut self, mappings: Option<Mappings>) {
+    pub fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError>{
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
                 for input in &source.inputs {
                     let is_m3u = matches!(input.input_type, InputType::M3u);
                     for target in &mut source.targets {
                         if is_m3u && target.filename.is_none() {
-                            exit!("filename is required for m3u type: {}", target.name);
+                            return create_m3u_filter_error_result!("filename is required for m3u type: {}", target.name);
                         }
                         if !is_m3u && target.filename.is_none() && !target.publish {
-                            exit!("filename or publish is required for xtream type: {}", target.name);
+                            return create_m3u_filter_error_result!("filename or publish is required for xtream type: {}", target.name);
                         }
 
                         if let Some(mapping_ids) = &target.mapping {
@@ -326,39 +371,52 @@ impl Config {
                 }
             }
         }
+        Ok(())
     }
 
-    pub fn prepare(&mut self) {
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError>{
         self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
         self.prepare_api_web_root();
-        if let Some(templates) = &mut self.templates { self.templates = Some(prepare_templates(templates)) };
+        if let Some(templates) = &mut self.templates {
+            match prepare_templates(templates) {
+                Ok(tmplts) => {
+                    self.templates = Some(tmplts);
+                }
+                Err(err) => {
+                    return Err(err);
+                }
+            }
+
+        };
         // prepare sources and set id's
         let mut target_names_check = HashSet::<String>::new();
         let default_target_name = default_as_default();
         let mut source_index: u16 = 1;
         let mut target_index: u16 = 1;
         for source in &mut self.sources {
-            source.prepare(source_index);
+            source.prepare(source_index)?;
             source_index += 1;
             for target in &mut source.targets {
                 // check target name is unique
                 let target_name = target.name.clone();
                 if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
                     if target_names_check.contains(target_name.as_str()) {
-                        exit!("target names should be unique: {}", target_name);
+                        return create_m3u_filter_error_result!("target names should be unique: {}", target_name);
                     } else {
                         target_names_check.insert(target_name);
                     }
                 }
                 // prepare templaes
-                match &self.templates {
+                let prepare_result = match &self.templates {
                     Some(templ) => target.prepare(target_index, Some(templ)),
                     _ => target.prepare(target_index, None)
-                }
+                };
+                prepare_result?;
                 target_index += 1;
             }
         }
+        Ok(())
     }
 
     fn prepare_api_web_root(&mut self) {
@@ -397,7 +455,7 @@ impl Config {
 /// * `target_args` the program parameters given with `-target` parameter.
 /// * `sources` configured sources in config file
 ///
-pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> ProcessTargets {
+pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> Result<ProcessTargets, M3uFilterError> {
     let mut enabled = true;
     let mut inputs: Vec<u16> = vec![];
     let mut targets: Vec<u16> = vec![];
@@ -424,7 +482,7 @@ pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<
 
         let missing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v == 0).map(|(k, _)| k.to_string()).collect();
         if !missing_targets.is_empty() {
-            exit!("No target found for {}", missing_targets.join(", "));
+            return create_m3u_filter_error_result!("No target found for {}", missing_targets.join(", "));
         }
         let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
         debug!("Processing targets {}", processing_targets.join(", "));
@@ -432,9 +490,9 @@ pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<
         enabled = false;
     }
 
-    ProcessTargets {
+    Ok(ProcessTargets {
         enabled,
         inputs,
         targets,
-    }
+    })
 }

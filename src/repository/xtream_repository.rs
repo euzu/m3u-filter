@@ -9,8 +9,8 @@ use serde_json::{json, Map, Value};
 use crate::model::config::{Config, ConfigTarget};
 use crate::messaging::send_message;
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItemHeader, XtreamCluster};
-use crate::utils;
-use log::{error};
+use crate::{create_m3u_filter_error_result, utils};
+use crate::m3u_filter_error::M3uFilterError;
 
 pub(crate) static COL_CAT_LIVE: &str = "cat_live";
 pub(crate) static COL_CAT_SERIES: &str = "cat_series";
@@ -83,13 +83,12 @@ fn get_collection_path(path: &Path, collection: &str) -> PathBuf {
     path.join(format!("{}.json", collection))
 }
 
-pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), std::io::Error> {
-    let mut failed = false;
+pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
     if let Some(path) = get_storage_path(cfg, &target.name) {
         if fs::create_dir_all(&path).is_err() {
             let msg = format!("Failed to save, can't create directory {}", &path.into_os_string().into_string().unwrap());
             send_message(&cfg.messaging, msg.as_str());
-            return Err(Error::new(std::io::ErrorKind::Other, msg));
+            return Err(M3uFilterError::new(msg));
         }
 
         let mut cat_live_col = vec![];
@@ -172,6 +171,7 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
             }
         }
 
+        let mut errors = Vec::new();
         for (col_path, data) in [
             (get_collection_path(&path, COL_CAT_LIVE), &cat_live_col),
             (get_collection_path(&path, COL_CAT_VOD), &cat_vod_col),
@@ -182,18 +182,19 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
             match write_to_file(&col_path, data) {
                 Ok(()) => {}
                 Err(err) => {
-                    failed = true;
-                    error!("Persisting collection failed: {}: {}", &col_path.clone().into_os_string().into_string().unwrap(), err);
+                    errors.push(format!("Persisting collection failed: {}: {}", &col_path.clone().into_os_string().into_string().unwrap(), err));
                 }
             }
         }
+        if !errors.is_empty() {
+            send_message(&cfg.messaging, format!("Something went wrong persisting target {}", &target.name).as_str());
+            return create_m3u_filter_error_result!("{}", errors.join("\n"));
+        }
     } else {
-        return Err(Error::new(std::io::ErrorKind::Other, format!("Persisting playlist failed: {}.db", &target.name)));
+        send_message(&cfg.messaging, format!("Something went wrong persisting target {}", &target.name).as_str());
+        return create_m3u_filter_error_result!("Persisting playlist failed: {}.db", &target.name);
     }
 
-    if failed {
-        send_message(&cfg.messaging, format!("Something went wrong persisting target {}", &target.name).as_str());
-    }
     Ok(())
 }
 
