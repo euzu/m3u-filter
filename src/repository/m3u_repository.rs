@@ -6,7 +6,7 @@ use std::io::{Write};
 use chrono::Datelike;
 use crate::model::model_config::TargetType;
 use log::{error};
-use crate::m3u_filter_error::M3uFilterError;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     match res {
@@ -83,7 +83,7 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
 fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), M3uFilterError> {
     macro_rules! cant_write_result {
         ($path:expr, $err:expr) => {
-            create_m3u_filter_error_result!("failed to write m3u playlist: {} - {}", $path.clone().into_os_string().into_string().unwrap() ,$err)
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.clone().into_os_string().into_string().unwrap() ,$err)
         }
     }
     if !new_playlist.is_empty() {
@@ -127,14 +127,14 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
             }
             if let Err(e) = std::fs::create_dir_all(&path) {
                 error!("cant create directory: {:?}", &path);
-                return create_m3u_filter_error_result!("failed to write strm playlist: {}", e);
+                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
             };
             for pg in new_playlist {
                 for pli in &pg.channels {
                     let dir_path = path.join(sanitize_for_filename(&pli.header.borrow().group, underscore_whitespace));
                     if let Err(e) = std::fs::create_dir_all(&dir_path) {
                         error!("cant create directory: {:?}", &path);
-                        return create_m3u_filter_error_result!("failed to write strm playlist: {}", e);
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
                     };
                     let mut file_name = sanitize_for_filename(&pli.header.borrow().title, underscore_whitespace);
                     if kodi_style {
@@ -151,11 +151,11 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
                         Ok(mut strm_file) => {
                             match check_write(strm_file.write(pli.url.as_bytes())) {
                                 Ok(_) => (),
-                                Err(e) => return create_m3u_filter_error_result!("failed to write strm playlist: {}", e),
+                                Err(e) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e),
                             }
                         }
                         Err(err) => {
-                            return create_m3u_filter_error_result!("failed to write strm playlist: {}", err);
+                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", err);
                         }
                     }
                 }

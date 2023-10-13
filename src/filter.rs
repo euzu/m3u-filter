@@ -9,7 +9,7 @@ use crate::model::model_m3u::PlaylistItem;
 use crate::model::model_config::ItemField;
 use petgraph::graph::DiGraph;
 use crate::{create_m3u_filter_error_result};
-use crate::m3u_filter_error::M3uFilterError;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 
 pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
@@ -166,7 +166,7 @@ fn get_parser_item_field(expr: Pair<Rule>) -> Result<ItemField, M3uFilterError> 
             }
         }
     }
-    create_m3u_filter_error_result!("unknown field: {}", expr.as_str())
+    create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
 }
 
 fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<RegexWithCaptures, M3uFilterError> {
@@ -180,7 +180,7 @@ fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Resu
         }
         let re = regex::Regex::new(regstr.as_str());
         if re.is_err() {
-            return create_m3u_filter_error_result!("cant parse regex: {}", regstr);
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
         }
         let regexp = re.unwrap();
         let captures = regexp.capture_names()
@@ -192,7 +192,7 @@ fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Resu
             captures,
         });
     }
-    create_m3u_filter_error_result!("unknown field: {}", expr.as_str())
+    create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
 }
 
 fn get_parser_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<Filter, M3uFilterError> {
@@ -279,7 +279,7 @@ fn get_parser_binary_op(expr: Pair<Rule>) -> Result<BinaryOperator, M3uFilterErr
     match expr.as_rule() {
         Rule::and => Ok(BinaryOperator::And),
         Rule::or => Ok(BinaryOperator::Or),
-        _ => create_m3u_filter_error_result!("Unknown binary operator {}", expr.as_str())
+        _ => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown binary operator {}", expr.as_str())
     }
 }
 
@@ -336,17 +336,17 @@ pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTempla
 
             if !errors.is_empty() {
                 errors.push(format!("Unable to parse filter: {}", &filter_text));
-                return Err(M3uFilterError::new(errors.join("\n")));
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, errors.join("\n")));
             }
 
             match result {
                 Some(filter) => Ok(filter),
                 _ => {
-                    create_m3u_filter_error_result!("Unable to parse filter: {}", &filter_text)
+                    create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unable to parse filter: {}", &filter_text)
                 }
             }
         }
-        Err(err) => create_m3u_filter_error_result!("{}", err)
+        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err)
     }
 }
 
@@ -400,7 +400,7 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<
     let mut result: Vec<PatternTemplate> = templates.to_vec();
     let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
     if cyclic {
-        return create_m3u_filter_error_result!("Cyclic dependencies in templates detected!");
+        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Cyclic dependencies in templates detected!");
     } else {
         let mut dep_value_map: HashMap<&String, String> = templates.iter().map(|t| (&t.name, t.value.clone())).collect();
         // Perform a topological sort to get a linear ordering of the nodes

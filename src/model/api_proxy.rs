@@ -1,5 +1,5 @@
 use std::collections::{HashSet};
-use crate::m3u_filter_error::M3uFilterError;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UserCredentials {
@@ -57,7 +57,7 @@ impl ApiProxyConfig {
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(M3uFilterError::new(errors.join("\n")))
+            Err(M3uFilterError::new(M3uFilterErrorKind::Info, errors.join("\n")))
         }
     }
 

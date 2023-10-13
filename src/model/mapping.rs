@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use log::{debug, error};
 use regex::Regex;
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
-use crate::m3u_filter_error::M3uFilterError;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::model_m3u::{FieldAccessor, PlaylistItem};
 use crate::model::model_config::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
                                  default_as_empty_str, default_as_false, default_as_empty_map, };
@@ -225,7 +225,7 @@ impl Mapping {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
                    tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
         for mapper in &mut self.mapper {
-            handle_m3u_filter_error_result!(mapper.prepare(templates, tags));
+            handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, mapper.prepare(templates, tags));
         }
         Ok(())
     }
@@ -258,7 +258,7 @@ impl MappingDefinition {
                 Some(t) => Some(t),
                 _ => None
             };
-            handle_m3u_filter_error_result!(mapping.prepare(template_list, tag_list));
+            handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, mapping.prepare(template_list, tag_list));
         }
         Ok(())
     }

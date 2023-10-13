@@ -3,7 +3,7 @@ use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::Config;
 use crate::model::mapping::Mappings;
 use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, utils};
-use crate::m3u_filter_error::M3uFilterError;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
     let mappings_file: String = args_mapping.unwrap_or(utils::get_default_mappings_path());
@@ -11,7 +11,7 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
     match read_mapping(mappings_file.as_str()) {
         Ok(mappings) => {
             if mappings.is_none() { debug!("no mapping loaded"); }
-            handle_m3u_filter_error_result!(cfg.set_mappings(mappings));
+            handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, cfg.set_mappings(mappings));
             Ok(())
         }
         Err(err) => Err(err),
@@ -23,7 +23,7 @@ pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: 
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str());
     if api_proxy_config.is_none() {
         if cfg.has_published_targets() {
-            return create_m3u_filter_error_result!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
         } else {
             warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
         }
@@ -40,7 +40,7 @@ pub(crate) fn read_config(config_file: &str) -> Result<Config, M3uFilterError> {
             let mut cfg: Config = match serde_yaml::from_reader(file) {
                 Ok(result) => result,
                 Err(e) => {
-                    return create_m3u_filter_error_result!("cant read config file: {}", e);
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant read config file: {}", e);
                 }
             };
             match cfg.prepare() {
@@ -48,7 +48,7 @@ pub(crate) fn read_config(config_file: &str) -> Result<Config, M3uFilterError> {
                 Err(err) => Err(err)
             }
         },
-        Err(err) => create_m3u_filter_error_result!("{}", err)
+        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err)
      }
 
 }
@@ -59,7 +59,7 @@ pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFi
             let mapping: Result<Mappings, _> = serde_yaml::from_reader(file);
             match mapping {
                 Ok(mut result) => {
-                    handle_m3u_filter_error_result!(result.prepare());
+                    handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, result.prepare());
                     Ok(Some(result))
                 }
                 Err(err) => {

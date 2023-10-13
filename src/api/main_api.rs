@@ -10,11 +10,15 @@ use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use chrono::Local;
 use cron::Schedule;
+use log::error;
+use serde_json::json;
 
-use crate::{playlist_processor};
+use crate::{get_notify_message, playlist_processor};
 use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::api::xtream_player_api::xtream_player_api;
 use crate::download::get_m3u_playlist;
+use crate::m3u_filter_error::M3uFilterErrorKind;
+use crate::messaging::send_message;
 use crate::model::config::{Config, ConfigInput, InputType, ProcessTargets};
 
 #[get("/")]
@@ -41,10 +45,16 @@ pub(crate) async fn playlist(
         persist: None,
         prefix: None,
         suffix: None,
+        name: None,
         enabled: true,
     };
-    let result = get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir);
-    HttpResponse::Ok().json(result)
+    let (result, errors) = get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir);
+    if result.is_empty() {
+        let error_strings: Vec<String> = errors.iter().map(|err| err.to_string()).collect();
+        HttpResponse::BadRequest().json(json!({"error": error_strings.join(", ")}))
+    } else {
+        HttpResponse::Ok().json(result)
+    }
 }
 
 pub(crate) async fn config(
@@ -120,7 +130,11 @@ async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
 
         if let Some(datetime) = upcoming.next() {
             if datetime.timestamp() <= local.timestamp() {
-                playlist_processor::process_sources((data.config).clone(), &data.targets);
+                let errors = playlist_processor::process_sources((data.config).clone(), &data.targets);
+                errors.iter().for_each(|err| error!("{}", err.message));
+                if let Some(message) = get_notify_message!(errors, 255) {
+                    send_message(&data.config.messaging, message.as_str());
+                }
             }
         }
     }

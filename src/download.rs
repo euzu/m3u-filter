@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicI32;
 use log::debug;
 use crate::{m3u_parser, utils, xtream_parser};
+use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput};
 use crate::model::model_m3u::{PlaylistGroup, XtreamCluster};
 
@@ -23,11 +24,15 @@ fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str) ->
     }
 }
 
-pub(crate) fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> Option<Vec<PlaylistGroup>> {
+pub(crate) fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let url = input.url.as_str();
     let file_path = prepare_file_path(input, working_dir, "");
-    let lines: Option<Vec<String>> = utils::get_input_content(cfg, working_dir, url, file_path);
-    lines.map(|l| m3u_parser::parse_m3u(cfg, &l))
+    match utils::get_input_content(working_dir, url, file_path) {
+        Ok(lines) => {
+            (m3u_parser::parse_m3u(cfg, &lines), vec![])
+        }
+        Err(err) => (vec![], vec![err])
+    }
 }
 
 /*
@@ -152,13 +157,14 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Video, "get_vod_categories", "get_vod_streams"),
     (XtreamCluster::Series, "get_series_categories", "get_series")];
 
-pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> Option<Vec<PlaylistGroup>> {
+pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let mut playlist: Vec<PlaylistGroup> = Vec::new();
     let username = input.username.as_ref().unwrap().clone();
     let password = input.password.as_ref().unwrap().clone();
     let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);
     let stream_base_url = format!("{}/{}/{}", input.url, username, password);
 
+    let mut errors = vec![];
     let category_id_cnt = AtomicI32::new(0);
     for (xtream_cluster, category, stream) in &ACTIONS {
         let category_url = format!("{}&action={}", base_url, category);
@@ -166,12 +172,24 @@ pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> 
         let category_file_path = prepare_file_path(input, working_dir, format!("{}_", category).as_str());
         let stream_file_path = prepare_file_path(input, working_dir, format!("{}_", stream).as_str());
 
-        let category_content: Option<serde_json::Value> = utils::get_input_json_content(input, &category_url, category_file_path);
-        let stream_content: Option<serde_json::Value> = utils::get_input_json_content(input, &stream_url, stream_file_path);
-        let mut sub_playlist = xtream_parser::parse_xtream(&category_id_cnt, xtream_cluster, category_content, stream_content, &stream_base_url);
-        while let Some(group) = sub_playlist.pop() {
-            playlist.push(group);
+        match utils::get_input_json_content(input, &category_url, category_file_path) {
+            Ok(category_content) => {
+                match utils::get_input_json_content(input, &stream_url, stream_file_path) {
+                    Ok(stream_content) => {
+                        match xtream_parser::parse_xtream(&category_id_cnt, xtream_cluster, &category_content, &stream_content, &stream_base_url) {
+                            Ok(sub_playlist_opt) => {
+                                if let Some(mut sub_playlist) = sub_playlist_opt {
+                                    sub_playlist.drain(..).for_each(|group| playlist.push(group));
+                                }
+                            }
+                            Err(err) => errors.push(err)
+                        }
+                    }
+                    Err(err) => errors.push(err)
+                }
+            }
+            Err(err) => errors.push(err)
         }
     }
-    Some(playlist)
+    (playlist, errors)
 }

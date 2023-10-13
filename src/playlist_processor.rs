@@ -1,7 +1,7 @@
 extern crate unidecode;
 
 use std::cell::RefCell;
-use std::sync::{Arc};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use log::{debug, error, info};
 use unidecode::unidecode;
@@ -13,7 +13,7 @@ use crate::repository::m3u_repository::write_playlist;
 use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
-use crate::m3u_filter_error::M3uFilterError;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::repository::xtream_repository::xtream_save_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
@@ -159,7 +159,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                     for r in renames {
                         if let ItemField::Group = r.field {
                             let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
-                            debug!("Renamed group {} to {}", &grp.title, cap);
+                            debug!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
                             grp.title = cap.into_owned();
                         }
                     }
@@ -214,7 +214,6 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
 }
 
 fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
-    debug!("Mapping");
     if target._mapping.is_some() {
         let new_playlist: Vec<PlaylistGroup> = playlist.iter().map(|playlist_group| {
             let mut grp = playlist_group.clone();
@@ -240,7 +239,8 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
                             id: grp_id,
                             title: String::from(title),
                             channels: vec![channel.clone()],
-                            xtream_cluster:  cluster.clone()})
+                            xtream_cluster: cluster.clone(),
+                        })
                     }
                 }
             }
@@ -261,33 +261,39 @@ fn is_input_enabled(enabled_inputs: usize, input_enabled: bool, input_id: u16, u
     input_enabled
 }
 
-fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) {
+fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> Vec<M3uFilterError> {
     let source = cfg.sources.get(source_idx).unwrap();
     let mut all_playlist = Vec::new();
     let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
+    let mut errors = vec![];
     for input in &source.inputs {
         //if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)) {
         if is_input_enabled(enabled_inputs, input.enabled, input.id, &user_targets) {
-            let result = match input.input_type {
+            let (playlist, mut error_list) = match input.input_type {
                 InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir),
                 InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir),
             };
-            if let Some(playlist) = result {
-                if !playlist.is_empty() {
-                    all_playlist.push(
-                        FetchedPlaylist {
-                            input: input.clone(),
-                            playlist
-                        }
-                    );
-                } else {
-                    info!("source is empty {}", input.url);
-                }
+            error_list.drain(..).for_each(|err| errors.push(err));
+            if !playlist.is_empty() {
+                all_playlist.push(
+                    FetchedPlaylist {
+                        input: input.clone(),
+                        playlist,
+                    }
+                );
+            } else {
+                info!("source is empty {}", input.url);
+                let input_name = match &input.name {
+                    None => input.url.as_str(),
+                    Some(name_val) => name_val.as_str()
+                };
+                errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("source is empty {}", input_name)));
             }
         }
     }
     if all_playlist.is_empty() {
-        debug!("Input is empty");
+        debug!("Source at {} input is empty", source_idx);
+        errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Source at {} input is empty", source_idx)));
     } else {
         debug!("Input has {} groups", all_playlist.len());
         source.targets.iter().for_each(|target| {
@@ -295,32 +301,35 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
                 || (user_targets.enabled && user_targets.has_target(target.id));
             if should_process {
                 match process_playlist(&mut all_playlist, target, &cfg) {
-                    Ok(_) => (),
-                    Err(e) => error!("Failed to write file: {}", e)
+                    Ok(_) => {}
+                    Err(err) => errors.push(err)
                 }
             }
         });
     }
+    errors
 }
 
-pub(crate) fn process_sources(cfg: Config, user_targets: &ProcessTargets) {
+pub(crate) fn process_sources(cfg: Config, user_targets: &ProcessTargets) -> Vec<M3uFilterError> {
     let config = Arc::new(cfg);
     let mut handle_list = vec![];
     let thread_num = config.threads;
     let process_parallel = thread_num > 1 && config.sources.len() > 1;
     if process_parallel { debug!("Using {} threads", thread_num); }
 
+    let errors = Arc::new(Mutex::<Vec<M3uFilterError>>::new(vec![]));
     for (index, _) in config.sources.iter().enumerate() {
         let cfg_clone = config.clone();
         let usr_targets = Arc::new(user_targets.clone());
-        let process = move || process_source(cfg_clone, index, usr_targets);
+        let shared_errors = errors.clone();
+        let process = move || {
+            process_source(cfg_clone, index, usr_targets).drain(..).for_each(|err| shared_errors.lock().unwrap().push(err));
+        };
         if process_parallel {
             let handles = &mut handle_list;
             handles.push(thread::spawn(process));
             if handles.len() as u8 >= thread_num {
-                while let Some(handle) = handles.pop() {
-                    let _ = handle.join();
-                }
+                handles.drain(..).for_each(|handle| { let _ = handle.join(); });
             }
         } else {
             process();
@@ -329,22 +338,26 @@ pub(crate) fn process_sources(cfg: Config, user_targets: &ProcessTargets) {
     for handle in handle_list {
         let _ = handle.join();
     }
+    Arc::try_unwrap(errors).unwrap().into_inner().unwrap()
 }
 
 
 type ProcessingPipe = Vec<fn(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>>>;
 
+fn get_processing_pipe(target: &ConfigTarget) -> ProcessingPipe {
+    match &target.processing_order {
+        ProcessingOrder::Frm => vec![filter_playlist, rename_playlist, map_playlist],
+        ProcessingOrder::Fmr => vec![filter_playlist, map_playlist, rename_playlist],
+        ProcessingOrder::Rfm => vec![rename_playlist, filter_playlist, map_playlist],
+        ProcessingOrder::Rmf => vec![rename_playlist, map_playlist, filter_playlist],
+        ProcessingOrder::Mfr => vec![map_playlist, filter_playlist, rename_playlist],
+        ProcessingOrder::Mrf => vec![map_playlist, rename_playlist, filter_playlist]
+    }
+}
+
 pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
                                target: &ConfigTarget, cfg: &Config) -> Result<(), M3uFilterError> {
-    let pipe: ProcessingPipe =
-        match &target.processing_order {
-            ProcessingOrder::Frm => vec![filter_playlist, rename_playlist, map_playlist],
-            ProcessingOrder::Fmr => vec![filter_playlist, map_playlist, rename_playlist],
-            ProcessingOrder::Rfm => vec![rename_playlist, filter_playlist, map_playlist],
-            ProcessingOrder::Rmf => vec![rename_playlist, map_playlist, filter_playlist],
-            ProcessingOrder::Mfr => vec![map_playlist, filter_playlist, rename_playlist],
-            ProcessingOrder::Mrf => vec![map_playlist, rename_playlist, filter_playlist]
-        };
+    let pipe = get_processing_pipe(target);
 
     debug!("Processing order is {}", &target.processing_order);
 
@@ -369,9 +382,9 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
         if target.filename.is_some() {
             let result = write_playlist(target, cfg, &mut new_playlist);
             match &result {
-                Ok(..) => {},
+                Ok(..) => {}
                 Err(e) => {
-                    error!("failed to write {:?}", e);
+                    error!("failed to write playlist {} {}", target.name, e);
                 }
             }
             if !publish {
@@ -382,9 +395,10 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
         if target.publish {
             return xtream_save_playlist(target, cfg, &mut new_playlist);
         }
-        create_m3u_filter_error_result!("Persisting playlist failed: {}", &target.name)
+        create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Persisting playlist failed: {}", &target.name)
     } else {
         info!("Playlist is empty: {}", &target.name);
         Ok(())
     }
 }
+

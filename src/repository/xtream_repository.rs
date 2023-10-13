@@ -7,10 +7,9 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use crate::model::config::{Config, ConfigTarget};
-use crate::messaging::send_message;
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItemHeader, XtreamCluster};
 use crate::{create_m3u_filter_error_result, utils};
-use crate::m3u_filter_error::M3uFilterError;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 pub(crate) static COL_CAT_LIVE: &str = "cat_live";
 pub(crate) static COL_CAT_SERIES: &str = "cat_series";
@@ -87,8 +86,7 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
     if let Some(path) = get_storage_path(cfg, &target.name) {
         if fs::create_dir_all(&path).is_err() {
             let msg = format!("Failed to save, can't create directory {}", &path.into_os_string().into_string().unwrap());
-            send_message(&cfg.messaging, msg.as_str());
-            return Err(M3uFilterError::new(msg));
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg));
         }
 
         let mut cat_live_col = vec![];
@@ -187,12 +185,10 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
             }
         }
         if !errors.is_empty() {
-            send_message(&cfg.messaging, format!("Something went wrong persisting target {}", &target.name).as_str());
-            return create_m3u_filter_error_result!("{}", errors.join("\n"));
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", errors.join("\n"));
         }
     } else {
-        send_message(&cfg.messaging, format!("Something went wrong persisting target {}", &target.name).as_str());
-        return create_m3u_filter_error_result!("Persisting playlist failed: {}.db", &target.name);
+        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Persisting playlist failed: {}.db", &target.name);
     }
 
     Ok(())

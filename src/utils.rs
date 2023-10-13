@@ -5,8 +5,9 @@ use log::{debug, error};
 use path_absolutize::*;
 use reqwest::header;
 use reqwest::header::{HeaderName, HeaderValue};
-use crate::model::config::{Config, ConfigInput};
-use crate::messaging::send_message;
+use crate::create_m3u_filter_error_result;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::model::config::{ConfigInput};
 
 #[macro_export]
 macro_rules! exit {
@@ -93,14 +94,13 @@ pub(crate) fn open_file(file_name: &PathBuf) -> Result<fs::File, std::io::Error>
     fs::File::open(file_name)
 }
 
-pub(crate) fn get_input_content(cfg: &Config, working_dir: &String, url_str: &str, persist_file: Option<PathBuf>) -> Option<Vec<String>> {
+pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<PathBuf>) -> Result<Vec<String>, M3uFilterError> {
     match url_str.parse::<url::Url>() {
         Ok(url) => match download_content(url, persist_file) {
-            Ok(content) => Some(content),
+            Ok(content) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", url_str, e);
-                send_message(&cfg.messaging, format!("Failed to download: {}", url_str).as_str());
-                None
+                create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
             }
         }
         Err(_) => {
@@ -112,15 +112,19 @@ pub(crate) fn get_input_content(cfg: &Config, working_dir: &String, url_str: &st
                             let to_file = &persist_file_value;
                             match fs::copy(file, to_file) {
                                 Ok(_) => {}
-                                Err(e) => error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e),
+                                Err(e) => {
+                                    error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e);
+                                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
+                                }
                             }
                         };
                         match open_file(file) {
                             Ok(content) => Some(std::io::BufReader::new(content).lines().map(|l| l.unwrap()).collect()),
                             Err(err) => {
-                                error!("cant read: {}", err);
-                                None
-                            },
+                                let file_str = &file.clone().into_os_string().into_string().unwrap();
+                                error!("cant read: {} {}", file_str,  err);
+                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
+                            }
                         }
                     } else {
                         None
@@ -129,12 +133,11 @@ pub(crate) fn get_input_content(cfg: &Config, working_dir: &String, url_str: &st
                 None => None
             };
             match result {
-                Some(file) => Some(file),
+                Some(file) => Ok(file),
                 None => {
                     let msg = format!("cant read input url: {:?}", &file_path.unwrap());
                     error!("{}", msg);
-                    send_message(&cfg.messaging, msg.as_str());
-                    None
+                    create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
                 }
             }
         }
@@ -235,18 +238,12 @@ fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Optio
     }
 }
 
-pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_file: Option<PathBuf>) -> Option<serde_json::Value> {
+pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_file: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
     match url_str.parse::<url::Url>() {
         Ok(url) => match download_json_content(input, url, persist_file) {
-            Ok(content) => Some(content),
-            Err(e) => {
-                error!("cant download input url: {}  => {}", url_str, e);
-                None
-            }
+            Ok(content) => Ok(content),
+            Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", url_str, e)
         },
-        Err(_) => {
-            error!("malformed input url: {}", url_str);
-            None
-        }
+        Err(_) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "malformed input url: {}", url_str)
     }
 }

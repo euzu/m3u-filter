@@ -2,10 +2,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use log::error;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use crate::create_m3u_filter_error_result;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 use crate::model::model_config::default_as_empty_str;
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
@@ -221,88 +222,77 @@ impl XtreamStream {
     }
 }
 
-fn process_category(category: Option<serde_json::Value>) -> Vec<XtreamCategory> {
-    match category {
-        Some(value) => {
-            match serde_json::from_value::<Vec<XtreamCategory>>(value) {
-                Ok(category_list) => category_list,
-                Err(err) => {
-                    error!("Failed to process categories {}", &err);
-                    vec![]
-                }
-            }
+fn process_category(category: &serde_json::Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
+    match serde_json::from_value::<Vec<XtreamCategory>>(category.to_owned()) {
+        Ok(category_list) => Ok(category_list),
+        Err(err) => {
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to process categories {}", &err)
         }
-        None => vec![]
     }
 }
 
 
-fn process_streams(xtream_cluster: &XtreamCluster, streams: Option<serde_json::Value>) -> Vec<XtreamStream> {
-    match streams {
-        Some(value) => {
-            match serde_json::from_value::<Vec<XtreamStream>>(value) {
-                Ok(stream_list) => stream_list,
-                Err(err) => {
-                    error!("Failed to process streams {:?}: {}", xtream_cluster, &err);
-                    vec![]
-                }
-            }
+fn process_streams(xtream_cluster: &XtreamCluster, streams: &serde_json::Value) -> Result<Vec<XtreamStream>, M3uFilterError> {
+    match serde_json::from_value::<Vec<XtreamStream>>(streams.to_owned()) {
+        Ok(stream_list) => Ok(stream_list),
+        Err(err) => {
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to process streams {:?}: {}", xtream_cluster, &err)
         }
-        None => vec![]
     }
 }
 
-pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluster, category: Option<serde_json::Value>, streams: Option<serde_json::Value>, stream_base_url: &String) -> Vec<PlaylistGroup> {
-    let mut categories = process_category(category);
-    if !categories.is_empty() {
-        let streams = process_streams(xtream_cluster, streams);
-        if !streams.is_empty() {
-            let mut group_map = HashMap::<String, RefCell<XtreamCategory>>::new();
-            while let Some(category) = categories.pop() {
-                group_map.insert(String::from(&category.category_id), RefCell::new(category));
-            }
+pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluster,
+                           category: &serde_json::Value, streams: &serde_json::Value,
+                           stream_base_url: &String) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
+    match process_category(category) {
+        Ok(mut categories) => {
+            return match process_streams(xtream_cluster, streams) {
+                Ok(streams) => {
+                    let group_map: HashMap::<String, RefCell<XtreamCategory>> =
+                        categories.drain(..).map(|category|
+                            (String::from(&category.category_id), RefCell::new(category))
+                        ).collect();
 
-            for stream in streams {
-                if let Some(group) = group_map.get(stream.category_id.as_str()) {
-                    let mut grp = group.borrow_mut();
-                    let title = String::from(&grp.category_name);
-                    let item = PlaylistItem {
-                        header: RefCell::new(PlaylistItemHeader {
-                            id: stream.get_stream_id(),
-                            name: String::from(&stream.name),
-                            logo: String::from(&stream.stream_icon),
-                            logo_small: "".to_string(),
-                            group: title,
-                            title: String::from(&stream.name),
-                            parent_code: "".to_string(),
-                            audio_track: "".to_string(),
-                            time_shift: "".to_string(),
-                            rec: "".to_string(),
-                            source: String::from(&stream.direct_source),
+                    for stream in streams {
+                        if let Some(group) = group_map.get(stream.category_id.as_str()) {
+                            let mut grp = group.borrow_mut();
+                            let title = String::from(&grp.category_name);
+                            let item = PlaylistItem {
+                                header: RefCell::new(PlaylistItemHeader {
+                                    id: stream.get_stream_id(),
+                                    name: String::from(&stream.name),
+                                    logo: String::from(&stream.stream_icon),
+                                    logo_small: "".to_string(),
+                                    group: title,
+                                    title: String::from(&stream.name),
+                                    parent_code: "".to_string(),
+                                    audio_track: "".to_string(),
+                                    time_shift: "".to_string(),
+                                    rec: "".to_string(),
+                                    source: String::from(&stream.direct_source),
+                                    xtream_cluster: xtream_cluster.clone(),
+                                    additional_properties: stream.get_additional_properties(),
+                                }),
+                                url: format!("{}/{}", stream_base_url, stream.get_stream_id()),
+                            };
+                            grp.add(item);
+                        }
+                    }
+
+                    Ok(Some(group_map.values().map(|category| {
+                        let cat = category.borrow();
+                        cat_id_cnt.fetch_add(1, Ordering::Relaxed);
+                        PlaylistGroup {
+                            id: cat_id_cnt.load(Ordering::Relaxed),
                             xtream_cluster: xtream_cluster.clone(),
-                            additional_properties: stream.get_additional_properties(),
-                        }),
-                        url: format!("{}/{}", stream_base_url, stream.get_stream_id()),
-                    };
-                    grp.add(item);
+                            title: String::from(&cat.category_name),
+                            channels: cat.channels.clone(),
+                        }
+                    }).collect()))
                 }
-            }
-
-            let mut result = vec![];
-            for category in group_map.values() {
-                let cat = category.borrow();
-                cat_id_cnt.fetch_add(1, Ordering::Relaxed);
-                let group = PlaylistGroup {
-                    id: cat_id_cnt.load(Ordering::Relaxed),
-                    xtream_cluster: xtream_cluster.clone(),
-                    title: String::from(&cat.category_name),
-                    channels: cat.channels.clone(),
-                };
-                result.push(group);
-            }
-
-            return result;
+                Err(err) => Err(err)
+            };
         }
+        Err(err) => Err(err)
     }
-    vec![]
 }
