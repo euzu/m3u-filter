@@ -15,8 +15,9 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
         new_tree.insert(title);
     });
 
-    let filename_re = Regex::new(r"[^A-Za-z0-9_.-\\s]").unwrap();
-    let watch_filename = format!("watch_{}.bin", filename_re.replace_all(target_name, "_"));
+    let filename_re = Regex::new(r"[^A-Za-z0-9_-]").unwrap();
+    let file_name = format!("watch_{}_{}", target_name, &pl.title);
+    let watch_filename = format!("{}.bin", filename_re.replace_all(&file_name, "_")).to_string();
     match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&watch_filename))) {
         Some(path) => {
             let save_path = path.clone();
