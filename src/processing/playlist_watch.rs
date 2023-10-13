@@ -28,7 +28,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
                         let added_difference: BTreeSet<String> = new_tree.difference(&loaded_tree).cloned().collect();
                         let removed_difference: BTreeSet<String> = loaded_tree.difference(&new_tree).cloned().collect();
                         if !added_difference.is_empty() || !removed_difference.is_empty() {
-                            handle_watch_notification(cfg, added_difference, removed_difference);
+                            handle_watch_notification(cfg, added_difference, removed_difference, target_name, &pl.title);
                         }
                     }
                     None => {
@@ -49,7 +49,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
     }
 }
 
-fn handle_watch_notification(cfg: &Config, added: BTreeSet<String>, removed: BTreeSet<String>) {
+fn handle_watch_notification(cfg: &Config, added: BTreeSet<String>, removed: BTreeSet<String>, target_name: &str, group_name: &str) {
     let added_entries = added.iter().map(|name| name.to_string()).collect::<Vec<String>>().join("\n\t");
     let removed_entries = removed.iter().map(|name| name.to_string()).collect::<Vec<String>>().join("\n\t");
 
@@ -66,8 +66,9 @@ fn handle_watch_notification(cfg: &Config, added: BTreeSet<String>, removed: BTr
     }
 
     if !message.is_empty() {
-        info!("{}", message.join("").as_str());
-        send_message(&cfg.messaging, message.join("").as_str())
+        let msg = format!("Changes {}/{}\n{}", target_name, group_name, message.join(""));
+        info!("{}", &msg);
+        send_message(&cfg.messaging, &msg);
     }
 }
 

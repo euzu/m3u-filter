@@ -12,6 +12,7 @@ m3u-filter is a simple application which can:
   - define filter as statements like `filter: (Group ~ "^FR.*") AND NOT(Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~".*MOVIES.*")`
   - DRY - define templates and use them, don't repeat yourself
   - Send a telegram bot message when something goes wrong
+  - Watch changes in groups and get a message on changes
 
 ```
   ------------                               |----> playlist_1  
