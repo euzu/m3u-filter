@@ -14,7 +14,7 @@ use crate::utils::get_working_path;
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 
-fn default_as_default() -> String { String::from("default") }
+pub(crate) fn default_as_default() -> String { String::from("default") }
 
 fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
 
@@ -166,6 +166,7 @@ pub(crate) struct ConfigTarget {
     pub mapping: Option<Vec<String>>,
     #[serde(default = "default_as_frm")]
     pub processing_order: ProcessingOrder,
+    pub watch: Option<Vec<String>>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]

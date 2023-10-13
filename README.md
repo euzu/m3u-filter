@@ -163,6 +163,7 @@ Has the following top level entries:
 * `filter` _mandatory_,
 * `rename` _optional_
 * `mapping` _optional_
+* `watch` _optional_
 
 ### 1.5.2.1 `publish` and `filename`
 
@@ -314,6 +315,21 @@ sources:
             new_name: 1. DE$1
 ```
 
+### 1.5.2.9 `watch`
+For each target with a *unique name*, you can define a watched groups.
+It is a list of final group names from this target playlist. 
+Final means in this case: the name in the resulting playlist after applying all steps
+of transformation.
+
+For example given the following configuration:
+```yaml
+watch:
+  - 'FR | Movies'
+  - 'FR | Series'
+```
+
+Changes from this groups will be printed as info on console and send to 
+the configured messaging (f.e. telegram channel).
 
 ### 1.6 `messaging`
 `messaging` is an optional configuration for receiving messages.

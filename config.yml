@@ -48,6 +48,8 @@ sources:
         - Belgique
         - Suisse
         - Canada
+      watch:
+        - 'FR - Movies'
     - filename: playlist_strm
       type: strm
       filter: 'Group ~ "^tv-shows.*"'

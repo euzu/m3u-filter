@@ -6,7 +6,7 @@ use std::thread;
 use log::{debug, error, info};
 use unidecode::unidecode;
 use crate::{model::config, Config, valid_property, create_m3u_filter_error_result};
-use crate::model::config::{ConfigTarget, InputAffix, InputType, ProcessTargets};
+use crate::model::config::{ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
 use crate::model::model_config::{SortOrder::{Asc, Desc}, ItemField, AFFIX_FIELDS, ProcessingOrder};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::repository::m3u_repository::write_playlist;
@@ -14,6 +14,7 @@ use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, Pla
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::processing::playlist_watch::process_group_watch;
 use crate::repository::xtream_repository::xtream_save_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
@@ -385,6 +386,20 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
 
     if !new_playlist.is_empty() {
         sort_playlist(target, &mut new_playlist);
+
+        if target.watch.is_some() {
+            if default_as_default().eq_ignore_ascii_case(&target.name) {
+                error!("cant watch a target with no unique name");
+            } else {
+                let titles = target.watch.as_ref().unwrap();
+                new_playlist.iter().for_each(|pl| {
+                    if titles.contains(&pl.title) {
+                        process_group_watch(cfg, &target.name, pl)
+                    }
+                });
+            }
+        }
+
         let publish = target.publish;
         if target.filename.is_some() {
             let result = write_playlist(target, cfg, &mut new_playlist);
@@ -408,4 +423,3 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
         Ok(())
     }
 }
-

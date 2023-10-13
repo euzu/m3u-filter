@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 use std::sync::atomic::AtomicI32;
 use log::debug;
-use crate::{m3u_parser, utils, xtream_parser};
+use crate::{utils};
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput};
 use crate::model::model_m3u::{PlaylistGroup, XtreamCluster};
+use crate::processing::{m3u_parser, xtream_parser};
 
 fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str) -> Option<PathBuf> {
     let persist_file: Option<PathBuf> =
