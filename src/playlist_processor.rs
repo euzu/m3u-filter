@@ -277,7 +277,7 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
             if !playlist.is_empty() {
                 all_playlist.push(
                     FetchedPlaylist {
-                        input: input.clone(),
+                        input,
                         playlist,
                     }
                 );
@@ -361,18 +361,25 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
 
     debug!("Processing order is {}", &target.processing_order);
 
-    playlists.iter_mut().for_each(|pl| {
+    let mut new_fetched_playlist : Vec<FetchedPlaylist> = vec![];
+    playlists.iter_mut().for_each(|fpl| {
+        let mut new_fpl = FetchedPlaylist {
+            input: fpl.input,
+            playlist: fpl.playlist.clone(),
+        };
         for f in &pipe {
-            let r = f(&mut pl.playlist, target);
+            let playlist = &mut new_fpl.playlist;
+            let r = f(playlist, target);
             if let Some(v) = r {
-                pl.playlist = v;
+                new_fpl.playlist = v;
             }
         }
+        new_fetched_playlist.push(new_fpl);
     });
 
-    apply_affixes(playlists);
-    let mut new_playlist = Vec::new();
-    playlists.iter_mut().for_each(|fp| {
+    apply_affixes(&mut new_fetched_playlist);
+    let mut new_playlist = vec![];
+    new_fetched_playlist.iter_mut().for_each(|fp| {
         fp.playlist.drain(..).for_each(|group| new_playlist.push(group));
     });
 

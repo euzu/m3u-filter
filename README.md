@@ -406,7 +406,7 @@ Has the following top level entries:
 
 #### 2.3.4.1 `filter`
 The filter  is a string with a statement (@see filter statements).
-It is optional and allows you to 
+It is optional and allows you to filter the content.
 
 #### 2.3.4.2 `pattern`
 The pattern is a string with a statement (@see filter statements).

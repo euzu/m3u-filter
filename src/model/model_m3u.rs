@@ -7,8 +7,8 @@ use crate::model::config::{ConfigInput, ConfigOptions};
 // https://siptv.eu/howto/playlist.html
 
 #[derive(Debug, Clone)]
-pub(crate) struct FetchedPlaylist {
-    pub input: ConfigInput,
+pub(crate) struct FetchedPlaylist<'a> {
+    pub input: &'a ConfigInput,
     pub playlist: Vec<PlaylistGroup>,
 }
 
