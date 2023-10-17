@@ -15,9 +15,9 @@ pub(crate) struct TargetUser {
 
 impl TargetUser {
 
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<String> {
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<&str> {
         if self.credentials.iter().any(|c| c.username.eq_ignore_ascii_case(username) && c.password.eq(password)) {
-            return Some(self.target.clone());
+            return Some(&self.target);
         }
         None
     }
@@ -61,7 +61,7 @@ impl ApiProxyConfig {
         }
     }
 
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<String> {
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<&str> {
         for target_user in &self.user {
             if let Some(target_name) = target_user.get_target_name(username, password) {
                 return Some(target_name);

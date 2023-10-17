@@ -71,16 +71,15 @@ pub(crate) async fn config(
 
 #[actix_web::main]
 pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets) -> futures::io::Result<()> {
-    let host = cfg.api.host.clone();
+    let host = cfg.api.host.to_string();
     let port = cfg.api.port;
-    let web_dir = cfg.api.web_root.clone();
+    let web_dir = cfg.api.web_root.to_string();
     let web_dir_path = PathBuf::from(&web_dir);
     if !web_dir_path.exists() || !web_dir_path.is_dir() {
         return Err(std::io::Error::new(ErrorKind::NotFound, format!("web_root does not exists or is not an directory: {:?}", &web_dir_path)));
     }
 
     let schedule = cfg.schedule.clone();
-
 
     let shared_data = web::Data::new(AppState {
         config: cfg,
@@ -112,7 +111,7 @@ pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets) -> future
                 .route("/config", web::get().to(config))
         ).service(xtream_player_api)
         .service(index)
-        .service(actix_files::Files::new("/", web_dir.clone()))
+        .service(actix_files::Files::new("/", web_dir.to_string()))
     )
         .bind(format!("{}:{}", host, port))?
         .run().await

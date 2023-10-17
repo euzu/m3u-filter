@@ -339,7 +339,7 @@ impl Config {
         self._api_proxy = api_proxy;
     }
 
-    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<String> {
+    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<&str> {
         match &self._api_proxy {
             Some(api_proxy) => api_proxy.get_target_name(username, password),
             _ => None
