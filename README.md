@@ -600,11 +600,18 @@ cargo build --target x86_64-unknown-linux-musl --release
 #### Dockerize
 Dockerfile
 ```
+FROM alpine as app-builder
+
 FROM scratch
+
+WORKDIR /
 COPY ./m3u-filter /
 COPY ./config.yml /
 COPY ./web /web
-WORKDIR /
+
+# the tls certificates:
+COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
 CMD ["./m3u-filter", "-s", "-c", "./config.yml"]
 ```
 Image
