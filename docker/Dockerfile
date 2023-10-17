@@ -1,3 +1,5 @@
+FROM alpine as app-builder
+
 FROM scratch
 COPY ./m3u-filter /
 COPY ./config.yml /

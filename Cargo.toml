@@ -18,7 +18,7 @@ serde_json = "1.0"
 regex = "1.7"
 clap = { version = "4", features = ["derive"] }
 url = "2.3"
-reqwest = { version = "0", features = ["blocking", "json"] }
+reqwest = { version = "0", features = ["blocking", "json", "rustls-tls"] }
 chrono = "0.4"
 cron = "0"
 actix-web = "4.3"
