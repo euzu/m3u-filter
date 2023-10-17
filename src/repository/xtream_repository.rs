@@ -85,7 +85,7 @@ fn get_collection_path(path: &Path, collection: &str) -> PathBuf {
 pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
     if let Some(path) = get_storage_path(cfg, &target.name) {
         if fs::create_dir_all(&path).is_err() {
-            let msg = format!("Failed to save, can't create directory {}", &path.into_os_string().into_string().unwrap());
+            let msg = format!("Failed to save, can't create directory {}", &path.to_str().unwrap());
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg));
         }
 
@@ -180,7 +180,7 @@ pub(crate) fn xtream_save_playlist(target: &ConfigTarget, cfg: &Config, playlist
             match write_to_file(&col_path, data) {
                 Ok(()) => {}
                 Err(err) => {
-                    errors.push(format!("Persisting collection failed: {}: {}", &col_path.clone().into_os_string().into_string().unwrap(), err));
+                    errors.push(format!("Persisting collection failed: {}: {}", &col_path.to_str().unwrap(), err));
                 }
             }
         }

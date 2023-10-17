@@ -26,7 +26,7 @@ async fn index(
     _req: HttpRequest,
     _app_state: web::Data<AppState>,
 ) -> std::io::Result<NamedFile> {
-    let path: PathBuf = [_app_state.config.api.web_root.clone(), String::from("index.html")].iter().collect();
+    let path: PathBuf = [&_app_state.config.api.web_root, "index.html"].iter().collect();
     NamedFile::open(path)
 }
 

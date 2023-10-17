@@ -121,7 +121,7 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
                         match open_file(file) {
                             Ok(content) => Some(std::io::BufReader::new(content).lines().map(|l| l.unwrap()).collect()),
                             Err(err) => {
-                                let file_str = &file.clone().into_os_string().into_string().unwrap();
+                                let file_str = file.to_str().unwrap();
                                 error!("cant read: {} {}", file_str,  err);
                                 return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
                             }

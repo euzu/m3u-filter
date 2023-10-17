@@ -83,7 +83,7 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
 fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), M3uFilterError> {
     macro_rules! cant_write_result {
         ($path:expr, $err:expr) => {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.clone().into_os_string().into_string().unwrap() ,$err)
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
         }
     }
     if !new_playlist.is_empty() {
