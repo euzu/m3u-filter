@@ -1,6 +1,7 @@
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use actix_cors::Cors;
@@ -10,16 +11,13 @@ use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use chrono::Local;
 use cron::Schedule;
-use log::error;
 use serde_json::json;
 
-use crate::{get_notify_message, playlist_processor};
 use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::api::xtream_player_api::xtream_player_api;
 use crate::download::get_m3u_playlist;
-use crate::m3u_filter_error::M3uFilterErrorKind;
-use crate::messaging::send_message;
 use crate::model::config::{Config, ConfigInput, InputType, ProcessTargets};
+use crate::processing::playlist_processor::start_processing;
 
 #[get("/")]
 async fn index(
@@ -70,7 +68,7 @@ pub(crate) async fn config(
 }
 
 #[actix_web::main]
-pub(crate) async fn start_server(cfg: Config, targets: ProcessTargets) -> futures::io::Result<()> {
+pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> futures::io::Result<()> {
     let host = cfg.api.host.to_string();
     let port = cfg.api.port;
     let web_dir = cfg.api.web_root.to_string();
@@ -129,11 +127,7 @@ async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
 
         if let Some(datetime) = upcoming.next() {
             if datetime.timestamp() <= local.timestamp() {
-                let errors = playlist_processor::process_sources((data.config).clone(), &data.targets);
-                errors.iter().for_each(|err| error!("{}", err.message));
-                if let Some(message) = get_notify_message!(errors, 255) {
-                    send_message(&data.config.messaging, message.as_str());
-                }
+                start_processing(data.config.clone(), data.targets.clone());
             }
         }
     }

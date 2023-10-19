@@ -1,4 +1,4 @@
-FROM alpine as app-builder
+FROM alpine:latest as app-builder
 
 FROM scratch
 

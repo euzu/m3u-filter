@@ -1,7 +1,17 @@
+extern crate env_logger;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
-extern crate env_logger;
+
+use std::sync::Arc;
+
+use clap::Parser;
+use env_logger::Builder;
+use log::{debug, error, info, LevelFilter};
+
+use crate::config_reader::{read_api_proxy_config, read_config, read_mappings};
+use crate::model::config::{Config, ProcessTargets, validate_targets};
+use crate::processing::playlist_processor::start_processing;
 
 mod m3u_filter_error;
 mod config_reader;
@@ -14,16 +24,6 @@ mod messaging;
 mod test;
 mod api;
 mod processing;
-
-use env_logger::{Builder};
-use log::{debug, error, info, LevelFilter};
-
-use clap::Parser;
-use crate::config_reader::{read_api_proxy_config, read_config, read_mappings};
-use crate::messaging::send_message;
-use crate::model::config::{Config, ProcessTargets, validate_targets};
-use crate::m3u_filter_error::{M3uFilterErrorKind};
-use crate::processing::playlist_processor;
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
@@ -62,8 +62,8 @@ fn main() {
 
     let default_config_path = utils::get_default_config_path();
     let config_file: String = args.config.unwrap_or(default_config_path);
-    let mut cfg = read_config(config_file.as_str()).unwrap_or_else(|err|  exit!("{}", err));
-    let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err|  exit!("{}", err));
+    let mut cfg = read_config(config_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
+    let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
     info!("working dir: {:?}", &cfg.working_dir);
 
@@ -72,23 +72,18 @@ fn main() {
     }
 
     if args.server {
-        start_in_server_mode(args.api_proxy, cfg, targets);
+        if let Err(err) = read_api_proxy_config(args.api_proxy, &mut cfg) { exit!("{}", err) };
+        start_in_server_mode(Arc::new(cfg), Arc::new(targets));
     } else {
-        start_in_cli_mode(cfg, &targets)
+        start_in_cli_mode(Arc::new(cfg), Arc::new(targets))
     }
 }
 
-fn start_in_cli_mode(cfg: Config, targets: &ProcessTargets) {
-    let messaging = &cfg.messaging.clone();
-    let errors = playlist_processor::process_sources(cfg, targets);
-    errors.iter().for_each(|err| error!("{}", err.message));
-    if let Some(message) = get_notify_message!(errors, 255) {
-        send_message(messaging, message.as_str());
-    }
+fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+    start_processing(cfg, targets);
 }
 
-fn start_in_server_mode(api_proxy: Option<String>, mut cfg: Config, targets: ProcessTargets) {
-    if let Err(err) = read_api_proxy_config(api_proxy, &mut cfg) { exit!("{}", err) };
+fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     debug!("web_root: {}", &cfg.api.web_root);
     info!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
     match api::main_api::start_server(cfg, targets) {

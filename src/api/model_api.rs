@@ -1,10 +1,11 @@
+use std::sync::Arc;
 use actix_web::web;
 use serde::{Deserialize, Serialize};
 use crate::model::config::{Config, ProcessTargets};
 
 pub(crate) struct AppState {
-    pub config: Config,
-    pub targets: ProcessTargets,
+    pub config: Arc<Config>,
+    pub targets: Arc<ProcessTargets>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

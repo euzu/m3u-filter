@@ -224,6 +224,15 @@ pub(crate) enum InputType {
     Xtream,
 }
 
+impl ToString for InputType {
+    fn to_string(&self) -> String {
+        match self {
+            InputType::M3u => "m3u".to_string(),
+            InputType::Xtream => "xtream".to_string()
+        }
+    }
+}
+
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

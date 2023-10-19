@@ -1,20 +1,25 @@
 extern crate unidecode;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
+
 use log::{debug, error, info};
 use unidecode::unidecode;
-use crate::{model::config, Config, valid_property, create_m3u_filter_error_result};
-use crate::model::config::{ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
-use crate::model::model_config::{SortOrder::{Asc, Desc}, ItemField, AFFIX_FIELDS, ProcessingOrder};
-use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
-use crate::repository::m3u_repository::write_playlist;
-use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
-use crate::model::mapping::{Mapping, MappingValueProcessor};
+
+use crate::{Config, create_m3u_filter_error_result, get_errors_notify_message, model::config, valid_property};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
+use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::messaging::send_message;
+use crate::model::config::{ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
+use crate::model::mapping::{Mapping, MappingValueProcessor};
+use crate::model::model_config::{AFFIX_FIELDS, ItemField, ProcessingOrder, SortOrder::{Asc, Desc}};
+use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
+use crate::model::stats::{InputStats, PlaylistStats};
 use crate::processing::playlist_watch::process_group_watch;
+use crate::repository::m3u_repository::write_playlist;
 use crate::repository::xtream_repository::xtream_save_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
@@ -255,41 +260,60 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
 // If no input is enabled but the user set the target as command line argument,
 // we force the input to be enabled.
 // If there are enabled input, then only these are used.
-fn is_input_enabled(enabled_inputs: usize, input_enabled: bool, input_id: u16, user_targets: &Arc<ProcessTargets>) -> bool {
+fn is_input_enabled(enabled_inputs: usize, input_enabled: bool, input_id: u16, user_targets: &ProcessTargets) -> bool {
     if enabled_inputs == 0 {
         return user_targets.enabled && user_targets.has_input(input_id);
     }
     input_enabled
 }
 
-fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> Vec<M3uFilterError> {
+fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
     let source = cfg.sources.get(source_idx).unwrap();
     let mut all_playlist = Vec::new();
     let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
     let mut errors = vec![];
+    let mut stats = HashMap::<u16, InputStats>::new();
     for input in &source.inputs {
         //if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)) {
-        if is_input_enabled(enabled_inputs, input.enabled, input.id, &user_targets) {
+        let input_id = input.id;
+        if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
             let (playlist, mut error_list) = match input.input_type {
                 InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir),
                 InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir),
             };
             error_list.drain(..).for_each(|err| errors.push(err));
-            if !playlist.is_empty() {
+            let input_name = match &input.name {
+                None => input.url.as_str(),
+                Some(name_val) => name_val.as_str()
+            };
+            let group_count = playlist.len();
+            let channel_count = playlist.iter()
+                .map(|group| group.channels.len())
+                .sum();
+            if playlist.is_empty() {
+                info!("source is empty {}", input.url);
+                errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("source is empty {}", input_name)));
+            } else {
                 all_playlist.push(
                     FetchedPlaylist {
                         input,
                         playlist,
                     }
                 );
-            } else {
-                info!("source is empty {}", input.url);
-                let input_name = match &input.name {
-                    None => input.url.as_str(),
-                    Some(name_val) => name_val.as_str()
-                };
-                errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("source is empty {}", input_name)));
             }
+            stats.insert(input_id, InputStats {
+                name: input_name.to_string(),
+                input_type: input.input_type.clone(),
+                error_count: error_list.len(),
+                raw_stats: PlaylistStats {
+                    group_count,
+                    channel_count,
+                },
+                processed_stats: PlaylistStats {
+                    group_count: 0,
+                    channel_count: 0,
+                },
+            });
         }
     }
     if all_playlist.is_empty() {
@@ -301,30 +325,35 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
             let should_process = (!user_targets.enabled && target.enabled)
                 || (user_targets.enabled && user_targets.has_target(target.id));
             if should_process {
-                match process_playlist(&mut all_playlist, target, &cfg) {
+                match process_playlist(&mut all_playlist, target, &cfg, &mut stats) {
                     Ok(_) => {}
                     Err(err) => errors.push(err)
                 }
             }
         });
     }
-    errors
+    (stats.drain().map(|(_, v)| v).collect(), errors)
 }
 
-pub(crate) fn process_sources(cfg: Config, user_targets: &ProcessTargets) -> Vec<M3uFilterError> {
-    let config = Arc::new(cfg);
+pub(crate) fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
     let mut handle_list = vec![];
     let thread_num = config.threads;
     let process_parallel = thread_num > 1 && config.sources.len() > 1;
     if process_parallel { debug!("Using {} threads", thread_num); }
 
     let errors = Arc::new(Mutex::<Vec<M3uFilterError>>::new(vec![]));
+    let stats = Arc::new(Mutex::<Vec<InputStats>>::new(vec![]));
     for (index, _) in config.sources.iter().enumerate() {
-        let cfg_clone = config.clone();
-        let usr_targets = Arc::new(user_targets.clone());
         let shared_errors = errors.clone();
+        let shared_stats = stats.clone();
+        let cfg = config.clone();
+        let usr_trgts = user_targets.clone();
         let process = move || {
-            process_source(cfg_clone, index, usr_targets).drain(..).for_each(|err| shared_errors.lock().unwrap().push(err));
+            let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts);
+            res_errors.drain(..)
+                .for_each(|err| shared_errors.lock().unwrap().push(err));
+            res_stats.drain(..)
+                .for_each(|stat| shared_stats.lock().unwrap().push(stat));
         };
         if process_parallel {
             let handles = &mut handle_list;
@@ -339,7 +368,7 @@ pub(crate) fn process_sources(cfg: Config, user_targets: &ProcessTargets) -> Vec
     for handle in handle_list {
         let _ = handle.join();
     }
-    Arc::try_unwrap(errors).unwrap().into_inner().unwrap()
+    (Arc::try_unwrap(stats).unwrap().into_inner().unwrap(), Arc::try_unwrap(errors).unwrap().into_inner().unwrap())
 }
 
 
@@ -357,12 +386,13 @@ fn get_processing_pipe(target: &ConfigTarget) -> ProcessingPipe {
 }
 
 pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
-                               target: &ConfigTarget, cfg: &Config) -> Result<(), M3uFilterError> {
+                               target: &ConfigTarget, cfg: &Config,
+                               stats: &mut HashMap<u16, InputStats>) -> Result<(), M3uFilterError> {
     let pipe = get_processing_pipe(target);
 
     debug!("Processing order is {}", &target.processing_order);
 
-    let mut new_fetched_playlist : Vec<FetchedPlaylist> = vec![];
+    let mut new_fetched_playlists: Vec<FetchedPlaylist> = vec![];
     playlists.iter_mut().for_each(|fpl| {
         let mut new_fpl = FetchedPlaylist {
             input: fpl.input,
@@ -375,12 +405,21 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
                 new_fpl.playlist = v;
             }
         }
-        new_fetched_playlist.push(new_fpl);
+        // stats
+        let input_stats = stats.get_mut(&new_fpl.input.id);
+        if let Some(stat) = input_stats {
+            stat.processed_stats.group_count = new_fpl.playlist.len();
+            stat.processed_stats.channel_count = new_fpl.playlist.iter()
+                .map(|group| group.channels.len())
+                .sum();
+        }
+
+        new_fetched_playlists.push(new_fpl);
     });
 
-    apply_affixes(&mut new_fetched_playlist);
+    apply_affixes(&mut new_fetched_playlists);
     let mut new_playlist = vec![];
-    new_fetched_playlist.iter_mut().for_each(|fp| {
+    new_fetched_playlists.iter_mut().for_each(|fp| {
         fp.playlist.drain(..).for_each(|group| new_playlist.push(group));
     });
 
@@ -421,5 +460,16 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
     } else {
         info!("Playlist is empty: {}", &target.name);
         Ok(())
+    }
+}
+
+pub(crate) fn start_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+    let (stats, errors) = process_sources(cfg.clone(), targets.clone());
+    let stats_msg = format!("Stats: {}", stats.iter().map(|stat| stat.to_string()).collect::<Vec<String>>().join("\n"));
+    info!("{}", stats_msg);
+    send_message(&cfg.messaging, stats_msg.as_str());
+    errors.iter().for_each(|err| error!("{}", err.message));
+    if let Some(message) = get_errors_notify_message!(errors, 255) {
+        send_message(&cfg.messaging, message.as_str());
     }
 }

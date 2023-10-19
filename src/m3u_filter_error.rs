@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter, Result};
 
 #[macro_export]
-macro_rules! get_notify_message {
+macro_rules! get_errors_notify_message {
     ($errors:expr, $size:expr) => {
         if $errors.is_empty() {
             None
