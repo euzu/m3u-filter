@@ -8,6 +8,7 @@
 * Added Telegram message support
 * Added Target watch for groups
 * Fixed TLS problem with docker scratch
+* Added simple stats
 
 # v1.0.1(2023-09-07)
 * Refactored sorting. Sorting channels inside group now possible
