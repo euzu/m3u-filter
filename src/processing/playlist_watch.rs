@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use log::{error, info};
 use regex::Regex;
-use crate::messaging::send_message;
+use crate::messaging::{MsgKind, send_message};
 use crate::model::config::Config;
 use crate::model::model_m3u::PlaylistGroup;
 use crate::utils;
@@ -68,7 +68,7 @@ fn handle_watch_notification(cfg: &Config, added: BTreeSet<String>, removed: BTr
     if !message.is_empty() {
         let msg = format!("Changes {}/{}\n{}", target_name, group_name, message.join(""));
         info!("{}", &msg);
-        send_message(&cfg.messaging, &msg);
+        send_message(&MsgKind::Info, &cfg.messaging, &msg);
     }
 }
 

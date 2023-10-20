@@ -12,7 +12,7 @@ use crate::{Config, create_m3u_filter_error_result, get_errors_notify_message, m
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::messaging::send_message;
+use crate::messaging::{MsgKind, send_message};
 use crate::model::config::{ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::model::model_config::{AFFIX_FIELDS, ItemField, ProcessingOrder, SortOrder::{Asc, Desc}};
@@ -466,10 +466,14 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
 pub(crate) fn start_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let (stats, errors) = process_sources(cfg.clone(), targets.clone());
     let stats_msg = format!("Stats: {}", stats.iter().map(|stat| stat.to_string()).collect::<Vec<String>>().join("\n"));
+    // print stats
     info!("{}", stats_msg);
-    send_message(&cfg.messaging, stats_msg.as_str());
+    // send stats
+    send_message(&MsgKind::Stats, &cfg.messaging, stats_msg.as_str());
+    // log errors
     errors.iter().for_each(|err| error!("{}", err.message));
+    // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
-        send_message(&cfg.messaging, message.as_str());
+        send_message(&MsgKind::Error,&cfg.messaging, message.as_str());
     }
 }

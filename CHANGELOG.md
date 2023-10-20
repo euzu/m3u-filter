@@ -5,10 +5,41 @@
 * Added api-proxy config for xtream proxy, to define server info and user credentials
 * Added Xtream Api Endpoints.
 * Added multiple input support
+* Added Messaging with opt in message types [info, error, stats]
 * Added Telegram message support
 * Added Target watch for groups
 * Fixed TLS problem with docker scratch
 * Added simple stats
+
+Changes in `config.yml`
+```yaml
+messaging:
+  notify_on:
+    - error
+    - info
+    - stats
+  telegram:
+    bot_token: '<your telegram bot token>'
+    chat_ids:
+      - <your telegram chat_id>
+schedule: '0  0  0,8,18  *  *  *  *'
+```
+
+`api-proxy.yml`
+```yaml
+server:
+  protocol: http
+  ip: 192.168.9.3
+  http_port: 80
+  https_port:
+  rtmp_port:
+  timezone: Europe/Paris
+  message: Welcome to m3u-filter
+user:
+  - target: pl1
+    credentials:
+      - {username: x3452, password: ztrhgrGZrt83hjerter}
+```
 
 # v1.0.1(2023-09-07)
 * Refactored sorting. Sorting channels inside group now possible

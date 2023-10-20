@@ -3,6 +3,15 @@ threads: 0
 working_dir: /home/m3u-filter/data
 # sec  min   hour   day of month   month   day of week   year
 schedule: "0  0  8,12,16,20,22,1  *  *  *  *"
+messaging:
+  notify_on:
+    - error
+    - info
+    - stats
+  telegram:
+    bot_token: '<your telegram bot token>'
+    chat_ids:
+      - <your telegram chat_id>
 video_suffix:
   - .mkv
   - .mp4

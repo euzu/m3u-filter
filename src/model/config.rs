@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use path_absolutize::*;
-use enum_iterator::Sequence;
 use log::{debug, error};
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
@@ -9,6 +8,7 @@ use crate::model::mapping::Mapping;
 use crate::model::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_false, default_as_true};
 use crate::{utils};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::messaging::MsgKind;
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::utils::get_working_path;
 
@@ -216,7 +216,7 @@ pub(crate) struct InputAffix {
     pub value: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) enum InputType {
     #[serde(rename = "m3u")]
     M3u,
@@ -312,8 +312,13 @@ pub(crate) struct TelegramMessagingConfig {
     pub chat_ids: Vec<String>,
 }
 
+fn default_as_empty_list() -> Vec<MsgKind> { vec![] }
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MessagingConfig {
+
+    #[serde(default = "default_as_empty_list")]
+    pub notify_on: Vec<MsgKind>,
     pub telegram: Option<TelegramMessagingConfig>,
 }
 

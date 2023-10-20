@@ -1,6 +1,6 @@
 server:
   protocol: http
-  ip: 102.168.9.3
+  ip: 192.168.9.3
   http_port: 80
   https_port:
   rtmp_port:
