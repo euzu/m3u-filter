@@ -179,25 +179,32 @@ pub(crate) struct ConfigTarget {
     pub _mapping: Option<Vec<Mapping>>,
 }
 
+
 impl ConfigTarget {
     pub(crate) fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
         self.id = id;
         if self.output.is_empty() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Missing output format for {}", self.name)));
         }
+        let mut m3u_cnt = 0;
+        let mut strm_cnt = 0;
+        let mut xtream_cnt = 0;
         for format in &self.output {
             match format.target {
                 TargetType::M3u => {
+                    m3u_cnt += 1;
                     if format.filename.is_none() {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for m3u type: {}", self.name);
                     }
                 }
                 TargetType::Strm => {
+                    strm_cnt += 1;
                     if format.filename.is_none() {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for strm type: {}", self.name);
                     }
                 }
                 TargetType::Xtream => {
+                    xtream_cnt += 1;
                     if default_as_default().eq_ignore_ascii_case(&self.name) {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unique target name is required for xtream type: {}", self.name);
                     }
@@ -208,6 +215,10 @@ impl ConfigTarget {
                     }
                 }
             }
+        }
+
+        if m3u_cnt > 1 || strm_cnt > 1 || xtream_cnt > 1 {
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Multiple output formats with same type : {}", self.name);
         }
 
         match get_filter(&self.filter, templates) {
@@ -239,6 +250,15 @@ impl ConfigTarget {
             }
         }
         None
+    }
+
+    pub(crate) fn has_output(&self, tt: &TargetType) -> bool {
+        for format in &self.output {
+            if tt.eq(&format.target) {
+                return true;
+            }
+        }
+        false
     }
 }
 

@@ -6,7 +6,7 @@ use chrono::{Duration, Local};
 use crate::api::api_utils::serve_file;
 use crate::api::model_api::{AppState, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::model::config::Config;
-use crate::model::model_config::default_as_empty_str;
+use crate::model::model_config::{default_as_empty_str, TargetType};
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, xtream_get_all};
 
 fn get_user_info(user_name: &str, cfg: &Config) -> XtreamAuthorizationResponse {
@@ -56,22 +56,26 @@ pub(crate) async fn xtream_player_api(
     match _app_state.config.get_target_for_user(api_req.username.as_str(), api_req.password.as_str()) {
         Some(target) => {
             let target_name = &target.name;
-            if api_req.action.is_empty() {
-                return HttpResponse::Ok().json(get_user_info(api_req.username.as_str(), &_app_state.config));
-            }
-            match match api_req.action.as_str() {
-                "get_live_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_LIVE),
-                "get_vod_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_VOD),
-                "get_series_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_SERIES),
-                "get_live_streams" => xtream_get_all(&_app_state.config, target_name, COL_LIVE),
-                "get_vod_streams" => xtream_get_all(&_app_state.config, target_name, COL_VOD),
-                "get_series" => xtream_get_all(&_app_state.config, target_name, COL_SERIES),
-                _ => Err(std::io::Error::new(std::io::ErrorKind::Unsupported, format!("Cant find action: {}/{}", target_name, &api_req.action))),
-            } {
-                Ok(file_path) => {
-                    serve_file(&file_path, &req).await
+            if target.has_output(&TargetType::Xtream) {
+                if api_req.action.is_empty() {
+                    return HttpResponse::Ok().json(get_user_info(api_req.username.as_str(), &_app_state.config));
                 }
-                Err(_) => HttpResponse::BadRequest().finish()
+                match match api_req.action.as_str() {
+                    "get_live_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_LIVE),
+                    "get_vod_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_VOD),
+                    "get_series_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_SERIES),
+                    "get_live_streams" => xtream_get_all(&_app_state.config, target_name, COL_LIVE),
+                    "get_vod_streams" => xtream_get_all(&_app_state.config, target_name, COL_VOD),
+                    "get_series" => xtream_get_all(&_app_state.config, target_name, COL_SERIES),
+                    _ => Err(std::io::Error::new(std::io::ErrorKind::Unsupported, format!("Cant find action: {}/{}", target_name, &api_req.action))),
+                } {
+                    Ok(file_path) => {
+                        serve_file(&file_path, &req).await
+                    }
+                    Err(_) => HttpResponse::BadRequest().finish()
+                }
+            } else {
+                HttpResponse::BadRequest().finish()
             }
         }
         _ => {
