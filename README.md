@@ -129,7 +129,7 @@ sources:
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ad.m3u'
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/au.m3u'
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/za.m3u'
-  targets:
+ targets:
   - name: test
     output:
       - type: m3u
@@ -574,6 +574,15 @@ If you use the proxy functionality,
 you need to create a `api-proxy.yml` configuration.
 
 You can specify the path for the file with the  `-a` cli argument. 
+
+To access the api for: 
+- `xtream` use url like `http://192.169.1.2/player_api.php?username={}&password={}`
+- `m3u` use url `http://192.169.1.2/get.php?username={}&password={}`
+
+_Do not forget to replace `{}` with credentials._ 
+
+When you define credentials for a `target`, ensure that this target has
+`output` format  `xtream`or `m3u`.
 
 ```yaml
 server:

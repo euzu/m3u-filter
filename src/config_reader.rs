@@ -49,7 +49,8 @@ pub(crate) fn read_config(config_file: &str) -> Result<Config, M3uFilterError> {
 }
 
 pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterError> {
-    match utils::open_file(&std::path::PathBuf::from(mapping_file)) {
+    let mapping_file = std::path::PathBuf::from(mapping_file);
+    match utils::open_file(&mapping_file) {
         Ok(file) => {
             let mapping: Result<Mappings, _> = serde_yaml::from_reader(file);
             match mapping {
@@ -63,7 +64,10 @@ pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFi
                 }
             }
         }
-        _ => Ok(None)
+        _ => {
+            warn!("cant read mapping file: {}", mapping_file.to_str().unwrap());
+            Ok(None)
+        }
     }
 }
 
