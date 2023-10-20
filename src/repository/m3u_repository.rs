@@ -81,21 +81,21 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
     String::from(name)
 }
 
-pub(crate) fn get_m3u_file_path(cfg: &Config, target: &ConfigTarget) -> Option<std::path::PathBuf> {
-    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename.as_ref().unwrap())))
+pub(crate) fn get_m3u_file_path(cfg: &Config, filename: &Option<String>) -> Option<std::path::PathBuf> {
+    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
 }
 
-pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
     macro_rules! cant_write_result {
         ($path:expr, $err:expr) => {
             create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
         }
     }
     if !new_playlist.is_empty() {
-        if target.filename.is_none() {
+        if filename.is_none() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write m3u playlist failed: ".to_string()));
         }
-        if let Some(path) = get_m3u_file_path(cfg, target) {
+        if let Some(path) = get_m3u_file_path(cfg, filename) {
             match File::create(&path) {
                 Ok(mut m3u_file) => {
                     match check_write(m3u_file.write(b"#EXTM3U\n")) {
@@ -123,16 +123,16 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
     Ok(())
 }
 
-pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
-        if target.filename.is_none() {
+        if filename.is_none() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write strm playlist failed: ".to_string()));
         }
         let underscore_whitespace = target.options.as_ref().map_or(false, |o| o.underscore_whitespace);
         let cleanup = target.options.as_ref().map_or(false, |o| o.cleanup);
         let kodi_style = target.options.as_ref().map_or(false, |o| o.kodi_style);
 
-        if let Some(path) = utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename.as_ref().unwrap()))) {
+        if let Some(path) = utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) {
             if cleanup {
                 let _ = std::fs::remove_dir_all(&path);
             }

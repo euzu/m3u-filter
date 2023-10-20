@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use enum_iterator::Sequence;
-use log::{debug, error};
+use log::{debug, error, warn};
 use path_absolutize::*;
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
@@ -12,7 +12,7 @@ use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
 use crate::model::model_config::{default_as_false, default_as_true, default_as_zero, ItemField, ProcessingOrder, SortOrder, TargetType};
 use crate::utils;
-use crate::utils::{dedup, get_working_path};
+use crate::utils::get_working_path;
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 
@@ -148,7 +148,12 @@ pub(crate) struct ConfigOptions {
     pub kodi_style: bool,
 }
 
-fn default_as_empty_output() -> Vec::<TargetType> { vec![] }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct TargetOutput {
+    #[serde(alias = "type")]
+    pub target: TargetType,
+    pub filename: Option<String>,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigTarget {
@@ -158,12 +163,11 @@ pub(crate) struct ConfigTarget {
     pub enabled: bool,
     #[serde(default = "default_as_default")]
     pub name: String,
-    pub filename: Option<String>,
     pub options: Option<ConfigOptions>,
     pub sort: Option<ConfigSort>,
     pub filter: String,
-    #[serde(alias = "type", default = "default_as_empty_output")]
-    pub output: Vec<TargetType>,
+    #[serde(alias = "type")]
+    pub output: Vec<TargetOutput>,
     pub rename: Option<Vec<ConfigRename>>,
     pub mapping: Option<Vec<String>>,
     #[serde(default = "default_as_frm")]
@@ -176,9 +180,36 @@ pub(crate) struct ConfigTarget {
 }
 
 impl ConfigTarget {
-    pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
+    pub(crate) fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
         self.id = id;
-        dedup::<TargetType>(&mut self.output);
+        if self.output.is_empty() {
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Missing output format for {}", self.name)));
+        }
+        for format in &self.output {
+            match format.target {
+                TargetType::M3u => {
+                    if format.filename.is_none() {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for m3u type: {}", self.name);
+                    }
+                }
+                TargetType::Strm => {
+                    if format.filename.is_none() {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for strm type: {}", self.name);
+                    }
+                }
+                TargetType::Xtream => {
+                    if default_as_default().eq_ignore_ascii_case(&self.name) {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unique target name is required for xtream type: {}", self.name);
+                    }
+                    if let Some(fname) = &format.filename {
+                        if !fname.trim().is_empty() {
+                            warn!("Filename for target output xtream is ignored: {}", self.name)
+                        }
+                    }
+                }
+            }
+        }
+
         match get_filter(&self.filter, templates) {
             Ok(fltr) => {
                 debug!("Filter: {}", fltr);
@@ -194,9 +225,20 @@ impl ConfigTarget {
             Err(err) => Err(err),
         }
     }
-    pub fn filter(&self, provider: &ValueProvider) -> bool {
+    pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
         return self._filter.as_ref().unwrap().filter(provider, &mut processor);
+    }
+
+    pub(crate) fn get_m3u_filename(&self) -> Option<String> {
+        for format in &self.output {
+            match format.target {
+                TargetType::M3u => return format.filename.clone(),
+                TargetType::Strm => {}
+                TargetType::Xtream => {}
+            }
+        }
+        None
     }
 }
 
@@ -207,7 +249,7 @@ pub(crate) struct ConfigSource {
 }
 
 impl ConfigSource {
-    pub fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
+    pub(crate) fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
         Ok(index + (self.inputs.len() as u16))
     }
@@ -369,11 +411,6 @@ impl Config {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
                 for target in &mut source.targets {
-                    let needs_filename = target.output.is_empty() || target.output.contains(&TargetType::M3u) || target.output.contains(&TargetType::Strm);
-                    if needs_filename && target.filename.is_none() {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for m3u type: {}", target.name);
-                    }
-
                     if let Some(mapping_ids) = &target.mapping {
                         let mut target_mappings = Vec::new();
                         for mapping_id in mapping_ids {

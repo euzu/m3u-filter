@@ -18,7 +18,8 @@ pub(crate) async fn m3u_api(
 ) -> HttpResponse {
     match _app_state.config.get_target_for_user(api_req.username.as_str(), api_req.password.as_str()) {
         Some(target) => {
-            match get_m3u_file_path(&_app_state.config, target) {
+            let filename = target.get_m3u_filename();
+            match get_m3u_file_path(&_app_state.config, &filename) {
                 Some(file_path) => {
                     serve_file(&file_path, &req).await
                 }

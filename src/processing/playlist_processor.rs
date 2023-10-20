@@ -1,7 +1,7 @@
 extern crate unidecode;
 
 use std::cell::RefCell;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -20,7 +20,7 @@ use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, Pla
 use crate::model::stats::{InputStats, PlaylistStats};
 use crate::processing::playlist_watch::process_group_watch;
 use crate::repository::m3u_repository::{write_m3u_playlist, write_strm_playlist};
-use crate::repository::xtream_repository::{write_xtream_playlist};
+use crate::repository::xtream_repository::write_xtream_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
     debug!("Filtering {} groups", playlist.len());
@@ -447,12 +447,12 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
 }
 
 fn persist_playlist(playlist: &[PlaylistGroup],
-                    target: &ConfigTarget, cfg: &Config,)  -> Result<(), Vec<M3uFilterError>> {
+                    target: &ConfigTarget, cfg: &Config, ) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
-    for target_type in &target.output {
-        match match target_type {
-            TargetType::M3u => write_m3u_playlist(target, cfg, playlist),
-            TargetType::Strm => write_strm_playlist(target, cfg, playlist),
+    for output in &target.output {
+        match match output.target {
+            TargetType::M3u => write_m3u_playlist(target, cfg, playlist, &output.filename),
+            TargetType::Strm => write_strm_playlist(target, cfg, playlist, &output.filename),
             TargetType::Xtream => write_xtream_playlist(target, cfg, playlist)
         } {
             Ok(_) => {}
@@ -462,26 +462,7 @@ fn persist_playlist(playlist: &[PlaylistGroup],
         }
     }
 
-    //
-    // if target.filename.is_some() {
-    //     let result = write_playlist(target, cfg, &mut new_playlist);
-    //     match &result {
-    //         Ok(..) => {}
-    //         Err(e) => {
-    //             error!("failed to write playlist {} {}", target.name, e);
-    //         }
-    //     }
-    //     if !publish {
-    //         return result;
-    //     }
-    // }
-    //
-    // if publish {
-    //     if let Some(TargetType::Xtream) = target.output {
-    //         return xtream_save_playlist(target, cfg, &mut new_playlist);
-    //     }
-    // }
-    Err(vec![M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Persisting playlist failed: {}", &target.name))])
+    if errors.is_empty() { Err(errors) } else { Ok(()) }
 }
 
 pub(crate) fn start_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
@@ -495,6 +476,6 @@ pub(crate) fn start_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     errors.iter().for_each(|err| error!("{}", err.message));
     // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
-        send_message(&MsgKind::Error,&cfg.messaging, message.as_str());
+        send_message(&MsgKind::Error, &cfg.messaging, message.as_str());
     }
 }

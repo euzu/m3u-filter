@@ -131,7 +131,9 @@ sources:
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/za.m3u'
   targets:
   - name: test
-    filename: test.m3u
+    output:
+      - type: m3u
+        filename: test.m3u
 
 ```
 
@@ -155,9 +157,8 @@ sources:
 Has the following top level entries:
 * `enabled` _optional_ default is `true`, if you disable the processing is skipped
 * `name` _optional_ default is `default`, if not default it has to be unique, for running selective targets
-* `filename` _mandatory_ if type `m3u` or `strm`, otherwise _optional_
 * `sort`  _optional_
-* `output` _optional_  list of output types [`m3u`, `strm`, `xtream`], default is [`m3u`]
+* `output` _optional_  list of output formats
 * `processing_order` _optional_ default is `frm`
 * `options` _optional_
 * `filter` _mandatory_,
@@ -165,12 +166,7 @@ Has the following top level entries:
 * `mapping` _optional_
 * `watch` _optional_
 
-### 1.5.2.1 `filename`
-
-`filename` is the file for resulting playlist. 
-It is _mandatory_ if output type contains `m3u` or `strm` 
-
-### 1.5.2.2 `sort`
+### 1.5.2.1 `sort`
 Has three top level attributes
 * `match_as_ascii` _optional_ default is `false`
 * `groups`
@@ -194,19 +190,26 @@ sort:
     - { field: name,  group_pattern: '^DE.*',  order: asc }
 ```
 
-### 1.5.2.3 `output`
-Is a list of target types.
-There are three types of targets ```m3u```, ```strm``` and ```xtream```. 
-If the attribute is not specified ```m3u``` is created by default.
-You can set options for each `output` type.
+### 1.5.2.2 `output`
+
+Is a list of output format:
+Each format has 2 properties `type` and `filename`
+`type` _mandatory_ ```m3u```, ```strm``` and ```xtream```.
+`filename` _mandatory_ if type `m3u` or `strm`, otherwise ignored
 
 `strm` output has additional options `underscore_whitespace`, `cleanup` and `kodi_style`.
 
-### 1.5.2.4 `processing_order`
+```yaml
+output:
+  - type: m3u
+    filename: {}.m3u
+```
+
+### 1.5.2.3 `processing_order`
 The processing order (Filter, Rename and Map) can be configured for each target with:
 `processing_order: frm` (valid values are: frm, fmr, rfm, rmf, mfr, mrf. default is frm)
 
-### 1.5.2.5 `options`
+### 1.5.2.4 `options`
 * ignore_logo `true` or `false` 
 * underscore_whitespace `true` or `false`
 * cleanup `true` or `false`
@@ -219,7 +222,7 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 - `cleanup` deletes the directory given at `filename`.
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 
-### 1.5.2.6 `filter`
+### 1.5.2.5 `filter`
 The filter is a string with a filter statement.
 The filter can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
 Filter fields are `Group`, `Title`, `Name` and `Url`.
@@ -230,7 +233,7 @@ If you use characters like `+ | [ ] ( )` in filters don't forget to escape them!
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
 
-### 1.5.2.7 `rename`
+### 1.5.2.6 `rename`
 Is a List of rename configurations. Each configuration has 3 top level entries.
 * `field` can be  `group`, `title`, `name` or `url`.
 * `pattern` is a regular expression like `'^TR.:\s?(.*)'`
@@ -247,7 +250,7 @@ In the above example each entry starting with `DE` will be prefixed with `1.`.
 
 (_Please be aware of the processing order. If you first map, you should match the mapped entries!_)
 
-### 1.5.2.8 `mapping`
+### 1.5.2.7 `mapping`
 `mapping: <list of mapping id's>`
 The mappings are defined in a file `mapping.yml`. The filename can be given as `-m` argument.
 
@@ -284,7 +287,9 @@ sources:
         persist: ./playlist_{}.m3u
     targets:
       - name: pl1
-        filename: playlist_1.m3u
+        output:
+          - type: m3u
+            filename: playlist_1.m3u
         processing_order: frm
         options:
           ignore_logo: true
@@ -297,9 +302,9 @@ sources:
             new_name: 1. DE$1
       - name: pl1strm
         enabled: false
-        filename: playlist_strm
         output:
-          - strm
+          - type: strm
+            filename: playlist_strm
         options:
           ignore_logo: true
           underscore_whitespace: false
@@ -316,7 +321,7 @@ sources:
             new_name: 1. DE$1
 ```
 
-### 1.5.2.9 `watch`
+### 1.5.2.8 `watch`
 For each target with a *unique name*, you can define a watched groups.
 It is a list of final group names from this target playlist. 
 Final means in this case: the name in the resulting playlist after applying all steps

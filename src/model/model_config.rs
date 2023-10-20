@@ -31,7 +31,7 @@ pub(crate) fn default_as_empty_map() -> HashMap<String, String> { HashMap::new()
 pub(crate) fn default_as_zero() -> u8 { 0 }
 
 
-#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
 pub(crate) enum TargetType {
     #[serde(rename = "m3u")]
     M3u,
