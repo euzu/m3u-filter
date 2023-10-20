@@ -23,12 +23,17 @@ impl TargetUser {
     }
 }
 
+fn default_as_443() -> u16 { 443 }
+fn default_as_1935() -> u16 { 1935 }
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ServerInfo {
     pub protocol: String,
     pub ip: String,
     pub http_port: u16,
+    #[serde(default = "default_as_443")]
     pub https_port: u16,
+    #[serde(default = "default_as_1935")]
     pub rtmp_port: u16,
     pub timezone: String,
     pub message: String,

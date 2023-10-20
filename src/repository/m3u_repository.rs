@@ -1,12 +1,13 @@
 use std::fs::File;
+use std::io::Write;
+
+use chrono::Datelike;
+use log::error;
+
+use crate::{create_m3u_filter_error_result, utils};
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::model_m3u::PlaylistGroup;
-use crate::{create_m3u_filter_error_result, utils};
-use std::io::{Write};
-use chrono::Datelike;
-use crate::model::model_config::TargetType;
-use log::{error};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     match res {
@@ -80,14 +81,21 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
     String::from(name)
 }
 
-fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), M3uFilterError> {
+pub(crate) fn get_m3u_file_path(cfg: &Config, target: &ConfigTarget) -> Option<std::path::PathBuf> {
+    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename.as_ref().unwrap())))
+}
+
+pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
     macro_rules! cant_write_result {
         ($path:expr, $err:expr) => {
             create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
         }
     }
     if !new_playlist.is_empty() {
-        if let Some(path) = utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&target.filename.as_ref().unwrap()))) {
+        if target.filename.is_none() {
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write m3u playlist failed: ".to_string()));
+        }
+        if let Some(path) = get_m3u_file_path(cfg, target) {
             match File::create(&path) {
                 Ok(mut m3u_file) => {
                     match check_write(m3u_file.write(b"#EXTM3U\n")) {
@@ -107,7 +115,7 @@ fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Ve
                             }
                         }
                     }
-                },
+                }
                 Err(e) => return cant_write_result!(&path, e),
             }
         }
@@ -115,8 +123,11 @@ fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Ve
     Ok(())
 }
 
-fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut Vec<PlaylistGroup>) -> Result<(), M3uFilterError> {
+pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
+        if target.filename.is_none() {
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write strm playlist failed: ".to_string()));
+        }
         let underscore_whitespace = target.options.as_ref().map_or(false, |o| o.underscore_whitespace);
         let cleanup = target.options.as_ref().map_or(false, |o| o.cleanup);
         let kodi_style = target.options.as_ref().map_or(false, |o| o.kodi_style);
@@ -165,10 +176,3 @@ fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &mut V
     Ok(())
 }
 
-pub(crate) fn write_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut Vec<PlaylistGroup>) -> Result<(), M3uFilterError> {
-    let mut new_playlist = playlist.to_owned();
-    if let Some(TargetType::Strm) = &target.output {
-        return write_strm_playlist(target, cfg, &mut new_playlist);
-    }
-    write_m3u_playlist(target, cfg, &mut new_playlist)
-}

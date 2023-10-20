@@ -12,6 +12,7 @@ use actix_web::web::Data;
 use chrono::Local;
 use cron::Schedule;
 use serde_json::json;
+use crate::api::m3u_api::m3u_api;
 
 use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::api::xtream_player_api::xtream_player_api;
@@ -108,6 +109,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
                 .route("/playlist", web::post().to(playlist))
                 .route("/config", web::get().to(config))
         ).service(xtream_player_api)
+        .service(m3u_api)
         .service(index)
         .service(actix_files::Files::new("/", web_dir.to_string()))
     )

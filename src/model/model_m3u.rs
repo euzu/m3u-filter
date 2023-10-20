@@ -12,7 +12,7 @@ pub(crate) struct FetchedPlaylist<'a> {
     pub playlist: Vec<PlaylistGroup>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum XtreamCluster {
     Live = 1,
     Video = 2,

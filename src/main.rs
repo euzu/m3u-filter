@@ -72,7 +72,7 @@ fn main() {
     }
 
     if args.server {
-        if let Err(err) = read_api_proxy_config(args.api_proxy, &mut cfg) { exit!("{}", err) };
+        read_api_proxy_config(args.api_proxy, &mut cfg);
         start_in_server_mode(Arc::new(cfg), Arc::new(targets));
     } else {
         start_in_cli_mode(Arc::new(cfg), Arc::new(targets))

@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::fs;
+use std::hash::Hash;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use log::{debug, error};
@@ -246,4 +248,9 @@ pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, pers
         },
         Err(_) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "malformed input url: {}", url_str)
     }
+}
+
+pub(crate) fn dedup<T: Eq + Hash + Copy>(v: &mut Vec<T>) {
+    let mut uniques = HashSet::new();
+    v.retain(|e| uniques.insert(*e));
 }

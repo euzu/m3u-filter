@@ -18,19 +18,14 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
     }
 }
 
-pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError>{
+pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
     let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(utils::get_default_api_proxy_config_path());
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str());
     if api_proxy_config.is_none() {
-        if cfg.has_published_targets() {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
-        } else {
-            warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
-        }
+       warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
     } else {
         cfg.set_api_proxy(api_proxy_config);
     }
-    Ok(())
 }
 
 

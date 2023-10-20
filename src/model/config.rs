@@ -1,16 +1,18 @@
 use std::collections::{HashMap, HashSet};
-use path_absolutize::*;
+
+use enum_iterator::Sequence;
 use log::{debug, error};
+use path_absolutize::*;
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
-use crate::model::mapping::Mappings;
-use crate::model::mapping::Mapping;
-use crate::model::model_config::{ItemField, ProcessingOrder, SortOrder, TargetType, default_as_zero, default_as_false, default_as_true};
-use crate::{utils};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::MsgKind;
 use crate::model::api_proxy::ApiProxyConfig;
-use crate::utils::get_working_path;
+use crate::model::mapping::Mapping;
+use crate::model::mapping::Mappings;
+use crate::model::model_config::{default_as_false, default_as_true, default_as_zero, ItemField, ProcessingOrder, SortOrder, TargetType};
+use crate::utils;
+use crate::utils::{dedup, get_working_path};
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 
@@ -146,6 +148,8 @@ pub(crate) struct ConfigOptions {
     pub kodi_style: bool,
 }
 
+fn default_as_empty_output() -> Vec::<TargetType> { vec![] }
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigTarget {
     #[serde(skip)]
@@ -154,14 +158,12 @@ pub(crate) struct ConfigTarget {
     pub enabled: bool,
     #[serde(default = "default_as_default")]
     pub name: String,
-    #[serde(default = "default_as_false")]
-    pub publish: bool,
     pub filename: Option<String>,
     pub options: Option<ConfigOptions>,
     pub sort: Option<ConfigSort>,
     pub filter: String,
-    #[serde(alias = "type")]
-    pub output: Option<TargetType>,
+    #[serde(alias = "type", default = "default_as_empty_output")]
+    pub output: Vec<TargetType>,
     pub rename: Option<Vec<ConfigRename>>,
     pub mapping: Option<Vec<String>>,
     #[serde(default = "default_as_frm")]
@@ -176,6 +178,7 @@ pub(crate) struct ConfigTarget {
 impl ConfigTarget {
     pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
         self.id = id;
+        dedup::<TargetType>(&mut self.output);
         match get_filter(&self.filter, templates) {
             Ok(fltr) => {
                 debug!("Filter: {}", fltr);
@@ -187,7 +190,7 @@ impl ConfigTarget {
                     handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, sort.prepare());
                 }
                 Ok(())
-            },
+            }
             Err(err) => Err(err),
         }
     }
@@ -206,7 +209,7 @@ pub(crate) struct ConfigSource {
 impl ConfigSource {
     pub fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
-        Ok(index+(self.inputs.len() as u16))
+        Ok(index + (self.inputs.len() as u16))
     }
 }
 
@@ -216,7 +219,7 @@ pub(crate) struct InputAffix {
     pub value: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
 pub(crate) enum InputType {
     #[serde(rename = "m3u")]
     M3u,
@@ -255,7 +258,7 @@ pub(crate) struct ConfigInput {
 }
 
 impl ConfigInput {
-    pub fn prepare(&mut self, id: u16) -> Result<(), M3uFilterError>{
+    pub fn prepare(&mut self, id: u16) -> Result<(), M3uFilterError> {
         self.id = id;
         if self.url.trim().is_empty() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "url for input is mandatory".to_string()));
@@ -316,7 +319,6 @@ fn default_as_empty_list() -> Vec<MsgKind> { vec![] }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MessagingConfig {
-
     #[serde(default = "default_as_empty_list")]
     pub notify_on: Vec<MsgKind>,
     pub telegram: Option<TelegramMessagingConfig>,
@@ -338,51 +340,49 @@ pub(crate) struct Config {
 }
 
 impl Config {
-    pub(crate) fn has_published_targets(&self) -> bool {
-        for source in &self.sources {
-            for target in &source.targets {
-                if target.publish {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
     pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) {
         self._api_proxy = api_proxy;
     }
 
-    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<&str> {
+    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<&ConfigTarget> {
         match &self._api_proxy {
-            Some(api_proxy) => api_proxy.get_target_name(username, password),
+            Some(api_proxy) => {
+                match api_proxy.get_target_name(username, password) {
+                    Some(target_name) => {
+                        for source in &self.sources {
+                            for target in &source.targets {
+                                if target_name.eq_ignore_ascii_case(&target.name) {
+                                    return Some(target);
+                                }
+                            }
+                        }
+                        None
+                    }
+                    None => None
+                }
+            }
             _ => None
         }
     }
 
-    pub fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError>{
+    pub fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError> {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
-                for input in &source.inputs {
-                    let is_m3u = matches!(input.input_type, InputType::M3u);
-                    for target in &mut source.targets {
-                        if is_m3u && target.filename.is_none() {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for m3u type: {}", target.name);
-                        }
-                        if !is_m3u && target.filename.is_none() && !target.publish {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename or publish is required for xtream type: {}", target.name);
-                        }
+                for target in &mut source.targets {
+                    let needs_filename = target.output.is_empty() || target.output.contains(&TargetType::M3u) || target.output.contains(&TargetType::Strm);
+                    if needs_filename && target.filename.is_none() {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for m3u type: {}", target.name);
+                    }
 
-                        if let Some(mapping_ids) = &target.mapping {
-                            let mut target_mappings = Vec::new();
-                            for mapping_id in mapping_ids {
-                                let mapping = mapping_list.get_mapping(mapping_id);
-                                if let Some(mappings) = mapping {
-                                    target_mappings.push(mappings);
-                                }
+                    if let Some(mapping_ids) = &target.mapping {
+                        let mut target_mappings = Vec::new();
+                        for mapping_id in mapping_ids {
+                            let mapping = mapping_list.get_mapping(mapping_id);
+                            if let Some(mappings) = mapping {
+                                target_mappings.push(mappings);
                             }
-                            target._mapping = if !target_mappings.is_empty() { Some(target_mappings) } else { None };
                         }
+                        target._mapping = if !target_mappings.is_empty() { Some(target_mappings) } else { None };
                     }
                 }
             }
@@ -390,7 +390,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError>{
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         self.working_dir = get_working_path(&self.working_dir);
         self.api.prepare();
         self.prepare_api_web_root();
@@ -403,7 +403,6 @@ impl Config {
                     return Err(err);
                 }
             }
-
         };
         // prepare sources and set id's
         let mut target_names_check = HashSet::<String>::new();

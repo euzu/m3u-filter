@@ -4,6 +4,7 @@
 * Added Xtream Cluster Live, Video, Series. M3u Playlist cluster guessing through video file endings.
 * Added api-proxy config for xtream proxy, to define server info and user credentials
 * Added Xtream Api Endpoints.
+* Added M3u Api Endpoints.
 * Added multiple input support
 * Added Messaging with opt in message types [info, error, stats]
 * Added Telegram message support

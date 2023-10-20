@@ -1,11 +1,12 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
-use actix_web::{HttpResponse, web, get, HttpRequest};
-use actix_web::http::header::{CACHE_CONTROL, HeaderValue};
+use actix_web::{get, HttpRequest, HttpResponse, web};
 use chrono::{Duration, Local};
+
+use crate::api::api_utils::serve_file;
 use crate::api::model_api::{AppState, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::model::config::Config;
-use crate::model::model_config::{default_as_empty_str};
+use crate::model::model_config::default_as_empty_str;
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, xtream_get_all};
 
 fn get_user_info(user_name: &str, cfg: &Config) -> XtreamAuthorizationResponse {
@@ -53,7 +54,8 @@ pub(crate) async fn xtream_player_api(
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
     match _app_state.config.get_target_for_user(api_req.username.as_str(), api_req.password.as_str()) {
-        Some(target_name) => {
+        Some(target) => {
+            let target_name = &target.name;
             if api_req.action.is_empty() {
                 return HttpResponse::Ok().json(get_user_info(api_req.username.as_str(), &_app_state.config));
             }
@@ -67,13 +69,7 @@ pub(crate) async fn xtream_player_api(
                 _ => Err(std::io::Error::new(std::io::ErrorKind::Unsupported, format!("Cant find action: {}/{}", target_name, &api_req.action))),
             } {
                 Ok(file_path) => {
-                    let file = actix_files::NamedFile::open_async(file_path).await.unwrap()
-                        .set_content_type(mime::APPLICATION_JSON)
-                        .disable_content_disposition();
-                    let mut result = file.into_response(&req);
-                    let headers = result.headers_mut();
-                    headers.insert(CACHE_CONTROL, HeaderValue::from_bytes("no-cache".as_bytes()).unwrap());
-                    result
+                    serve_file(&file_path, &req).await
                 }
                 Err(_) => HttpResponse::BadRequest().finish()
             }

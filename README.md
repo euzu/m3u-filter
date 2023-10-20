@@ -16,7 +16,7 @@ m3u-filter is a simple application which can:
 
 ```
   ------------                               |----> playlist_1  
- |  M3U_URL_1 | --> filter|map|rename|sort --|----> playlist_2 (optional)
+ |  M3U_URL_1 | --> filter|map|rename|sort --|----> playlist_2 (optional)  --> publish in server mode for user
  |  M3U_URL_2 | (optional)
   ------------                               |----> playlist_3 (optional)
 ```
@@ -155,10 +155,9 @@ sources:
 Has the following top level entries:
 * `enabled` _optional_ default is `true`, if you disable the processing is skipped
 * `name` _optional_ default is `default`, if not default it has to be unique, for running selective targets
-* `publish` _optional_ default is false,  only required if type is `xtream`, otherwise ignored. If true the contents can be published through xtream proxy. 
-* `filename` _mandatory_ if type `m3u` or `publish`= false, otherwise _optional_
+* `filename` _mandatory_ if type `m3u` or `strm`, otherwise _optional_
 * `sort`  _optional_
-* `output` _optional_ default is `m3u`
+* `output` _optional_  list of output types [`m3u`, `strm`, `xtream`], default is [`m3u`]
 * `processing_order` _optional_ default is `frm`
 * `options` _optional_
 * `filter` _mandatory_,
@@ -166,11 +165,10 @@ Has the following top level entries:
 * `mapping` _optional_
 * `watch` _optional_
 
-### 1.5.2.1 `publish` and `filename`
+### 1.5.2.1 `filename`
 
-`publish` only required if type is `xtream`, otherwise it is ignored.
-If true the contents can be published through xtream proxy.
-`filename` is the file for resulting playlist. It is _mandatory_ if type `m3u` or `publish`= false 
+`filename` is the file for resulting playlist. 
+It is _mandatory_ if output type contains `m3u` or `strm` 
 
 ### 1.5.2.2 `sort`
 Has three top level attributes
@@ -197,7 +195,8 @@ sort:
 ```
 
 ### 1.5.2.3 `output`
-There are two types of targets ```m3u``` and ```strm```. 
+Is a list of target types.
+There are three types of targets ```m3u```, ```strm``` and ```xtream```. 
 If the attribute is not specified ```m3u``` is created by default.
 You can set options for each `output` type.
 
@@ -299,7 +298,8 @@ sources:
       - name: pl1strm
         enabled: false
         filename: playlist_strm
-        output: strm
+        output:
+          - strm
         options:
           ignore_logo: true
           underscore_whitespace: false
@@ -335,8 +335,18 @@ the configured messaging (f.e. telegram channel).
 ### 1.6 `messaging`
 `messaging` is an optional configuration for receiving messages.
 Currently only telegram is supported.
+
+Messaging is Opt-In, you need to set the `notify_on` message types which are
+- `info`
+- `stats`
+- `error`
+
 ```yaml
 messaging:
+  notify_on:
+    - info
+    - stats
+    - error
   telegram:
     bot_token: '<telegram bot token>'
     chat_ids:
@@ -558,7 +568,7 @@ mappings:
 If you use the proxy functionality, 
 you need to create a `api-proxy.yml` configuration.
 
-You can specify the path for the file with the  `-a` cli argument.
+You can specify the path for the file with the  `-a` cli argument. 
 
 ```yaml
 server:

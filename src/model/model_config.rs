@@ -31,12 +31,14 @@ pub(crate) fn default_as_empty_map() -> HashMap<String, String> { HashMap::new()
 pub(crate) fn default_as_zero() -> u8 { 0 }
 
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
 pub(crate) enum TargetType {
     #[serde(rename = "m3u")]
     M3u,
     #[serde(rename = "strm")]
     Strm,
+    #[serde(rename = "xtream")]
+    Xtream,
 }
 
 impl std::fmt::Display for TargetType {
@@ -44,11 +46,12 @@ impl std::fmt::Display for TargetType {
         match *self {
             TargetType::M3u => write!(f, "M3u"),
             TargetType::Strm => write!(f, "Strm"),
+            TargetType::Xtream => write!(f, "Xtream"),
         }
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
 pub(crate) enum ProcessingOrder {
     #[serde(rename = "frm")]
     Frm,
