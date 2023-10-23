@@ -21,6 +21,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
     match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&watch_filename))) {
         Some(path) => {
             let save_path = path.clone();
+            let mut changed = false;
             if path.exists() {
                 match load_tree(&path) {
                     Some(loaded_tree) => {
@@ -28,6 +29,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
                         let added_difference: BTreeSet<String> = new_tree.difference(&loaded_tree).cloned().collect();
                         let removed_difference: BTreeSet<String> = loaded_tree.difference(&new_tree).cloned().collect();
                         if !added_difference.is_empty() || !removed_difference.is_empty() {
+                            changed = true;
                             handle_watch_notification(cfg, added_difference, removed_difference, target_name, &pl.title);
                         }
                     }
@@ -36,10 +38,12 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
                     }
                 }
             }
-            match save_tree(&save_path, new_tree) {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("failed to write watch_file {}: {}", &save_path.to_str().unwrap(), err)
+            if changed {
+                match save_tree(&save_path, new_tree) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        error!("failed to write watch_file {}: {}", &save_path.to_str().unwrap(), err)
+                    }
                 }
             }
         }

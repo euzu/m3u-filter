@@ -11,7 +11,7 @@ use log::{debug, error, info, LevelFilter};
 
 use crate::config_reader::{read_api_proxy_config, read_config, read_mappings};
 use crate::model::config::{Config, ProcessTargets, validate_targets};
-use crate::processing::playlist_processor::start_processing;
+use crate::processing::playlist_processor::exec_processing;
 
 mod m3u_filter_error;
 mod config_reader;
@@ -80,7 +80,7 @@ fn main() {
 }
 
 fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    start_processing(cfg, targets);
+    exec_processing(cfg, targets);
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {

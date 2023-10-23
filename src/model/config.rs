@@ -406,22 +406,35 @@ impl Config {
         self._api_proxy = api_proxy;
     }
 
+    fn _get_target_for_user(&self, user_target: Option<&str>) -> Option<&ConfigTarget> {
+        match user_target {
+            Some(target_name) => {
+                for source in &self.sources {
+                    for target in &source.targets {
+                        if target_name.eq_ignore_ascii_case(&target.name) {
+                            return Some(target);
+                        }
+                    }
+                }
+                None
+            }
+            None => None
+        }
+    }
+
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<&ConfigTarget> {
         match &self._api_proxy {
             Some(api_proxy) => {
-                match api_proxy.get_target_name(username, password) {
-                    Some(target_name) => {
-                        for source in &self.sources {
-                            for target in &source.targets {
-                                if target_name.eq_ignore_ascii_case(&target.name) {
-                                    return Some(target);
-                                }
-                            }
-                        }
-                        None
-                    }
-                    None => None
-                }
+               self._get_target_for_user(api_proxy.get_target_name(username, password))
+            }
+            _ => None
+        }
+    }
+
+    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<&ConfigTarget> {
+        match &self._api_proxy {
+            Some(api_proxy) => {
+                self._get_target_for_user(api_proxy.get_target_name_by_token(token))
             }
             _ => None
         }

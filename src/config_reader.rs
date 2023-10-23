@@ -76,7 +76,7 @@ pub(crate) fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
         Ok(file) => {
             let mapping: Result<ApiProxyConfig, _> = serde_yaml::from_reader(file);
             match mapping {
-                Ok(result) => {
+                Ok(mut result) => {
                     match result.prepare() {
                         Ok(_) => Some(result),
                         Err(err) => {

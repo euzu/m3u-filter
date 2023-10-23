@@ -3,10 +3,10 @@
 use actix_web::{get, HttpRequest, HttpResponse, web};
 use chrono::{Duration, Local};
 
-use crate::api::api_utils::serve_file;
-use crate::api::model_api::{AppState, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
+use crate::api::api_utils::{get_user_target, serve_file};
+use crate::api::model_api::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::model::config::Config;
-use crate::model::model_config::{default_as_empty_str, TargetType};
+use crate::model::model_config::{TargetType};
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, xtream_get_all};
 
 fn get_user_info(user_name: &str, cfg: &Config) -> XtreamAuthorizationResponse {
@@ -39,21 +39,14 @@ fn get_user_info(user_name: &str, cfg: &Config) -> XtreamAuthorizationResponse {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct XtreamApiRequest {
-    username: String,
-    password: String,
-    #[serde(default = "default_as_empty_str")]
-    action: String,
-}
 
 #[get("/player_api.php")]
 pub(crate) async fn xtream_player_api(
-    api_req: web::Query<XtreamApiRequest>,
+    api_req: web::Query<UserApiRequest>,
     req: HttpRequest,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    match _app_state.config.get_target_for_user(api_req.username.as_str(), api_req.password.as_str()) {
+    match get_user_target(&api_req, &_app_state) {
         Some(target) => {
             let target_name = &target.name;
             if target.has_output(&TargetType::Xtream) {

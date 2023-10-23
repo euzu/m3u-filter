@@ -2,6 +2,7 @@ use std::sync::Arc;
 use actix_web::web;
 use serde::{Deserialize, Serialize};
 use crate::model::config::{Config, ProcessTargets};
+use crate::model::model_config::{default_as_empty_str};
 
 pub(crate) struct AppState {
     pub config: Arc<Config>,
@@ -59,3 +60,15 @@ pub(crate) struct XtreamAuthorizationResponse {
     pub server_info: XtreamServerInfo,
 }
 
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct UserApiRequest {
+    #[serde(default = "default_as_empty_str")]
+    pub username: String,
+    #[serde(default = "default_as_empty_str")]
+    pub password: String,
+    #[serde(default = "default_as_empty_str")]
+    pub token: String,
+    #[serde(default = "default_as_empty_str")]
+    pub action: String,
+}

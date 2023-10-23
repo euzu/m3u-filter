@@ -18,7 +18,7 @@ use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
 use crate::api::xtream_player_api::xtream_player_api;
 use crate::download::get_m3u_playlist;
 use crate::model::config::{Config, ConfigInput, InputType, ProcessTargets};
-use crate::processing::playlist_processor::start_processing;
+use crate::processing::playlist_processor::exec_processing;
 
 #[get("/")]
 async fn index(
@@ -129,7 +129,7 @@ async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
 
         if let Some(datetime) = upcoming.next() {
             if datetime.timestamp() <= local.timestamp() {
-                start_processing(data.config.clone(), data.targets.clone());
+                exec_processing(data.config.clone(), data.targets.clone());
             }
         }
     }

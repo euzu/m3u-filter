@@ -575,14 +575,23 @@ you need to create a `api-proxy.yml` configuration.
 
 You can specify the path for the file with the  `-a` cli argument. 
 
+`username` and `password`are mandatory for credentials. `username` is unique.
+The `token` is _optional_. If defined it should be unique. The `token`can be used
+instead of username+password
+
 To access the api for: 
 - `xtream` use url like `http://192.169.1.2/player_api.php?username={}&password={}`
 - `m3u` use url `http://192.169.1.2/get.php?username={}&password={}`
+or with token
+- `xtream` use url like `http://192.169.1.2/player_api.php?token={}`
+- `m3u` use url `http://192.169.1.2/get.php?token={}`
 
-_Do not forget to replace `{}` with credentials._ 
+
+_Do not forget to replace `{}` with credentials._
 
 When you define credentials for a `target`, ensure that this target has
 `output` format  `xtream`or `m3u`.
+
 
 ```yaml
 server:
@@ -596,7 +605,7 @@ server:
 user:
   - target: pl1
     credentials:
-      - {username: x3452, password: ztrhgrGZrt83hjerter}
+      - {username: x3452, password: ztrhgrGZrt83hjerter, token: 4342sdfr3424}
 ```
 
 important: if the given `target`is of type  

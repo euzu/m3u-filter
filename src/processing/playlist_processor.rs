@@ -465,7 +465,7 @@ fn persist_playlist(playlist: &[PlaylistGroup],
     if errors.is_empty() { Err(errors) } else { Ok(()) }
 }
 
-pub(crate) fn start_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+pub(crate) fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let (stats, errors) = process_sources(cfg.clone(), targets.clone());
     let stats_msg = format!("Stats: {}", stats.iter().map(|stat| stat.to_string()).collect::<Vec<String>>().join("\n"));
     // print stats
