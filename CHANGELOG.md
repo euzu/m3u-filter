@@ -12,6 +12,7 @@
 * Fixed TLS problem with docker scratch
 * Added simple stats
 * Target Output is now a list of multiple output formats, !breaking change!
+* RegExp captures can now be used in mapper attributes
 
 Changes in `config.yml`
 ```yaml

@@ -8,7 +8,7 @@ pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "audio_track",
     "time_shift",
     "rec",
-    "source",
+    "url",
 ];
 pub(crate) const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 

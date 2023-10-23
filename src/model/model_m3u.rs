@@ -1,6 +1,8 @@
 use std::cell::RefCell;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
 use crate::model::config::{ConfigInput, ConfigOptions};
 
 // https://de.wikipedia.org/wiki/M3U
@@ -16,7 +18,7 @@ pub(crate) struct FetchedPlaylist<'a> {
 pub(crate) enum XtreamCluster {
     Live = 1,
     Video = 2,
-    Series = 3
+    Series = 3,
 }
 
 pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::Live }
@@ -39,6 +41,8 @@ pub(crate) struct PlaylistItemHeader {
     pub time_shift: String,
     pub rec: String,
     pub source: String,
+    // this is the source content not the url
+    pub url: String,
     #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
     pub xtream_cluster: XtreamCluster,
     #[serde(skip_serializing, skip_deserializing)]
@@ -59,6 +63,7 @@ impl FieldAccessor for PlaylistItemHeader {
             "time_shift" => Some(&self.time_shift),
             "rec" => Some(&self.rec),
             "source" => Some(&self.source),
+            "url" => Some(&self.url),
             _ => None
         }
     }
@@ -66,17 +71,54 @@ impl FieldAccessor for PlaylistItemHeader {
     fn set_field(&mut self, field: &str, value: &str) -> bool {
         let val = String::from(value);
         match field {
-            "id" => { self.id = val; true},
-            "name" =>  { self.name = val; true }
-            "logo" =>  { self.logo = val; true }
-            "logo_small" =>  { self.logo_small = val; true }
-            "group" =>  { self.group = val; true }
-            "title" =>  { self.title = val; true }
-            "parent_code" =>  { self.parent_code = val; true }
-            "audio_track" =>  { self.audio_track = val; true }
-            "time_shift" =>  { self.time_shift = val; true }
-            "rec" =>  { self.rec = val; true }
-            "source" =>  { self.source = val; true }
+            "id" => {
+                self.id = val;
+                true
+            }
+            "name" => {
+                self.name = val;
+                true
+            }
+            "logo" => {
+                self.logo = val;
+                true
+            }
+            "logo_small" => {
+                self.logo_small = val;
+                true
+            }
+            "group" => {
+                self.group = val;
+                true
+            }
+            "title" => {
+                self.title = val;
+                true
+            }
+            "parent_code" => {
+                self.parent_code = val;
+                true
+            }
+            "audio_track" => {
+                self.audio_track = val;
+                true
+            }
+            "time_shift" => {
+                self.time_shift = val;
+                true
+            }
+            "rec" => {
+                self.rec = val;
+                true
+            }
+            "source" => {
+                self.source = val;
+                true
+            }
+            "url" => {
+                self.url = val;
+                true
+            }
             _ => false
         }
     }
@@ -85,7 +127,6 @@ impl FieldAccessor for PlaylistItemHeader {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistItem {
     pub header: RefCell<PlaylistItemHeader>,
-    pub url: String,
 }
 
 impl PlaylistItem {
@@ -116,9 +157,10 @@ impl PlaylistItem {
         if !header.rec.is_empty() {
             line = format!("{} rec=\"{}\"", line, header.rec);
         }
-        format!("{},{}\n{}", line, header.title, self.url)
+        format!("{},{}\n{}", line, header.title, header.url)
     }
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistGroup {

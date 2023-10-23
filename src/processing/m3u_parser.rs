@@ -49,7 +49,7 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     }
 }
 
-fn create_empty_playlistitem_header(content: &String) -> PlaylistItemHeader {
+fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistItemHeader {
     PlaylistItemHeader {
         id: String::from(""),
         name: String::from(""),
@@ -62,13 +62,14 @@ fn create_empty_playlistitem_header(content: &String) -> PlaylistItemHeader {
         time_shift: String::from(""),
         rec: String::from(""),
         source: String::from(content),
+        url,
         xtream_cluster: XtreamCluster::Live,
         additional_properties: None,
     }
 }
 
 fn process_header(video_suffixes: &Vec<&str>,content: &String, url: String) -> PlaylistItemHeader {
-    let mut plih = create_empty_playlistitem_header(content);
+    let mut plih = create_empty_playlistitem_header(content, url.clone());
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':');
     if line_token == Some(String::from("#EXTINF")) {
@@ -139,7 +140,7 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
             continue;
         }
         if let Some(header_value) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value, String::from(line))), url: String::from(line) };
+            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value, String::from(line))) };
             if let Some(group_value) = group {
                 if item.header.borrow().group.is_empty() {
                     item.header.borrow_mut().group = group_value;

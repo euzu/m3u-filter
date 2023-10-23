@@ -18,7 +18,7 @@ pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
         ItemField::Group => header.group.as_str(),
         ItemField::Name => header.name.as_str(),
         ItemField::Title => header.title.as_str(),
-        ItemField::Url => pli.url.as_str(),
+        ItemField::Url => header.url.as_str(),
     };
     String::from(value)
 }
@@ -29,7 +29,7 @@ pub(crate) fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: 
         ItemField::Group => header.group = value,
         ItemField::Name => header.name = value,
         ItemField::Title => header.title = value,
-        ItemField::Url => {}
+        ItemField::Url =>  header.url = value,
     };
 }
 

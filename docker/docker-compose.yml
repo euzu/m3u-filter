@@ -6,6 +6,9 @@ services:
     working_dir: /
     volumes:
       - ./data:/data
+      # - ./config.yml:/config.yml
+      # - ./api-proxy.yml:/api-proxy.yml
+      # - ./mapping.yml:/mapping.yml
     ports:
       - "8901:8901"
     restart: unless-stopped

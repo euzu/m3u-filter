@@ -470,6 +470,29 @@ Attributes is a map of key value pairs. Valid keys are:
 - `source`
 
 If the regexps matches, the given fields will be set to the new value
+You can use `captures` in attributes.
+For example you want to `rewrite` the `base_url` for channels in a specific group.
+
+```yaml
+
+mappings:
+  templates:
+    - name: sports
+      value: 'Group ~ ".*SPORT.*"'
+    - name: source
+      value: 'Url ~ "https?:\/\/(.*?)\/(?P<query>.*)$"'
+
+  mapping:
+    - id: sport-mapper
+      mapper:
+        - filter: '!sports!'
+          pattern: "!source!"
+          attributes:
+            url: http://my.bubble-gum.tv/<query>
+```
+
+In this example all channels the urls of all channels with a group name containing `SPORT` will be changed.
+
 
 #### 2.3.4.4 `suffix`
 Suffix is a map of key value pairs. Valid keys are
@@ -537,6 +560,8 @@ mappings:
         value: '[\s_-]*'
       - name: quality
         value: '(?i)(?P<quality>HD|LQ|4K|UHD)?'
+      - name: source
+        value: 'Url ~ "https?:\/\/(.*?)\/(?P<query>.*)$"'
     tags:
       - name: quality
         captures:
@@ -548,6 +573,10 @@ mappings:
       - id: France
         match_as_ascii: true
         mapper:
+          - filter: 'Name ~ "^TF.*"'
+            pattern: '!source!'
+            attributes:
+              url: http://my.iptv.proxy.com/<query> 
           - pattern: 'Name ~ "^TF1$"'
             attributes:
               name: TF1

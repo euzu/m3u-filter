@@ -126,13 +126,13 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                     match header.xtream_cluster {
                         XtreamCluster::Live => {
                             document.insert("stream_id".to_string(), stream_id);
-                            document.insert("direct_source".to_string(), Value::String(header.source.clone()));
+                            document.insert("direct_source".to_string(), Value::String(header.url.clone()));
                             document.insert("thumbnail".to_string(), Value::String(header.logo_small.clone()));
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
                         }
                         XtreamCluster::Video => {
                             document.insert("stream_id".to_string(), stream_id);
-                            document.insert("direct_source".to_string(), Value::String(header.source.clone()));
+                            document.insert("direct_source".to_string(), Value::String(header.url.clone()));
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
                         }
                         XtreamCluster::Series => {

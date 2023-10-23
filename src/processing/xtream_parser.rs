@@ -222,7 +222,7 @@ impl XtreamStream {
     }
 }
 
-fn process_category(category: &serde_json::Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
+fn process_category(category: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(category.to_owned()) {
         Ok(category_list) => Ok(category_list),
         Err(err) => {
@@ -232,7 +232,7 @@ fn process_category(category: &serde_json::Value) -> Result<Vec<XtreamCategory>,
 }
 
 
-fn process_streams(xtream_cluster: &XtreamCluster, streams: &serde_json::Value) -> Result<Vec<XtreamStream>, M3uFilterError> {
+fn process_streams(xtream_cluster: &XtreamCluster, streams: &Value) -> Result<Vec<XtreamStream>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamStream>>(streams.to_owned()) {
         Ok(stream_list) => Ok(stream_list),
         Err(err) => {
@@ -242,7 +242,7 @@ fn process_streams(xtream_cluster: &XtreamCluster, streams: &serde_json::Value) 
 }
 
 pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluster,
-                           category: &serde_json::Value, streams: &serde_json::Value,
+                           category: &Value, streams: &Value,
                            stream_base_url: &String) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match process_category(category) {
         Ok(mut categories) => {
@@ -269,11 +269,11 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluste
                                     audio_track: "".to_string(),
                                     time_shift: "".to_string(),
                                     rec: "".to_string(),
-                                    source: String::from(&stream.direct_source),
+                                    source: "".to_string(), // String::from(&stream.direct_source),
+                                    url: if stream.direct_source.is_empty() { format!("{}/{}", stream_base_url, stream.get_stream_id())} else { String::from(&stream.direct_source) },
                                     xtream_cluster: xtream_cluster.clone(),
                                     additional_properties: stream.get_additional_properties(),
                                 }),
-                                url: format!("{}/{}", stream_base_url, stream.get_stream_id()),
                             };
                             grp.add(item);
                         }

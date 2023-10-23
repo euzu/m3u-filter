@@ -192,18 +192,17 @@ macro_rules! apply_pattern {
     }};
 }
 
-fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
+fn map_channel(channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
     if !mapping.mapper.is_empty() {
         let header = channel.header.borrow();
         let channel_name = if mapping.match_as_ascii { unidecode(&header.name) } else { String::from(&header.name) };
         if mapping.match_as_ascii { debug!("Decoded {} for matching to {}", &header.name, &channel_name); };
         drop(header);
-        let ref_chan = RefCell::new(channel);
+        let ref_chan = RefCell::new(&channel);
         let provider = ValueProvider { pli: ref_chan.clone() };
         let mut mock_processor = MockValueProcessor {};
-
         for m in &mapping.mapper {
-            let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: RefCell::new(m) };
+            let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: RefCell::new(m)};
             match &m._filter {
                 Some(filter) => {
                     if filter.filter(&provider, &mut mock_processor) {
@@ -216,7 +215,7 @@ fn map_channel(channel: &PlaylistItem, mapping: &Mapping) -> PlaylistItem {
             };
         }
     }
-    channel.clone()
+    channel
 }
 
 fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
@@ -225,7 +224,7 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
             let mut grp = playlist_group.clone();
             let mappings = target._mapping.as_ref().unwrap();
             mappings.iter().filter(|mapping| !mapping.mapper.is_empty()).for_each(|mapping|
-                grp.channels = grp.channels.iter_mut().map(|chan| map_channel(chan, mapping)).collect());
+                grp.channels = grp.channels.drain(..).map(|chan| map_channel(chan, mapping)).collect());
             grp
         }).collect();
 

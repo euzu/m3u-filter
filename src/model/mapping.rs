@@ -1,13 +1,15 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+
 use log::{debug, error};
 use regex::Regex;
+
+use crate::{handle_m3u_filter_error_result, valid_property};
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::model::model_config::{AFFIX_FIELDS, default_as_empty_map, default_as_empty_str,
+                                 default_as_false, ItemField, MAPPER_ATTRIBUTE_FIELDS, };
 use crate::model::model_m3u::{FieldAccessor, PlaylistItem};
-use crate::model::model_config::{ItemField, MAPPER_ATTRIBUTE_FIELDS, AFFIX_FIELDS,
-                                 default_as_empty_str, default_as_false, default_as_empty_map, };
-use crate::{handle_m3u_filter_error_result, valid_property};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MappingTag {
@@ -41,6 +43,8 @@ pub(crate) struct Mapper {
     pub _tags: Vec<MappingTag>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _tagre: Option<Regex>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _attre: Option<Regex>,
 }
 
 impl Mapper {
@@ -62,6 +66,7 @@ impl Mapper {
                     _ => vec![]
                 };
                 self._tagre = Some(Regex::new("<tag:(.*?)>").unwrap());
+                self._attre = Some(Regex::new("<(.*?)>").unwrap());
                 Ok(())
             }
             Err(err) => Err(err)
@@ -79,25 +84,34 @@ impl MappingValueProcessor<'_> {
         self.pli.borrow().header.borrow().get_field(key).map(String::from)
     }
 
-    fn set_property(&mut self, key: &str, value: &String) {
+    fn set_property(&mut self, key: &str, value: &str) {
         if !self.pli.borrow().header.borrow_mut().set_field(key, value) {
             error!("Cant set unknown field {} to {}", key, value);
         }
         debug!("Property {} set to {}", key, value);
     }
 
-    fn apply_attributes(&mut self) {
+    fn apply_attributes(&mut self, captured_names: &HashMap<&str, &str>) {
         let mapper = self.mapper.borrow();
+        let attr_re = &mapper._attre.as_ref().unwrap();
         let attributes = &mapper.attributes;
         drop(mapper);
         for (key, value) in attributes {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
-                self.set_property(key, value);
+                if value.contains('<') { // possible replacement
+                    let replaced = attr_re.replace_all(value, |captures: &regex::Captures| {
+                        let capture_name = &captures[1];
+                        captured_names.get(&capture_name).unwrap_or(&&captures[0]).to_string()
+                    });
+                    self.set_property(key, &replaced);
+                } else {
+                    self.set_property(key, value);
+                }
             }
         }
     }
 
-    fn apply_tags(&mut self, value: &String, captures: &HashMap<&String, &str>) -> Option<String> {
+    fn apply_tags(&mut self, value: &String, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
         let tag_captures = self.mapper.borrow()._tagre.as_ref().unwrap().captures_iter(value)
             .filter(|caps| caps.len() > 1)
@@ -111,7 +125,7 @@ impl MappingValueProcessor<'_> {
                     // we have the right tag, now get all captured values
                     let mut captured_tag_values: Vec<&str> = Vec::new();
                     for cap in &mapping_tag.captures {
-                        match captures.get(&cap) {
+                        match captures.get(cap.as_str()) {
                             Some(cap_value) => captured_tag_values.push(cap_value),
                             _ => {
                                 debug!("Cant find any tag match for {}", tag_capture);
@@ -136,7 +150,7 @@ impl MappingValueProcessor<'_> {
         Some(new_value)
     }
 
-    fn apply_suffix(&mut self, captures: &HashMap<&String, &str>) {
+    fn apply_suffix(&mut self, captures: &HashMap<&str, &str>) {
         let mapper = self.mapper.borrow();
         let suffix = &mapper.suffix;
         drop(mapper);
@@ -153,7 +167,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_prefix(&mut self, captures: &HashMap<&String, &str>) {
+    fn apply_prefix(&mut self, captures: &HashMap<&str, &str>) {
         let mapper = self.mapper.borrow();
         let prefix = &mapper.prefix;
         drop(mapper);
@@ -199,11 +213,11 @@ impl ValueProcessor for MappingValueProcessor<'_> {
                             ""
                         };
                         debug!("match {}: {}", capture_name, capture_value);
-                        captured_values.insert(capture_name, capture_value);
+                        captured_values.insert(capture_name.as_str(), capture_value);
                     }
                 );
         }
-        let _ = &MappingValueProcessor::<'_>::apply_attributes(self);
+        let _ = &MappingValueProcessor::<'_>::apply_attributes(self, &captured_values);
         let _ = &MappingValueProcessor::<'_>::apply_suffix(self, &captured_values);
         let _ = &MappingValueProcessor::<'_>::apply_prefix(self, &captured_values);
         let _ = &MappingValueProcessor::<'_>::apply_assignments(self);
@@ -247,7 +261,6 @@ impl MappingDefinition {
                 }
                 Err(err) => return Err(err),
             }
-
         };
         for mapping in &mut self.mapping {
             let template_list = match &self.templates {
@@ -283,4 +296,3 @@ impl Mappings {
         None
     }
 }
-

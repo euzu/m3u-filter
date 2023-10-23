@@ -142,12 +142,13 @@ pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playl
             };
             for pg in new_playlist {
                 for pli in &pg.channels {
-                    let dir_path = path.join(sanitize_for_filename(&pli.header.borrow().group, underscore_whitespace));
+                    let header = &pli.header.borrow();
+                    let dir_path = path.join(sanitize_for_filename(&header.group, underscore_whitespace));
                     if let Err(e) = std::fs::create_dir_all(&dir_path) {
                         error!("cant create directory: {:?}", &path);
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
                     };
-                    let mut file_name = sanitize_for_filename(&pli.header.borrow().title, underscore_whitespace);
+                    let mut file_name = sanitize_for_filename(&header.title, underscore_whitespace);
                     if kodi_style {
                         let style = KodiStyle {
                             season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
@@ -160,7 +161,7 @@ pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playl
                     let file_path = dir_path.join(format!("{}.strm", file_name));
                     match File::create(&file_path) {
                         Ok(mut strm_file) => {
-                            match check_write(strm_file.write(pli.url.as_bytes())) {
+                            match check_write(strm_file.write(header.url.as_bytes())) {
                                 Ok(_) => (),
                                 Err(e) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e),
                             }

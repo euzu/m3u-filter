@@ -5,6 +5,8 @@ FROM scratch
 WORKDIR /
 COPY ./m3u-filter /
 COPY ./config.yml /
+COPY ./api-proxy.yml /
+COPY ./mapping.yml /
 COPY ./web /web
 
 # the tls certificates:
