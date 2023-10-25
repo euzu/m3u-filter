@@ -31,7 +31,6 @@ m3u-filter is a simple application which can:
 
 If you have a playlist which contains unwanted entries, you can create filter which include or discard entries
 based on the header information of the playlist entries, you can rename entries or map entries based on regular expressions.
-Currently, filter and rename operations support group, name and title fields.
 
 You can run m3u-filter as command line application to update your playlists (manually or as cron job), or you can 
 run it in server mode and open the web-ui to see the contents of the playlist, filter/search content and save 

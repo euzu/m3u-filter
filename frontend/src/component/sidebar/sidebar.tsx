@@ -1,6 +1,6 @@
 import React, {useCallback, useState} from "react";
 import './sidebar.scss';
-import {ArrowLeft, ArrowRight} from "@mui/icons-material";
+import {getIconByName} from "../../icons/icons";
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface SidebarProps {
   children?: any;
@@ -20,7 +20,7 @@ export default function Sidebar(props: SidebarProps): JSX.Element {
             {children}
         </div>
         <div className={'sidebar-toggle'} onClick={handleToggle}>
-            {collapsed ? <ArrowRight/> : <ArrowLeft/>}
+            {getIconByName(collapsed ? 'ArrowDown' : 'ArrowUp')}
         </div>
     </div>;
 

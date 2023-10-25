@@ -1,26 +1,79 @@
-.text-input {
-  flex-grow: 1;
+.input-field {
+  display: flex;
+  position: relative;
+  flex-flow: row nowrap;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  flex: 1 1 auto;
+  padding: 2px;
 
-  .MuiFormLabel-root {
-    color: var(--playlist-color);
-    font-size: 1.2em;
+  &:focus-within {
+    border: 1px solid var(--hover-border-color);
   }
 
-  .MuiOutlinedInput-notchedOutline {
-    border-color: var(--border-color);
+  label {
+    position: absolute;
+    color: var(--label-color);
+    transform: translate(6px, -0.8rem);
+    background-color: var(--background-color);
+    padding: 0 2px;
   }
 
-  .MuiInputBase-input {
+  input {
+    color: var(--text-color);
+    background-color: transparent;
+    font-size: 1.2rem;
+    padding: 0.5rem;
+    border: none;
+    flex: 1 1 auto;
+
+    &:focus,
+    &:hover {
+      border: none;
+      outline: none;
+    }
+  }
+
+  button {
     color: var(--playlist-color);
+    background-color: transparent;
+    border: none;
+    border-radius: 50%;
+    aspect-ratio: 1 / 1;
+
+    svg {
+      color: var(--playlist-color);
+    }
+
+    &:focus,
+    &:hover {
+      background-color: var(--tree-hover-background-color);
+      border: none;
+      outline: none;
+    }
   }
 }
 
-.icon-button {
-  color: var(--playlist-color);
-  svg {
-    color: var(--playlist-color);
+.app {
+  /* ===== Scrollbar CSS ===== */
+  /* Firefox */
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: #0081fa #ffffff;
   }
-  &:hover {
-    background-color: var(--tree-hover-background-color) !important;
+
+  /* Chrome, Edge, and Safari */
+  *::-webkit-scrollbar {
+    width: 12px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--background-color);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #0081fa;
+    border-radius: 10px;
+    border: none;
   }
 }

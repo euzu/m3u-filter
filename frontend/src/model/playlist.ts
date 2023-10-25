@@ -10,12 +10,12 @@ export interface PlaylistItemHeader {
     time_shift: string;
     rec: string;
     source: string;
+    url: string;
 }
 
 export interface PlaylistItem {
     id: number;
     header: PlaylistItemHeader;
-    url: string;
 }
 
 export interface PlaylistGroup {

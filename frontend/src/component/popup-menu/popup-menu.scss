@@ -1,0 +1,26 @@
+.popup-menu {
+  position: fixed;
+  z-index: 9999;
+  color: var(--popup-color);
+  background-color: var(--popup-background-color);
+  border: 1px solid var(--popup-border-color);
+  border-radius: 4px;
+  padding: 4px;
+  filter: drop-shadow(8px 9px 7px var(--popup-shadow-color));
+
+  ul {
+    list-style-type: none; /* Remove bullets */
+    padding: 0; /* Remove padding */
+    margin: 0; /* Remove margins */
+    li {
+      padding: 8px;
+      border-radius: 4px;
+      user-select: none;
+      cursor: pointer;
+      &:hover {
+        color: var(--popup-hover-color);
+        background-color: var(--popup-hover-background-color);
+      }
+    }
+  }
+}

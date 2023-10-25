@@ -2,7 +2,6 @@
   display: flex;
   flex-flow: column;
   justify-content: center;
-  flex-grow: 1;
   overflow: hidden;
   height: 100%;
 
@@ -16,7 +15,7 @@
 
   .app-main {
     display: flex;
-    flex-flow: row;
+    flex-flow: column;
     justify-content: center;
     flex-grow: 1;
     overflow: hidden;

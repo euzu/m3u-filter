@@ -13,6 +13,8 @@
 * Added simple stats
 * Target Output is now a list of multiple output formats, !breaking change!
 * RegExp captures can now be used in mapper attributes
+* Added file download to a defined directory in config
+* Refactored web-ui
 
 Changes in `config.yml`
 ```yaml

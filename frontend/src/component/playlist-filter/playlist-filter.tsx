@@ -1,7 +1,6 @@
 import React, {useMemo, useCallback, useRef, KeyboardEvent} from "react";
 import './playlist-filter.scss';
-import {TextField, InputAdornment, IconButton} from "@mui/material";
-import {Search} from "@mui/icons-material";
+import {getIconByName} from "../../icons/icons";
 
 interface PlaylistFilterProps {
    onFilter: (filter: string) => void;
@@ -22,31 +21,11 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
         }
     }, [handleSearch]);
 
-    const inputProps = useMemo(() => (
-    {
-        endAdornment: (
-            <InputAdornment position="end">
-                <IconButton
-                    className={"icon-button"}
-                    aria-label="select"
-                    onClick={handleSearch}
-                    edge="end">
-                    <Search />
-                </IconButton>
-            </InputAdornment>
-        )
-    }
-    ), [handleSearch]);
-
     return <div className={'playlist-filter'}>
-        <TextField
-            className={'text-input'}
-            inputRef={textField} label="Search" variant="outlined"
-            InputProps={inputProps}
-            InputLabelProps={{
-                shrink: true,
-            }}
-            onKeyUp={handleKeyPress}
-        />
+        <div className={'input-field'} onKeyUp={handleKeyPress}>
+            <label>Search</label>
+            <input ref={textField}/>
+            <button onClick={handleSearch}>{getIconByName('Search')}</button>
+        </div>
     </div>
 }

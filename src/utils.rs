@@ -252,3 +252,7 @@ pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, pers
 //     let mut uniques = HashSet::new();
 //     v.retain(|e| uniques.insert(*e));
 // }
+
+pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
+    bytes / 1_048_576
+}

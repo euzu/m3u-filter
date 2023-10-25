@@ -5,6 +5,7 @@ import PlaylistTree, {PlaylistTreeState} from "../playlist-tree/playlist-tree";
 import {Observable, noop, tap, finalize} from "rxjs";
 import {useSnackbar} from "notistack";
 import {first} from "rxjs/operators";
+import ServerConfig from "../../model/server-config";
 
 function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: boolean }): PlaylistGroup[] {
     if (playlist) {
@@ -58,6 +59,7 @@ export interface IPlaylistViewer {
 }
 
 interface PlaylistViewerProps {
+    serverConfig: ServerConfig;
     playlist: PlaylistGroup[];
     searchChannel: Observable<string>;
     onProgress: (value: boolean) => void;
@@ -66,7 +68,7 @@ interface PlaylistViewerProps {
 }
 
 const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: PlaylistViewerProps, ref: any) => {
-    const {playlist, searchChannel, onProgress, onCopy, onPlay} = props;
+    const {serverConfig, playlist, searchChannel, onProgress, onCopy, onPlay} = props;
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [data, setData] = useState<PlaylistGroup[]>([]);
     const checked = useMemo((): PlaylistTreeState => ({}), []);
@@ -109,7 +111,7 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
     }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
 
     return <div className={'playlist-viewer'}>
-        <PlaylistTree data={data} state={checked} onCopy={onCopy} onPlay={onPlay}/>
+        <PlaylistTree data={data} state={checked} onCopy={onCopy} onPlay={onPlay} serverConfig={serverConfig}/>
     </div>
 });
 

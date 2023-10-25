@@ -1,3 +1,4 @@
 export interface PlaylistRequest {
-    url: string;
+    url?: string;
+    input_id?: number;
 }

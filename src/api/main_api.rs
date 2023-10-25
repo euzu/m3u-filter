@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use actix_cors::Cors;
@@ -44,6 +45,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
     let shared_data = web::Data::new(AppState {
         config: cfg,
         targets,
+        downloads: Arc::new(Mutex::new(HashMap::new()))
     });
 
     // Scheduler

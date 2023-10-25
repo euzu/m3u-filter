@@ -3,4 +3,13 @@
   flex-grow: 0;
   justify-content: flex-end;
   padding: 6px;
+
+  button {
+    background-color: #0081fa;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    font-size: 1.2rem;
+    border-radius: 4px;
+    padding: 4px 12px;
+  }
 }

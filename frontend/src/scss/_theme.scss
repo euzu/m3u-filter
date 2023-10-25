@@ -1,11 +1,13 @@
 :root {
   --text-color: #ffffff;
+  --label-color: #aaaaaa;
   --background-color: #2b2b2b;
   --app-header-color: #6495b1;
   --sidebar-toggle-color: #ffffff;
   --sidebar-toggle-hover-color: #004db4;
   --playlist-color: #aeb0b2;
   --border-color: #aeb0b2;
+  --hover-border-color: #ffffff;
   --spinner-color: #ffffff66;
   --spinner-highlight-color: #5599f0;
   --tree-count-color: #7b7b7e;
@@ -20,4 +22,12 @@
   --toolbar-background-color: #434343;
   --toolbar-button-hover-color: #ffffff;
   --toolbar-button-hover-background-color: #004db4;
+
+  --popup-background-color: #272727;
+  --popup-shadow-color: #646464;
+  --popup-border-color: #646464;
+  --popup-color: #fff;
+  --popup-hover-background-color: #5599f0;
+  --popup-hover-color: #fff;
+
 }

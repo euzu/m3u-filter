@@ -8,10 +8,15 @@ const HEADER_ACCEPT = 'Accept';
 
 export default interface ApiService {
     get<T>(query: string, url?: string): Observable<T>;
+
     post<T>(query: string, payload: any, url?: string): Observable<T>;
+
     put<T>(query: string, payload: any, url?: string): Observable<T>;
-    delete<T>(query: string, url?: string) : Observable<T>;
-    postFile<T>(query: string, fileName: string, file: any, url?: string) : Observable<T>;
+
+    delete<T>(query: string, url?: string): Observable<T>;
+
+    postFile<T>(query: string, fileName: string, file: any, url?: string): Observable<T>;
+    downloadFile<T>(query: string, payload: any, url?: string): Observable<T>;
 }
 
 export class DefaultApiService implements ApiService {
@@ -112,6 +117,33 @@ export class DefaultApiService implements ApiService {
                 })
                 .catch((error) => observer.error(this.prepareError(error)));
         });
+    }
+
+    downloadFile<T>(query: string, payload: any, url?: string): Observable<T> {
+        return this.post(query, payload, url);
+        // return new Observable((observer) => {
+        //
+        //     axios.post<T>(this.getUrl(query, url), payload, {responseType: 'blob', headers: this.getHeaders()})
+        //         .then((response) => {
+        //             const disposition = response.headers['content-disposition'];
+        //             let filename = disposition.split(/;(.+)/)[1].split(/=(.+)/)[1];
+        //             if (filename.toLowerCase().startsWith("utf-8''"))
+        //                 filename = decodeURIComponent(filename.replace("utf-8''", ''));
+        //             else
+        //                 filename = filename.replace(/['"]/g, '');
+        //             return {filename, data: response.data};
+        //         }).then((params: { filename: string, data: any }) => {
+        //         const url = window.URL.createObjectURL(params.data);
+        //         const a = document.createElement('a');
+        //         a.href = url;
+        //         a.download = params.filename;
+        //         document.body.appendChild(a); // append the element to the dom
+        //         a.click();
+        //         a.remove(); // afterwards, remove the element
+        //         observer.next(true as any);
+        //         observer.complete();
+        //     }).catch((error) => observer.error(this.prepareError(error)));
+        // });
     }
 
 }

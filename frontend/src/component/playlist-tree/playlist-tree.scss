@@ -51,6 +51,7 @@
           display: flex;
           flex-flow: row;
           align-items: center;
+          gap: 3px;
 
           .tool-button {
             display: flex;
@@ -107,4 +108,31 @@
     }
   }
 
+}
+
+.download-info {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  background-color: var(--popup-background-color);
+  color: var(--popup-color);
+  filter: drop-shadow(2px 2px 3px var(--popup-shadow-color));
+  border: 1px solid var(--popup-border-color);
+  z-index: 100;
+
+  ul {
+    list-style-type: none; /* Remove bullets */
+    padding: 0; /* Remove padding */
+    margin: 0; /* Remove margins */
+    li {
+      padding: 8px;
+      border-radius: 4px;
+      user-select: none;
+      cursor: pointer;
+      &:hover {
+        color: var(--popup-hover-color);
+        background-color: var(--popup-hover-background-color);
+      }
+    }
+  }
 }

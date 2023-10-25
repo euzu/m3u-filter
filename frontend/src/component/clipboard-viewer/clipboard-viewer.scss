@@ -1,10 +1,10 @@
 @import '../../scss/theme';
 
-$viewer-width: 200px;
+$viewer-height: 200px;
 
 .clipboard-viewer {
   display: flex;
-  flex-grow: 1;
+  flex: 1 1 auto;
   flex-flow: column;
 
   .clipboard-viewer-toolbar {
@@ -30,8 +30,7 @@ $viewer-width: 200px;
 
   .clipboard-viewer-content {
     flex-grow: 1;
-    max-width: $viewer-width;
-    min-width: $viewer-width;
+    max-height: $viewer-height;
     color: var(--text-color);
     overflow: auto;
     white-space: nowrap;
@@ -42,5 +41,6 @@ $viewer-width: 200px;
         padding: 0; /* Remove padding */
         margin: 0; /* Remove margins */
     }
+
   }
 }

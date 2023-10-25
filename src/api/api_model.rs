@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use actix_web::web;
 use serde::{Deserialize, Serialize};
 use crate::model::config::{Config, ConfigOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig};
@@ -7,6 +8,7 @@ use crate::model::model_config::{default_as_empty_str, ProcessingOrder};
 pub(crate) struct AppState {
     pub config: Arc<Config>,
     pub targets: Arc<ProcessTargets>,
+    pub downloads: Arc<Mutex<HashMap<String, u64>>>
 }
 
 #[derive(Serialize)]
