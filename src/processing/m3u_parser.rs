@@ -1,3 +1,4 @@
+use std::borrow::{BorrowMut};
 use std::cell::RefCell;
 use crate::model::config::Config;
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
@@ -68,7 +69,7 @@ fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistIt
     }
 }
 
-fn process_header(video_suffixes: &Vec<&str>,content: &String, url: String) -> PlaylistItemHeader {
+fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> PlaylistItemHeader {
     let mut plih = create_empty_playlistitem_header(content, url.clone());
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':');
@@ -104,15 +105,24 @@ fn process_header(video_suffixes: &Vec<&str>,content: &String, url: String) -> P
     }
 
     for suffix in video_suffixes {
-       if url.ends_with(suffix) {
-           // TODO find Series based on group or configured names
-           plih.xtream_cluster = XtreamCluster::Video;
-           break;
-       }
+        if url.ends_with(suffix) {
+            // TODO find Series based on group or configured names
+            plih.xtream_cluster = XtreamCluster::Video;
+            break;
+        }
+    }
+
+    let header = plih.borrow_mut();
+    if header.name.is_empty() {
+        if !header.title.is_empty() {
+            header.name = header.title.clone();
+        } else if !header.id.is_empty() {
+            header.name = header.id.clone();
+            header.title = header.id.clone();
+        }
     }
     plih
 }
-
 
 
 pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup> {
@@ -121,12 +131,7 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
-    let video_suffixes = if let Some(suffixes) = &cfg.video_suffix {
-        suffixes.iter().map(|s| s.as_str()).collect()
-    } else {
-        vec![".mp4", ".mkv", ".avi"]
-    };
-
+    let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(|ext| ext.as_str()).collect();
     for line in lines {
         if line.starts_with("#EXTINF") {
             header = Some(String::from(line));

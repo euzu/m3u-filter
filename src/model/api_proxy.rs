@@ -30,17 +30,13 @@ pub(crate) struct TargetUser {
 }
 
 impl TargetUser {
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<&str> {
-        if self.credentials.iter().any(|c| c.matches(username, password)) {
-            return Some(&self.target);
-        }
-        None
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(&UserCredentials, &str)> {
+        self.credentials.iter().find(|c| c.matches(username, password))
+            .map(|credentials| (credentials, self.target.as_str()))
     }
-    pub fn get_target_name_by_token(&self, token: &str) -> Option<&str> {
-        if self.credentials.iter().any(|c| c.matches_token(token)) {
-            return Some(&self.target);
-        }
-        None
+    pub fn get_target_name_by_token(&self, token: &str) -> Option<(&UserCredentials, &str)> {
+        self.credentials.iter().find(|c| c.matches_token(token))
+            .map(|credentials| (credentials, self.target.as_str()))
     }
 }
 
@@ -97,19 +93,19 @@ impl ApiProxyConfig {
         }
     }
 
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<&str> {
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(&UserCredentials, &str)> {
         for target_user in &self.user {
-            if let Some(target_name) = target_user.get_target_name(username, password) {
-                return Some(target_name);
+            if let Some((credentials, target_name)) = target_user.get_target_name(username, password) {
+                return Some((credentials, target_name));
             };
         }
         None
     }
 
-    pub fn get_target_name_by_token(&self, token: &str) -> Option<&str> {
+    pub fn get_target_name_by_token(&self, token: &str) -> Option<(&UserCredentials, &str)> {
         for target_user in &self.user {
-            if let Some(target_name) = target_user.get_target_name_by_token(token) {
-                return Some(target_name);
+            if let Some((credentials, target_name)) = target_user.get_target_name_by_token(token) {
+                return Some((credentials, target_name));
             };
         }
         None

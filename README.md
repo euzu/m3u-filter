@@ -60,7 +60,7 @@ Top level entries in the config files are:
 * `sources`
 * `threads` _optional_
 * `messaging`  _optional_
-* `video_suffix` _optional_
+* `video` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -122,19 +122,18 @@ They have 2 fields:
 Example input config for `m3u`
 ```yaml
 sources:
- inputs:
+- inputs:
     - url: 'test-input.m3u'
       enabled: false
       persist: 'playlist_1_{}.m3u'
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ad.m3u'
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/au.m3u'
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/za.m3u'
- targets:
-  - name: test
-    output:
-      - type: m3u
-        filename: test.m3u
-
+  targets:
+   - name: test
+     output:
+       - type: m3u
+         filename: test.m3u
 ```
 
 Example input config for `xtream`
@@ -281,7 +280,7 @@ templates:
 - name: PROV1_ALL
   value:  "!PROV1_TR! OR !PROV1_DE! OR !PROV1_FR!"
 sources:
-    inputs:
+  - inputs:
       - enabled: true
         url: http://myserver.net/playlist.m3u
         persist: ./playlist_{}.m3u
@@ -360,17 +359,30 @@ messaging:
 
 For more information: [Telegram bots](https://core.telegram.org/bots/tutorial)
 
-### 1.7 `video_suffix`
-video_suffix a optional list.
+### 1.7 `video`
+`video` is optional.
 
-It is possible to define video file endings to assign the playlist entry to the xtream cluster video.
-If no suffix is given, default suffixes are: 
+It has 2 entries `extensions` and `download`.
+
+The `extensions` are a list of video file extensions like `mp4`, `avi`, `mkv`.
+It used for 2 purposes:
+a. When you have input `m3u` and output `xtream` the url's with the matching endings will be categorized as `video`.
+b. The download button from the `ui` is available. 
+
+`download` is optional and is only necessary if you want to download the video files from the ui 
+to a specific directory.
 
 ```yaml
-video_suffix:
-  - .mkv
-  - .mp4
-  - .avi
+video:
+  extensions:
+    - mkv
+    - mp4
+    - avi
+  download:
+    headers:
+      User-Agent: "AppleTV/tvOS/9.1.1."
+      Accept: "video/*"
+    directory: /tmp/
 ```
 
 ### 1.7 `schedule`

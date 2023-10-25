@@ -12,10 +12,16 @@ messaging:
     bot_token: '<your telegram bot token>'
     chat_ids:
       - <your telegram chat_id>
-video_suffix:
-  - .mkv
-  - .mp4
-  - .avi
+video:
+  extensions:
+    - mkv
+    - mp4
+    - avi
+  download:
+    headers:
+      User-Agent: "AppleTV/tvOS/9.1.1."
+      Accept: "video/*"
+    directory: /tmp/
 templates:
   - name: DE_CHAN
     value: >-

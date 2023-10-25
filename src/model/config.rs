@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 use enum_iterator::Sequence;
 use log::{debug, error, warn};
@@ -7,7 +8,7 @@ use path_absolutize::*;
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::MsgKind;
-use crate::model::api_proxy::ApiProxyConfig;
+use crate::model::api_proxy::{ApiProxyConfig, UserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
 use crate::model::model_config::{default_as_false, default_as_true, default_as_zero, ItemField, ProcessingOrder, SortOrder, TargetType};
@@ -18,7 +19,10 @@ fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 
 pub(crate) fn default_as_default() -> String { String::from("default") }
 
-fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
+fn default_as_empty_map<K, V>() -> HashMap<K, V> { HashMap::new() }
+
+fn default_as_empty_list<T>() -> Vec<T> { vec![] }
+
 
 #[macro_export]
 macro_rules! create_m3u_filter_error_result {
@@ -152,6 +156,7 @@ pub(crate) struct ConfigOptions {
 pub(crate) struct TargetOutput {
     #[serde(alias = "type")]
     pub target: TargetType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
 }
 
@@ -163,15 +168,20 @@ pub(crate) struct ConfigTarget {
     pub enabled: bool,
     #[serde(default = "default_as_default")]
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub options: Option<ConfigOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sort: Option<ConfigSort>,
     pub filter: String,
     #[serde(alias = "type")]
     pub output: Vec<TargetOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rename: Option<Vec<ConfigRename>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mapping: Option<Vec<String>>,
     #[serde(default = "default_as_frm")]
     pub processing_order: ProcessingOrder,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub watch: Option<Vec<String>>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _filter: Option<Filter>,
@@ -298,6 +308,21 @@ impl ToString for InputType {
     }
 }
 
+impl FromStr for InputType {
+    type Err = M3uFilterError;
+
+    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+        if s.eq("m3u") {
+            Ok(InputType::M3u)
+        } else if s.eq("xtream") {
+            Ok(InputType::Xtream)
+        } else {
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unkown InputType: {}", s)
+        }
+    }
+}
+
+
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -309,11 +334,17 @@ pub(crate) struct ConfigInput {
     #[serde(default = "default_as_empty_map")]
     pub headers: HashMap<String, String>,
     pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub persist: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<InputAffix>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub suffix: Option<InputAffix>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(default = "default_as_true")]
     pub enabled: bool,
@@ -377,13 +408,26 @@ pub(crate) struct TelegramMessagingConfig {
     pub chat_ids: Vec<String>,
 }
 
-fn default_as_empty_list() -> Vec<MsgKind> { vec![] }
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MessagingConfig {
     #[serde(default = "default_as_empty_list")]
     pub notify_on: Vec<MsgKind>,
     pub telegram: Option<TelegramMessagingConfig>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct VideoDownloadConfig {
+    #[serde(default = "default_as_empty_map")]
+    pub headers: HashMap<String, String>,
+    pub directory: Option<String>,
+
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct VideoConfig {
+    #[serde(default = "default_as_empty_list")]
+    pub extensions: Vec<String>,
+    pub download: Option<VideoDownloadConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -394,7 +438,7 @@ pub(crate) struct Config {
     pub sources: Vec<ConfigSource>,
     pub working_dir: String,
     pub templates: Option<Vec<PatternTemplate>>,
-    pub video_suffix: Option<Vec<String>>,
+    pub video: Option<VideoConfig>,
     pub schedule: Option<String>,
     pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -406,13 +450,13 @@ impl Config {
         self._api_proxy = api_proxy;
     }
 
-    fn _get_target_for_user(&self, user_target: Option<&str>) -> Option<&ConfigTarget> {
+    fn _get_target_for_user<'a>(&self, user_target: Option<(&'a UserCredentials, &str)>) -> Option<(&'a UserCredentials, &ConfigTarget)> {
         match user_target {
-            Some(target_name) => {
+            Some((user, target_name)) => {
                 for source in &self.sources {
                     for target in &source.targets {
                         if target_name.eq_ignore_ascii_case(&target.name) {
-                            return Some(target);
+                            return Some((user, target));
                         }
                     }
                 }
@@ -422,22 +466,33 @@ impl Config {
         }
     }
 
-    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<&ConfigTarget> {
+    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(&UserCredentials, &ConfigTarget)> {
         match &self._api_proxy {
             Some(api_proxy) => {
-               self._get_target_for_user(api_proxy.get_target_name(username, password))
+                self._get_target_for_user(api_proxy.get_target_name(username, password))
             }
             _ => None
         }
     }
 
-    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<&ConfigTarget> {
+    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(&UserCredentials, &ConfigTarget)> {
         match &self._api_proxy {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name_by_token(token))
             }
             _ => None
         }
+    }
+
+    pub fn get_input_by_id(&self, input_id: &u16) -> Option<ConfigInput> {
+        for source in &self.sources {
+            for input in &source.inputs {
+                if input.id == *input_id {
+                    return Some(input.clone());
+                }
+            }
+        }
+        None
     }
 
     pub fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError> {
@@ -499,6 +554,19 @@ impl Config {
                 prepare_result?;
                 target_index += 1;
             }
+        }
+
+        match &mut self.video {
+            None => {
+                self.video = Some(VideoConfig {
+                    extensions: vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()],
+                    download: None,
+                })
+            }
+            Some(video) =>
+                {
+                    video.extensions = vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()];
+                }
         }
         Ok(())
     }

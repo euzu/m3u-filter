@@ -4,12 +4,13 @@ use actix_web::{get, HttpRequest, HttpResponse, web};
 use chrono::{Duration, Local};
 
 use crate::api::api_utils::{get_user_target, serve_file};
-use crate::api::model_api::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
+use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
+use crate::model::api_proxy::{UserCredentials};
 use crate::model::config::Config;
 use crate::model::model_config::{TargetType};
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, xtream_get_all};
 
-fn get_user_info(user_name: &str, cfg: &Config) -> XtreamAuthorizationResponse {
+fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
     let server = &cfg._api_proxy.as_ref().unwrap().server;
     let now = Local::now();
     XtreamAuthorizationResponse {
@@ -22,8 +23,8 @@ fn get_user_info(user_name: &str, cfg: &Config) -> XtreamAuthorizationResponse {
             is_trial: 0,
             max_connections: 1,
             message: server.message.to_string(),
-            password: "dfdfdf".to_string(),
-            username: user_name.to_string(),
+            password: user.password.to_string(),
+            username: user.username.to_string(),
             status: "Active".to_string(),
         },
         server_info: XtreamServerInfo {
@@ -47,11 +48,11 @@ pub(crate) async fn xtream_player_api(
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
     match get_user_target(&api_req, &_app_state) {
-        Some(target) => {
+        Some((user, target)) => {
             let target_name = &target.name;
             if target.has_output(&TargetType::Xtream) {
                 if api_req.action.is_empty() {
-                    return HttpResponse::Ok().json(get_user_info(api_req.username.as_str(), &_app_state.config));
+                    return HttpResponse::Ok().json(get_user_info(user, &_app_state.config));
                 }
                 match match api_req.action.as_str() {
                     "get_live_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_LIVE),

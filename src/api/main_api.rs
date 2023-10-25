@@ -6,18 +6,17 @@ use std::time::Duration;
 
 use actix_cors::Cors;
 use actix_files::NamedFile;
-use actix_web::{App, get, HttpRequest, HttpResponse, HttpServer, web};
+use actix_web::{App, get, HttpRequest, HttpServer, web};
 use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use chrono::Local;
 use cron::Schedule;
-use serde_json::json;
 use crate::api::m3u_api::m3u_api;
 
-use crate::api::model_api::{AppState, PlaylistRequest, ServerConfig};
+use crate::api::api_model::{AppState};
+use crate::api::v1_api::{v1_api_register};
 use crate::api::xtream_player_api::xtream_player_api;
-use crate::download::get_m3u_playlist;
-use crate::model::config::{Config, ConfigInput, InputType, ProcessTargets};
+use crate::model::config::{Config,ProcessTargets};
 use crate::processing::playlist_processor::exec_processing;
 
 #[get("/")]
@@ -29,44 +28,6 @@ async fn index(
     NamedFile::open(path)
 }
 
-pub(crate) async fn playlist(
-    req: web::Json<PlaylistRequest>,
-    _app_state: web::Data<AppState>,
-) -> HttpResponse {
-    // TODO refactor this
-    let input = ConfigInput {
-        id: 0,
-        input_type: InputType::M3u,
-        headers: Default::default(),
-        url: String::from(&req.url),
-        username: None,
-        password: None,
-        persist: None,
-        prefix: None,
-        suffix: None,
-        name: None,
-        enabled: true,
-    };
-    let (result, errors) = get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir);
-    if result.is_empty() {
-        let error_strings: Vec<String> = errors.iter().map(|err| err.to_string()).collect();
-        HttpResponse::BadRequest().json(json!({"error": error_strings.join(", ")}))
-    } else {
-        HttpResponse::Ok().json(result)
-    }
-}
-
-pub(crate) async fn config(
-    _app_state: web::Data<AppState>,
-) -> HttpResponse {
-    let sources: Vec<String> = _app_state.config.sources.iter()
-        .flat_map(|t| t.inputs.iter())
-        .map(|i| i.url.clone()).collect();
-    let result = ServerConfig {
-        sources
-    };
-    HttpResponse::Ok().json(result)
-}
 
 #[actix_web::main]
 pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> futures::io::Result<()> {
@@ -104,11 +65,8 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
             .max_age(3600)
         )
         .app_data(shared_data.clone())
-        .service(
-            web::scope("/api/v1")
-                .route("/playlist", web::post().to(playlist))
-                .route("/config", web::get().to(config))
-        ).service(xtream_player_api)
+        .service(v1_api_register())
+        .service(xtream_player_api)
         .service(m3u_api)
         .service(index)
         .service(actix_files::Files::new("/", web_dir.to_string()))
