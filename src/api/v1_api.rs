@@ -120,7 +120,7 @@ async fn async_download_file(download_id: &String, path: &PathBuf, response: Res
                                         downloaded = new;
                                         downloads.lock().unwrap().insert(download_id.to_owned(), downloaded);
                                     }
-                                    Err(err) => return Err(format!("Error while writing to file: {}", err))
+                                    Err(err) => return Err(format!("Error while writing to file: {} {}", path.to_str().unwrap_or("?"), err))
                                 }
                             }
                             None => {
@@ -130,11 +130,11 @@ async fn async_download_file(download_id: &String, path: &PathBuf, response: Res
                             },
                         }
                     }
-                    Err(err) => return Err(format!("Error while writing to file: {}", err)),
+                    Err(err) => return Err(format!("Error while writing to file: {} {}", path.to_str().unwrap_or("?"), err))
                 }
             }
         }
-        Err(err) => Err(format!("Error while writing to file: {}", err))
+        Err(err) => Err(format!("Error while writing to file: {} {}", path.to_str().unwrap_or("?"), err))
     }
 }
 

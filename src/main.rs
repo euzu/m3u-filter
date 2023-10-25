@@ -84,7 +84,7 @@ fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    debug!("web_root: {}", &cfg.api.web_root);
+    info!("web_root: {}", &cfg.api.web_root);
     info!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
     match api::main_api::start_server(cfg, targets) {
         Ok(_) => {}
