@@ -173,7 +173,7 @@ pub(crate) struct ConfigTarget {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort: Option<ConfigSort>,
     pub filter: String,
-    #[serde(alias = "type")]
+    #[serde(alias = "type", default="default_as_empty_list")]
     pub output: Vec<TargetOutput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rename: Option<Vec<ConfigRename>>,

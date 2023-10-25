@@ -30,6 +30,7 @@ pub(crate) async fn config_user(
 ) -> HttpResponse {
     // TODO implement
     info!("{:?}", req.0);
+    // dont forget to trim()
     HttpResponse::Ok().finish()
 }
 

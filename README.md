@@ -156,7 +156,7 @@ Has the following top level entries:
 * `enabled` _optional_ default is `true`, if you disable the processing is skipped
 * `name` _optional_ default is `default`, if not default it has to be unique, for running selective targets
 * `sort`  _optional_
-* `output` _optional_  list of output formats
+* `output` _mandatory_ list of output formats
 * `processing_order` _optional_ default is `frm`
 * `options` _optional_
 * `filter` _mandatory_,

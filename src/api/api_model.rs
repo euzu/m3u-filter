@@ -46,7 +46,7 @@ pub(crate) struct XtreamAuthorizationResponse {
 }
 
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UserApiRequest {
     #[serde(default = "default_as_empty_str")]
     pub username: String,

@@ -2,6 +2,7 @@
 
 use actix_web::{get, HttpRequest, HttpResponse, web};
 use chrono::{Duration, Local};
+use log::debug;
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
@@ -47,35 +48,43 @@ pub(crate) async fn xtream_player_api(
     req: HttpRequest,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
+    debug!("Incoming request {:?}", &api_req.0);
     match get_user_target(&api_req, &_app_state) {
         Some((user, target)) => {
+            let action = api_req.action.trim();
             let target_name = &target.name;
             if target.has_output(&TargetType::Xtream) {
-                if api_req.action.is_empty() {
+                if action.is_empty() {
                     return HttpResponse::Ok().json(get_user_info(user, &_app_state.config));
                 }
-                match match api_req.action.as_str() {
+                match match action {
                     "get_live_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_LIVE),
                     "get_vod_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_VOD),
                     "get_series_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_SERIES),
                     "get_live_streams" => xtream_get_all(&_app_state.config, target_name, COL_LIVE),
                     "get_vod_streams" => xtream_get_all(&_app_state.config, target_name, COL_VOD),
                     "get_series" => xtream_get_all(&_app_state.config, target_name, COL_SERIES),
-                    _ => Err(std::io::Error::new(std::io::ErrorKind::Unsupported, format!("Cant find action: {}/{}", target_name, &api_req.action))),
+                    _ => Err(std::io::Error::new(std::io::ErrorKind::Unsupported, format!("Cant find action: {}/{}", target_name, action))),
                 } {
                     Ok(file_path) => {
                         serve_file(&file_path, &req).await
                     }
-                    Err(_) => HttpResponse::BadRequest().finish()
+                    Err(err) => {
+                        debug!("Could not open file for xtream target: {} {}", target_name, err);
+                        HttpResponse::BadRequest().finish()
+                    }
                 }
             } else {
+                debug!("Target has not output xtream {}", target_name);
                 HttpResponse::BadRequest().finish()
             }
         }
         _ => {
             if api_req.action.is_empty() {
+                debug!("Paremeter action is empty!");
                 HttpResponse::Unauthorized().finish()
             } else {
+                debug!("cant find user!");
                 HttpResponse::BadRequest().finish()
             }
         }

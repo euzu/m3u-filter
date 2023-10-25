@@ -99,7 +99,14 @@ export default function UserView(props: UserViewProps) {
                 usernames[user.username] = true;
             }
         }
-        const targetUser = targets.map(t => ({target: t.target, credentials: t.credentials}));
+        const targetUser = targets.map(t => {
+            t.credentials.forEach(c => {
+                c.username = c.username.trim();
+                c.password = c.password.trim();
+                c.token = c.token.trim();
+            })
+            return {target: t.target, credentials: t.credentials}
+        });
         services.config().saveTargetUser(targetUser).subscribe({
             next: () => enqueueSnackbar("User saved!", {variant: 'success'}),
             error: (err) => enqueueSnackbar("Failed to save user!", {variant: 'error'})
