@@ -48,7 +48,7 @@ export default function App(props: AppProps) {
 
     const handleSave = useCallback(() => {
         const filteredPlaylist = viewerRef.current.getFilteredPlaylist();
-        if (filteredPlaylist) {
+        if (filteredPlaylist?.length) {
             services.file().save(filteredPlaylist);
         }
     }, [services]);

@@ -2,7 +2,6 @@ import {Observable} from "rxjs";
 import PlaylistApiService, {DefaultPlaylistApiService} from "../api/playlist-api-service";
 import {PlaylistGroup} from "../model/playlist";
 import {first} from "rxjs/operators";
-import {InputType} from "../model/server-config";
 import {PlaylistRequest} from "../model/playlist-request";
 
 export default class PlaylistService {

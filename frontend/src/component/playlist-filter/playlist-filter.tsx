@@ -1,9 +1,9 @@
-import React, {useMemo, useCallback, useRef, KeyboardEvent} from "react";
+import React, {useCallback, useRef, KeyboardEvent} from "react";
 import './playlist-filter.scss';
 import {getIconByName} from "../../icons/icons";
 
 interface PlaylistFilterProps {
-   onFilter: (filter: string) => void;
+    onFilter: (filter: string) => void;
 }
 
 export default function PlaylistFilter(props: PlaylistFilterProps) {
@@ -15,7 +15,7 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
         onFilter(value);
     }, [onFilter]);
 
-    const handleKeyPress = useCallback((event:  KeyboardEvent<any>) => {
+    const handleKeyPress = useCallback((event: KeyboardEvent<any>) => {
         if (event.key === 'Enter') {
             handleSearch();
         }

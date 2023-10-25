@@ -1,5 +1,5 @@
 import ApiService, {DefaultApiService} from "./api-service";
-import {Observable, throwError, timer} from "rxjs";
+import {Observable, throwError} from "rxjs";
 import {FileDownloadInfo, FileDownloadRequest, FileDownloadResponse} from "../model/file-download";
 import {first} from "rxjs/operators";
 

@@ -40,6 +40,7 @@
     border: none;
     border-radius: 50%;
     aspect-ratio: 1 / 1;
+    cursor: pointer;
 
     svg {
       color: var(--playlist-color);
@@ -75,5 +76,12 @@
     background-color: #0081fa;
     border-radius: 10px;
     border: none;
+  }
+}
+
+button {
+  cursor: pointer;
+  &:active {
+    transform: scale(0.98); /* Scaling button to 0.98 to its original size */
   }
 }

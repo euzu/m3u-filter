@@ -1,37 +1,33 @@
-import React, {ReactChildren, ReactNode, useCallback, useEffect, useRef, useState} from "react";
+import React, {ReactNode, useEffect, useRef, useState} from "react";
 
 import './popup-menu.scss';
 import ClickAwayListener from "../../utils/click-away-listener";
 
 interface PopupMenuProps {
-    position: {x: number, y: number},
+    position: { x: number, y: number },
     children: ReactNode,
     onHide: () => void;
 }
 
 export default function PopupMenu(props: PopupMenuProps) {
-
+    const {position, onHide} = props;
     const popupRef = useRef();
-    const [position, setPosition] = useState<any>({top:0, left: -2000})
-
-    const handleClickAway = useCallback(() => {
-        props.onHide?.();
-    }, [props.onHide]);
+    const [popupPosition, setPopupPosition] = useState<any>({top: 0, left: -2000})
 
     useEffect(() => {
-        if (props.position &&  popupRef.current) {
+        if (position && popupRef.current) {
             const ww = window.innerWidth;
             const {offsetWidth} = popupRef.current;
             const style: any =
-                (props.position.x + offsetWidth > ww)
-                    ? {right:12, top: props.position.y}
-                    : {left:props.position.x, top: props.position.y};
-            setPosition(style);
+                (position.x + offsetWidth > ww)
+                    ? {right: 12, top: position.y}
+                    : {left: position.x, top: position.y};
+            setPopupPosition(style);
         }
-    }, [props.position])
+    }, [position])
 
-    return <>{props.position && <ClickAwayListener onClickAway={handleClickAway}>
-        <div className="popup-menu" ref={popupRef} style={position}>
+    return <>{props.position && <ClickAwayListener onClickAway={onHide}>
+        <div className="popup-menu" ref={popupRef} style={popupPosition}>
             {props.children}
         </div>
     </ClickAwayListener>}</>
