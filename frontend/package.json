@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@babel/runtime": "7.23.2",
+    "@babel/plugin-proposal-private-property-in-object": "7.21.11",
     "@types/file-saver": "2.0.6",
     "@types/react": "18.2.31",
     "@types/react-dom": "18.2.14",
@@ -44,7 +45,7 @@
     "eslint-plugin-node": "11.1.0",
     "eslint-plugin-react": "7.33.2",
     "eslint-plugin-react-hooks": "4.6.0",
-    "node-sass": "9.0.0",
+    "sass": "1.69.4",
     "prettier": "3.0.3",
     "react-scripts": "5.0.1",
     "source-map-explorer": "2.5.3",

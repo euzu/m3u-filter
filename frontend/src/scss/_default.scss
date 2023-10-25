@@ -1,3 +1,5 @@
+@use './common';
+
 .input-field {
   display: flex;
   position: relative;
@@ -35,23 +37,7 @@
   }
 
   button {
-    color: var(--playlist-color);
-    background-color: transparent;
-    border: none;
-    border-radius: 50%;
-    aspect-ratio: 1 / 1;
-    cursor: pointer;
-
-    svg {
-      color: var(--playlist-color);
-    }
-
-    &:focus,
-    &:hover {
-      background-color: var(--tree-hover-background-color);
-      border: none;
-      outline: none;
-    }
+    @include common.iconButton();
   }
 }
 
@@ -82,6 +68,10 @@
 button {
   cursor: pointer;
   &:active {
-    transform: scale(0.98); /* Scaling button to 0.98 to its original size */
+    transform: scale(0.90); /* Scaling button to 0.98 to its original size */
   }
+}
+
+.hidden {
+  display: none !important;
 }

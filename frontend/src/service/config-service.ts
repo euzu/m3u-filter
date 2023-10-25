@@ -1,6 +1,6 @@
 import ConfigApiService, {DefaultConfigApiService} from "../api/config-api-service";
 import {Observable} from "rxjs";
-import ServerConfig from "../model/server-config";
+import ServerConfig, {TargetUser} from "../model/server-config";
 
 export default class ConfigService {
     constructor(private configApiService: ConfigApiService = new DefaultConfigApiService()) {
@@ -8,5 +8,9 @@ export default class ConfigService {
 
     getServerConfig(): Observable<ServerConfig> {
         return this.configApiService.getServerConfig();
+    }
+
+    saveTargetUser(targetUser: TargetUser[]) {
+        return this.configApiService.saveTargetUser(targetUser);
     }
 }

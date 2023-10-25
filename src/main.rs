@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use env_logger::Builder;
-use log::{debug, error, info, LevelFilter};
+use log::{ error, info, LevelFilter};
 
 use crate::config_reader::{read_api_proxy_config, read_config, read_mappings};
 use crate::model::config::{Config, ProcessTargets, validate_targets};

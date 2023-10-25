@@ -13,14 +13,25 @@ use crate::model::config::{ConfigInput, InputType};
 use crate::utils::{bytes_to_megabytes};
 use futures::stream::TryStreamExt;
 use log::{error, info};
+use regex::Regex;
 use reqwest::{header, Response};
 use reqwest::header::{HeaderName, HeaderValue};
 use unidecode::unidecode;
+use crate::model::api_proxy::{TargetUser};
 
 const DOWNLOAD_HEADERS: &[(&str, &str)] = &[
     ("Accept", "video/*"),
     ("User-Agent", "AppleTV/tvOS/9.1.1.")
 ];
+
+pub(crate) async fn config_user(
+    req: web::Json<Vec<TargetUser>>,
+    _app_state: web::Data<AppState>,
+) -> HttpResponse {
+    // TODO implement
+    info!("{:?}", req.0);
+    HttpResponse::Ok().finish()
+}
 
 pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
@@ -97,7 +108,8 @@ pub(crate) async fn config(
 
     let result = ServerConfig {
         video: _app_state.config.video.clone(),
-        sources
+        sources,
+        user: _app_state.config._api_proxy.as_ref().map(|proxy| proxy.user.clone())
     };
     HttpResponse::Ok().json(result)
 }
@@ -171,7 +183,9 @@ pub(crate) async fn download_file(
                 }
                 match client.get(_url).headers(headers).send().await {
                     Ok(response) => {
-                        let filename = unidecode(&req.filename).replace(' ', "_");
+                        let filename_re = Regex::new(r"[^A-Za-z0-9_-]").unwrap();
+                        let filename = filename_re.replace_all(&unidecode(&req.filename).replace(' ', "_"), "").to_string();
+
                         let path: PathBuf = [(download.directory.clone().unwrap().as_str()), filename.as_str()].iter().collect();
                         let download_id = Uuid::new_v4().to_string();
                         let response_download_id = download_id.clone();
@@ -208,6 +222,7 @@ pub(crate) async fn download_file(
 pub(crate) fn v1_api_register() -> Scope {
     web::scope("/api/v1")
         .route("/config", web::get().to(config))
+        .route("/config/user", web::post().to(config_user))
         .route("/playlist", web::post().to(playlist))
         .route("/file/download", web::post().to(download_file))
         .route("/file/download/{did}", web::get().to(download_file_info))

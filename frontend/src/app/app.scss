@@ -1,16 +1,35 @@
+@use '../scss/common';
+
 .app {
   display: flex;
   flex-flow: column;
   justify-content: center;
   overflow: hidden;
   height: 100%;
+  color: var(--text-color);
 
   .app-header {
+    display: flex;
+    flex-flow: row;
     font-size: 2rem;
     font-weight: bold;
     color: var(--app-header-color);
     text-align:center;
     padding-top: 10px;
+
+    &__caption {
+      flex: 1 1 auto;
+      text-align:center;
+      padding-left: 40px;
+    }
+
+    &__toolbar {
+      flex: 0 0 auto;
+      button {
+        @include common.iconButton();
+      }
+      padding-right: 4px;
+    }
   }
 
   .app-main {

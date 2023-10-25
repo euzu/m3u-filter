@@ -9,6 +9,8 @@ services:
       # - ./config.yml:/config.yml
       # - ./api-proxy.yml:/api-proxy.yml
       # - ./mapping.yml:/mapping.yml
+    environment:
+      - TZ=Europe/Paris
     ports:
       - "8901:8901"
     restart: unless-stopped

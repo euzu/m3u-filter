@@ -1,0 +1,31 @@
+@mixin iconButton {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--playlist-color);
+  background-color: transparent;
+  border: none;
+  border-radius: 50%;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+
+  svg {
+    color: var(--playlist-color);
+  }
+
+  &:focus,
+  &:hover {
+    background-color: var(--tree-hover-background-color);
+    border: none;
+    outline: none;
+  }
+}
+
+@mixin textButton {
+  background-color: #0081fa;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  font-size: 1.2rem;
+  border-radius: 4px;
+  padding: 4px 12px;
+}

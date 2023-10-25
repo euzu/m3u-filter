@@ -15,6 +15,8 @@ import ClipboardViewer from "../component/clipboard-viewer/clipboard-viewer";
 import Sidebar from "../component/sidebar/sidebar";
 import {PlaylistRequest} from "../model/playlist-request";
 import ServerConfig from "../model/server-config";
+import {getIconByName} from "../icons/icons";
+import Preferences from "../component/preferences/preferences";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface AppProps {
@@ -26,6 +28,7 @@ export default function App(props: AppProps) {
     const [progress, setProgress] = useState<boolean>(false);
     const [playlist, setPlaylist] = useState<PlaylistGroup[]>([]);
     const [serverConfig, setServerConfig] = useState<ServerConfig>(undefined);
+    const [preferencesVisible, setPreferencesVisible] = useState<boolean>(false);
     const clipboardChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
     const viewerRef = useRef<IPlaylistViewer>();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
@@ -83,11 +86,23 @@ export default function App(props: AppProps) {
         return noop
     }, [enqueueSnackbar, services]);
 
+    const handlePreferences = useCallback(() => {
+       setPreferencesVisible((value:boolean) => !value);
+    }, []);
+
 
     return (
         <div className="app">
-            <div className={'app-header'}>m3u-filter</div>
-            <div className={'app-main'}>
+            <div className={'app-header'}>
+                <div className={'app-header__caption'}>m3u-filter</div>
+                <div className={'app-header__toolbar'}><button onClick={handlePreferences}>{getIconByName('Config')}</button></div>
+            </div>
+            <div className={'app-main' + (preferencesVisible ? '' : '  hidden')}>
+                <div className={'app-content'}>
+                    <Preferences config={serverConfig} />
+                </div>
+            </div>
+            <div className={'app-main' + (preferencesVisible ? ' hidden' : '')}>
                 <Sidebar>
                     <ClipboardViewer channel={clipboardChannel}></ClipboardViewer>
                 </Sidebar>

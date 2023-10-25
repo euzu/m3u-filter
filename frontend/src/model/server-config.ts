@@ -87,7 +87,19 @@ export interface VideoConfig {
     }
 }
 
+export interface Credentials {
+    username: string;
+    password: string;
+    token: string;
+}
+
+export interface TargetUser {
+    target: string;
+    credentials: Credentials[];
+}
+
 export default interface ServerConfig {
     sources: SourceConfig[];
     video: VideoConfig;
+    user: TargetUser[];
 }
