@@ -19,11 +19,11 @@ export default function UserView(props: UserViewProps) {
     useEffect(() => {
         if (config) {
             const target_names = ConfigUtils.getTargetNames(config);
-            const missing = config?.user.filter(target => !target_names.includes(target.target));
+            const missing = config?.api_proxy?.user.filter(target => !target_names.includes(target.target));
             const result: TargetUser[] = target_names?.map(name => ({
                 src: true,
                 target: name,
-                credentials: config.user.find(t => t.target === name)?.credentials || []
+                credentials: config.api_proxy.user.find(t => t.target === name)?.credentials || []
             } as any));
             missing?.forEach(target => {
                 result.push({src: false, target: target.target, credentials: target.credentials} as any);
@@ -155,7 +155,7 @@ export default function UserView(props: UserViewProps) {
                                     <input defaultValue={usr.token} key={usr.token} data-field={'token'}
                                            onChange={handleValueChange}></input>
                                 </div>
-                                <div className={'user__target-user-col toolbar'}>
+                                <div className={'user__target-user-col user__target-user-col-toolbar'}>
                                 <span data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
                                     {getIconByName('PersonRemove')}
                                 </span>

@@ -18,7 +18,8 @@ use reqwest::{header, Response};
 use reqwest::header::{HeaderName, HeaderValue};
 use unidecode::unidecode;
 use crate::config_reader::save_api_proxy;
-use crate::model::api_proxy::{TargetUser};
+use crate::m3u_filter_error::M3uFilterError;
+use crate::model::api_proxy::{ApiProxyConfig, ServerInfo, TargetUser};
 use crate::processing::playlist_processor::exec_processing;
 
 const DOWNLOAD_HEADERS: &[(&str, &str)] = &[
@@ -26,19 +27,41 @@ const DOWNLOAD_HEADERS: &[(&str, &str)] = &[
     ("User-Agent", "AppleTV/tvOS/9.1.1.")
 ];
 
-pub(crate) async fn config_user(
+
+fn save_config_api_proxy(api_proxy: &mut ApiProxyConfig) -> Option<M3uFilterError> {
+    match save_api_proxy(api_proxy) {
+        Ok(_) => {}
+        Err(err) => {
+            error!("Failed to save api_proxy.yml {}", err.to_string());
+            return Some(err);
+        }
+    }
+    None
+}
+
+pub(crate) async fn config_api_proxy_user(
     mut req: web::Json<Vec<TargetUser>>,
     mut _app_state: web::Data<AppState>,
 ) -> HttpResponse {
     req.0.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.trim());
     if let Some(api_proxy) = _app_state.config._api_proxy.lock().unwrap().as_mut() {
         api_proxy.user = req.0;
-        match save_api_proxy(api_proxy) {
-            Ok(_) => {}
-            Err(err) => {
-                error!("Failed to save api_proxy.yml {}", err.to_string());
-                return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
-            }
+        if let Some(err) = save_config_api_proxy(api_proxy) {
+            return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+        }
+    }
+    HttpResponse::Ok().finish()
+}
+
+pub(crate) async fn config_api_proxy_server_info(
+    req: web::Json<ServerInfo>,
+    mut _app_state: web::Data<AppState>,
+) -> HttpResponse {
+    // @TODO check server info
+    if let Some(api_proxy) = _app_state.config._api_proxy.lock().unwrap().as_mut() {
+        api_proxy.server = req.0;
+        if let Some(err) = save_config_api_proxy(api_proxy) {
+            return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
     }
     HttpResponse::Ok().finish()
@@ -139,7 +162,8 @@ pub(crate) async fn config(
     let result = ServerConfig {
         video: _app_state.config.video.clone(),
         sources,
-        user: _app_state.config._api_proxy.lock().unwrap().as_ref().map(|proxy| proxy.user.clone())
+        api_proxy: _app_state.config._api_proxy.lock().unwrap().clone(),
+        //user: _app_state.config._api_proxy.lock().unwrap().as_ref().map(|proxy| proxy.user.clone())
     };
     HttpResponse::Ok().json(result)
 }
@@ -252,7 +276,8 @@ pub(crate) async fn download_file(
 pub(crate) fn v1_api_register() -> Scope {
     web::scope("/api/v1")
         .route("/config", web::get().to(config))
-        .route("/config/user", web::post().to(config_user))
+        .route("/config/user", web::post().to(config_api_proxy_user))
+        .route("/config/serverinfo", web::post().to(config_api_proxy_server_info))
         .route("/playlist", web::post().to(playlist))
         .route("/playlist/update", web::post().to(playlist_update))
         .route("/file/download", web::post().to(download_file))

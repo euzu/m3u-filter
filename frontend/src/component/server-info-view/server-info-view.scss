@@ -1,0 +1,41 @@
+@use '../../scss/common';
+@use '../../scss/preferences';
+
+.server-info {
+
+  @include preferences.prefsRoot();
+  @include preferences.prefsToolbar();
+  @include preferences.prefsInput();
+
+  .server-info__content {
+    &-table {
+      margin: 8px 4px;
+      display: table;
+      width: auto;
+      border-collapse: separate;
+      border-spacing: 8px;
+    }
+
+    &-row {
+      display: table-row;
+      width: auto;
+      clear: both;
+    }
+
+    &-col {
+      display: table-cell;
+      width: auto;
+      padding: 6px;
+      text-align: right;
+
+      label {
+        font-weight: bold;
+        color: var(--label-color);
+        &:after {
+          content : ':'
+        }
+      }
+    }
+  }
+}
+

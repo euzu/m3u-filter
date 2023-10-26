@@ -98,8 +98,24 @@ export interface TargetUser {
     credentials: Credentials[];
 }
 
+export interface ServerInfo {
+    protocol: string;
+    ip: string;
+    http_port: string;
+    https_port: string;
+    rtmp_port: string;
+    timezone: string;
+    message: string;
+
+}
+
+export interface ApiProxyConfig {
+    server: ServerInfo;
+    user: TargetUser[];
+}
+
 export default interface ServerConfig {
     sources: SourceConfig[];
-    video: VideoConfig;
-    user: TargetUser[];
+    video?: VideoConfig;
+    api_proxy?: ApiProxyConfig;
 }

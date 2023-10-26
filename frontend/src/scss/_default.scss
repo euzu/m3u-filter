@@ -79,11 +79,20 @@ button {
 .card {
   display: flex;
   flex-flow: column;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   overflow: hidden;
   padding: 20px;
   border: 1px solid var(--card-border-color);
   background-color: var(--card-background-color);
   color: var(--card-color);
   filter: drop-shadow(3px 3px 4px var(--popup-shadow-color));
+  min-width: 200px;
+
+}
+
+.vert-group {
+  display: flex;
+  flex-flow: column;
+  gap: 20px;
+  overflow: hidden;
 }

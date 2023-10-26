@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use actix_web::web;
 use serde::{Deserialize, Serialize};
-use crate::model::api_proxy::TargetUser;
+use crate::model::api_proxy::{ApiProxyConfig};
 use crate::model::config::{Config, ConfigOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig};
 use crate::model::model_config::{default_as_empty_str, ProcessingOrder};
 
@@ -98,7 +98,7 @@ pub(crate) struct ServerSourceConfig {
 pub(crate) struct ServerConfig {
     pub sources: Vec<ServerSourceConfig>,
     pub video: Option<VideoConfig>,
-    pub user: Option<Vec<TargetUser>>
+    pub api_proxy: Option<ApiProxyConfig>
 }
 
 
