@@ -16,13 +16,13 @@ fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationRes
     let now = Local::now();
     XtreamAuthorizationResponse {
         user_info: XtreamUserInfo {
-            active_cons: 0,
+            active_cons: "0".to_string(),
             allowed_output_formats: Vec::from(["ts".to_string()]),
             auth: 1,
             created_at: (now - Duration::days(365)).timestamp(), // fake
             exp_date: (now + Duration::days(365)).timestamp(),// fake
-            is_trial: 0,
-            max_connections: 1,
+            is_trial: "0".to_string(),
+            max_connections: "1".to_string(),
             message: server.message.to_string(),
             password: user.password.to_string(),
             username: user.username.to_string(),

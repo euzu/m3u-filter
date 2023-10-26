@@ -1,5 +1,4 @@
 use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::PathBuf;
 use log::{debug, error, info, warn};
 use crate::model::api_proxy::ApiProxyConfig;
