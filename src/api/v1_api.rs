@@ -17,6 +17,7 @@ use regex::Regex;
 use reqwest::{header, Response};
 use reqwest::header::{HeaderName, HeaderValue};
 use unidecode::unidecode;
+use crate::config_reader::save_api_proxy;
 use crate::model::api_proxy::{TargetUser};
 use crate::processing::playlist_processor::exec_processing;
 
@@ -26,12 +27,20 @@ const DOWNLOAD_HEADERS: &[(&str, &str)] = &[
 ];
 
 pub(crate) async fn config_user(
-    req: web::Json<Vec<TargetUser>>,
-    _app_state: web::Data<AppState>,
+    mut req: web::Json<Vec<TargetUser>>,
+    mut _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    // TODO implement
-    info!("{:?}", req.0);
-    // dont forget to trim()
+    req.0.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.trim());
+    if let Some(api_proxy) = _app_state.config._api_proxy.lock().unwrap().as_mut() {
+        api_proxy.user = req.0;
+        match save_api_proxy(api_proxy) {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Failed to save api_proxy.yml {}", err.to_string());
+                return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+            }
+        }
+    }
     HttpResponse::Ok().finish()
 }
 
@@ -46,8 +55,10 @@ pub(crate) async fn playlist_update(
             exec_processing(_app_state.config.clone(), Arc::new(valid_targets));
             HttpResponse::Ok().finish()
         }
-        Err(err) =>
+        Err(err) => {
+            error!("Failed playlist update {}", err.to_string());
             HttpResponse::BadRequest().json(json!({"error": err.to_string()}))
+        }
     }
 }
 
@@ -128,7 +139,7 @@ pub(crate) async fn config(
     let result = ServerConfig {
         video: _app_state.config.video.clone(),
         sources,
-        user: _app_state.config._api_proxy.as_ref().map(|proxy| proxy.user.clone())
+        user: _app_state.config._api_proxy.lock().unwrap().as_ref().map(|proxy| proxy.user.clone())
     };
     HttpResponse::Ok().json(result)
 }

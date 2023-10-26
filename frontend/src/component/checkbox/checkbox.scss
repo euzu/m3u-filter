@@ -24,6 +24,7 @@ $checkbox-size:18px;
     height: $checkbox-size;
     width:  $checkbox-size;
     background-color: #eee;
+    border-radius: var(--border-radius);
 
     &:after {
       content: "";

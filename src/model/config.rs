@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 
 use enum_iterator::Sequence;
 use log::{debug, error, warn};
@@ -442,15 +443,15 @@ pub(crate) struct Config {
     pub schedule: Option<String>,
     pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _api_proxy: Option<ApiProxyConfig>,
+    pub _api_proxy: Arc<Mutex<Option<ApiProxyConfig>>>,
 }
 
 impl Config {
     pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) {
-        self._api_proxy = api_proxy;
+        self._api_proxy = Arc::new(Mutex::new(api_proxy));
     }
 
-    fn _get_target_for_user<'a>(&self, user_target: Option<(&'a UserCredentials, &str)>) -> Option<(&'a UserCredentials, &ConfigTarget)> {
+    fn _get_target_for_user(&self, user_target: Option<(UserCredentials, String)>) -> Option<(UserCredentials, &ConfigTarget)> {
         match user_target {
             Some((user, target_name)) => {
                 for source in &self.sources {
@@ -466,8 +467,8 @@ impl Config {
         }
     }
 
-    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(&UserCredentials, &ConfigTarget)> {
-        match &self._api_proxy {
+    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {
+        match self._api_proxy.lock().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name(username, password))
             }
@@ -475,8 +476,8 @@ impl Config {
         }
     }
 
-    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(&UserCredentials, &ConfigTarget)> {
-        match &self._api_proxy {
+    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(UserCredentials, &ConfigTarget)> {
+        match self._api_proxy.lock().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name_by_token(token))
             }

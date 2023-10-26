@@ -14,6 +14,7 @@
     flex: 0 1 auto;
     justify-content: center;
     align-items: center;
+    gap: 12px;
 
     label {
       flex: 1 1 auto;
@@ -36,9 +37,11 @@
 
     label {
       font-weight: bold;
+
       &:not(.target-not-exists) {
         color: var(--label-color);
       }
+
       &.target-not-exists {
         color: var(--attention-color);
       }
@@ -72,22 +75,65 @@
       label {
         flex: 1 1 0;
       }
+
+      &-toolbar {
+        flex: 0 0 auto;
+        button {
+          @include common.iconButton();
+        }
+        padding-right: 8px;
+      }
     }
 
     &-user {
       &-table {
         margin: 8px 4px;
-        display:table;
-        width:auto;
+        display: table;
+        width: auto;
       }
-      &-col {
-        display:table-cell;
-        width:auto;
-      }
+
       &-row {
-        display:table-row;
-        width:auto;
+        display: table-row;
+        width: auto;
         clear: both;
+      }
+
+      &-col {
+        display: table-cell;
+        width: auto;
+      }
+
+      &-col-label {
+        display: none;
+      }
+
+      @media (max-width: 750px) {
+        &-table {
+          display: flex;
+          flex-flow: column;
+          gap: 20px;
+
+          &-header {
+            display: none !important;
+          }
+
+        }
+
+        &-row {
+          display: flex;
+          flex-flow: column;
+          gap: 4px;
+        }
+
+        &-col-label {
+          display: block;
+        }
+
+        &-col {
+          display: flex;
+          flex-flow: column;
+          gap: 4px;
+        }
       }
     }
   }

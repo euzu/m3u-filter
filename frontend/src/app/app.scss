@@ -17,6 +17,12 @@
     text-align:center;
     padding-top: 10px;
 
+    &__logo {
+      svg {
+        transform: scale(1.5) translate(-10px, 2px);
+      }
+    }
+
     &__caption {
       flex: 1 1 auto;
       text-align:center;

@@ -6,6 +6,11 @@
   overflow: hidden;
   gap: 18px;
 
+  @media (max-width:980px) {
+    flex-flow: row wrap;
+    overflow: auto;
+  }
+
   //.user {
   //  max-height: 90%;
   //}

@@ -1,4 +1,7 @@
-use log::{debug, error, warn};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
+use log::{debug, error, info, warn};
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::Config;
 use crate::model::mapping::Mappings;
@@ -21,13 +24,16 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
 pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
     let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(utils::get_default_api_proxy_config_path());
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str());
-    if api_proxy_config.is_none() {
-       warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
-    } else {
-        cfg.set_api_proxy(api_proxy_config);
+    match api_proxy_config {
+        None => {
+            warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
+        }
+        Some(mut config) => {
+            config._file_path = api_proxy_config_file;
+            cfg.set_api_proxy(Some(config));
+        }
     }
 }
-
 
 pub(crate) fn read_config(config_file: &str) -> Result<Config, M3uFilterError> {
     match utils::open_file(&std::path::PathBuf::from(config_file)) {
@@ -42,10 +48,9 @@ pub(crate) fn read_config(config_file: &str) -> Result<Config, M3uFilterError> {
                 Ok(_) => Ok(cfg),
                 Err(err) => Err(err)
             }
-        },
+        }
         Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err)
-     }
-
+    }
 }
 
 pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterError> {
@@ -93,4 +98,20 @@ pub(crate) fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
         }
         _ => None
     }
+}
+
+pub(crate) fn save_api_proxy(config: &ApiProxyConfig) -> Result<(), M3uFilterError>{
+    let path = PathBuf::from(&config._file_path);
+    info!("Saving api proxy to {}", path.to_str().unwrap_or("?"));
+    match OpenOptions::new().write(true)
+        .truncate(true)
+        .create(true)
+        .open(path) {
+        Ok(f) => {
+            serde_yaml::to_writer(f, &config).unwrap();
+            Ok(())
+        }
+        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not write file {}", err)
+    }
+
 }

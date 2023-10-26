@@ -12,7 +12,7 @@ use crate::model::model_config::{TargetType};
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, xtream_get_all};
 
 fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
-    let server = &cfg._api_proxy.as_ref().unwrap().server;
+    let server = cfg._api_proxy.lock().unwrap().as_ref().unwrap().server.clone();
     let now = Local::now();
     XtreamAuthorizationResponse {
         user_info: XtreamUserInfo {
@@ -55,7 +55,7 @@ pub(crate) async fn xtream_player_api(
             let target_name = &target.name;
             if target.has_output(&TargetType::Xtream) {
                 if action.is_empty() {
-                    return HttpResponse::Ok().json(get_user_info(user, &_app_state.config));
+                    return HttpResponse::Ok().json(get_user_info(&user, &_app_state.config));
                 }
                 match match action {
                     "get_live_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_LIVE),

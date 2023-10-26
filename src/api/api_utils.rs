@@ -19,7 +19,7 @@ pub(crate) async fn serve_file(file_path: &PathBuf, req: &HttpRequest) -> HttpRe
     }
 }
 
-pub(crate) fn get_user_target<'a>(api_req: &'a web::Query<UserApiRequest>, app_state: &'a web::Data<AppState>) -> Option<(&'a UserCredentials, &'a ConfigTarget)> {
+pub(crate) fn get_user_target<'a>(api_req: &'a web::Query<UserApiRequest>, app_state: &'a web::Data<AppState>) -> Option<(UserCredentials, &'a ConfigTarget)> {
     let username = api_req.username.as_str().trim();
     let password = api_req.password.as_str().trim();
     if !username.is_empty() && !password.is_empty() {

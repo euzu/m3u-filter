@@ -21,6 +21,17 @@ impl UserCredentials {
         self.username.eq(username) && self.password.eq(password)
     }
 
+    pub fn trim(&mut self) {
+        self.username = self.username.trim().to_string();
+        self.password = self.password.trim().to_string();
+        match &self.token {
+            None => {}
+            Some(tkn) => {
+                self.token = Some(tkn.trim().to_string());
+            }
+        }
+
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -61,6 +72,8 @@ pub(crate) struct ServerInfo {
 pub(crate) struct ApiProxyConfig {
     pub server: ServerInfo,
     pub user: Vec<TargetUser>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _file_path: String,
 }
 
 impl ApiProxyConfig {
@@ -93,19 +106,19 @@ impl ApiProxyConfig {
         }
     }
 
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(&UserCredentials, &str)> {
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(UserCredentials, String)> {
         for target_user in &self.user {
             if let Some((credentials, target_name)) = target_user.get_target_name(username, password) {
-                return Some((credentials, target_name));
+                return Some((credentials.clone(), target_name.to_string()));
             };
         }
         None
     }
 
-    pub fn get_target_name_by_token(&self, token: &str) -> Option<(&UserCredentials, &str)> {
+    pub fn get_target_name_by_token(&self, token: &str) -> Option<(UserCredentials, String)> {
         for target_user in &self.user {
             if let Some((credentials, target_name)) = target_user.get_target_name_by_token(token) {
-                return Some((credentials, target_name));
+                return Some((credentials.clone(), target_name.to_string()));
             };
         }
         None
