@@ -26,6 +26,37 @@
   color: var(--text-color);
   border: 1px solid var(--border-color);
   font-size: 1.2rem;
-  border-radius: 4px;
+  border-radius: var(--border-radius);
   padding: 4px 12px;
+}
+
+@mixin list {
+  ul {
+    list-style-type: none; /* Remove bullets */
+    padding: 0; /* Remove padding */
+    margin: 0; /* Remove margins */
+    li {
+      padding: 8px;
+      border-radius: var(--border-radius);
+    }
+  }
+}
+
+@mixin list-hover {
+  ul {
+    list-style-type: none; /* Remove bullets */
+    padding: 0; /* Remove padding */
+    margin: 0; /* Remove margins */
+    li {
+      padding: 8px;
+      border-radius: var(--border-radius);
+      user-select: none;
+      cursor: pointer;
+
+      &:hover {
+        color: var(--popup-hover-color);
+        background-color: var(--popup-hover-background-color);
+      }
+    }
+  }
 }

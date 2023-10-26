@@ -1,3 +1,5 @@
+@use '../../scss/common';
+
 .playlist-tree {
   font-size: 12px;
 
@@ -11,6 +13,7 @@
 
   .tree-expander, .tool-button {
     cursor: pointer;
+
     * {
       pointer-events: none;
     }
@@ -59,9 +62,10 @@
             justify-content: center;
             height: 1em;
             width: 1em;
-            border-radius: 2px;
+            border-radius: var(--border-radius);
             background-color: var(--tool-button-background-color);
             color: var(--tool-button-color);
+
             svg {
               width: 0.5em;
               height: 0.5em;
@@ -121,19 +125,6 @@
   border: 1px solid var(--popup-border-color);
   z-index: 100;
 
-  ul {
-    list-style-type: none; /* Remove bullets */
-    padding: 0; /* Remove padding */
-    margin: 0; /* Remove margins */
-    li {
-      padding: 8px;
-      border-radius: 4px;
-      user-select: none;
-      cursor: pointer;
-      &:hover {
-        color: var(--popup-hover-color);
-        background-color: var(--popup-hover-background-color);
-      }
-    }
-  }
+  @include common.list-hover();
+
 }

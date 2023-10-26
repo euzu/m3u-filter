@@ -1,7 +1,12 @@
 .preferences {
   display: flex;
-  flex-flow: column;
+  flex-flow: row;
   flex: 1 1 auto;
   padding: 12px;
   overflow: hidden;
+  gap: 18px;
+
+  //.user {
+  //  max-height: 90%;
+  //}
 }

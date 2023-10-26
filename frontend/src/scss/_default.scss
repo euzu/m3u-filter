@@ -5,7 +5,7 @@
   position: relative;
   flex-flow: row nowrap;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   flex: 1 1 auto;
   padding: 2px;
 
@@ -74,4 +74,16 @@ button {
 
 .hidden {
   display: none !important;
+}
+
+.card {
+  display: flex;
+  flex-flow: column;
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid var(--card-border-color);
+  background-color: var(--card-background-color);
+  color: var(--card-color);
+  filter: drop-shadow(3px 3px 4px var(--popup-shadow-color));
 }

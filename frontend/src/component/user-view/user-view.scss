@@ -3,17 +3,24 @@
 .user {
   display: flex;
   flex-flow: column;
-  flex: 1 1 auto;
   gap: 20px;
   align-content: flex-start;
   justify-content: center;
-  overflow: hidden;
+  flex-shrink: 0;
 
   &__toolbar {
     display: flex;
     flex-flow: row wrap;
     flex: 0 1 auto;
-    justify-content: flex-end;
+    justify-content: center;
+    align-items: center;
+
+    label {
+      flex: 1 1 auto;
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--title-label-color);
+    }
 
     button {
       @include common.textButton();
@@ -22,13 +29,30 @@
 
   &__content {
     display: flex;
-    flex-flow: row wrap;
-    gap: 20px;
+    flex-flow: column;
     flex: 1 1 auto;
-    align-content: flex-start;
-    justify-content: center;
-    overflow: auto;
+    justify-content: flex-start;
+    overflow: hidden;
 
+    label {
+      font-weight: bold;
+      &:not(.target-not-exists) {
+        color: var(--label-color);
+      }
+      &.target-not-exists {
+        color: var(--attention-color);
+      }
+    }
+
+    &-targets {
+      display: flex;
+      flex-flow: column;
+      flex: 1 1 auto;
+      overflow: auto;
+      gap: 20px;
+      justify-content: flex-start;
+      padding-right: 6px;
+    }
   }
 
   &__target {
@@ -36,7 +60,7 @@
     flex-flow: column;
     border: 1px solid var(--border-color);
     padding: 8px;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
 
     &-target {
       font-size: 1.2rem;
@@ -51,38 +75,19 @@
     }
 
     &-user {
-      padding: 10px 0;
-
+      &-table {
+        margin: 8px 4px;
+        display:table;
+        width:auto;
+      }
+      &-col {
+        display:table-cell;
+        width:auto;
+      }
       &-row {
-        display: flex;
-        flex-flow: row nowrap;
-        gap: 20px;
-        padding: 8px 0;
-        border-bottom: 1px solid var(--border-light-color);
-      }
-
-      &-data {
-        display: flex;
-        flex-flow: row wrap;
-        gap: 20px;
-      }
-
-      &-entry {
-        display: flex;
-        flex-flow: row;
-        align-items: center;
-        gap: 10px;
-
-        label {
-          width: 100px;
-          font-weight: bold;
-          color: var(--label-color);
-          text-align: right;
-
-          &:after {
-            content: ':'
-          }
-        }
+        display:table-row;
+        width:auto;
+        clear: both;
       }
     }
   }
@@ -93,21 +98,11 @@
     padding: 0.2rem 0.5rem;
     flex: 1 1 auto;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
 
     &:focus,
     &:hover {
       outline: none;
     }
   }
-
-  .toolbar {
-    button {
-      @include common.iconButton();
-    }
-  }
 }
 
-.target-not-exists {
-  color: red;
-}

@@ -12,7 +12,7 @@ export default class PlaylistService {
     getPlaylist(req: PlaylistRequest): Observable<PlaylistGroup[]> {
         return new Observable((obs) =>
             this.playlistApiService.getPlaylist(req).pipe(first()).subscribe({
-                next: (pl) => {
+                next: (pl: PlaylistGroup[]) => {
                     if (pl) {
                         let cnt = 0;
                         pl.forEach(g => {
@@ -27,5 +27,9 @@ export default class PlaylistService {
                 error: (e) => obs.error(e),
                 complete: () => obs.complete(),
             }));
+    }
+
+    update(targets: string[]): Observable<any> {
+        return this.playlistApiService.updateTargets(targets);
     }
 }

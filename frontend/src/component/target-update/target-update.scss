@@ -1,0 +1,41 @@
+@use '../../scss/common';
+.target-update {
+  display: flex;
+  flex-flow: column;
+  flex: 1 1 auto;
+  overflow: hidden;
+  gap: 12px;
+
+  @include common.list();
+
+
+  &__toolbar {
+    display: flex;
+    flex-flow: row wrap;
+    flex: 0 1 auto;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+
+    label {
+      flex: 1 1 auto;
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--title-label-color);
+    }
+
+    button {
+      @include common.textButton();
+    }
+  }
+
+  &__content {
+    overflow: auto;
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 12px;
+  }
+}

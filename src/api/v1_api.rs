@@ -9,7 +9,7 @@ use serde_json::json;
 use uuid::Uuid;
 use crate::api::api_model::{AppState, FileDownloadRequest, PlaylistRequest, ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
-use crate::model::config::{ConfigInput, InputType};
+use crate::model::config::{ConfigInput, InputType, validate_targets};
 use crate::utils::{bytes_to_megabytes};
 use futures::stream::TryStreamExt;
 use log::{error, info};
@@ -18,6 +18,7 @@ use reqwest::{header, Response};
 use reqwest::header::{HeaderName, HeaderValue};
 use unidecode::unidecode;
 use crate::model::api_proxy::{TargetUser};
+use crate::processing::playlist_processor::exec_processing;
 
 const DOWNLOAD_HEADERS: &[(&str, &str)] = &[
     ("Accept", "video/*"),
@@ -33,6 +34,23 @@ pub(crate) async fn config_user(
     // dont forget to trim()
     HttpResponse::Ok().finish()
 }
+
+pub(crate) async fn playlist_update(
+    req: web::Json<Vec<String>>,
+    _app_state: web::Data<AppState>,
+) -> HttpResponse {
+    let targets = req.0;
+    let process_targets = validate_targets(&Some(targets), &_app_state.config.sources);
+    match process_targets {
+        Ok(valid_targets) => {
+            exec_processing(_app_state.config.clone(), Arc::new(valid_targets));
+            HttpResponse::Ok().finish()
+        }
+        Err(err) =>
+            HttpResponse::BadRequest().json(json!({"error": err.to_string()}))
+    }
+}
+
 
 pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
@@ -139,8 +157,8 @@ async fn async_download_file(download_id: &String, path: &PathBuf, response: Res
                             None => {
                                 let megabytes = bytes_to_megabytes(downloaded);
                                 info!("Downloaded {}, filesize: {}MB", path.to_str().unwrap_or("?"), megabytes);
-                                return Ok(downloaded)
-                            },
+                                return Ok(downloaded);
+                            }
                         }
                     }
                     Err(err) => return Err(format!("Error while writing to file: {} {}", path.to_str().unwrap_or("?"), err))
@@ -225,6 +243,7 @@ pub(crate) fn v1_api_register() -> Scope {
         .route("/config", web::get().to(config))
         .route("/config/user", web::post().to(config_user))
         .route("/playlist", web::post().to(playlist))
+        .route("/playlist/update", web::post().to(playlist_update))
         .route("/file/download", web::post().to(download_file))
         .route("/file/download/{did}", web::get().to(download_file_info))
 }

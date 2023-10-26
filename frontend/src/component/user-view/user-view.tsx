@@ -3,8 +3,9 @@ import './user-view.scss';
 import ServerConfig, {TargetUser} from "../../model/server-config";
 import {getIconByName} from "../../icons/icons";
 import TextGenerator from "../../utils/text-generator";
-import {enqueueSnackbar} from "notistack";
+import {useSnackbar} from "notistack";
 import {useServices} from "../../provider/service-provider";
+import ConfigUtils from "../../utils/config-utils";
 
 interface UserViewProps {
     config: ServerConfig;
@@ -13,11 +14,11 @@ interface UserViewProps {
 export default function UserView(props: UserViewProps) {
     const {config} = props;
     const services = useServices();
+    const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [targets, setTargets] = useState<TargetUser[]>([]);
     useEffect(() => {
         if (config) {
-            const target_names = config?.sources.flatMap(s => s.targets)
-                .map(t => t.name).filter(n => "default" !== n);
+            const target_names = ConfigUtils.getTargetNames(config);
             const missing = config?.user.filter(target => !target_names.includes(target.target));
             const result: TargetUser[] = target_names?.map(name => ({
                 src: true,
@@ -103,7 +104,7 @@ export default function UserView(props: UserViewProps) {
             t.credentials.forEach(c => {
                 c.username = c.username.trim();
                 c.password = c.password.trim();
-                c.token = c.token.trim();
+                c.token = c.token?.trim();
             })
             return {target: t.target, credentials: t.credentials}
         });
@@ -111,52 +112,58 @@ export default function UserView(props: UserViewProps) {
             next: () => enqueueSnackbar("User saved!", {variant: 'success'}),
             error: (err) => enqueueSnackbar("Failed to save user!", {variant: 'error'})
         });
-    }, [targets, services]);
+
+        enqueueSnackbar('!!This functionality has not yet been implemented!!', {variant: 'error'})
+    }, [targets, services, enqueueSnackbar]);
 
     return <div className={'user'}>
 
-        <div className={'user__toolbar'}>!!This functionality has not yet been implemented!!___<button onClick={handleSave}>Save</button></div>
+        <div className={'user__toolbar'}><label>User</label><button onClick={handleSave}>Save</button></div>
         <div className={'user__content'}>
-        {
-            targets?.map(target => <div key={target.target}
-                                        className={'user__target' + ((target as any).src ? '' : ' target-not-exists')}>
-                <div className={'user__target-target'}>
-                    <label>{target.target}</label>
-                    <div className={'toolbar'}>
-                        <button data-target={target.target}
-                                onClick={handleUserAdd}>{getIconByName('PersonAdd')}</button>
-                    </div>
-                </div>
-                {target.credentials.map((usr, idx) => <div key={target.target + '_' + idx}
-                                                           className={'user__target-user'}>
-                    <div className={'user__target-user-row'}>
-                        <div className={'user__target-user-data'}>
-                            <div className={'user__target-user-entry'}>
-                                <label>Username</label>
-                                <input data-target={target.target} data-idx={idx} defaultValue={usr.username}
-                                       key={usr.username}
-                                       data-field={'username'} onChange={handleValueChange}></input>
-                            </div>
-                            <div className={'user__target-user-entry'}>
-                                <label>Password</label>
-                                <input defaultValue={usr.password} key={usr.password} data-field={'password'}
-                                       onChange={handleValueChange}></input>
-                            </div>
-                            <div className={'user__target-user-entry'}>
-                                <label>Token</label>
-                                <input defaultValue={usr.token} key={usr.token} data-field={'token'}
-                                       onChange={handleValueChange}></input>
-                            </div>
-                        </div>
+        <div className={'user__content-targets'}>
+            {
+                targets?.map(target => <div key={target.target}
+                                            className={'user__target'}>
+                    <div className={'user__target-target'}>
+                        <label className={(target as any).src ? '' : 'target-not-exists'}>{target.target}</label>
                         <div className={'toolbar'}>
-                            <button data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
-                                {getIconByName('PersonRemove')}
-                            </button>
+                            <button data-target={target.target}
+                                    onClick={handleUserAdd}>{getIconByName('PersonAdd')}</button>
                         </div>
+                    </div>
+
+                    <div className={'user__target-user-table'}>
+                        <div className={'user__target-user-row'}>
+                            <div className={'user__target-user-col'}><label>Username</label></div>
+                            <div className={'user__target-user-col'}><label>Password</label></div>
+                            <div className={'user__target-user-col'}><label>Token</label></div>
+                            <div className={'user__target-user-col'}></div>
+                        </div>
+                        {target.credentials.map((usr, idx) =>
+                            <div key={'credential' + idx} className={'user__target-user-row'}>
+                                <div className={'user__target-user-col'}>
+                                    <input data-target={target.target} data-idx={idx} defaultValue={usr.username}
+                                           key={usr.username}
+                                           data-field={'username'} onChange={handleValueChange}></input>
+                                </div>
+                                <div className={'user__target-user-col'}>
+                                    <input defaultValue={usr.password} key={usr.password} data-field={'password'}
+                                           onChange={handleValueChange}></input>
+                                </div>
+                                <div className={'user__target-user-col'}>
+                                    <input defaultValue={usr.token} key={usr.token} data-field={'token'}
+                                           onChange={handleValueChange}></input>
+                                </div>
+                                <div className={'user__target-user-col toolbar'}>
+                                <span data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
+                                    {getIconByName('PersonRemove')}
+                                </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>)}
-            </div>)
-        }
+            </div>
         </div>
     </div>
 }
