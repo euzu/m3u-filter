@@ -1,5 +1,6 @@
 use std::fs::OpenOptions;
 use std::path::PathBuf;
+use chrono::Local;
 use log::{debug, error, info, warn};
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::Config;
@@ -101,16 +102,22 @@ pub(crate) fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
 
 pub(crate) fn save_api_proxy(config: &ApiProxyConfig) -> Result<(), M3uFilterError>{
     let path = PathBuf::from(&config._file_path);
-    info!("Saving api proxy to {}", path.to_str().unwrap_or("?"));
+    let backup_path = PathBuf::from(format!("{}_{}", &config._file_path, Local::now().format("%Y%m%d_%H%M%S")));
+
+    match std::fs::copy(&path, &backup_path) {
+        Ok(_) => {}
+        Err(err) => {error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err)}
+    }
+    info!("Saving api proxy to {}", &path.to_str().unwrap_or("?"));
     match OpenOptions::new().write(true)
         .truncate(true)
         .create(true)
-        .open(path) {
+        .open(&path) {
         Ok(f) => {
             serde_yaml::to_writer(f, &config).unwrap();
             Ok(())
         }
-        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not write file {}", err)
+        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not write file {}: {}", &path.to_str().unwrap_or("?"), err)
     }
 
 }
