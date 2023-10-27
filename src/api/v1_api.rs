@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::{fs, io};
 use std::io::{ErrorKind, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use actix_web::{HttpResponse, Scope, web};
 use serde_json::json;
@@ -88,6 +88,7 @@ fn create_config_input_for_url(url: &str) -> ConfigInput {
         headers: Default::default(),
         input_type: InputType::M3u,
         url: String::from(url),
+        epg_url: None,
         username: None,
         password: None,
         persist: None,
@@ -167,7 +168,7 @@ pub(crate) async fn config(
     HttpResponse::Ok().json(result)
 }
 
-async fn async_download_file(download_id: &String, path: &PathBuf, response: Response, downloads: Arc<Mutex<HashMap<String, u64>>>) -> Result<u64, String> {
+async fn async_download_file(download_id: &String, path: &Path, response: Response, downloads: Arc<Mutex<HashMap<String, u64>>>) -> Result<u64, String> {
     match File::create(path) {
         Ok(mut file) => {
             info!("Downloading {}", path.to_str().unwrap_or("?"));

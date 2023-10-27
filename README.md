@@ -104,6 +104,7 @@ Each input has the following attributes:
   - `enabled` is optional, default is true, if you disable the processing is skipped 
   - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
   - `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is `http://<hostname>:<port>`
+  - `epg_url` _optional_ xmltv url
   - `headers` is optional, used only for type `xtream`
   - `username` only mandatory for type `xtream`
   - `pasword`only mandatory for type `xtream`
@@ -123,6 +124,7 @@ Example input config for `m3u`
 sources:
 - inputs:
     - url: 'test-input.m3u'
+      epg_url: 'test-epg.xml'
       enabled: false
       persist: 'playlist_1_{}.m3u'
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ad.m3u'

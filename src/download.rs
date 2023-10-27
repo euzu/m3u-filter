@@ -5,7 +5,9 @@ use crate::{utils};
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput};
 use crate::model::model_m3u::{PlaylistGroup, XtreamCluster};
-use crate::processing::{m3u_parser, xtream_parser};
+use crate::model::xmltv::TVGuide;
+use crate::processing::{m3u_parser, xmltv_parser, xtream_parser};
+use crate::utils::add_prefix_to_filename;
 
 fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str) -> Option<PathBuf> {
     let persist_file: Option<PathBuf> =
@@ -26,133 +28,17 @@ fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str) ->
 }
 
 pub(crate) fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
-    let url = input.url.as_str();
-    let file_path = prepare_file_path(input, working_dir, "");
-    match utils::get_input_content(working_dir, url, file_path) {
-        Ok(lines) => {
+    let url = input.url.to_owned();
+    let persist_file_path = prepare_file_path(input, working_dir, "");
+    match utils::get_input_text_content(input, working_dir,&url, persist_file_path) {
+        Ok(text) => {
+            let lines = text.lines().map(String::from).collect();
             (m3u_parser::parse_m3u(cfg, &lines), vec![])
         }
         Err(err) => (vec![], vec![err])
     }
 }
 
-/*
-get_live_categories, get_vod_categories, get_live_categories ->
-[
-  {
-    "category_id": "225",
-    "category_name": "Public Channels",
-    "parent_id": 0
-  },
-  {
-    "category_id": "240",
-    "category_name": "Public Movies",
-    "parent_id": 0
-  }
-]
-
-get_series -> [
-  {
-    "backdrop_path": [
-      "https://image.tmdb.org/.....jpg"
-    ],
-    "cast": "Barakuda Marakuda",
-    "category_id": "72",
-    "category_ids": [
-      72
-    ],
-    "cover": "https://image.tmdb.org/....jpg",
-    "director": null,
-    "episode_run_time": "0",
-    "genre": "Science Fiction",
-    "last_modified": "1688398196",
-    "name": "Monsieur Barakuda (2023)",
-    "num": 16,
-    "plot": "The darkest hour in history, the future is volatile.",
-    "rating": "5",
-    "rating_5based": 2.5,
-    "releaseDate": "2023-06-05",
-    "release_date": "2023-06-05",
-    "series_id": 2192,
-    "stream_type": "series",
-    "title": "Monsieur Barakuda",
-    "year": "2023",
-    "youtube_trailer": null
-  }
- ]
-
-get_vod_streams ->
-[
-  {
-    "added": "1603364032",
-    "cast": "Pirle Palle, Milli Vanilla",
-    "category_id": "195",
-    "category_ids": [
-      195
-    ],
-    "container_extension": "mkv",
-    "custom_sid": "",
-    "direct_source": "http://192.168.0.2:8080/play/jnmj-bubblegum",
-    "director": "Joe Barlow",
-    "episode_run_time": "123",
-    "genre": "Crime, Drama, Mystery",
-    "name": "Enola Holmes (2020)",
-    "num": 1,
-    "plot": "While searching for her missing mother, she goes crozy.",
-    "rating": 7.6,
-    "rating_5based": 3.8,
-    "release_date": null,
-    "stream_icon": "https://image.tmdb.org/....jpg",
-    "stream_id": 95078,
-    "stream_type": "movie",
-    "title": "Search for a mother (2020)",
-    "year": null,
-    "youtube_trailer": "dd9Zf9sXlHk"
-  }
-]
-
-
-get_live_streams ->
-[
-  {
-    "added": "1602322663",
-    "category_id": "125",
-    "category_ids": [
-      125
-    ],
-    "custom_sid": "",
-    "direct_source": "http://192.168.0.2:8080/play/qlv9ZgTZdRFC8wct0n678YUIYlctwQg9ZBV",
-    "epg_channel_id": "360.fr",
-    "name": "FR | FR 1 SD",
-    "num": 1,
-    "stream_icon": "https://imagizer.imageshack.com/.....png",
-    "stream_id": 88019,
-    "stream_type": "live",
-    "thumbnail": "",
-    "tv_archive": 0,
-    "tv_archive_duration": 0
-  },
-  {
-    "added": "1586779266",
-    "category_id": "148",
-    "category_ids": [
-      148
-    ],
-    "custom_sid": "",
-    "direct_source": "http://192.168.0.2:8080/play/qlv9ZgTZdHGC8wct0n318YUIYlctwQg9ZBV",
-    "epg_channel_id": null,
-    "name": "FR | RADIO VIVA LA FRANCE",
-    "num": 9119,
-    "stream_icon": "https://imagizer.imageshack.com/.....png",
-    "stream_id": 27569,
-    "stream_type": "radio_streams",
-    "thumbnail": "",
-    "tv_archive": 0,
-    "tv_archive_duration": 0
-  }
-]
-
- */
 const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Live, "get_live_categories", "get_live_streams"),
     (XtreamCluster::Video, "get_vod_categories", "get_vod_streams"),
@@ -193,4 +79,22 @@ pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> 
         }
     }
     (playlist, errors)
+}
+
+
+pub(crate) fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Option<TVGuide>, Vec<M3uFilterError>) {
+    match &input.epg_url {
+        None => (None, vec![]),
+        Some(url) => {
+            debug!("Getting epg file path for url: {}", url);
+            let persist_file_path = prepare_file_path(input, working_dir, "").map(|path| add_prefix_to_filename(&path, "epg_", Some("xml")));
+            match utils::get_input_text_content(input, working_dir, url, persist_file_path) {
+                Ok(xml_content) => {
+                    xmltv_parser::parse_tvguide(&xml_content)
+                }
+                Err(err) => (None, vec![err])
+            }
+
+        }
+    }
 }

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::model::config::{ConfigInput, ConfigOptions};
+use crate::model::xmltv::TVGuide;
 
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
@@ -12,6 +13,7 @@ use crate::model::config::{ConfigInput, ConfigOptions};
 pub(crate) struct FetchedPlaylist<'a> {
     pub input: &'a ConfigInput,
     pub playlist: Vec<PlaylistGroup>,
+    pub epg: Option<TVGuide>
 }
 
 #[derive(Debug, Clone, PartialEq)]

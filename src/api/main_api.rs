@@ -16,6 +16,7 @@ use crate::api::m3u_api::m3u_api;
 
 use crate::api::api_model::{AppState};
 use crate::api::v1_api::{v1_api_register};
+use crate::api::xmltv_api::xmltv_api;
 use crate::api::xtream_player_api::xtream_player_api;
 use crate::model::config::{Config,ProcessTargets};
 use crate::processing::playlist_processor::exec_processing;
@@ -70,6 +71,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
         .service(v1_api_register())
         .service(xtream_player_api)
         .service(m3u_api)
+        .service(xmltv_api)
         .service(index)
         .service(actix_files::Files::new("/", web_dir.to_string()))
     )

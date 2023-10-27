@@ -48,7 +48,6 @@ pub(crate) async fn xtream_player_api(
     req: HttpRequest,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    debug!("Incoming request {:?}", &api_req.0);
     match get_user_target(&api_req, &_app_state) {
         Some((user, target)) => {
             let action = api_req.action.trim();

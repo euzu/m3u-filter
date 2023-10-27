@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path};
 use log::{error, info};
 use regex::Regex;
 use crate::messaging::{MsgKind, send_message};
@@ -76,7 +76,7 @@ fn handle_watch_notification(cfg: &Config, added: BTreeSet<String>, removed: BTr
     }
 }
 
-fn load_tree(path: &PathBuf) -> Option<BTreeSet<String>> {
+fn load_tree(path: &Path) -> Option<BTreeSet<String>> {
     match std::fs::read(path) {
         Ok(encoded) => {
             let decoded: BTreeSet<String> = bincode::deserialize(&encoded[..]).unwrap();
@@ -86,7 +86,7 @@ fn load_tree(path: &PathBuf) -> Option<BTreeSet<String>> {
     }
 }
 
-fn save_tree(path: &PathBuf, tree: BTreeSet<String>) -> std::io::Result<()> {
+fn save_tree(path: &Path, tree: BTreeSet<String>) -> std::io::Result<()> {
     let encoded: Vec<u8> = bincode::serialize(&tree).unwrap();
     std::fs::write(path, encoded)
 }

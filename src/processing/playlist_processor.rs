@@ -1,7 +1,7 @@
 extern crate unidecode;
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -9,7 +9,7 @@ use log::{debug, error, info};
 use unidecode::unidecode;
 
 use crate::{Config, get_errors_notify_message, model::config, valid_property};
-use crate::download::{get_m3u_playlist, get_xtream_playlist};
+use crate::download::{get_m3u_playlist, get_xmltv, get_xtream_playlist};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{MsgKind, send_message};
@@ -18,22 +18,25 @@ use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::model::model_config::{AFFIX_FIELDS, ItemField, ProcessingOrder, SortOrder::{Asc, Desc}, TargetType};
 use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::model::stats::{InputStats, PlaylistStats};
+use crate::model::xmltv::TVGuide;
 use crate::processing::playlist_watch::process_group_watch;
+use crate::processing::xmltv_parser::flatten_tvguide;
+use crate::repository::epg_repository::write_epg;
 use crate::repository::m3u_repository::{write_m3u_playlist, write_strm_playlist};
 use crate::repository::xtream_repository::write_xtream_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
-    debug!("Filtering {} groups", playlist.len());
+    //debug!("Filtering {} groups", playlist.len());
     let mut new_playlist = Vec::new();
     playlist.iter_mut().for_each(|pg| {
-        debug!("Filtering group {} with {} items", pg.title, pg.channels.len());
+        //debug!("Filtering group {} with {} items", pg.title, pg.channels.len());
         let mut channels = Vec::new();
         pg.channels.iter_mut().for_each(|pli| {
             if is_valid(pli, target) {
                 channels.push(pli.clone());
             }
         });
-        debug!("Filtered group {} has now {} items", pg.title, channels.len());
+        // debug!("Filtered group {} has now {} items", pg.title, channels.len());
         if !channels.is_empty() {
             new_playlist.push(PlaylistGroup {
                 id: pg.id,
@@ -48,7 +51,7 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
 
 fn apply_affixes(fetched_playlists: &mut [FetchedPlaylist]) {
     fetched_playlists.iter_mut().for_each(|fetched_playlist| {
-        let FetchedPlaylist { input, playlist } = fetched_playlist;
+        let FetchedPlaylist { input, playlist, epg: _ } = fetched_playlist;
         if input.suffix.is_some() || input.prefix.is_some() {
             let validate_affix = |a: &Option<InputAffix>| match a {
                 Some(affix) => {
@@ -147,7 +150,7 @@ fn exec_rename(pli: &mut PlaylistItem, rename: &Option<Vec<config::ConfigRename>
             for r in renames {
                 let value = get_field_value(result, &r.field);
                 let cap = r.re.as_ref().unwrap().replace_all(value.as_str(), &r.new_name);
-                debug!("Renamed {}={} to {}", &r.field, value, cap);
+                //debug!("Renamed {}={} to {}", &r.field, value, cap);
                 let value = cap.into_owned();
                 set_field_value(result, &r.field, value);
             }
@@ -165,7 +168,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                     for r in renames {
                         if let ItemField::Group = r.field {
                             let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
-                            debug!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
+                            //debug!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
                             grp.title = cap.into_owned();
                         }
                     }
@@ -280,7 +283,11 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
                 InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir),
                 InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir),
             };
+            let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
+                get_xmltv(&cfg, input, &cfg.working_dir)} else { (None, vec![])
+            };
             error_list.drain(..).for_each(|err| errors.push(err));
+            tvguide_errors.drain(..).for_each(|err| errors.push(err));
             let input_name = match &input.name {
                 None => input.url.as_str(),
                 Some(name_val) => name_val.as_str()
@@ -297,6 +304,7 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
                     FetchedPlaylist {
                         input,
                         playlist,
+                        epg: tvguide
                     }
                 );
             }
@@ -395,7 +403,8 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
     playlists.iter_mut().for_each(|fpl| {
         let mut new_fpl = FetchedPlaylist {
             input: fpl.input,
-            playlist: fpl.playlist.clone(),
+            playlist: fpl.playlist.clone(), // we need to clone, because of multiple target definitions, we cant change the initial playlist.
+            epg: fpl.epg.clone(),
         };
         for f in &pipe {
             let playlist = &mut new_fpl.playlist;
@@ -418,8 +427,22 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
 
     apply_affixes(&mut new_fetched_playlists);
     let mut new_playlist = vec![];
-    new_fetched_playlists.iter_mut().for_each(|fp| {
+    let mut new_epg = vec![];
+    new_fetched_playlists.drain(..).for_each(|mut fp| {
         fp.playlist.drain(..).for_each(|group| new_playlist.push(group));
+        match fp.epg {
+            None => {}
+            Some(mut epg) => {
+                debug!("found epg information for {}", &target.name);
+                let channel_ids: HashSet<_> = new_playlist.iter().flat_map(|g| &g.channels).map(|c| c.header.borrow().id.to_owned()).collect();
+                if !channel_ids.is_empty() {
+                    epg.clear(&channel_ids);
+                    new_epg.push(epg);
+                } else {
+                    debug!("channel ids are empty");
+                }
+            }
+        }
     });
 
     if !new_playlist.is_empty() {
@@ -438,15 +461,15 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
             }
         }
 
-        persist_playlist(&new_playlist, target, cfg)
+        persist_playlist(&new_playlist, flatten_tvguide(&mut new_epg), target, cfg)
     } else {
         info!("Playlist is empty: {}", &target.name);
         Ok(())
     }
 }
 
-fn persist_playlist(playlist: &[PlaylistGroup],
-                    target: &ConfigTarget, cfg: &Config, ) -> Result<(), Vec<M3uFilterError>> {
+fn persist_playlist(playlist: &[PlaylistGroup], epg: Option<TVGuide>,
+                    target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
     for output in &target.output {
         match match output.target {
@@ -454,18 +477,23 @@ fn persist_playlist(playlist: &[PlaylistGroup],
             TargetType::Strm => write_strm_playlist(target, cfg, playlist, &output.filename),
             TargetType::Xtream => write_xtream_playlist(target, cfg, playlist)
         } {
-            Ok(_) => {}
-            Err(err) => {
-                errors.push(err)
+            Ok(_) => {
+                if !playlist.is_empty() {
+                    match write_epg(target, cfg, &epg, output) {
+                        Ok(_) => {},
+                        Err(err) => errors.push(err)
+                    }
+                }
             }
+            Err(err) => errors.push(err)
         }
     }
 
-    if errors.is_empty() { Err(errors) } else { Ok(()) }
+    if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 
 pub(crate) fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    let (stats, errors) = process_sources(cfg.clone(), targets.clone());
+    let (stats, errors) = process_sources(cfg.to_owned(), targets.to_owned());
     let stats_msg = format!("Stats: {}", stats.iter().map(|stat| stat.to_string()).collect::<Vec<String>>().join("\n"));
     // print stats
     info!("{}", stats_msg);

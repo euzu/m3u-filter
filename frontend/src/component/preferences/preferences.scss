@@ -5,6 +5,7 @@
   padding: 12px;
   overflow: hidden;
   gap: 18px;
+  justify-content: center;
 
   @media (max-width:980px) {
     flex-flow: row wrap;

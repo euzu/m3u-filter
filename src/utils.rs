@@ -1,6 +1,6 @@
 use std::fs;
-use std::io::{BufRead, Write};
-use std::path::PathBuf;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use log::{debug, error};
 use path_absolutize::*;
 use reqwest::header;
@@ -90,13 +90,14 @@ pub(crate) fn get_working_path(wd: &String) -> String {
     }
 }
 
-pub(crate) fn open_file(file_name: &PathBuf) -> Result<fs::File, std::io::Error> {
+pub(crate) fn open_file(file_name: &Path) -> Result<fs::File, std::io::Error> {
     fs::File::open(file_name)
 }
 
-pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_file: Option<PathBuf>) -> Result<Vec<String>, M3uFilterError> {
+pub(crate) fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
+    debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
     match url_str.parse::<url::Url>() {
-        Ok(url) => match download_content(url, persist_file) {
+        Ok(url) => match download_text_content(input, url, persist_filepath) {
             Ok(content) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", url_str, e);
@@ -104,13 +105,12 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
             }
         }
         Err(_) => {
-            let file_path = get_file_path(working_dir, Some(PathBuf::from(url_str)));
-            let result = match &file_path {
-                Some(file) => {
-                    if file.exists() {
-                        if let Some(persist_file_value) = persist_file {
+            let result = match get_file_path(working_dir, Some(PathBuf::from(url_str))) {
+                Some(filepath) => {
+                    if filepath.exists() {
+                        if let Some(persist_file_value) = persist_filepath {
                             let to_file = &persist_file_value;
-                            match fs::copy(file, to_file) {
+                            match fs::copy(&filepath, to_file) {
                                 Ok(_) => {}
                                 Err(e) => {
                                     error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e);
@@ -118,11 +118,21 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
                                 }
                             }
                         };
-                        match open_file(file) {
-                            Ok(content) => Some(std::io::BufReader::new(content).lines().map(|l| l.unwrap()).collect()),
+                        match open_file(&filepath) {
+                            Ok(file) => {
+                                let mut content = String::new();
+                                match std::io::BufReader::new(file).read_to_string(&mut content) {
+                                    Ok(_) => Some(content),
+                                    Err(err) =>  {
+                                        let file_str = &filepath.to_str().unwrap_or("?");
+                                        error!("cant read file: {} {}", file_str,  err);
+                                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err)
+                                    }
+                                }
+                            },
                             Err(err) => {
-                                let file_str = file.to_str().unwrap();
-                                error!("cant read: {} {}", file_str,  err);
+                                let file_str = &filepath.to_str().unwrap_or("?");
+                                error!("cant read file: {} {}", file_str,  err);
                                 return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
                             }
                         }
@@ -133,9 +143,9 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
                 None => None
             };
             match result {
-                Some(file) => Ok(file),
+                Some(content) => Ok(content),
                 None => {
-                    let msg = format!("cant read input url: {:?}", &file_path.unwrap());
+                    let msg = format!("cant read input url: {:?}", url_str);
                     error!("{}", msg);
                     create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
                 }
@@ -144,29 +154,8 @@ pub(crate) fn get_input_content(working_dir: &String, url_str: &str, persist_fil
     }
 }
 
-fn download_content(url: url::Url, persist_file: Option<PathBuf>) -> Result<Vec<String>, String> {
-    match reqwest::blocking::get(url) {
-        Ok(response) => {
-            if response.status().is_success() {
-                match response.text_with_charset("utf8") {
-                    Ok(text) => {
-                        if persist_file.is_some() {
-                            persist_playlist(persist_file, &text);
-                        }
-                        let result = text.lines().map(String::from).collect();
-                        Ok(result)
-                    }
-                    Err(e) => Err(e.to_string())
-                }
-            } else {
-                Err(format!("Request failed: {}", response.status()))
-            }
-        }
-        Err(e) => Err(e.to_string())
-    }
-}
 
-fn persist_playlist(persist_file: Option<PathBuf>, text: &String) {
+fn persist_file(persist_file: Option<PathBuf>, text: &String) {
     if let Some(path_buf) = persist_file {
         let filename = &path_buf.to_str().unwrap_or("?");
         match fs::File::create(&path_buf) {
@@ -205,7 +194,8 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
     }
 }
 
-fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Option<PathBuf>) -> Result<serde_json::Value, String> {
+
+fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::blocking::RequestBuilder {
     let mut request = reqwest::blocking::Client::new().get(url);
     if input.headers.is_empty() {
         let mut headers = header::HeaderMap::new();
@@ -218,13 +208,18 @@ fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Optio
         debug!("Request with headers{:?}", &headers);
         request = request.headers(headers);
     }
+    request
+}
+
+fn download_json_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, String> {
+    let request = get_client_request(input, url);
     match request.send() {
         Ok(response) => {
             if response.status().is_success() {
                 match response.json::<serde_json::Value>() {
                     Ok(content) => {
-                        if persist_file.is_some() {
-                            persist_playlist(persist_file, &serde_json::to_string(&content).unwrap());
+                        if persist_filepath.is_some() {
+                            persist_file(persist_filepath, &serde_json::to_string(&content).unwrap());
                         }
                         Ok(content)
                     }
@@ -238,9 +233,9 @@ fn download_json_content(input: &ConfigInput, url: url::Url, persist_file: Optio
     }
 }
 
-pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_file: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
+pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
     match url_str.parse::<url::Url>() {
-        Ok(url) => match download_json_content(input, url, persist_file) {
+        Ok(url) => match download_json_content(input, url, persist_filepath) {
             Ok(content) => Ok(content),
             Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", url_str, e)
         },
@@ -248,11 +243,45 @@ pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, pers
     }
 }
 
-// pub(crate) fn dedup<T: Eq + Hash + Copy>(v: &mut Vec<T>) {
-//     let mut uniques = HashSet::new();
-//     v.retain(|e| uniques.insert(*e));
-// }
+fn download_text_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<String, String> {
+    let request = get_client_request(input, url);
+    match request.send() {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.text_with_charset("utf8") {
+                    Ok(content) => {
+                        if persist_filepath.is_some() {
+                            persist_file(persist_filepath, &content);
+                        }
+                        Ok(content)
+                    }
+                    Err(e) => Err(e.to_string())
+                }
+            } else {
+                Err(format!("Request failed: {}", response.status()))
+            }
+        }
+        Err(e) => Err(e.to_string())
+    }
+}
 
 pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
+}
+
+pub(crate) fn add_prefix_to_filename(path: &Path, prefix: &str, ext: Option<&str>) -> PathBuf {
+    let file_name = path.file_name().unwrap_or_default();
+    let new_file_name = format!("{}{}", prefix, file_name.to_string_lossy());
+    let result =  path.with_file_name(new_file_name);
+    match ext {
+        None => result,
+        Some(extension) => result.with_extension(extension)
+    }
+}
+
+pub(crate) fn path_exists(file_path: &Path) -> bool {
+    if let Ok(metadata) = fs::metadata(file_path) {
+        return metadata.is_file()
+    }
+    false
 }

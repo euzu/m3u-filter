@@ -35,30 +35,7 @@ const SERIES_STREAM_FIELDS: &[&str] = &[
     "stream_type", "title", "year", "youtube_trailer",
 ];
 
-// fn value_to_bson(value: &Value) -> Bson {
-//     match value {
-//         Value::Null => Bson::Null,
-//         Value::Bool(value) => Bson::Boolean(value.clone()),
-//         Value::Number(value) => {
-//             if value.is_f64() {
-//                 Bson::Double(value.as_f64().unwrap())
-//             } else {
-//                 Bson::Int64(value.as_i64().unwrap())
-//             }
-//         }
-//         Value::String(value) => Bson::String(value.clone()),
-//         Value::Array(value) => Bson::Array(value.iter().map(value_to_bson).collect()),
-//         Value::Object(value) => {
-//             let mut document = Document::new();
-//             for (key, val) in value {
-//                 document.insert(key, value_to_bson(val));
-//             }
-//             Bson::Document(document)
-//         }
-//     }
-// }
-
-fn write_to_file<T>(file: &PathBuf, value: &T) -> Result<(), Error>
+fn write_to_file<T>(file: &Path, value: &T) -> Result<(), Error>
     where
         T: ?Sized + Serialize {
     match File::create(file) {
@@ -74,7 +51,7 @@ fn write_to_file<T>(file: &PathBuf, value: &T) -> Result<(), Error>
     }
 }
 
-fn get_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
+pub(crate) fn get_xtream_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
     utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(' ', "_"))))
 }
 
@@ -82,8 +59,12 @@ fn get_collection_path(path: &Path, collection: &str) -> PathBuf {
     path.join(format!("{}.json", collection))
 }
 
+pub(crate) fn get_xtream_epg_file_path(path: &Path) -> PathBuf {
+    path.join("epg.xml")
+}
+
 pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
-    if let Some(path) = get_storage_path(cfg, &target.name) {
+    if let Some(path) = get_xtream_storage_path(cfg, &target.name) {
         if fs::create_dir_all(&path).is_err() {
             let msg = format!("Failed to save, can't create directory {}", &path.to_str().unwrap());
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg));
@@ -241,7 +222,7 @@ fn append_mandatory_fields(document: &mut Map<String, Value>, fields: &[&str]) {
 }
 
 pub(crate) fn xtream_get_all(cfg: &Config, target_name: &str, collection_name: &str) -> Result<PathBuf, Error> {
-    if let Some(path) = get_storage_path(cfg, target_name) {
+    if let Some(path) = get_xtream_storage_path(cfg, target_name) {
         let col_path = get_collection_path(&path, collection_name);
         if col_path.exists() {
             return Ok(col_path);

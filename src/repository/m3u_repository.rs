@@ -8,6 +8,7 @@ use crate::{create_m3u_filter_error_result, utils};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::model_m3u::PlaylistGroup;
+use crate::utils::add_prefix_to_filename;
 
 fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
     match res {
@@ -85,6 +86,12 @@ pub(crate) fn get_m3u_file_path(cfg: &Config, filename: &Option<String>) -> Opti
     utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
 }
 
+pub(crate) fn get_m3u_epg_file_path(cfg: &Config, filename: &Option<String>) -> Option<std::path::PathBuf> {
+    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
+        .map(|path| add_prefix_to_filename(&path, "epg_", Some("xml")))
+}
+
+
 pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
     macro_rules! cant_write_result {
         ($path:expr, $err:expr) => {
@@ -93,7 +100,9 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
     }
     if !new_playlist.is_empty() {
         if filename.is_none() {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write m3u playlist failed: ".to_string()));
+            return Err(M3uFilterError::new(
+                M3uFilterErrorKind::Notify,
+                format!("write m3u playlist for target {} failed: No filename set", target.name)));
         }
         if let Some(path) = get_m3u_file_path(cfg, filename) {
             match File::create(&path) {

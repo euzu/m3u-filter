@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::path::{Path};
 use actix_web::http::header::{CACHE_CONTROL, HeaderValue};
 use actix_web::{HttpRequest, HttpResponse, web};
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::api_proxy::{UserCredentials};
 use crate::model::config::ConfigTarget;
 
-pub(crate) async fn serve_file(file_path: &PathBuf, req: &HttpRequest) -> HttpResponse {
+pub(crate) async fn serve_file(file_path: &Path, req: &HttpRequest) -> HttpResponse {
     if file_path.exists() {
         let file = actix_files::NamedFile::open_async(file_path).await.unwrap()
             .set_content_type(mime::APPLICATION_JSON)

@@ -15,6 +15,7 @@
 * RegExp captures can now be used in mapper attributes
 * Added file download to a defined directory in config
 * Refactored web-ui
+* Added XMLTV support
 
 Changes in `config.yml`
 ```yaml

@@ -324,7 +324,6 @@ impl FromStr for InputType {
     }
 }
 
-
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -336,6 +335,8 @@ pub(crate) struct ConfigInput {
     #[serde(default = "default_as_empty_map")]
     pub headers: HashMap<String, String>,
     pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epg_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
