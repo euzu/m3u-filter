@@ -12,7 +12,7 @@ use crate::model::model_config::{TargetType};
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, xtream_get_all};
 
 fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
-    let server = cfg._api_proxy.lock().unwrap().as_ref().unwrap().server.clone();
+    let server = cfg._api_proxy.read().unwrap().as_ref().unwrap().server.clone();
     let now = Local::now();
     XtreamAuthorizationResponse {
         user_info: XtreamUserInfo {

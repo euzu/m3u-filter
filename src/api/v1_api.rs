@@ -22,12 +22,6 @@ use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ServerInfo, TargetUser};
 use crate::processing::playlist_processor::exec_processing;
 
-const DOWNLOAD_HEADERS: &[(&str, &str)] = &[
-    ("Accept", "video/*"),
-    ("User-Agent", "AppleTV/tvOS/9.1.1.")
-];
-
-
 fn save_config_api_proxy(api_proxy: &mut ApiProxyConfig) -> Option<M3uFilterError> {
     match save_api_proxy(api_proxy) {
         Ok(_) => {}
@@ -44,7 +38,7 @@ pub(crate) async fn config_api_proxy_user(
     mut _app_state: web::Data<AppState>,
 ) -> HttpResponse {
     req.0.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.trim());
-    if let Some(api_proxy) = _app_state.config._api_proxy.lock().unwrap().as_mut() {
+    if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
         api_proxy.user = req.0;
         if let Some(err) = save_config_api_proxy(api_proxy) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
@@ -54,17 +48,20 @@ pub(crate) async fn config_api_proxy_user(
 }
 
 pub(crate) async fn config_api_proxy_server_info(
-    req: web::Json<ServerInfo>,
+    mut req: web::Json<ServerInfo>,
     mut _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    // @TODO check server info
-    if let Some(api_proxy) = _app_state.config._api_proxy.lock().unwrap().as_mut() {
-        api_proxy.server = req.0;
-        if let Some(err) = save_config_api_proxy(api_proxy) {
-            return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+    if req.0.is_valid() {
+        if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
+            api_proxy.server = req.0;
+            if let Some(err) = save_config_api_proxy(api_proxy) {
+                return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+            }
         }
+        HttpResponse::Ok().finish()
+    } else {
+        HttpResponse::BadRequest().json(json!({"error": "Invalid content"}))
     }
-    HttpResponse::Ok().finish()
 }
 
 pub(crate) async fn playlist_update(
@@ -85,6 +82,21 @@ pub(crate) async fn playlist_update(
     }
 }
 
+fn create_config_input_for_url(url: &str) -> ConfigInput {
+    ConfigInput {
+        id: 0,
+        headers: Default::default(),
+        input_type: InputType::M3u,
+        url: String::from(url),
+        username: None,
+        password: None,
+        persist: None,
+        prefix: None,
+        suffix: None,
+        name: None,
+        enabled: true,
+    }
+}
 
 pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
@@ -96,19 +108,7 @@ pub(crate) async fn playlist(
         }
         None => {
             let url = req.url.as_deref().unwrap_or("");
-            Some(ConfigInput {
-                id: 0,
-                headers: Default::default(),
-                input_type: InputType::M3u,
-                url: String::from(url),
-                username: None,
-                password: None,
-                persist: None,
-                prefix: None,
-                suffix: None,
-                name: None,
-                enabled: true,
-            })
+            Some(create_config_input_for_url(url))
         }
     } {
         None => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
@@ -162,8 +162,7 @@ pub(crate) async fn config(
     let result = ServerConfig {
         video: _app_state.config.video.clone(),
         sources,
-        api_proxy: _app_state.config._api_proxy.lock().unwrap().clone(),
-        //user: _app_state.config._api_proxy.lock().unwrap().as_ref().map(|proxy| proxy.user.clone())
+        api_proxy: _app_state.config._api_proxy.read().unwrap().clone(),
     };
     HttpResponse::Ok().json(result)
 }
@@ -229,7 +228,7 @@ pub(crate) async fn download_file(
             Ok(_url) => {
                 let client = reqwest::Client::new();
                 let mut headers = header::HeaderMap::new();
-                for (key, value) in DOWNLOAD_HEADERS {
+                for (key, value) in &download.headers {
                     headers.insert(
                         HeaderName::from_bytes(key.as_bytes()).unwrap(),
                         HeaderValue::from_bytes(value.as_bytes()).unwrap(),

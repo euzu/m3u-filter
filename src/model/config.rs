@@ -1,6 +1,7 @@
+use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use enum_iterator::Sequence;
 use log::{debug, error, warn};
@@ -174,7 +175,7 @@ pub(crate) struct ConfigTarget {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort: Option<ConfigSort>,
     pub filter: String,
-    #[serde(alias = "type", default="default_as_empty_list")]
+    #[serde(alias = "type", default = "default_as_empty_list")]
     pub output: Vec<TargetOutput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rename: Option<Vec<ConfigRename>>,
@@ -443,12 +444,12 @@ pub(crate) struct Config {
     pub schedule: Option<String>,
     pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _api_proxy: Arc<Mutex<Option<ApiProxyConfig>>>,
+    pub _api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
 }
 
 impl Config {
     pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) {
-        self._api_proxy = Arc::new(Mutex::new(api_proxy));
+        self._api_proxy = Arc::new(RwLock::new(api_proxy));
     }
 
     fn _get_target_for_user(&self, user_target: Option<(UserCredentials, String)>) -> Option<(UserCredentials, &ConfigTarget)> {
@@ -468,7 +469,7 @@ impl Config {
     }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {
-        match self._api_proxy.lock().unwrap().as_ref() {
+        match self._api_proxy.read().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name(username, password))
             }
@@ -477,7 +478,7 @@ impl Config {
     }
 
     pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(UserCredentials, &ConfigTarget)> {
-        match self._api_proxy.lock().unwrap().as_ref() {
+        match self._api_proxy.read().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name_by_token(token))
             }
@@ -567,6 +568,15 @@ impl Config {
             Some(video) =>
                 {
                     video.extensions = vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()];
+                    match &mut video.download {
+                        None => {}
+                        Some(downl) => {
+                            if downl.headers.is_empty() {
+                                downl.headers.borrow_mut().insert("Accept".to_string(), "video/*".to_string());
+                                downl.headers.borrow_mut().insert("User-Agent".to_string(), "AppleTV/tvOS/9.1.1.".to_string());
+                            }
+                        }
+                    }
                 }
         }
         Ok(())

@@ -30,7 +30,6 @@ impl UserCredentials {
                 self.token = Some(tkn.trim().to_string());
             }
         }
-
     }
 }
 
@@ -66,6 +65,46 @@ pub(crate) struct ServerInfo {
     pub rtmp_port: String,
     pub timezone: String,
     pub message: String,
+}
+
+impl ServerInfo {
+    pub fn is_valid(&mut self) -> bool {
+        self.protocol = self.protocol.trim().to_string();
+        if self.protocol.is_empty() {
+            return false;
+        }
+        self.ip = self.ip.trim().to_string();
+        if self.ip.is_empty() {
+            return false;
+        }
+        self.http_port = self.http_port.trim().to_string();
+        if self.http_port.is_empty() {
+            self.http_port = "80".to_string();
+        } else if self.http_port.parse::<u16>().is_err() {
+            return false;
+        }
+        self.https_port = self.https_port.trim().to_string();
+        if self.https_port.is_empty() {
+            self.https_port = "443".to_string();
+        } else if self.https_port.parse::<u16>().is_err() {
+            return false;
+        }
+        self.rtmp_port = self.rtmp_port.trim().to_string();
+        if self.rtmp_port.is_empty() {
+            self.rtmp_port = "1953".to_string();
+        } else if self.rtmp_port.parse::<u16>().is_err() {
+            return false;
+        }
+        self.timezone = self.timezone.trim().to_string();
+        if self.timezone.is_empty() {
+            self.timezone = "UTC".to_string();
+        }
+        if self.message.is_empty() {
+            self.message = "Welcome to m3u-filter".to_string();
+        }
+
+        true
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
