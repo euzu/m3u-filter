@@ -1,73 +1,102 @@
-use std::collections::HashSet;
-use serde::{Deserialize, Serialize};
-use crate::model::model_config::default_as_empty_str;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::{Error, Writer};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub(crate) struct Text {
-    #[serde(rename = "$value")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    lang: Option<String>,
+// https://github.com/XMLTV/xmltv/blob/master/xmltv.dtd
+
+
+#[derive(Debug, Clone)]
+pub(crate) struct XmlTag {
+    pub name: String,
+    pub value: Option<String>,
+    pub attributes: Option<Rc<HashMap<String, String>>>,
+    pub children: Option<Vec<Rc<XmlTag>>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub(crate) struct Channel {
-    #[serde(rename = "@id", default="default_as_empty_str")]
-    id: String,
-    #[serde(rename = "display-name")]
-    display_name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    icon: Option<Icon>,
+impl XmlTag {
+    pub(crate) fn get_attribute_value(&self, attr_name: &str) -> Option<&String> {
+        match &self.attributes {
+            None => None,
+            Some(attr) => {
+                attr.get(attr_name)
+            }
+        }
+    }
+
+    fn write_to<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<(), Error> {
+        let mut elem = BytesStart::new(self.name.as_str());
+        if let Some(attribs) = self.attributes.as_ref() {
+            attribs.iter().for_each(|(k, v)| elem.push_attribute((k.as_str(), v.as_str())))
+        }
+        writer.write_event(Event::Start(elem))?;
+        self.value.as_ref().map(|text| writer.write_event(Event::Text(BytesText::new(text.as_str()))));
+        if let Some(children) = &self.children {
+            for child in children {
+                child.write_to(writer)?
+            }
+        }
+        writer.write_event(Event::End(BytesEnd::new(self.name.as_str())))
+    }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub(crate) struct Icon {
-    #[serde(rename = "@src", default="default_as_empty_str")]
-    src: String,
+
+#[derive(Debug, Clone)]
+pub(crate) struct Epg {
+    pub attributes: Option<Rc<HashMap<String, String>>>,
+    pub children: Vec<Rc<XmlTag>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub(crate) struct Programme {
-    #[serde(rename = "@start", default="default_as_empty_str")]
-    start: String,
-    #[serde(rename = "@stop", default="default_as_empty_str")]
-    stop: String,
-    #[serde(rename = "@channel", default="default_as_empty_str")]
-    channel: String,
-    title: Text,
-    desc: Text,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    category: Option<Text>,
-    #[serde(skip_serializing_if = "Option::is_none", rename="sub-title")]
-    sub_title: Option<Text>,
+impl Epg {
+    pub(crate) fn write_to<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<(), quick_xml::Error> {
+        let mut elem = BytesStart::new("tv");
+        if let Some(attribs) = self.attributes.as_ref() {
+            attribs.iter().for_each(|(k, v)| elem.push_attribute((k.as_str(), v.as_str())))
+        }
+        writer.write_event(Event::Start(elem))?;
+        for child in &self.children {
+            child.write_to(writer)?
+        }
+        writer.write_event(Event::End(BytesEnd::new("tv")))
+    }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename = "tv")]
+#[derive(Debug, Clone)]
 pub(crate) struct TVGuide {
-    #[serde(rename = "channel")]
-    pub channels: Vec<Channel>,
-    #[serde(rename = "programme")]
-    pub programs: Vec<Programme>,
-    #[serde(skip_serializing_if = "Option::is_none", rename="@date")]
-    pub date: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", alias="generator-info-url", rename="@source-info-url")]
-    pub source_info_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", alias="generator-info-name", rename="@source-info-name")]
-    pub source_info_name: Option<String>,
+    pub epg: XmlTag,
 }
 
 impl TVGuide {
-    pub(crate) fn clear(&mut self, channel_ids: &HashSet<String>) {
+    pub(crate) fn filter(&self, channel_ids: &HashSet<String>) -> Option<Epg> {
         if !channel_ids.is_empty() {
-            self.channels = self.channels.drain(..).filter(|chan| channel_ids.contains(&chan.id)).collect();
+            let children: Vec<Rc<XmlTag>> = self.epg.children.as_ref().unwrap().iter().filter(|c| {
+                match c.name.as_str() {
+                    "channel" => {
+                        match c.get_attribute_value("id") {
+                            None => false,
+                            Some(val) => channel_ids.contains(val)
+                        }
+                    }
+                    "programme" => {
+                        match c.get_attribute_value("channel") {
+                            None => false,
+                            Some(val) => channel_ids.contains(val)
+                        }
+                    }
+                    _ => false,
+                }
+            }).cloned().collect();
+            if children.is_empty() {
+                None
+            } else {
+                Some(Epg {
+                    attributes: self.epg.attributes.clone(),
+                    children,
+                })
+            }
+        } else {
+            None
         }
     }
 }
 
-impl TVGuide {
-    pub fn prepare(&mut self) {
-        self.channels = self.channels.drain(..).filter(|chan| !chan.id.trim().is_empty()).collect();
-    }
-}

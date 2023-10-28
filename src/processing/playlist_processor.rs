@@ -18,7 +18,7 @@ use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::model::model_config::{AFFIX_FIELDS, ItemField, ProcessingOrder, SortOrder::{Asc, Desc}, TargetType};
 use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::model::stats::{InputStats, PlaylistStats};
-use crate::model::xmltv::TVGuide;
+use crate::model::xmltv::{Epg};
 use crate::processing::playlist_watch::process_group_watch;
 use crate::processing::xmltv_parser::flatten_tvguide;
 use crate::repository::epg_repository::write_epg;
@@ -26,17 +26,17 @@ use crate::repository::m3u_repository::{write_m3u_playlist, write_strm_playlist}
 use crate::repository::xtream_repository::write_xtream_playlist;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
-    //debug!("Filtering {} groups", playlist.len());
+    debug!("Filtering {} groups", playlist.len());
     let mut new_playlist = Vec::new();
     playlist.iter_mut().for_each(|pg| {
-        //debug!("Filtering group {} with {} items", pg.title, pg.channels.len());
+        debug!("Filtering group {} with {} items", pg.title, pg.channels.len());
         let mut channels = Vec::new();
         pg.channels.iter_mut().for_each(|pli| {
             if is_valid(pli, target) {
                 channels.push(pli.clone());
             }
         });
-        // debug!("Filtered group {} has now {} items", pg.title, channels.len());
+        debug!("Filtered group {} has now {} items", pg.title, channels.len());
         if !channels.is_empty() {
             new_playlist.push(PlaylistGroup {
                 id: pg.id,
@@ -150,7 +150,7 @@ fn exec_rename(pli: &mut PlaylistItem, rename: &Option<Vec<config::ConfigRename>
             for r in renames {
                 let value = get_field_value(result, &r.field);
                 let cap = r.re.as_ref().unwrap().replace_all(value.as_str(), &r.new_name);
-                //debug!("Renamed {}={} to {}", &r.field, value, cap);
+                debug!("Renamed {}={} to {}", &r.field, value, cap);
                 let value = cap.into_owned();
                 set_field_value(result, &r.field, value);
             }
@@ -168,7 +168,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                     for r in renames {
                         if let ItemField::Group = r.field {
                             let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
-                            //debug!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
+                            debug!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
                             grp.title = cap.into_owned();
                         }
                     }
@@ -428,19 +428,20 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
     apply_affixes(&mut new_fetched_playlists);
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
+    let mut tv_guides = vec![];
     new_fetched_playlists.drain(..).for_each(|mut fp| {
         fp.playlist.drain(..).for_each(|group| new_playlist.push(group));
-        match fp.epg {
-            None => {}
-            Some(mut epg) => {
-                debug!("found epg information for {}", &target.name);
-                let channel_ids: HashSet<_> = new_playlist.iter().flat_map(|g| &g.channels).map(|c| c.header.borrow().id.to_owned()).collect();
-                if !channel_ids.is_empty() {
-                    epg.clear(&channel_ids);
+        if let Some(tv_guide) = fp.epg {
+            tv_guides.push(tv_guide);
+            let guide = tv_guides.last().unwrap();
+            debug!("found epg information for {}", &target.name);
+            let channel_ids: HashSet<_> = new_playlist.iter().flat_map(|g| &g.channels).map(|c| c.header.borrow().id.to_owned()).collect();
+            if !channel_ids.is_empty() {
+                if let Some(epg) = guide.filter(&channel_ids) {
                     new_epg.push(epg);
-                } else {
-                    debug!("channel ids are empty");
                 }
+            } else {
+                debug!("channel ids are empty");
             }
         }
     });
@@ -461,14 +462,14 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
             }
         }
 
-        persist_playlist(&new_playlist, flatten_tvguide(&mut new_epg), target, cfg)
+        persist_playlist(&new_playlist, flatten_tvguide(&new_epg), target, cfg)
     } else {
         info!("Playlist is empty: {}", &target.name);
         Ok(())
     }
 }
 
-fn persist_playlist(playlist: &[PlaylistGroup], epg: Option<TVGuide>,
+fn persist_playlist(playlist: &[PlaylistGroup], epg: Option<Epg>,
                     target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
     for output in &target.output {

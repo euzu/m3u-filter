@@ -110,7 +110,7 @@ impl Filter {
                 let value = provider.call(field);
                 let is_match = rewc.re.is_match(value.as_str());
                 if is_match {
-                    //debug!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);
+                    debug!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);
                     processor.process(field, &value, rewc);
                 }
                 is_match

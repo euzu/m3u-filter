@@ -90,7 +90,7 @@ pub(crate) fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &String
             let persist_file_path = prepare_file_path(input, working_dir, "").map(|path| add_prefix_to_filename(&path, "epg_", Some("xml")));
             match utils::get_input_text_content(input, working_dir, url, persist_file_path) {
                 Ok(xml_content) => {
-                    xmltv_parser::parse_tvguide(&xml_content)
+                    (xmltv_parser::parse_tvguide(xml_content.as_str()), vec![])
                 }
                 Err(err) => (None, vec![err])
             }
