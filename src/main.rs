@@ -65,7 +65,8 @@ fn main() {
     let mut cfg = read_config(config_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
     let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
-    info!("working dir: {:?}", &cfg.working_dir);
+    info!("Current time {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+    info!("Working dir: {:?}", &cfg.working_dir);
 
     if let Err(err) = read_mappings(args.mapping, &mut cfg) {
         exit!("{}", err);
@@ -84,12 +85,12 @@ fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    info!("web_root: {}", &cfg.api.web_root);
-    info!("server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
+    info!("Web root: {}", &cfg.api.web_root);
+    info!("Server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
     match api::main_api::start_server(cfg, targets) {
         Ok(_) => {}
         Err(e) => {
-            exit!("cant start server: {}", e);
+            exit!("Can't start server: {}", e);
         }
     };
 }

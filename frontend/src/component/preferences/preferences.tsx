@@ -13,7 +13,9 @@ export default function Preferences(props: PreferencesProps) {
     const {config} = props;
     return <div className={'preferences'}>
 
-        <div className={'card'}><TargetUpdate config={config}></TargetUpdate></div>
+        <div className={'vert-group'}>
+            <div className={'card'}><TargetUpdate config={config}></TargetUpdate></div>
+        </div>
         <div className={'vert-group'}>
             <div className={'card'}><ServerInfoView config={config}></ServerInfoView></div>
             <div className={'card'}><UserView config={config}></UserView></div>

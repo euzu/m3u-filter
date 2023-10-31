@@ -628,6 +628,7 @@ or with token
 - `xtream` use url like `http://192.169.1.2/player_api.php?token={}`
 - `m3u` use url `http://192.169.1.2/get.php?token={}`
 
+To access the xmltv-api use url like `http://192.169.1.2/xmltv.php?username={}&password={}`
 
 _Do not forget to replace `{}` with credentials._
 

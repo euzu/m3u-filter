@@ -1,15 +1,13 @@
-FROM alpine:latest as app-builder
+FROM gcr.io/distroless/base-debian12 as build
+
 
 FROM scratch
-
 WORKDIR /
-COPY ./m3u-filter /
-COPY ./config.yml /
-COPY ./api-proxy.yml /
-COPY ./mapping.yml /
-COPY ./web /web
 
-# the tls certificates:
-COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+COPY ["./m3u-filter", "./config.yml",  "./api-proxy.yml",  "./mapping.yml", "/"]
+COPY ./web /web
 
 CMD ["./m3u-filter", "-s", "-c", "./config.yml"]

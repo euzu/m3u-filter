@@ -23,7 +23,7 @@ $checkbox-size:18px;
     left: 0;
     height: $checkbox-size;
     width:  $checkbox-size;
-    background-color: #eee;
+    background-color: var(--checkbox-background-color);
     border-radius: var(--border-radius);
 
     &:after {
@@ -34,11 +34,11 @@ $checkbox-size:18px;
   }
 
   &:hover input ~ .checkmark {
-    background-color: var(--border-color);
+    background-color: var(--checkbox-hover-background-color);
   }
 
   input:checked ~ .checkmark {
-    background-color: var(--popup-hover-background-color);
+    background-color: var(--checkbox-checked-background-color);
   }
 
   input:checked ~ .checkmark:after {

@@ -5,6 +5,7 @@ import {getIconByName} from "../../icons/icons";
 import ServerConfig, {InputConfig} from "../../model/server-config";
 import PopupMenu from "../popup-menu/popup-menu";
 import {PlaylistRequest} from "../../model/playlist-request";
+import InputField from "../input-field/input-field";
 
 interface SourceSelectorProps {
     serverConfig: ServerConfig;
@@ -62,12 +63,11 @@ export default function SourceSelector(props: SourceSelectorProps) {
     }, [serverConfig]);
 
     return <div className={'source-selector'}>
-        <div className={'input-field'}>
-            <label>Source</label>
+        <InputField label={'Source'}>
             <input onKeyUp={handleKeyPress} ref={textField}/>
             <button onClick={handleDownload}>{getIconByName('CloudDownload')}</button>
             <button onClick={openPopup}>{getIconByName('ArrowDown')}</button>
-        </div>
+        </InputField>
         <PopupMenu position={popupVisible} onHide={closePopup}>
             <ul>
                 {sources.map((s, idx) =>

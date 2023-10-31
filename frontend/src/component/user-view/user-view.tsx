@@ -16,6 +16,8 @@ export default function UserView(props: UserViewProps) {
     const services = useServices();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [targets, setTargets] = useState<TargetUser[]>([]);
+    const [activeTarget, setActiveTarget] = useState<string>(undefined);
+
     useEffect(() => {
         if (config) {
             const target_names = ConfigUtils.getTargetNames(config);
@@ -29,8 +31,17 @@ export default function UserView(props: UserViewProps) {
                 result.push({src: false, target: target.target, credentials: target.credentials} as any);
             });
             setTargets(result || []);
+            if (result?.length) {
+                setActiveTarget(result[0].target);
+            }
         }
     }, [config])
+
+
+    const handleTabClick = useCallback((evt: any) => {
+        const target_name = evt.target.dataset.target;
+        setActiveTarget(target_name);
+    }, []);
 
     const handleUserAdd = useCallback((evt: any) => {
         const target_name = evt.target.dataset.target;
@@ -54,7 +65,11 @@ export default function UserView(props: UserViewProps) {
                     break;
                 }
             }
-            target.credentials.push({username, password: TextGenerator.generatePassword(), token: TextGenerator.generatePassword()});
+            target.credentials.push({
+                username,
+                password: TextGenerator.generatePassword(),
+                token: TextGenerator.generatePassword()
+            });
             setTargets([...targets]);
         }
     }, [targets]);
@@ -87,7 +102,7 @@ export default function UserView(props: UserViewProps) {
 
     const handleSave = useCallback(() => {
         const usernames: any = {};
-        for(const target of targets) {
+        for (const target of targets) {
             for (const user of target.credentials) {
                 if (!user.username?.trim().length) {
                     enqueueSnackbar("Username empty!", {variant: 'error'});
@@ -116,54 +131,60 @@ export default function UserView(props: UserViewProps) {
 
     return <div className={'user'}>
 
-        <div className={'user__toolbar'}><label>User</label><button onClick={handleSave}>Save</button></div>
+        <div className={'user__toolbar'}><label>User</label>
+            <button onClick={handleSave}>Save</button>
+        </div>
+        <div className={'tabset'}>
+            {targets?.map(target => <span className={'tabset__tab' + (target.target === activeTarget ? ' tabset__tab-active' : '')} key={'tab_' + target.target} data-target={target.target} onClick={handleTabClick}>{target.target}</span>)}
+        </div>
         <div className={'user__content'}>
-        <div className={'user__content-targets'}>
-            {
-                targets?.map(target => <div key={target.target}
-                                            className={'user__target'}>
-                    <div className={'user__target-target'}>
-                        <label className={(target as any).src ? '' : 'target-not-exists'}>{target.target}</label>
-                        <div className={'user__target-target-toolbar'}>
-                            <button data-target={target.target}
-                                    onClick={handleUserAdd}>{getIconByName('PersonAdd')}</button>
-                        </div>
-                    </div>
-
-                    <div className={'user__target-user-table'}>
-                        <div className={'user__target-user-row user__target-user-table-header'}>
-                            <div className={'user__target-user-col'}><label>Username</label></div>
-                            <div className={'user__target-user-col'}><label>Password</label></div>
-                            <div className={'user__target-user-col'}><label>Token</label></div>
-                            <div className={'user__target-user-col'}></div>
-                        </div>
-                        {target.credentials.map((usr, idx) =>
-                            <div key={'credential' + idx} className={'user__target-user-row'}>
-                                <div className={'user__target-user-col'}>
-                                    <div className={'user__target-user-col-label'}><label>Username</label></div>
-                                    <input data-target={target.target} data-idx={idx} defaultValue={usr.username}
-                                           key={usr.username}
-                                           data-field={'username'} onChange={handleValueChange}></input>
-                                </div>
-                                <div className={'user__target-user-col'}>
-                                    <div className={'user__target-user-col-label'}><label>Password</label></div>
-                                    <input defaultValue={usr.password} key={usr.password} data-field={'password'}
-                                           onChange={handleValueChange}></input>
-                                </div>
-                                <div className={'user__target-user-col'}>
-                                    <div className={'user__target-user-col-label'}><label>Token</label></div>
-                                    <input defaultValue={usr.token} key={usr.token} data-field={'token'}
-                                           onChange={handleValueChange}></input>
-                                </div>
-                                <div className={'user__target-user-col user__target-user-col-toolbar'}>
-                                <span data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
-                                    {getIconByName('PersonRemove')}
-                                </span>
-                                </div>
+            <div className={'user__content-targets'}>
+                {
+                    targets?.map(target => <div key={target.target} className={'user__target' + (activeTarget !== target.target ? ' hidden' : '')}>
+                        <div className={'user__target-target'}>
+                            <label className={(target as any).src ? '' : 'target-not-exists'}>{target.target}</label>
+                            <div className={'user__target-target-toolbar'}>
+                                <button data-target={target.target}
+                                        onClick={handleUserAdd}>{getIconByName('PersonAdd')}</button>
                             </div>
-                        )}
-                    </div>
-                </div>)}
+                        </div>
+
+                        <div className={'user__target-user-table-container'}>
+                            <div className={'user__target-user-table'}>
+                                <div className={'user__target-user-row user__target-user-table-header'}>
+                                    <div className={'user__target-user-col user__target-user-col-header'}><label>Username</label></div>
+                                    <div className={'user__target-user-col user__target-user-col-header'}><label>Password</label></div>
+                                    <div className={'user__target-user-col user__target-user-col-header'}><label>Token</label></div>
+                                    <div className={'user__target-user-col user__target-user-col-header'}></div>
+                                </div>
+                                {target.credentials.map((usr, idx) =>
+                                    <div key={'credential' + idx} className={'user__target-user-row'}>
+                                        <div className={'user__target-user-col'}>
+                                            <div className={'user__target-user-col-label'}><label>Username</label></div>
+                                            <input data-target={target.target} data-idx={idx} defaultValue={usr.username}
+                                                   key={usr.username}
+                                                   data-field={'username'} onChange={handleValueChange}></input>
+                                        </div>
+                                        <div className={'user__target-user-col'}>
+                                            <div className={'user__target-user-col-label'}><label>Password</label></div>
+                                            <input defaultValue={usr.password} key={usr.password} data-field={'password'}
+                                                   onChange={handleValueChange}></input>
+                                        </div>
+                                        <div className={'user__target-user-col'}>
+                                            <div className={'user__target-user-col-label'}><label>Token</label></div>
+                                            <input defaultValue={usr.token} key={usr.token} data-field={'token'}
+                                                   onChange={handleValueChange}></input>
+                                        </div>
+                                        <div className={'user__target-user-col user__target-user-col-toolbar'}>
+                                    <span data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
+                                        {getIconByName('PersonRemove')}
+                                    </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>)}
             </div>
         </div>
     </div>

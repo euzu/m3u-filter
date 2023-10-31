@@ -1,6 +1,7 @@
 import React, {useCallback, useRef, KeyboardEvent} from "react";
 import './playlist-filter.scss';
 import {getIconByName} from "../../icons/icons";
+import InputField from "../input-field/input-field";
 
 interface PlaylistFilterProps {
     onFilter: (filter: string) => void;
@@ -22,10 +23,9 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
     }, [handleSearch]);
 
     return <div className={'playlist-filter'}>
-        <div className={'input-field'} onKeyUp={handleKeyPress}>
-            <label>Search</label>
-            <input ref={textField}/>
+        <InputField label={'Search'}>
+            <input ref={textField} onKeyUp={handleKeyPress}/>
             <button onClick={handleSearch}>{getIconByName('Search')}</button>
-        </div>
+        </InputField>
     </div>
 }

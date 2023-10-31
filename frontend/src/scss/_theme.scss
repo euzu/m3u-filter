@@ -1,14 +1,14 @@
 :root {
   --text-color: #ffffff;
   --label-color: #aaaaaa;
-  --background-color: #2b2b2b;
+  --background-color: #21222C;
   --app-header-color: #6495b1;
   --sidebar-toggle-color: #ffffff;
-  --sidebar-toggle-hover-color: #004db4;
+  --sidebar-toggle-hover-color: #47495d;
   --playlist-color: #aeb0b2;
-  --border-color: #aeb0b2;
+  --border-color: #47495d;
   --border-light-color: #68686c;
-  --hover-border-color: #ffffff;
+  --hover-border-color: #aaaab0;
   --spinner-color: #ffffff66;
   --spinner-highlight-color: #5599f0;
   --tree-count-color: #7b7b7e;
@@ -16,16 +16,16 @@
   --tree-hover-color: white;
   --tree-expander-hover-color: white;
   --tool-button-background-color: #434343;
-  --tool-button-color: #8f8f8f;
+  --tool-button-color: #fff;
   --tool-button-hover-color: #ffffff;
   --tool-button-hover-background-color: #0c8a13;
 
-  --toolbar-background-color: #434343;
+  --toolbar-background-color: #282A36;
   --toolbar-button-hover-color: #ffffff;
   --toolbar-button-hover-background-color: #004db4;
 
-  --popup-background-color: #272727;
-  --popup-shadow-color: #646464;
+  --popup-background-color: #282A36;
+  --popup-shadow-color: #06070a;
   --popup-border-color: #646464;
   --popup-color: #fff;
   --popup-hover-background-color: #5599f0;
@@ -33,12 +33,44 @@
 
   --attention-color: red;
 
-  --card-background-color: #363636;
+  --card-background-color: #282A36;
   --card-color: #ffffff;
-  --card-border-color: #606060;
+  --card-border-color: #47495d;
 
   --title-label-color: #6495b1;
 
   --border-radius: 4px;
 
+  --icon-button-border-radius: 4px;
+  --icon-button-background-color: #44475A;
+  --icon-button-color: #ffffff;
+  --icon-button-hover-background-color: #6272A4;
+  --icon-button-hover-color: #ffffff;
+
+  --text-button-border-radius: 4px;
+  --text-button-border-color: transparent;
+  --text-button-background-color: #44475A;
+  --text-button-color: #69a6ff;
+  --text-button-hover-background-color: #6272A4;
+  --text-button-hover-color: #50FA7B;
+
+
+  --scrollbar-color: #44475A #ffffff;
+  --scrollbar-thumb-background-color: #44475A;
+
+  --tabset-background-color: #282A36;
+  --tabset-border-color: #000;
+  --tab-background-color: #44475A;
+  --tab-color: #fff;
+  --tab-hover-background-color: #6272A4;
+  --tab-hover-color: #50FA7B;
+  --tab-avtive-indicator-color: #50FA7B;
+  --tab-active-background-color: #54547a;
+  --tab-active-color: #50FA7B;
+
+  --table-border-color: #44475a;
+
+  --checkbox-background-color: #44475A;
+  --checkbox-hover-background-color: #6272A4;
+  --checkbox-checked-background-color: #6272A4;
 }

@@ -5,6 +5,9 @@
   @include preferences.prefsRoot();
   @include preferences.prefsToolbar();
 
+  min-height: 400px;
+  max-height: 400px;
+
   &__content {
     display: flex;
     flex-flow: column;
@@ -28,10 +31,10 @@
       display: flex;
       flex-flow: column;
       flex: 1 1 auto;
-      overflow: auto;
       gap: 20px;
       justify-content: flex-start;
       padding-right: 6px;
+      overflow: hidden;
     }
   }
 
@@ -39,15 +42,17 @@
     display: flex;
     flex-flow: column;
     border: 1px solid var(--border-color);
-    padding: 8px;
     border-radius: var(--border-radius);
+    overflow: hidden;
+    background-color: var(--background-color);
+    gap: 12px;
 
     &-target {
       font-size: 1.2rem;
-      border-bottom: 2px dashed var(--border-color);
       align-items: center;
       display: flex;
       flex-flow: row;
+      padding: 8px;
 
       label {
         flex: 1 1 0;
@@ -63,28 +68,49 @@
     }
 
     &-user {
+      &-table-container {
+        flex: 1 1 auto;
+        overflow-y: scroll;
+        background-color: var(--card-background-color);
+        padding: 8px;
+      }
       &-table {
         margin: 8px 4px;
         display: table;
         width: auto;
+        border-collapse: collapse;
       }
 
       &-row {
         display: table-row;
         width: auto;
         clear: both;
+        border: 1px solid var(--table-border-color);
       }
+
+      &-col-header {
+        padding: 8px;
+        background-color: var(--background-color);
+      }
+
 
       &-col {
         display: table-cell;
         width: auto;
+        vertical-align: bottom;
+        input {
+          border: none !important;
+        }
 
         &-toolbar {
           display: flex;
           flex-flow: row;
           align-items: flex-end;
+          justify-content: flex-end;
+          padding-left: 4px;
           span {
             padding: 4px;
+            transform: scale(0.7) translateY(5px);
             @include common.iconButton();
           }
         }
@@ -120,6 +146,10 @@
           display: flex;
           flex-flow: column;
           gap: 4px;
+
+          input {
+            border: 1px solid var(--table-border-color);
+          }
         }
       }
     }

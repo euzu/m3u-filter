@@ -1,11 +1,10 @@
 .preferences {
   display: flex;
   flex-flow: row;
-  //flex: 1 1 auto;
   padding: 12px;
   overflow: hidden;
-  gap: 18px;
   justify-content: center;
+  gap: 18px;
 
   @media (max-width:980px) {
     flex-flow: row wrap;

@@ -1,0 +1,54 @@
+@use "../../scss/common";
+
+.input-field {
+  display: flex;
+  position: relative;
+  flex-flow: row nowrap;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  flex: 1 1 auto;
+
+  &__content {
+    display: flex;
+    flex-flow: row nowrap;
+    flex: 1 1 auto;
+    gap: 1px;
+    overflow: hidden;
+    border-radius: var(--border-radius);
+  }
+
+  &:focus-within {
+    border: 1px solid var(--hover-border-color);
+  }
+
+  label {
+    position: absolute;
+    color: var(--label-color);
+    transform: translate(6px, -0.8rem);
+    background-color: var(--background-color);
+    padding: 0 2px;
+  }
+
+  input {
+    color: var(--text-color);
+    font-size: 1.2rem;
+    padding: 0.5rem;
+    border: none;
+    flex: 1 1 auto;
+
+    &:focus,
+    &:hover {
+      border: none;
+      outline: none;
+    }
+  }
+
+  button {
+    @include common.iconButton();
+    border-radius: 0;
+    &:last-child {
+      border-bottom-right-radius: var(--border-radius);
+      border-top-right-radius: var(--border-radius);
+    }
+  }
+}
