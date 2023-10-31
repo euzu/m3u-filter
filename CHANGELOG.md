@@ -1,5 +1,5 @@
 # Changelog
-# v1.0.2(2023-10-??)
+# v1.1.1(2023-10-31)
 * Added scheduler to update lists in server mode.
 * Added Xtream Cluster Live, Video, Series. M3u Playlist cluster guessing through video file endings.
 * Added api-proxy config for xtream proxy, to define server info and user credentials

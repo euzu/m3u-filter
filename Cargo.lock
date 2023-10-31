@@ -1295,7 +1295,7 @@ checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
 name = "m3u-filter"
-version = "1.0.1"
+version = "1.1.1"
 dependencies = [
  "actix-cors",
  "actix-files",

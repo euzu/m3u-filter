@@ -2,7 +2,7 @@
   "name": "m3u-filter",
   "description": "m3u-filter",
   "author": "euzu",
-  "version": "1.0.1",
+  "version": "1.1.1",
   "private": true,
   "homepage": "./",
   "scripts": {
@@ -24,8 +24,8 @@
     "rxjs": "7.8.1"
   },
   "devDependencies": {
-    "@babel/runtime": "7.23.2",
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",
+    "@babel/runtime": "7.23.2",
     "@types/file-saver": "2.0.6",
     "@types/react": "18.2.31",
     "@types/react-dom": "18.2.14",
@@ -45,9 +45,9 @@
     "eslint-plugin-node": "11.1.0",
     "eslint-plugin-react": "7.33.2",
     "eslint-plugin-react-hooks": "4.6.0",
-    "sass": "1.69.4",
     "prettier": "3.0.3",
     "react-scripts": "5.0.1",
+    "sass": "1.69.4",
     "source-map-explorer": "2.5.3",
     "typescript": "5.2.2",
     "wait-on": "7.0.1"
