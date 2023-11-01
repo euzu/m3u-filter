@@ -59,38 +59,6 @@ button {
   padding: 0 4px 4px 0;
 }
 
-.tabset {
-  display: flex;
-  flex-flow: row;
-  gap: 2px;
-  background-color: var(--tabset-background-color);
-  border-bottom: 1px solid var(--tabset-border-color);
-  &__tab {
-    cursor: pointer;
-    user-select: none;
-    box-sizing: border-box;
-    background-color: var(--tab-background-color);
-    color: var(--tab-color);
-    padding: 4px 8px;
-    border-top-left-radius: var(--border-radius);
-    border-top-right-radius: var(--border-radius);
-
-    &:active {
-      transform: scale(0.9);
-    }
-
-    &:focus, &:hover {
-      background-color: var(--tab-hover-background-color);
-      color: var(--tab-hover-color);
-    }
-
-    &-active {
-      border-bottom: 3px solid var(--tab-avtive-indicator-color);
-      background-color: var(--tab-active-background-color);
-      color: var(--tab-active-color);
-    }
-  }
-}
 
 input {
   background-color: transparent;

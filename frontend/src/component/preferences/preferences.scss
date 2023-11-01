@@ -9,6 +9,9 @@
   @media (max-width:980px) {
     flex-flow: row wrap;
     overflow: auto;
+    > * {
+      flex-grow: 1;
+    }
   }
 
 

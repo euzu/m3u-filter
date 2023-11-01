@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from "react";
+import React, {useCallback, useMemo} from "react";
 import './server-info-view.scss';
 import ServerConfig, {ServerInfo} from "../../model/server-config";
 import {useSnackbar} from "notistack";
@@ -43,7 +43,7 @@ export default function ServerInfoView(props: ServerInfoViewProps) {
                 error: (err) => enqueueSnackbar("Failed to save server info!", {variant: 'error'})
             });
         }
-    }, [services, enqueueSnackbar]);
+    }, [services, serverInfo, enqueueSnackbar]);
 
     return <div className={'server-info'}>
         <div className={'server-info__toolbar'}><label>Server</label>
@@ -53,12 +53,12 @@ export default function ServerInfoView(props: ServerInfoViewProps) {
             <div className={'server-info__content-table'}>
                 {
                     SERVER_INFO_FIELDS.map(field =>
-                        <div className={'server-info__content-row'}>
+                        <div key={'server_info_field_' + field.name} className={'server-info__content-row'}>
                             <div className={'server-info__content-col'}>
                                 <label>{field.caption}</label>
                             </div>
                             <div className={'server-info__content-table-col'}>
-                                <input value={(serverInfo as any)?.[field.name]} data-field={field.name}
+                                <input defaultValue={(serverInfo as any)?.[field.name]} data-field={field.name}
                                        onChange={handleValueChange}></input>
                             </div>
                         </div>

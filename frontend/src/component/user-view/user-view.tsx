@@ -6,6 +6,7 @@ import TextGenerator from "../../utils/text-generator";
 import {useSnackbar} from "notistack";
 import {useServices} from "../../provider/service-provider";
 import ConfigUtils from "../../utils/config-utils";
+import TabSet, {TabSetTab} from "../tab-set/tab-set";
 
 interface UserViewProps {
     config: ServerConfig;
@@ -17,6 +18,7 @@ export default function UserView(props: UserViewProps) {
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [targets, setTargets] = useState<TargetUser[]>([]);
     const [activeTarget, setActiveTarget] = useState<string>(undefined);
+    const [tabs, setTabs] = useState<TabSetTab[]>([]);
 
     useEffect(() => {
         if (config) {
@@ -30,18 +32,14 @@ export default function UserView(props: UserViewProps) {
             missing?.forEach(target => {
                 result.push({src: false, target: target.target, credentials: target.credentials} as any);
             });
-            setTargets(result || []);
-            if (result?.length) {
-                setActiveTarget(result[0].target);
+            const targets = result || [];
+            setTargets(targets);
+            if (targets?.length) {
+                setActiveTarget(targets[0].target);
             }
+            setTabs(targets.map(target => ({key: target.target, label: target.target})));
         }
     }, [config])
-
-
-    const handleTabClick = useCallback((evt: any) => {
-        const target_name = evt.target.dataset.target;
-        setActiveTarget(target_name);
-    }, []);
 
     const handleUserAdd = useCallback((evt: any) => {
         const target_name = evt.target.dataset.target;
@@ -129,14 +127,16 @@ export default function UserView(props: UserViewProps) {
         });
     }, [targets, services, enqueueSnackbar]);
 
+    const handleTabChange = useCallback((target: string) => {
+        setActiveTarget(target);
+    }, []);
+
     return <div className={'user'}>
 
         <div className={'user__toolbar'}><label>User</label>
             <button onClick={handleSave}>Save</button>
         </div>
-        <div className={'tabset'}>
-            {targets?.map(target => <span className={'tabset__tab' + (target.target === activeTarget ? ' tabset__tab-active' : '')} key={'tab_' + target.target} data-target={target.target} onClick={handleTabClick}>{target.target}</span>)}
-        </div>
+        <TabSet tabs={tabs} active={activeTarget} onTabChange={handleTabChange}></TabSet>
         <div className={'user__content'}>
             <div className={'user__content-targets'}>
                 {

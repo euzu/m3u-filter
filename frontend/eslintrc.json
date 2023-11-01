@@ -28,9 +28,7 @@
   "plugins": [
     "import",
     "node",
-    "react",
-    "jest",
-    "@typescript-eslint"
+    "react"
   ],
   "rules": {
     "consistent-this": [
