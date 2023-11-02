@@ -1,25 +1,20 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_web::{App, get, HttpRequest, HttpServer, web};
 use actix_web::middleware::Logger;
-use actix_web::web::Data;
-use chrono::Local;
-use cron::Schedule;
-use crate::api::m3u_api::m3u_api;
+use crate::api::m3u_api::{m3u_api_register};
 
 use crate::api::api_model::{AppState};
+use crate::api::scheduler::start_scheduler;
 use crate::api::v1_api::{v1_api_register};
-use crate::api::xmltv_api::xmltv_api;
-use crate::api::xtream_player_api::xtream_player_api;
+use crate::api::xmltv_api::{xmltv_api_register};
+use crate::api::xtream_player_api::{xtream_api_register};
 use crate::model::config::{Config,ProcessTargets};
-use crate::processing::playlist_processor::exec_processing;
 
 #[get("/")]
 async fn index(
@@ -69,9 +64,9 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
         )
         .app_data(shared_data.clone())
         .service(v1_api_register())
-        .service(xtream_player_api)
-        .service(m3u_api)
-        .service(xmltv_api)
+        .service(xtream_api_register())
+        .service(m3u_api_register())
+        .service(xmltv_api_register())
         .service(index)
         .service(actix_files::Files::new("/", web_dir.to_string()))
     )
@@ -81,18 +76,3 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
     // .service(actix_files::Files::new("/static", ".").show_files_listing())
 }
 
-async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
-    let schedule = Schedule::from_str(expression).unwrap();
-    let offset = *Local::now().offset();
-    loop {
-        let mut upcoming = schedule.upcoming(offset).take(1);
-        actix_rt::time::sleep(Duration::from_millis(500)).await;
-        let local = &Local::now();
-
-        if let Some(datetime) = upcoming.next() {
-            if datetime.timestamp() <= local.timestamp() {
-                exec_processing(data.config.clone(), data.targets.clone());
-            }
-        }
-    }
-}

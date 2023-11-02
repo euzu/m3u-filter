@@ -1,6 +1,6 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
-use actix_web::{get, HttpRequest, HttpResponse, web};
+use actix_web::{HttpRequest, HttpResponse, web, Resource};
 use chrono::{Duration, Local};
 use log::debug;
 
@@ -41,9 +41,7 @@ fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationRes
     }
 }
 
-
-#[get("/player_api.php")]
-pub(crate) async fn xtream_player_api(
+async fn xtream_player_api(
     api_req: web::Query<UserApiRequest>,
     req: HttpRequest,
     _app_state: web::Data<AppState>,
@@ -88,4 +86,11 @@ pub(crate) async fn xtream_player_api(
             }
         }
     }
+}
+
+pub(crate) fn xtream_api_register() -> Vec<Resource> {
+    vec![
+        web::resource("/player_api.php").route(web::get().to(xtream_player_api)),
+        web::resource("/xtream").route(web::get().to(xtream_player_api)),
+    ]
 }

@@ -1,6 +1,6 @@
 use std::path::{PathBuf};
-use actix_web::{get, HttpRequest, HttpResponse, web};
-use log::debug;
+use actix_web::{HttpRequest, HttpResponse, Resource, web};
+use log::{info};
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest};
@@ -19,7 +19,7 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
                     if path_exists(&epg_path) {
                         return Some(epg_path);
                     } else {
-                        debug!("Cant find epg file for m3u target: {}", epg_path.to_str().unwrap_or("?"))
+                        info!("Cant find epg file for m3u target: {}", epg_path.to_str().unwrap_or("?"))
                     }
                 }
             }
@@ -29,7 +29,7 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
                     if path_exists(&epg_path) {
                         return Some(epg_path);
                     } else {
-                        debug!("Cant find epg file for xtream target: {}", epg_path.to_str().unwrap_or("?"))
+                        info!("Cant find epg file for xtream target: {}", epg_path.to_str().unwrap_or("?"))
                     }
                 }
             }
@@ -39,8 +39,7 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
     None
 }
 
-#[get("/xmltv.php")]
-pub(crate) async fn xmltv_api(
+async fn xmltv_api(
     api_req: web::Query<UserApiRequest>,
     req: HttpRequest,
     _app_state: web::Data<AppState>,
@@ -54,4 +53,11 @@ pub(crate) async fn xmltv_api(
         }
         None => HttpResponse::BadRequest().finish()
     }
+}
+
+pub(crate) fn xmltv_api_register() -> Vec<Resource> {
+    vec![
+        web::resource("/xmltv.php").route(web::get().to(xmltv_api)),
+        web::resource("/epg").route(web::get().to(xmltv_api)),
+    ]
 }

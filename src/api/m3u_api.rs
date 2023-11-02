@@ -1,11 +1,11 @@
-use actix_web::{get, HttpRequest, HttpResponse, web};
+use actix_web::{HttpRequest, HttpResponse, Resource, web};
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::repository::m3u_repository::get_m3u_file_path;
 
-#[get("/get.php")]
-pub(crate) async fn m3u_api(
+
+async fn m3u_api(
     api_req: web::Query<UserApiRequest>,
     req: HttpRequest,
     _app_state: web::Data<AppState>,
@@ -24,4 +24,11 @@ pub(crate) async fn m3u_api(
             HttpResponse::BadRequest().finish()
         }
     }
+}
+
+pub(crate) fn m3u_api_register() -> Vec<Resource> {
+    vec![
+        web::resource("/get.php").route(web::get().to(m3u_api)),
+        web::resource("/m3u").route(web::get().to(m3u_api))
+    ]
 }
