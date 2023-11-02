@@ -43,7 +43,7 @@ pub(crate) async fn xmltv_api(
     match get_user_target(&api_req, &_app_state) {
         Some((_, target)) => {
             match get_epg_path_for_target(&_app_state.config, target) {
-                None => HttpResponse::BadRequest().finish(),
+                None => HttpResponse::NoContent().finish(),
                 Some(epg_path) => serve_file(&epg_path, &req).await
             }
         }

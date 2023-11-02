@@ -17,7 +17,7 @@ pub(crate) async fn m3u_api(
                 Some(file_path) => {
                     serve_file(&file_path, &req).await
                 }
-                None => HttpResponse::BadRequest().finish()
+                None => HttpResponse::NoContent().finish()
             }
         }
         None => {

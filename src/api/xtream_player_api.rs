@@ -70,7 +70,7 @@ pub(crate) async fn xtream_player_api(
                     }
                     Err(err) => {
                         debug!("Could not open file for xtream target: {} {}", target_name, err);
-                        HttpResponse::BadRequest().finish()
+                        HttpResponse::NoContent().finish()
                     }
                 }
             } else {
