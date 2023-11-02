@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::{fs, io};
+use std::ffi::OsStr;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -237,26 +238,32 @@ pub(crate) async fn download_file(
                 }
                 match client.get(_url).headers(headers).send().await {
                     Ok(response) => {
-                        let filename_re = Regex::new(r"[^A-Za-z0-9_-]").unwrap();
+                        let filename_re = Regex::new(r"[^A-Za-z0-9_.-]").unwrap();
                         let filename = filename_re.replace_all(&unidecode(&req.filename).replace(' ', "_"), "").to_string();
-
-                        let path: PathBuf = [(download.directory.clone().unwrap().as_str()), filename.as_str()].iter().collect();
-                        let download_id = Uuid::new_v4().to_string();
-                        let response_download_id = download_id.clone();
-                        actix_rt::spawn(async move {
-                            let downloads = _app_state.downloads.clone();
-                            match async_download_file(&download_id, &path, response, downloads.clone()).await {
-                                Ok(_) => {
-                                    downloads.lock().unwrap().remove(&download_id);
-                                }
-                                Err(err) => {
-                                    downloads.lock().unwrap().remove(&download_id);
-                                    let _ = fs::remove_file(&path);
-                                    error!("{}", err);
-                                }
+                        let file_stem = Path::new(&filename).file_stem().and_then(OsStr::to_str).unwrap_or("");
+                        let file_dir: PathBuf = [download.directory.as_ref().unwrap(), file_stem].iter().collect();
+                        match fs::create_dir_all(&file_dir) {
+                            Ok(_) => {
+                                let path = file_dir.join(filename.as_str());
+                                let download_id = Uuid::new_v4().to_string();
+                                let response_download_id = download_id.clone();
+                                actix_rt::spawn(async move {
+                                    let downloads = _app_state.downloads.clone();
+                                    match async_download_file(&download_id, &path, response, downloads.clone()).await {
+                                        Ok(_) => {
+                                            downloads.lock().unwrap().remove(&download_id);
+                                        }
+                                        Err(err) => {
+                                            downloads.lock().unwrap().remove(&download_id);
+                                            let _ = fs::remove_file(&path);
+                                            error!("{}", err);
+                                        }
+                                    }
+                                });
+                                HttpResponse::Ok().json(json!({"download_id": response_download_id}))
                             }
-                        });
-                        HttpResponse::Ok().json(json!({"download_id": response_download_id}))
+                            Err(err) => HttpResponse::InternalServerError().json(json!({"error": format!("{}", err)}))
+                        }
                     }
                     Err(err) => HttpResponse::InternalServerError().json(json!({"error": format!("{}", err)})),
                 }
