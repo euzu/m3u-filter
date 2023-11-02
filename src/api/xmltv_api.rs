@@ -1,5 +1,6 @@
 use std::path::{PathBuf};
 use actix_web::{get, HttpRequest, HttpResponse, web};
+use log::debug;
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest};
@@ -17,6 +18,8 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
                 if let Some(epg_path) = get_m3u_epg_file_path(config, &target.get_m3u_filename()) {
                     if path_exists(&epg_path) {
                         return Some(epg_path);
+                    } else {
+                        debug!("Cant find epg file for m3u target: {}", epg_path.to_str().unwrap_or("?"))
                     }
                 }
             }
@@ -25,6 +28,8 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
                     let epg_path=  get_xtream_epg_file_path(&storage_path);
                     if path_exists(&epg_path) {
                         return Some(epg_path);
+                    } else {
+                        debug!("Cant find epg file for xtream target: {}", epg_path.to_str().unwrap_or("?"))
                     }
                 }
             }
