@@ -215,7 +215,7 @@ impl XtreamStream {
         add_str_property_if_exists!(result, self.title, "title");
         add_str_property_if_exists!(result, self.year, "year");
         add_str_property_if_exists!(result, self.youtube_trailer, "youtube_trailer");
-        add_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
+        //add_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
         add_i64_property_if_exists!(result, self.tv_archive, "tv_archive");
         add_i64_property_if_exists!(result, self.tv_archive_duration, "tv_archive_duration");
         if result.is_empty() { None } else { Some(result) }
@@ -271,6 +271,7 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluste
                                     rec: "".to_string(),
                                     source: "".to_string(), // String::from(&stream.direct_source),
                                     url: if stream.direct_source.is_empty() { format!("{}/{}", stream_base_url, stream.get_stream_id())} else { String::from(&stream.direct_source) },
+                                    epg_channel_id: stream.epg_channel_id.clone(),
                                     xtream_cluster: xtream_cluster.clone(),
                                     additional_properties: stream.get_additional_properties(),
                                 }),

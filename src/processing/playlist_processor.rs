@@ -435,7 +435,8 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
             tv_guides.push(tv_guide);
             let guide = tv_guides.last().unwrap();
             debug!("found epg information for {}", &target.name);
-            let channel_ids: HashSet<_> = new_playlist.iter().flat_map(|g| &g.channels).map(|c| c.header.borrow().id.to_owned()).collect();
+            let channel_ids: HashSet<_> = new_playlist.iter().flat_map(|g| &g.channels)
+                .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
             if !channel_ids.is_empty() {
                 if let Some(epg) = guide.filter(&channel_ids) {
                     new_epg.push(epg);

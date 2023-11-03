@@ -45,6 +45,7 @@ pub(crate) struct PlaylistItemHeader {
     pub source: String,
     // this is the source content not the url
     pub url: String,
+    pub epg_channel_id: Option<String>,
     #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
     pub xtream_cluster: XtreamCluster,
     #[serde(skip_serializing, skip_deserializing)]

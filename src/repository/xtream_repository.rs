@@ -19,7 +19,6 @@ pub(crate) static COL_SERIES: &str = "series";
 pub(crate) static COL_VOD: &str = "vod";
 
 const LIVE_STREAM_FIELDS: &[&str] = &[
-    "epg_channel_id"
 ];
 
 const VIDEO_STREAM_FIELDS: &[&str] = &[
@@ -110,6 +109,10 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                             document.insert("direct_source".to_string(), Value::String(header.url.clone()));
                             document.insert("thumbnail".to_string(), Value::String(header.logo_small.clone()));
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
+                            document.insert("epg_channel_id".to_string(), match &header.epg_channel_id {
+                                None => Value::Null,
+                                Some(epg_id) => Value::String(epg_id.to_owned())
+                            });
                         }
                         XtreamCluster::Video => {
                             document.insert("stream_id".to_string(), stream_id);

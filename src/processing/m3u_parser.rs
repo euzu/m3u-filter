@@ -64,6 +64,7 @@ fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistIt
         rec: String::from(""),
         source: String::from(content),
         url,
+        epg_channel_id: None,
         xtream_cluster: XtreamCluster::Live,
         additional_properties: None,
     }
@@ -86,7 +87,10 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
                     if let Some(t) = token {
                         let value = token_value(&mut it);
                         match t.as_str() {
-                            "tvg-id" => plih.id = value,
+                            "tvg-id" => {
+                                plih.id = value.to_owned();
+                                plih.epg_channel_id = Some(value);
+                            },
                             "tvg-name" => plih.name = value,
                             "group-title" => if !value.is_empty() { plih.group = value },
                             "parent-code" => plih.parent_code = value,
