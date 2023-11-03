@@ -632,6 +632,12 @@ To access the xmltv-api use url like `http://192.169.1.2/xmltv.php?username={}&p
 
 _Do not forget to replace `{}` with credentials._
 
+If you use the endpoints through rest calls, you can use, for the sake of simplicity:
+- `m3u` inplace of `get.php`
+- `xtream` inplace of `player_api.php`
+- `epg` inplace of `xmltv.php`
+- `token` inplace of `username` and `password` combination
+
 When you define credentials for a `target`, ensure that this target has
 `output` format  `xtream`or `m3u`.
 
