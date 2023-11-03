@@ -1,4 +1,9 @@
 # Changelog
+# v1.1.2(2023-11-03)
+* Fixed epg for xtream
+* Fixed some Web-UI Problems
+* Added some convenience endpoints to rest api
+
 # v1.1.1(2023-10-31)
 * Added scheduler to update lists in server mode.
 * Added Xtream Cluster Live, Video, Series. M3u Playlist cluster guessing through video file endings.
