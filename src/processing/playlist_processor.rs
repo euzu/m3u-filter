@@ -2,8 +2,10 @@ extern crate unidecode;
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use actix_rt::System;
 
 use log::{debug, error, info};
 use unidecode::unidecode;
@@ -103,8 +105,8 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
         let match_as_ascii = &sort.match_as_ascii;
         if let Some(group_sort) = &sort.groups {
             new_playlist.sort_by(|a, b| {
-                let value_a = if *match_as_ascii { unidecode(&a.title) } else { String::from(&a.title) };
-                let value_b = if *match_as_ascii { unidecode(&b.title) } else { String::from(&b.title) };
+                let value_a = if *match_as_ascii { Rc::new(unidecode(&a.title)) } else { Rc::clone(&a.title) };
+                let value_b = if *match_as_ascii { Rc::new(unidecode(&b.title)) } else { Rc::clone(&b.title) };
                 let ordering = value_a.partial_cmp(&value_b).unwrap();
                 match group_sort.order {
                     Asc => ordering,
@@ -116,14 +118,14 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
             channel_sorts.iter().for_each(|channel_sort| {
                 let regexp = channel_sort.re.as_ref().unwrap();
                 new_playlist.iter_mut().for_each(|group| {
-                    let group_title = if *match_as_ascii { unidecode(&group.title) } else { String::from(&group.title) };
+                    let group_title = if *match_as_ascii { Rc::new(unidecode(&group.title)) } else { Rc::clone(&group.title) };
                     let is_match = regexp.is_match(group_title.as_str());
                     if is_match {
                         group.channels.sort_by(|a, b| {
                             let raw_value_a = get_field_value(a, &channel_sort.field);
                             let raw_value_b = get_field_value(b, &channel_sort.field);
-                            let value_a = if *match_as_ascii { unidecode(&raw_value_a) } else { raw_value_a };
-                            let value_b = if *match_as_ascii { unidecode(&raw_value_b) } else { raw_value_b };
+                            let value_a = if *match_as_ascii { Rc::new(unidecode(&raw_value_a)) } else { raw_value_a };
+                            let value_b = if *match_as_ascii { Rc::new(unidecode(&raw_value_b)) } else { raw_value_b };
                             let ordering = value_a.partial_cmp(&value_b).unwrap();
                             match channel_sort.order {
                                 Asc => ordering,
@@ -152,7 +154,7 @@ fn exec_rename(pli: &mut PlaylistItem, rename: &Option<Vec<config::ConfigRename>
                 let cap = r.re.as_ref().unwrap().replace_all(value.as_str(), &r.new_name);
                 debug!("Renamed {}={} to {}", &r.field, value, cap);
                 let value = cap.into_owned();
-                set_field_value(result, &r.field, value);
+                set_field_value(result, &r.field, Rc::new(value));
             }
         }
     }
@@ -169,7 +171,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                         if let ItemField::Group = r.field {
                             let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
                             debug!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
-                            grp.title = cap.into_owned();
+                            grp.title = Rc::new(cap.into_owned());
                         }
                     }
 
@@ -198,14 +200,14 @@ macro_rules! apply_pattern {
 fn map_channel(channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
     if !mapping.mapper.is_empty() {
         let header = channel.header.borrow();
-        let channel_name = if mapping.match_as_ascii { unidecode(&header.name) } else { String::from(&header.name) };
+        let channel_name = if mapping.match_as_ascii { Rc::new(unidecode(&header.name)) } else { header.name.clone() };
         if mapping.match_as_ascii { debug!("Decoded {} for matching to {}", &header.name, &channel_name); };
         drop(header);
         let ref_chan = RefCell::new(&channel);
         let provider = ValueProvider { pli: ref_chan.clone() };
         let mut mock_processor = MockValueProcessor {};
         for m in &mapping.mapper {
-            let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: RefCell::new(m)};
+            let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: m};
             match &m._filter {
                 Some(filter) => {
                     if filter.filter(&provider, &mut mock_processor) {
@@ -239,13 +241,13 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
             for channel in &playlist_group.channels {
                 let cluster = &channel.header.borrow().xtream_cluster;
                 let title = &channel.header.borrow().group;
-                match new_groups.iter_mut().find(|x| &*x.title == title) {
+                match new_groups.iter_mut().find(|x| *x.title == **title) {
                     Some(grp) => grp.channels.push(channel.clone()),
                     _ => {
                         grp_id += 1;
                         new_groups.push(PlaylistGroup {
                             id: grp_id,
-                            title: String::from(title),
+                            title: Rc::clone(title),
                             channels: vec![channel.clone()],
                             xtream_cluster: cluster.clone(),
                         })
@@ -269,7 +271,7 @@ fn is_input_enabled(enabled_inputs: usize, input_enabled: bool, input_id: u16, u
     input_enabled
 }
 
-fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
+async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
     let source = cfg.sources.get(source_idx).unwrap();
     let mut all_playlist = Vec::new();
     let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
@@ -280,11 +282,11 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
         let input_id = input.id;
         if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
             let (playlist, mut error_list) = match input.input_type {
-                InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir),
-                InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir),
+                InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir).await,
+                InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir).await,
             };
             let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
-                get_xmltv(&cfg, input, &cfg.working_dir)} else { (None, vec![])
+                get_xmltv(&cfg, input, &cfg.working_dir).await } else { (None, vec![])
             };
             error_list.drain(..).for_each(|err| errors.push(err));
             tvguide_errors.drain(..).for_each(|err| errors.push(err));
@@ -342,12 +344,13 @@ fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<Process
     (stats.drain().map(|(_, v)| v).collect(), errors)
 }
 
-pub(crate) fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
+pub(crate) async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
     let mut handle_list = vec![];
     let thread_num = config.threads;
     let process_parallel = thread_num > 1 && config.sources.len() > 1;
-    if process_parallel { debug!("Using {} threads", thread_num); }
-
+    if process_parallel {
+        debug!("Using {} threads", thread_num);
+    }
     let errors = Arc::new(Mutex::<Vec<M3uFilterError>>::new(vec![]));
     let stats = Arc::new(Mutex::<Vec<InputStats>>::new(vec![]));
     for (index, _) in config.sources.iter().enumerate() {
@@ -355,21 +358,27 @@ pub(crate) fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTarg
         let shared_stats = stats.clone();
         let cfg = config.clone();
         let usr_trgts = user_targets.clone();
-        let process = move || {
-            let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts);
-            res_errors.drain(..)
-                .for_each(|err| shared_errors.lock().unwrap().push(err));
-            res_stats.drain(..)
-                .for_each(|stat| shared_stats.lock().unwrap().push(stat));
-        };
         if process_parallel {
             let handles = &mut handle_list;
+            let process = move || {
+                let (mut res_stats, mut res_errors) = System::new().block_on(async {
+                    process_source(cfg, index, usr_trgts).await
+                });
+                res_errors.drain(..)
+                    .for_each(|err| shared_errors.lock().unwrap().push(err));
+                res_stats.drain(..)
+                    .for_each(|stat| shared_stats.lock().unwrap().push(stat));
+            };
             handles.push(thread::spawn(process));
             if handles.len() as u8 >= thread_num {
                 handles.drain(..).for_each(|handle| { let _ = handle.join(); });
             }
         } else {
-            process();
+            let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
+            res_errors.drain(..)
+                .for_each(|err| shared_errors.lock().unwrap().push(err));
+            res_stats.drain(..)
+                .for_each(|stat| shared_stats.lock().unwrap().push(stat));
         }
     }
     for handle in handle_list {
@@ -494,8 +503,8 @@ fn persist_playlist(playlist: &[PlaylistGroup], epg: Option<Epg>,
     if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 
-pub(crate) fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    let (stats, errors) = process_sources(cfg.to_owned(), targets.to_owned());
+pub(crate) async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+    let (stats, errors) = process_sources(cfg.to_owned(), targets.to_owned()).await;
     let stats_msg = format!("Stats: {}", stats.iter().map(|stat| stat.to_string()).collect::<Vec<String>>().join("\n"));
     // print stats
     info!("{}", stats_msg);

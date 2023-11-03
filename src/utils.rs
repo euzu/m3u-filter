@@ -94,10 +94,10 @@ pub(crate) fn open_file(file_name: &Path) -> Result<fs::File, std::io::Error> {
     fs::File::open(file_name)
 }
 
-pub(crate) fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
+pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
     debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
     match url_str.parse::<url::Url>() {
-        Ok(url) => match download_text_content(input, url, persist_filepath) {
+        Ok(url) => match download_text_content(input, url, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", url_str, e);
@@ -195,8 +195,8 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
 }
 
 
-fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::blocking::RequestBuilder {
-    let mut request = reqwest::blocking::Client::new().get(url);
+fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::RequestBuilder {
+    let mut request = reqwest::Client::new().get(url);
     if input.headers.is_empty() {
         let mut headers = header::HeaderMap::new();
         for (key, value) in &input.headers {
@@ -211,12 +211,12 @@ fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::blocking::
     request
 }
 
-fn download_json_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, String> {
+async fn download_json_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, String> {
     let request = get_client_request(input, url);
-    match request.send() {
+    match request.send().await {
         Ok(response) => {
             if response.status().is_success() {
-                match response.json::<serde_json::Value>() {
+                match response.json::<serde_json::Value>().await {
                     Ok(content) => {
                         if persist_filepath.is_some() {
                             persist_file(persist_filepath, &serde_json::to_string(&content).unwrap());
@@ -233,9 +233,9 @@ fn download_json_content(input: &ConfigInput, url: url::Url, persist_filepath: O
     }
 }
 
-pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
+pub(crate) async fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
     match url_str.parse::<url::Url>() {
-        Ok(url) => match download_json_content(input, url, persist_filepath) {
+        Ok(url) => match download_json_content(input, url, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", url_str, e)
         },
@@ -243,12 +243,12 @@ pub(crate) fn get_input_json_content(input: &ConfigInput, url_str: &String, pers
     }
 }
 
-fn download_text_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<String, String> {
+async fn download_text_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<String, String> {
     let request = get_client_request(input, url);
-    match request.send() {
+    match request.send().await {
         Ok(response) => {
             if response.status().is_success() {
-                match response.text_with_charset("utf8") {
+                match response.text_with_charset("utf8").await {
                     Ok(content) => {
                         if persist_filepath.is_some() {
                             persist_file(persist_filepath, &content);

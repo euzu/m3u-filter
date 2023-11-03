@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use enum_iterator::all;
 use std::collections::{HashMap};
+use std::rc::Rc;
 use log::{debug, error};
 use pest::iterators::Pair;
 use pest::Parser;
@@ -12,18 +13,18 @@ use crate::{create_m3u_filter_error_result};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 
-pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
+pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<String> {
     let header = pli.header.borrow();
     let value = match field {
-        ItemField::Group => header.group.as_str(),
-        ItemField::Name => header.name.as_str(),
-        ItemField::Title => header.title.as_str(),
-        ItemField::Url => header.url.as_str(),
+        ItemField::Group => &header.group,
+        ItemField::Name => &header.name,
+        ItemField::Title => &header.title,
+        ItemField::Url => &header.url,
     };
-    String::from(value)
+    Rc::clone(value)
 }
 
-pub(crate) fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) {
+pub(crate) fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: Rc<String>) {
     let header = &mut pli.header.borrow_mut();
     match field {
         ItemField::Group => header.group = value,
@@ -38,7 +39,7 @@ pub(crate) struct ValueProvider<'a> {
 }
 
 impl<'a> ValueProvider<'a> {
-    fn call(&self, field: &ItemField) -> String {
+    fn call(&self, field: &ItemField) -> Rc<String> {
         let pli = *self.pli.borrow();
         get_field_value(pli, field)
     }

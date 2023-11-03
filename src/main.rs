@@ -4,6 +4,7 @@ extern crate pest;
 extern crate pest_derive;
 
 use std::sync::Arc;
+use actix_rt::System;
 
 use clap::Parser;
 use env_logger::Builder;
@@ -81,7 +82,7 @@ fn main() {
 }
 
 fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    exec_processing(cfg, targets);
+    System::new().block_on(async { exec_processing(cfg, targets).await });
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {

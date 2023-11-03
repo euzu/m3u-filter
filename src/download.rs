@@ -27,10 +27,10 @@ fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str) ->
     }
 }
 
-pub(crate) fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let url = input.url.to_owned();
     let persist_file_path = prepare_file_path(input, working_dir, "");
-    match utils::get_input_text_content(input, working_dir,&url, persist_file_path) {
+    match utils::get_input_text_content(input, working_dir,&url, persist_file_path).await {
         Ok(text) => {
             let lines = text.lines().map(String::from).collect();
             (m3u_parser::parse_m3u(cfg, &lines), vec![])
@@ -44,7 +44,7 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Video, "get_vod_categories", "get_vod_streams"),
     (XtreamCluster::Series, "get_series_categories", "get_series")];
 
-pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let mut playlist: Vec<PlaylistGroup> = Vec::new();
     let username = input.username.as_ref().unwrap().clone();
     let password = input.password.as_ref().unwrap().clone();
@@ -59,9 +59,9 @@ pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> 
         let category_file_path = prepare_file_path(input, working_dir, format!("{}_", category).as_str());
         let stream_file_path = prepare_file_path(input, working_dir, format!("{}_", stream).as_str());
 
-        match utils::get_input_json_content(input, &category_url, category_file_path) {
+        match utils::get_input_json_content(input, &category_url, category_file_path).await {
             Ok(category_content) => {
-                match utils::get_input_json_content(input, &stream_url, stream_file_path) {
+                match utils::get_input_json_content(input, &stream_url, stream_file_path).await {
                     Ok(stream_content) => {
                         match xtream_parser::parse_xtream(&category_id_cnt, xtream_cluster, &category_content, &stream_content, &stream_base_url) {
                             Ok(sub_playlist_opt) => {
@@ -82,13 +82,13 @@ pub(crate) fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> 
 }
 
 
-pub(crate) fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Option<TVGuide>, Vec<M3uFilterError>) {
+pub(crate) async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Option<TVGuide>, Vec<M3uFilterError>) {
     match &input.epg_url {
         None => (None, vec![]),
         Some(url) => {
             debug!("Getting epg file path for url: {}", url);
             let persist_file_path = prepare_file_path(input, working_dir, "").map(|path| add_prefix_to_filename(&path, "epg_", Some("xml")));
-            match utils::get_input_text_content(input, working_dir, url, persist_file_path) {
+            match utils::get_input_text_content(input, working_dir, url, persist_file_path).await {
                 Ok(xml_content) => {
                     (xmltv_parser::parse_tvguide(xml_content.as_str()), vec![])
                 }

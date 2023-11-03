@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 use enum_iterator::Sequence;
 
 pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
@@ -25,6 +26,7 @@ pub(crate) fn default_as_true() -> bool { true }
 pub(crate) fn default_as_false() -> bool { false }
 
 pub(crate) fn default_as_empty_str() -> String { String::from("") }
+pub(crate) fn default_as_empty_rc_str() -> Rc<String> { Rc::new(String::from("")) }
 
 pub(crate) fn default_as_empty_map() -> HashMap<String, String> { HashMap::new() }
 

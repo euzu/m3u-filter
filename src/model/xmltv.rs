@@ -67,7 +67,7 @@ pub(crate) struct TVGuide {
 }
 
 impl TVGuide {
-    pub(crate) fn filter(&self, channel_ids: &HashSet<String>) -> Option<Epg> {
+    pub(crate) fn filter(&self, channel_ids: &HashSet<Rc<String>>) -> Option<Epg> {
         if !channel_ids.is_empty() {
             let children: Vec<Rc<XmlTag>> = self.epg.children.as_ref().unwrap().iter().filter(|c| {
                 match c.name.as_str() {

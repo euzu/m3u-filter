@@ -96,27 +96,27 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                     let mut document = serde_json::Map::from_iter([
                         ("category_id".to_string(), Value::String(format!("{}", &plg.id))),
                         ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(plg.id.to_owned()))]))),
-                        ("name".to_string(), Value::String(header.name.clone())),
+                        ("name".to_string(), Value::String(header.name.as_ref().clone())),
                         ("num".to_string(), Value::Number(serde_json::Number::from(channel_num))),
-                        ("title".to_string(), Value::String(header.title.clone())),
-                        ("stream_icon".to_string(), Value::String(header.logo.clone())),
+                        ("title".to_string(), Value::String(header.title.as_ref().clone())),
+                        ("stream_icon".to_string(), Value::String(header.logo.as_ref().clone())),
                     ]);
 
                     let stream_id = Value::Number(serde_json::Number::from(header.id.parse::<i32>().unwrap()));
                     match header.xtream_cluster {
                         XtreamCluster::Live => {
                             document.insert("stream_id".to_string(), stream_id);
-                            document.insert("direct_source".to_string(), Value::String(header.url.clone()));
-                            document.insert("thumbnail".to_string(), Value::String(header.logo_small.clone()));
+                            document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                            document.insert("thumbnail".to_string(), Value::String(header.logo_small.as_ref().clone()));
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
                             document.insert("epg_channel_id".to_string(), match &header.epg_channel_id {
                                 None => Value::Null,
-                                Some(epg_id) => Value::String(epg_id.to_owned())
+                                Some(epg_id) => Value::String(epg_id.as_ref().clone())
                             });
                         }
                         XtreamCluster::Video => {
                             document.insert("stream_id".to_string(), stream_id);
-                            document.insert("direct_source".to_string(), Value::String(header.url.clone()));
+                            document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
                         }
                         XtreamCluster::Series => {

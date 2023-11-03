@@ -1,6 +1,8 @@
 use std::borrow::{BorrowMut};
 use std::cell::RefCell;
+use std::rc::Rc;
 use crate::model::config::Config;
+use crate::model::model_config::default_as_empty_rc_str;
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
 
 fn token_value(it: &mut std::str::Chars) -> String {
@@ -52,22 +54,33 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
 
 fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistItemHeader {
     PlaylistItemHeader {
-        id: String::from(""),
-        name: String::from(""),
-        logo: String::from(""),
-        logo_small: String::from(""),
-        group: String::from("Unknown"),
-        title: String::from(""),
-        parent_code: String::from(""),
-        audio_track: String::from(""),
-        time_shift: String::from(""),
-        rec: String::from(""),
-        source: String::from(content),
-        url,
+        id: default_as_empty_rc_str(),
+        name: default_as_empty_rc_str(),
+        logo: default_as_empty_rc_str(),
+        logo_small: default_as_empty_rc_str(),
+        group: default_as_empty_rc_str(),
+        title: default_as_empty_rc_str(),
+        parent_code: default_as_empty_rc_str(),
+        audio_track: default_as_empty_rc_str(),
+        time_shift: default_as_empty_rc_str(),
+        rec: default_as_empty_rc_str(),
+        source: Rc::new(content.to_owned()),
+        url: Rc::new(url),
         epg_channel_id: None,
         xtream_cluster: XtreamCluster::Live,
         additional_properties: None,
     }
+}
+
+macro_rules! process_header_fields {
+    ($header:expr, $token:expr, $(($prop:ident, $field:expr)),*; $val:expr) => {
+        match $token {
+            $(
+               $field => $header.$prop = Rc::new($val),
+             )*
+            _ => {}
+        }
+    };
 }
 
 fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> PlaylistItemHeader {
@@ -81,31 +94,30 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
                 break;
             }
             match c.unwrap() {
-                ',' => plih.title = get_value(&mut it),
+                ',' => plih.title = Rc::new(get_value(&mut it)),
                 _ => {
                     let token = token_till(&mut it, '=');
                     if let Some(t) = token {
                         let value = token_value(&mut it);
-                        match t.as_str() {
-                            "tvg-id" => {
-                                plih.id = value.to_owned();
-                                plih.epg_channel_id = Some(value);
-                            },
-                            "tvg-name" => plih.name = value,
-                            "group-title" => if !value.is_empty() { plih.group = value },
-                            "parent-code" => plih.parent_code = value,
-                            "audio-track" => plih.audio_track = value,
-                            "tvg-logo" => plih.logo = value,
-                            "tvg-logo-small" => plih.logo_small = value,
-                            "timeshift" => plih.time_shift = value,
-                            "tvg-rec" => plih.rec = value,
-                            _ => {}
-                        }
+                        process_header_fields!(plih, t.as_str(),
+                        (id, "tvg-id"),
+                        (group, "group-title"),
+                        (name, "tvg-name"),
+                        (parent_code, "parent-code"),
+                        (audio_track, "audio-track"),
+                        (logo, "tvg-logo"),
+                        (logo_small, "tvg-logo-small"),
+                        (time_shift, "timeshift"),
+                        (rec, "tvg-rec"); value)
                     }
                 }
             }
             c = it.next();
         }
+        if plih.group.is_empty() {
+            plih.group = Rc::new(String::from("Unknown"));
+        }
+        plih.epg_channel_id = Some(Rc::clone(&plih.id));
     }
 
     for suffix in video_suffixes {
@@ -130,8 +142,8 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
 
 
 pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup> {
-    let mut groups: std::collections::HashMap<String, Vec<PlaylistItem>> = std::collections::HashMap::new();
-    let mut sort_order: Vec<String> = vec![];
+    let mut groups: std::collections::HashMap<Rc<String>, Vec<PlaylistItem>> = std::collections::HashMap::new();
+    let mut sort_order: Vec<Rc<String>> = vec![];
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
@@ -152,15 +164,15 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
             let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value, String::from(line))) };
             if let Some(group_value) = group {
                 if item.header.borrow().group.is_empty() {
-                    item.header.borrow_mut().group = group_value;
+                    item.header.borrow_mut().group = Rc::new(group_value);
                 }
             }
-            let key = String::from(&item.header.borrow().group);
+            let key = Rc::clone(&item.header.borrow().group);
             // let key2 = String::from(&item.header.group);
-            match groups.entry(key.clone()) {
+            match groups.entry(Rc::clone(&key)) {
                 std::collections::hash_map::Entry::Vacant(e) => {
                     e.insert(vec![item]);
-                    sort_order.push(key);
+                    sort_order.push(Rc::clone(&key));
                 }
                 std::collections::hash_map::Entry::Occupied(mut e) => { e.get_mut().push(item); }
             }
@@ -172,11 +184,11 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
     let mut result: Vec<PlaylistGroup> = vec![];
     for (grp_id, (key, channels)) in (1_i32..).zip(groups.into_iter()) {
         let cluster = channels.first().map(|pli| pli.header.borrow().xtream_cluster.clone());
-        result.push(PlaylistGroup { id: grp_id, xtream_cluster: cluster.unwrap(), title: key, channels });
+        result.push(PlaylistGroup { id: grp_id, xtream_cluster: cluster.unwrap(), title: Rc::clone(&key), channels });
     }
     result.sort_by(|f, s| {
-        let i1 = sort_order.iter().position(|r| r == &f.title).unwrap();
-        let i2 = sort_order.iter().position(|r| r == &s.title).unwrap();
+        let i1 = sort_order.iter().position(|r| **r == *f.title).unwrap();
+        let i2 = sort_order.iter().position(|r| **r == *s.title).unwrap();
         i1.cmp(&i2)
     });
     result

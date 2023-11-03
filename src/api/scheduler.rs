@@ -16,7 +16,7 @@ pub(crate) async fn start_scheduler(expression: &str, data: Data<AppState>) -> !
 
         if let Some(datetime) = upcoming.next() {
             if datetime.timestamp() <= local.timestamp() {
-                exec_processing(data.config.clone(), data.targets.clone());
+                exec_processing(data.config.clone(), data.targets.clone()).await;
             }
         }
     }

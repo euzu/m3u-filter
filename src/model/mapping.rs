@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use log::{debug, error};
 use regex::Regex;
@@ -76,12 +77,12 @@ impl Mapper {
 
 pub(crate) struct MappingValueProcessor<'a> {
     pub pli: RefCell<&'a PlaylistItem>,
-    pub mapper: RefCell<&'a Mapper>,
+    pub mapper: &'a Mapper,
 }
 
 impl MappingValueProcessor<'_> {
-    fn get_property(&self, key: &str) -> Option<String> {
-        self.pli.borrow().header.borrow().get_field(key).map(String::from)
+    fn get_property(&self, key: &str) -> Option<Rc<String>> {
+        self.pli.borrow().header.borrow().get_field(key)
     }
 
     fn set_property(&mut self, key: &str, value: &str) {
@@ -92,10 +93,9 @@ impl MappingValueProcessor<'_> {
     }
 
     fn apply_attributes(&mut self, captured_names: &HashMap<&str, &str>) {
-        let mapper = self.mapper.borrow();
+        let mapper = self.mapper;
         let attr_re = &mapper._attre.as_ref().unwrap();
         let attributes = &mapper.attributes;
-        drop(mapper);
         for (key, value) in attributes {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
                 if value.contains('<') { // possible replacement
@@ -113,14 +113,14 @@ impl MappingValueProcessor<'_> {
 
     fn apply_tags(&mut self, value: &String, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
-        let tag_captures = self.mapper.borrow()._tagre.as_ref().unwrap().captures_iter(value)
+        let tag_captures = self.mapper._tagre.as_ref().unwrap().captures_iter(value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| caps.as_str())
             .collect::<Vec<&str>>();
 
         for tag_capture in tag_captures {
-            for mapping_tag in &self.mapper.borrow()._tags {
+            for mapping_tag in &self.mapper._tags {
                 if mapping_tag.name.eq(tag_capture) {
                     // we have the right tag, now get all captured values
                     let mut captured_tag_values: Vec<&str> = Vec::new();
@@ -151,9 +151,8 @@ impl MappingValueProcessor<'_> {
     }
 
     fn apply_suffix(&mut self, captures: &HashMap<&str, &str>) {
-        let mapper = self.mapper.borrow();
+        let mapper = self.mapper;
         let suffix = &mapper.suffix;
-        drop(mapper);
 
         for (key, value) in suffix {
             if valid_property!(key.as_str(), AFFIX_FIELDS) {
@@ -168,9 +167,8 @@ impl MappingValueProcessor<'_> {
     }
 
     fn apply_prefix(&mut self, captures: &HashMap<&str, &str>) {
-        let mapper = self.mapper.borrow();
+        let mapper = self.mapper;
         let prefix = &mapper.prefix;
-        drop(mapper);
         for (key, value) in prefix {
             if valid_property!(key.as_str(), AFFIX_FIELDS) {
                 if let Some(prefix) = self.apply_tags(value, captures) {
@@ -184,9 +182,8 @@ impl MappingValueProcessor<'_> {
     }
 
     fn apply_assignments(&mut self) {
-        let mapper = self.mapper.borrow();
+        let mapper = self.mapper;
         let assignments = &mapper.assignments;
-        drop(mapper);
         for (key, value) in assignments {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) &&
                 valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {

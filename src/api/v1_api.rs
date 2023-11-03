@@ -70,10 +70,11 @@ pub(crate) async fn playlist_update(
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let targets = req.0;
-    let process_targets = validate_targets(&Some(targets), &_app_state.config.sources);
+    let user_targets = if targets.is_empty() { None } else { Some(targets) };
+    let process_targets = validate_targets(&user_targets, &_app_state.config.sources);
     match process_targets {
         Ok(valid_targets) => {
-            exec_processing(_app_state.config.clone(), Arc::new(valid_targets));
+            exec_processing(Arc::clone(&_app_state.config), Arc::new(valid_targets)).await;
             HttpResponse::Ok().finish()
         }
         Err(err) => {
@@ -117,8 +118,8 @@ pub(crate) async fn playlist(
         Some(input) => {
             let (result, errors) =
                 match input.input_type {
-                    InputType::M3u => get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir),
-                    InputType::Xtream => get_xtream_playlist(&input, &_app_state.config.working_dir),
+                    InputType::M3u => get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir).await,
+                    InputType::Xtream => get_xtream_playlist(&input, &_app_state.config.working_dir).await,
                 };
             if result.is_empty() {
                 let error_strings: Vec<String> = errors.iter().map(|err| err.to_string()).collect();

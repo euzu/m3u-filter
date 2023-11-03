@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use serde::{Deserialize, Deserializer, Serialize};
@@ -8,7 +9,7 @@ use serde_json::Value;
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
-use crate::model::model_config::default_as_empty_str;
+use crate::model::model_config::{default_as_empty_rc_str};
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
 
 fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
@@ -60,28 +61,28 @@ fn value_to_string(v: &Value) -> Option<String> {
     }
 }
 
-fn deserialize_as_option_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+fn deserialize_as_option_rc_string<'de, D>(deserializer: D) -> Result<Option<Rc<String>>, D::Error>
     where
         D: Deserializer<'de>,
 {
     let value: Value = Deserialize::deserialize(deserializer)?;
 
     match &value {
-        Value::String(s) => Ok(Some(s.clone())),
-        Value::Number(s) => Ok(Some(s.to_string())),
+        Value::String(s) => Ok(Some(Rc::new(s.to_owned()))),
+        Value::Number(s) => Ok(Some(Rc::new(s.to_string()))),
         _ => Ok(None),
     }
 }
 
-fn deserialize_as_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+fn deserialize_as_rc_string<'de, D>(deserializer: D) -> Result<Rc<String>, D::Error>
     where
         D: Deserializer<'de>,
 {
     let value: Value = Deserialize::deserialize(deserializer)?;
 
     match &value {
-        Value::String(s) => Ok(s.clone()),
-        _ => Ok(value.to_string()),
+        Value::String(s) => Ok(Rc::new(s.to_owned())),
+        _ => Ok(Rc::new(value.to_string())),
     }
 }
 
@@ -97,10 +98,10 @@ fn deserialize_as_string_array<'de, D>(deserializer: D) -> Result<Option<Vec<Str
 
 #[derive(Deserialize)]
 struct XtreamCategory {
-    #[serde(deserialize_with = "deserialize_as_string")]
-    pub category_id: String,
-    #[serde(deserialize_with = "deserialize_as_string")]
-    pub category_name: String,
+    #[serde(deserialize_with = "deserialize_as_rc_string")]
+    pub category_id: Rc<String>,
+    #[serde(deserialize_with = "deserialize_as_rc_string")]
+    pub category_name: Rc<String>,
     //pub parent_id: i32,
     #[serde(default = "default_as_empty_list")]
     pub channels: Vec<PlaylistItem>,
@@ -114,56 +115,56 @@ impl XtreamCategory {
 
 #[derive(Serialize, Deserialize)]
 struct XtreamStream {
-    #[serde(default, deserialize_with = "deserialize_as_string")]
-    pub name: String,
-    #[serde(default, deserialize_with = "deserialize_as_string")]
-    pub category_id: String,
+    #[serde(default, deserialize_with = "deserialize_as_rc_string")]
+    pub name: Rc<String>,
+    #[serde(default, deserialize_with = "deserialize_as_rc_string")]
+    pub category_id: Rc<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub stream_id: Option<i32>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub series_id: Option<i32>,
-    #[serde(default = "default_as_empty_str", deserialize_with = "deserialize_as_string")]
-    pub stream_icon: String,
-    #[serde(default = "default_as_empty_str", deserialize_with = "deserialize_as_string")]
-    pub direct_source: String,
+    #[serde(default = "default_as_empty_rc_str", deserialize_with = "deserialize_as_rc_string")]
+    pub stream_icon: Rc<String>,
+    #[serde(default = "default_as_empty_rc_str", deserialize_with = "deserialize_as_rc_string")]
+    pub direct_source: Rc<String>,
 
     // optional attributes
     #[serde(default, deserialize_with = "deserialize_as_string_array")]
     backdrop_path: Option<Vec<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    added: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    cast: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    container_extension: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    cover: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    director: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    episode_run_time: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    genre: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    last_modified: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    plot: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    added: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    cast: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    container_extension: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    cover: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    director: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    episode_run_time: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    genre: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    last_modified: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    plot: Option<Rc<String>>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     rating: Option<f64>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     rating_5based: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    release_date: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    stream_type: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    title: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    year: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    youtube_trailer: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_as_option_string")]
-    epg_channel_id: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    release_date: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    stream_type: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    title: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    year: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    youtube_trailer: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    epg_channel_id: Option<Rc<String>>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     tv_archive: Option<i32>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
@@ -248,29 +249,33 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluste
         Ok(mut categories) => {
             return match process_streams(xtream_cluster, streams) {
                 Ok(streams) => {
-                    let group_map: HashMap::<String, RefCell<XtreamCategory>> =
+                    let group_map: HashMap::<Rc<String>, RefCell<XtreamCategory>> =
                         categories.drain(..).map(|category|
-                            (String::from(&category.category_id), RefCell::new(category))
+                            (Rc::clone(&category.category_id), RefCell::new(category))
                         ).collect();
 
                     for stream in streams {
-                        if let Some(group) = group_map.get(stream.category_id.as_str()) {
+                        if let Some(group) = group_map.get(&stream.category_id) {
                             let mut grp = group.borrow_mut();
-                            let title = String::from(&grp.category_name);
+                            let title = &grp.category_name;
                             let item = PlaylistItem {
                                 header: RefCell::new(PlaylistItemHeader {
-                                    id: stream.get_stream_id(),
-                                    name: String::from(&stream.name),
-                                    logo: String::from(&stream.stream_icon),
-                                    logo_small: "".to_string(),
-                                    group: title,
-                                    title: String::from(&stream.name),
-                                    parent_code: "".to_string(),
-                                    audio_track: "".to_string(),
-                                    time_shift: "".to_string(),
-                                    rec: "".to_string(),
-                                    source: "".to_string(), // String::from(&stream.direct_source),
-                                    url: if stream.direct_source.is_empty() { format!("{}/{}", stream_base_url, stream.get_stream_id())} else { String::from(&stream.direct_source) },
+                                    id: Rc::new(stream.get_stream_id()),
+                                    name: Rc::clone(&stream.name),
+                                    logo: Rc::clone(&stream.stream_icon),
+                                    logo_small: default_as_empty_rc_str(),
+                                    group: Rc::clone(title),
+                                    title: Rc::clone(&stream.name),
+                                    parent_code: default_as_empty_rc_str(),
+                                    audio_track: default_as_empty_rc_str(),
+                                    time_shift: default_as_empty_rc_str(),
+                                    rec: default_as_empty_rc_str(),
+                                    source: default_as_empty_rc_str(), // String::from(&stream.direct_source),
+                                    url: if stream.direct_source.is_empty() {
+                                        Rc::new(format!("{}/{}", stream_base_url, stream.get_stream_id()))
+                                    } else {
+                                        Rc::clone(&stream.direct_source)
+                                    },
                                     epg_channel_id: stream.epg_channel_id.clone(),
                                     xtream_cluster: xtream_cluster.clone(),
                                     additional_properties: stream.get_additional_properties(),
@@ -286,7 +291,7 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluste
                         PlaylistGroup {
                             id: cat_id_cnt.load(Ordering::Relaxed),
                             xtream_cluster: xtream_cluster.clone(),
-                            title: String::from(&cat.category_name),
+                            title: Rc::clone(&cat.category_name),
                             channels: cat.channels.clone(),
                         }
                     }).collect()))
