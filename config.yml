@@ -47,7 +47,6 @@ sources:
       password: test
   targets:
     - name: pl1
-      publish: true
       filename: playlist_1.m3u
       type: m3u
       filter: '!ALL_CHAN!'
@@ -66,7 +65,6 @@ sources:
       watch:
         - 'FR - Movies'
     - name: plxtream
-      publish: true
       filename: playlist_1
       type: xtream
       filter: '!ALL_CHAN!'
