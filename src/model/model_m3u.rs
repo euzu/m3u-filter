@@ -4,7 +4,7 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::model::config::{ConfigInput, ConfigOptions};
+use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
 
 // https://de.wikipedia.org/wiki/M3U
@@ -106,7 +106,7 @@ macro_rules! to_m3u_non_empty_fields {
 
 
 impl PlaylistItem {
-    pub fn to_m3u(&self, options: &Option<ConfigOptions>) -> String {
+    pub fn to_m3u(&self, options: &Option<ConfigTargetOptions>) -> String {
         let header = self.header.borrow();
         let ignore_logo = options.as_ref().map_or(false, |o| o.ignore_logo);
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",

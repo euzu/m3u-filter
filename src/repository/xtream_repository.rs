@@ -69,6 +69,10 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg));
         }
 
+
+        let (skip_live_direct_source, skip_video_direct_source) =  target.options.as_ref()
+            .map_or((false, false), |o| (o.xtream_skip_live_direct_source, o.xtream_skip_video_direct_source));
+
         let mut cat_live_col = vec![];
         let mut cat_series_col = vec![];
         let mut cat_vod_col = vec![];
@@ -106,7 +110,9 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                     match header.xtream_cluster {
                         XtreamCluster::Live => {
                             document.insert("stream_id".to_string(), stream_id);
-                            document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                            if !skip_live_direct_source {
+                                document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                            }
                             document.insert("thumbnail".to_string(), Value::String(header.logo_small.as_ref().clone()));
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
                             document.insert("epg_channel_id".to_string(), match &header.epg_channel_id {
@@ -116,7 +122,9 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                         }
                         XtreamCluster::Video => {
                             document.insert("stream_id".to_string(), stream_id);
-                            document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                            if !skip_video_direct_source {
+                                document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                            }
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));
                         }
                         XtreamCluster::Series => {

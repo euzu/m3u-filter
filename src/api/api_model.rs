@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use actix_web::web;
 use serde::{Deserialize, Serialize};
 use crate::model::api_proxy::{ApiProxyConfig};
-use crate::model::config::{Config, ConfigOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig};
+use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig};
 use crate::model::model_config::{default_as_empty_str, ProcessingOrder};
 
 pub(crate) struct AppState {
@@ -75,7 +75,7 @@ pub(crate) struct ServerTargetConfig {
     pub id: u16,
     pub enabled: bool,
     pub name: String,
-    pub options: Option<ConfigOptions>,
+    pub options: Option<ConfigTargetOptions>,
     pub sort: Option<ConfigSort>,
     pub filter: String,
     #[serde(alias = "type")]

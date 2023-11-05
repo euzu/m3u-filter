@@ -65,6 +65,25 @@ sources:
         - Canada
       watch:
         - 'FR - Movies'
+    - name: plxtream
+      publish: true
+      filename: playlist_1
+      type: xtream
+      filter: '!ALL_CHAN!'
+      options: { ignore_logo: true, xtream_skip_live_direct_source: true, , xtream_skip_video_direct_source: true, }
+      rename:
+        - { field: group, new_name: 1. DE$1, pattern: ^DE(.*) }
+      sort:
+        groups:
+          order: asc
+      mapping:
+        - France TNT
+        - France Premium
+        - Belgique
+        - Suisse
+        - Canada
+      watch:
+        - 'FR - Movies'
     - filename: playlist_strm
       type: strm
       filter: 'Group ~ "^tv-shows.*"'

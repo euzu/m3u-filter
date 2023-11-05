@@ -1,4 +1,10 @@
 # Changelog
+# v1.1.3(2023-11-??)
+* added new target options 
+  - `xtream_skip_live_direct_source`
+  - `xtream_skip_video_direct_source`
+* internal optimization/refactoring to avoid string cloning.
+
 # v1.1.2(2023-11-03)
 * Fixed epg for xtream
 * Fixed some Web-UI Problems

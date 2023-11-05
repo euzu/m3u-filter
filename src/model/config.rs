@@ -143,7 +143,7 @@ impl ConfigRename {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ConfigOptions {
+pub(crate) struct ConfigTargetOptions {
     #[serde(default = "default_as_false")]
     pub ignore_logo: bool,
     #[serde(default = "default_as_false")]
@@ -152,6 +152,10 @@ pub(crate) struct ConfigOptions {
     pub cleanup: bool,
     #[serde(default = "default_as_false")]
     pub kodi_style: bool,
+    #[serde(default = "default_as_false")]
+    pub xtream_skip_live_direct_source: bool,
+    #[serde(default = "default_as_false")]
+    pub xtream_skip_video_direct_source: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -171,7 +175,7 @@ pub(crate) struct ConfigTarget {
     #[serde(default = "default_as_default")]
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub options: Option<ConfigOptions>,
+    pub options: Option<ConfigTargetOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort: Option<ConfigSort>,
     pub filter: String,

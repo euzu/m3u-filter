@@ -242,8 +242,10 @@ fn process_streams(xtream_cluster: &XtreamCluster, streams: &Value) -> Result<Ve
     }
 }
 
-pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluster,
-                           category: &Value, streams: &Value,
+pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32,
+                           xtream_cluster: &XtreamCluster,
+                           category: &Value,
+                           streams: &Value,
                            stream_base_url: &String) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match process_category(category) {
         Ok(mut categories) => {
@@ -270,7 +272,8 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32, xtream_cluster: &XtreamCluste
                                     audio_track: default_as_empty_rc_str(),
                                     time_shift: default_as_empty_rc_str(),
                                     rec: default_as_empty_rc_str(),
-                                    source: default_as_empty_rc_str(), // String::from(&stream.direct_source),
+                                    // source is meant to hold the original provider data
+                                    source: default_as_empty_rc_str(),
                                     url: if stream.direct_source.is_empty() {
                                         Rc::new(format!("{}/{}", stream_base_url, stream.get_stream_id()))
                                     } else {

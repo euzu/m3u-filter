@@ -193,11 +193,21 @@ sort:
 ### 1.5.2.2 `output`
 
 Is a list of output format:
-Each format has 2 properties `type` and `filename`
-`type` _mandatory_ ```m3u```, ```strm``` and ```xtream```.
-`filename` _mandatory_ if type `m3u` or `strm`, otherwise ignored
+Each format has 2 properties 
+- `type` 
+- `filename`
 
-`strm` output has additional options `underscore_whitespace`, `cleanup` and `kodi_style`.
+`type` is _mandatory_  for `m3u`, `strm` and `xtream`.  
+`filename` is _mandatory_ if type `m3u` or `strm`, otherwise ignored
+
+`strm` output has additional options 
+- `underscore_whitespace`
+- `cleanup` 
+- `kodi_style`.
+
+`xtream` output has additional options 
+- `xtream_skip_live_direct_source` 
+- `xtream_skip_video_direct_source`
 
 ```yaml
 output:
