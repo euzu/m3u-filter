@@ -10,11 +10,10 @@ use serde_json::json;
 use uuid::Uuid;
 use crate::api::api_model::{AppState, FileDownloadRequest, PlaylistRequest, ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
-use crate::model::config::{ConfigInput, InputType, validate_targets};
+use crate::model::config::{ConfigInput, InputType, validate_targets, VideoDownloadConfig};
 use crate::utils::{bytes_to_megabytes};
 use futures::stream::TryStreamExt;
 use log::{error, info};
-use regex::Regex;
 use reqwest::{header, Response};
 use reqwest::header::{HeaderName, HeaderValue};
 use unidecode::unidecode;
@@ -239,10 +238,9 @@ pub(crate) async fn download_file(
                 }
                 match client.get(_url).headers(headers).send().await {
                     Ok(response) => {
-                        let filename_re = Regex::new(r"[^A-Za-z0-9_.-]").unwrap();
+                        let filename_re = download._re_filename.as_ref().unwrap();
                         let filename = filename_re.replace_all(&unidecode(&req.filename).replace(' ', "_"), "").to_string();
-                        let file_stem = Path::new(&filename).file_stem().and_then(OsStr::to_str).unwrap_or("");
-                        let file_dir: PathBuf = [download.directory.as_ref().unwrap(), file_stem].iter().collect();
+                        let file_dir = get_download_directory(download, &filename);
                         match fs::create_dir_all(&file_dir) {
                             Ok(_) => {
                                 let path = file_dir.join(filename.as_str());
@@ -278,6 +276,27 @@ pub(crate) async fn download_file(
         }
     } else {
         HttpResponse::BadRequest().json(json!({"error": "Server config missing video.download configuration"}))
+    }
+}
+
+fn get_download_directory(download: &VideoDownloadConfig, filename: &String) -> PathBuf {
+    if download.organize_into_directories {
+        let mut file_stem = Path::new(&filename).file_stem().and_then(OsStr::to_str).unwrap_or("");
+        if let Some(re) = &download._re_episode_pattern {
+            if let Some(captures) = re.captures(file_stem) {
+                if let Some(episode) = captures.name("episode") {
+                    if !episode.as_str().is_empty() {
+                        file_stem = &file_stem[..episode.start()];
+                    }
+                }
+            }
+        }
+        let re_ending = download._re_remove_filename_ending.as_ref().unwrap();
+        let dir_name = re_ending.replace(file_stem, "");
+        let file_dir: PathBuf = [download.directory.as_ref().unwrap(), dir_name.as_ref()].iter().collect();
+        file_dir
+    } else {
+        PathBuf::from(download.directory.as_ref().unwrap())
     }
 }
 

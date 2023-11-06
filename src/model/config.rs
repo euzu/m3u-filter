@@ -427,7 +427,15 @@ pub(crate) struct VideoDownloadConfig {
     #[serde(default = "default_as_empty_map")]
     pub headers: HashMap<String, String>,
     pub directory: Option<String>,
-
+    #[serde(default = "default_as_false")]
+    pub organize_into_directories: bool,
+    pub episode_pattern: Option<String>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _re_episode_pattern: Option<regex::Regex>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _re_filename: Option<regex::Regex>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _re_remove_filename_ending: Option<regex::Regex>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -435,6 +443,33 @@ pub(crate) struct VideoConfig {
     #[serde(default = "default_as_empty_list")]
     pub extensions: Vec<String>,
     pub download: Option<VideoDownloadConfig>,
+}
+
+impl VideoConfig {
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        self.extensions = vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()];
+        match &mut self.download {
+            None => {}
+            Some(downl) => {
+                if downl.headers.is_empty() {
+                    downl.headers.borrow_mut().insert("Accept".to_string(), "video/*".to_string());
+                    downl.headers.borrow_mut().insert("User-Agent".to_string(), "AppleTV/tvOS/9.1.1.".to_string());
+                }
+
+                if let Some(episode_pattern) = &downl.episode_pattern {
+                    let re = regex::Regex::new(episode_pattern);
+                    if re.is_err() {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", episode_pattern);
+                    }
+                    downl._re_episode_pattern = Some(re.unwrap());
+                }
+
+                downl._re_filename = Some(regex::Regex::new(r"[^A-Za-z0-9_.-]").unwrap());
+                downl._re_remove_filename_ending = Some(regex::Regex::new(r"[_.\s-]$").unwrap());
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -568,22 +603,15 @@ impl Config {
                 self.video = Some(VideoConfig {
                     extensions: vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()],
                     download: None,
-                })
+                });
             }
-            Some(video) =>
-                {
-                    video.extensions = vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()];
-                    match &mut video.download {
-                        None => {}
-                        Some(downl) => {
-                            if downl.headers.is_empty() {
-                                downl.headers.borrow_mut().insert("Accept".to_string(), "video/*".to_string());
-                                downl.headers.borrow_mut().insert("User-Agent".to_string(), "AppleTV/tvOS/9.1.1.".to_string());
-                            }
-                        }
-                    }
+            Some(video) => {
+                match video.prepare() {
+                    Ok(_) => {}
+                    Err(err) => return Err(err)
                 }
-        }
+            },
+        };
         Ok(())
     }
 

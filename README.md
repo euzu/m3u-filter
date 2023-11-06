@@ -68,11 +68,11 @@ Default is `0`.
 
 ### 1.2. `api`
 `api` contains the `server-mode` settings. To run `m3u-filter` in `server-mode` you need to start it with the `-s`cli argument.
-* `api: {host: localhost, port: 8901, web_root: ./web}`
+-`api: {host: localhost, port: 8901, web_root: ./web}`
 
 ### 1.3. `working_dir`
 `working_dir` is the directory where files are written which are given with relative paths.
-* `working_dir: ./data`
+-`working_dir: ./data`
 
 With this configuration, you should create a `data` directory where you execute the binary.
 
@@ -92,8 +92,8 @@ This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp
 
 ### 1.5. `sources`
 `sources` is a sequence of source definitions, which have two top level entries:
- * `inputs`
- * `targets`
+-`inputs`
+-`targets`
 
 ### 1.5.1 `inputs`
 `inputs` is a list of sources.
@@ -155,30 +155,30 @@ sources:
 
 ### 1.5.2 `targets`
 Has the following top level entries:
-* `enabled` _optional_ default is `true`, if you disable the processing is skipped
-* `name` _optional_ default is `default`, if not default it has to be unique, for running selective targets
-* `sort`  _optional_
-* `output` _mandatory_ list of output formats
-* `processing_order` _optional_ default is `frm`
-* `options` _optional_
-* `filter` _mandatory_,
-* `rename` _optional_
-* `mapping` _optional_
-* `watch` _optional_
+- `enabled` _optional_ default is `true`, if you disable the processing is skipped
+- `name` _optional_ default is `default`, if not default it has to be unique, for running selective targets
+- `sort`  _optional_
+- `output` _mandatory_ list of output formats
+- `processing_order` _optional_ default is `frm`
+- `options` _optional_
+- `filter` _mandatory_,
+- `rename` _optional_
+- `mapping` _optional_
+- `watch` _optional_
 
 ### 1.5.2.1 `sort`
 Has three top level attributes
-* `match_as_ascii` _optional_ default is `false`
-* `groups`
-* `channels`
+- `match_as_ascii` _optional_ default is `false`
+- `groups`
+- `channels`
 
 #### `groups` 
 has one top level attribute `order` which can be set to `asc`or `desc`.
 #### `channels` 
 is a list of sort configurations for groups. Each configuration has 3 top level entries.
-* `field` can be  `group`, `title`, `name` or `url`.
-* `group_pattern` is a regular expression like `'^TR.:\s?(.*)'` which is matched against group title.
-* `order` can be `asc` or `desc`
+- `field` can be  `group`, `title`, `name` or `url`.
+- `group_pattern` is a regular expression like `'^TR.:\s?(.*)'` which is matched against group title.
+- `order` can be `asc` or `desc`
 
 The pattern should be selected taking into account the processing sequence.
 
@@ -220,10 +220,10 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 `processing_order: frm` (valid values are: frm, fmr, rfm, rmf, mfr, mrf. default is frm)
 
 ### 1.5.2.4 `options`
-* ignore_logo `true` or `false` 
-* underscore_whitespace `true` or `false`
-* cleanup `true` or `false`
-* kodi_style `true` or `false`
+- ignore_logo `true` or `false` 
+- underscore_whitespace `true` or `false`
+- cleanup `true` or `false`
+- kodi_style `true` or `false`
 
 `underscore_whitespace`, `cleanup` and `kodi_style` are only valid for `strm` output.
 
@@ -245,9 +245,9 @@ but lacks a few features like look around and backreferences.
 
 ### 1.5.2.6 `rename`
 Is a List of rename configurations. Each configuration has 3 top level entries.
-* `field` can be  `group`, `title`, `name` or `url`.
-* `pattern` is a regular expression like `'^TR.:\s?(.*)'`
-* `new_name` can contain capture groups variables addressed with `$1`,`$2`,... 
+- `field` can be  `group`, `title`, `name` or `url`.
+- `pattern` is a regular expression like `'^TR.:\s?(.*)'`
+- `new_name` can contain capture groups variables addressed with `$1`,`$2`,... 
 
 `rename` supports capture groups. Each group can be addressed with `$1`, `$2` .. in the `new_name` attribute.
 
@@ -375,13 +375,16 @@ For more information: [Telegram bots](https://core.telegram.org/bots/tutorial)
 
 It has 2 entries `extensions` and `download`.
 
-The `extensions` are a list of video file extensions like `mp4`, `avi`, `mkv`.
-It used for 2 purposes:
-a. When you have input `m3u` and output `xtream` the url's with the matching endings will be categorized as `video`.
-b. The download button from the `ui` is available. 
+- `extensions` are a list of video file extensions like `mp4`, `avi`, `mkv`.  
+When you have input `m3u` and output `xtream` the url's with the matching endings will be categorized as `video`.
 
-`download` is optional and is only necessary if you want to download the video files from the ui 
-to a specific directory.
+- `download` is optional and is only necessary if you want to download the video files from the ui 
+to a specific directory. if defined, the download button from the `ui` is available.
+  - `headers` _optional_, download headers
+  - `organize_into_directories` _optional_, orgainize downloads into directories  
+  - `episode_pattern` _optional_ if you download episodes, the suffix like `S01.E01` should be removed to place all 
+files into one folder. The named capture group `episode` is mandatory.  
+Example: `.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*`
 
 ```yaml
 video:
@@ -394,6 +397,8 @@ video:
       User-Agent: "AppleTV/tvOS/9.1.1."
       Accept: "video/*"
     directory: /tmp/
+    organize_into_directories: true
+    episode_pattern: '.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*'
 ```
 
 ### 1.7 `schedule`
@@ -401,17 +406,17 @@ Schedule is optional.
 Format is
 ```yaml
 #   sec  min   hour   day of month   month   day of week   year
-schedule: "0  0  8,12,16,20,22,1  *  *  *  *"
+schedule: "0  0  8,20  *  *  *  *"
 ```
 
 At the given times the complete processing is started. Do not start it every second or minute.
-You could be banned from your server.
+You could be banned from your server. Twice a day should be enough.
 
 ## 2. `mapping.yml`
 Has the root item `mappings` which has the following top level entries:
-* `templates` _optional_
-* `tags` _optional_
-* `mapping` _mandatory_
+-`templates` _optional_
+-`tags` _optional_
+-`mapping` _mandatory_
 
 ### 2.1 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
@@ -437,9 +442,9 @@ Has the following top level entries:
 
 ### 2.3 `mapping`
 Has the following top level entries:
-* `id` _mandatory_
-* `match_as_ascii` _optional_ default is `false`
-* `mapper` _mandatory_
+-`id` _mandatory_
+-`match_as_ascii` _optional_ default is `false`
+-`mapper` _mandatory_
 
 ### 2.3.1 `id`
 Is referenced in the `config.yml`, should be a unique identifier
@@ -452,12 +457,12 @@ write regexp without considering chars like `é` and use `e` instead, set this o
 
 ### 2.3.3 `mapper`
 Has the following top level entries:
-* `filter` _optional_
-* `pattern`
-* `attributes`
-* `suffix`
-* `prefix`
-* `assignments`
+- `filter` _optional_
+- `pattern`
+- `attributes`
+- `suffix`
+- `prefix`
+- `assignments`
 
 #### 2.3.4.1 `filter`
 The filter  is a string with a statement (@see filter statements).

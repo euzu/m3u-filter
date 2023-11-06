@@ -22,6 +22,8 @@ video:
       User-Agent: "AppleTV/tvOS/9.1.1."
       Accept: "video/*"
     directory: /tmp/
+    organize_into_directories: true
+    episode_pattern: '.*(?P<episode>[Ss]\d{1,2}(.*?)[Ee]\d{1,2}).*'
 templates:
   - name: DE_CHAN
     value: >-
