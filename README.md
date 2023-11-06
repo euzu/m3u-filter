@@ -241,7 +241,9 @@ Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group
 If you use characters like `+ | [ ] ( )` in filters don't forget to escape them!!  
 
 The regular expression syntax is similar to Perl-style regular expressions,
-but lacks a few features like look around and backreferences.
+but lacks a few features like look around and backreferences.  
+To test the regular expression i use [regex101.com](https://regex101.com/).
+Don't forget to select `Rust` option which is under the `FLAVOR` section on the left.
 
 ### 1.5.2.6 `rename`
 Is a List of rename configurations. Each configuration has 3 top level entries.

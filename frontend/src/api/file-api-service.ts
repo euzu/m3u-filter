@@ -5,10 +5,11 @@ import {first} from "rxjs/operators";
 
 //const FILE_API_PATH = 'file';
 const FILE_DOWNLOAD_API_PATH = 'file/download';
+const FILE_DOWNLOAD_INFO_API_PATH =FILE_DOWNLOAD_API_PATH + '/info';
 
 export default interface FileApiService extends ApiService {
     download(req: FileDownloadRequest): Observable<FileDownloadResponse>;
-    getDownloadInfo(download_id: string): Observable<FileDownloadInfo>;
+    getDownloadInfo(): Observable<FileDownloadInfo>;
 }
 
 export class DefaultFileApiService extends DefaultApiService implements FileApiService {
@@ -19,28 +20,25 @@ export class DefaultFileApiService extends DefaultApiService implements FileApiS
         return throwError(() => new Error('Invalid arguments'));
     }
 
-    getDownloadInfo(download_id: string): Observable<FileDownloadInfo> {
-        if (download_id) {
-            return new Observable((observer) => {
-                const fetch_info = () => {
-                    this.get<FileDownloadInfo>(FILE_DOWNLOAD_API_PATH + '/' + download_id).pipe(first()).subscribe({
-                        next: (info: FileDownloadInfo) => {
-                            if (info.finished) {
-                                observer.next(info);
-                                observer.complete();
-                            } else if (info.filesize != undefined) {
-                                observer.next(info);
-                                setTimeout(() =>  fetch_info(), 1000);
-                            } else {
-                                observer.error("unknown file download state");
-                            }
-                        },
-                        error: (err) => observer.error(err)
-                    });
-                }
-                fetch_info();
-            });
-        }
-        return throwError(() => new Error('Invalid arguments'));
+    getDownloadInfo(): Observable<FileDownloadInfo> {
+        return new Observable((observer) => {
+            const fetch_info = () => {
+                this.get<FileDownloadInfo>(FILE_DOWNLOAD_INFO_API_PATH).pipe(first()).subscribe({
+                    next: (info: FileDownloadInfo) => {
+                        if (info.finished) {
+                            observer.next(info);
+                            observer.complete();
+                        } else if (info.filesize != undefined) {
+                            observer.next(info);
+                            setTimeout(() =>  fetch_info(), 1000);
+                        } else {
+                            observer.error("unknown file download state");
+                        }
+                    },
+                    error: (err) => observer.error(err),
+                });
+            }
+            fetch_info();
+        });
     }
 }

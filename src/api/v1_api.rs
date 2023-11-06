@@ -1,21 +1,19 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::{fs, io};
 use std::ffi::OsStr;
 use std::io::{ErrorKind, Write};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use actix_web::{HttpResponse, Scope, web};
-use serde_json::json;
-use uuid::Uuid;
-use crate::api::api_model::{AppState, FileDownloadRequest, PlaylistRequest, ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
+use serde_json::{json};
+use crate::api::api_model::{AppState, DownloadErrorInfo, DownloadQueue, FileDownload, FileDownloadRequest, PlaylistRequest, ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
 use crate::model::config::{ConfigInput, InputType, validate_targets, VideoDownloadConfig};
-use crate::utils::{bytes_to_megabytes};
+use crate::utils::{bytes_to_megabytes, get_request_headers};
 use futures::stream::TryStreamExt;
 use log::{error, info};
-use reqwest::{header, Response};
-use reqwest::header::{HeaderName, HeaderValue};
+use reqwest::header::HeaderMap;
 use unidecode::unidecode;
 use crate::config_reader::save_api_proxy;
 use crate::m3u_filter_error::M3uFilterError;
@@ -169,55 +167,106 @@ pub(crate) async fn config(
     HttpResponse::Ok().json(result)
 }
 
-async fn async_download_file(download_id: &String, path: &Path, response: Response, downloads: Arc<Mutex<HashMap<String, u64>>>) -> Result<u64, String> {
-    match File::create(path) {
-        Ok(mut file) => {
-            info!("Downloading {}", path.to_str().unwrap_or("?"));
-            let mut stream = response.bytes_stream().map_err(|err| io::Error::new(ErrorKind::Other, err));
-            let mut downloaded: u64 = 0;
-            downloads.lock().unwrap().insert(download_id.to_owned(), downloaded);
-            loop {
-                match stream.try_next().await {
-                    Ok(item) => {
-                        match item {
-                            Some(chunk) => {
-                                match file.write_all(&chunk) {
-                                    Ok(_) => {
-                                        let new = downloaded + (chunk.len() as u64);
-                                        downloaded = new;
-                                        downloads.lock().unwrap().insert(download_id.to_owned(), downloaded);
+async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, headers: HeaderMap) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let file_download = active.read().unwrap().as_ref().unwrap().clone();
+    match client.get(file_download.url.clone()).headers(headers).send().await {
+        Ok(response) => {
+            match fs::create_dir_all(&file_download.file_dir) {
+                Ok(_) => {
+                    let file_path_str = file_download.file_path.to_str().unwrap_or("?");
+                    match File::create(&file_download.file_path) {
+                        Ok(mut file) => {
+                            info!("Downloading {}", file_download.file_path.to_str().unwrap_or("?"));
+                            let mut stream = response.bytes_stream().map_err(|err| io::Error::new(ErrorKind::Other, err));
+                            let mut downloaded: u64 = 0;
+                            loop {
+                                match stream.try_next().await {
+                                    Ok(item) => {
+                                        match item {
+                                            Some(chunk) => {
+                                                match file.write_all(&chunk) {
+                                                    Ok(_) => {
+                                                        downloaded += (chunk.len() as u64);
+                                                        active.write().unwrap().as_mut().unwrap().size = downloaded;
+                                                    }
+                                                    Err(err) => return Err(format!("Error while writing to file: {} {}", file_path_str, err))
+                                                }
+                                            }
+                                            None => {
+                                                let megabytes = bytes_to_megabytes(downloaded);
+                                                info!("Downloaded {}, filesize: {}MB", file_path_str, megabytes);
+                                                active.write().unwrap().as_mut().unwrap().size = downloaded;
+                                                return Ok(());
+                                            }
+                                        }
                                     }
-                                    Err(err) => return Err(format!("Error while writing to file: {} {}", path.to_str().unwrap_or("?"), err))
+                                    Err(err) => return Err(format!("Error while writing to file: {} {}", file_path_str, err))
                                 }
                             }
-                            None => {
-                                let megabytes = bytes_to_megabytes(downloaded);
-                                info!("Downloaded {}, filesize: {}MB", path.to_str().unwrap_or("?"), megabytes);
-                                return Ok(downloaded);
-                            }
                         }
+                        Err(err) => Err(format!("Error while writing to file: {} {}", file_path_str, err))
                     }
-                    Err(err) => return Err(format!("Error while writing to file: {} {}", path.to_str().unwrap_or("?"), err))
                 }
+                Err(err) => Err(format!("Error while creating directory to file: {} {}", &file_download.file_dir.to_str().unwrap_or("?"), err))
             }
         }
-        Err(err) => Err(format!("Error while writing to file: {} {}", path.to_str().unwrap_or("?"), err))
+        Err(err) => Err(format!("Error while opening url: {} {}", &file_download.url, err))
     }
 }
 
 pub(crate) async fn download_file_info(
-    info: web::Path<String>,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let did: String = info.into_inner();
-    match _app_state.downloads.lock().unwrap().get(&did) {
-        // @TODO it is only a success when the file remains.
-        None => HttpResponse::Ok().json(json!({"download_id":  &did, "finished": true})),
-        Some(downloaded) => HttpResponse::Ok().json(json!({"download_id":  &did, "filesize": downloaded}))
+    let error_list: &[DownloadErrorInfo] = &_app_state.downloads.errors.write().unwrap().drain(..)
+        .map(|e| DownloadErrorInfo { filename: e.filename, error: e.error.unwrap() }).collect::<Vec<DownloadErrorInfo>>();
+    let errors = match serde_json::to_string(error_list) {
+        Ok(value) => value,
+        Err(_) => "[]".to_string()
+    };
+    match &*_app_state.downloads.active.read().unwrap() {
+        None => HttpResponse::Ok().json(json!({"finished": true, "errors": errors})),
+        Some(file_download) =>
+            HttpResponse::Ok().json(json!({"filename":  file_download.filename, "filesize": file_download.size, "errors": errors}))
     }
 }
 
-pub(crate) async fn download_file(
+fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<DownloadQueue>) {
+    if let Some(file_download) = download_queue.as_ref().queue.lock().unwrap().pop() {
+        *download_queue.as_ref().active.write().unwrap() = Some(file_download);
+        let headers = get_request_headers(&download_cfg.headers);
+        let dq = Arc::clone(&download_queue);
+        actix_rt::spawn(async move {
+            loop {
+                let opt: Option<FileDownload> = {
+                    dq.active.read().unwrap().deref().clone()
+                };
+                match opt {
+                    Some(_) => {
+                        match download_file(Arc::clone(&dq.active), headers.clone()).await {
+                            Ok(_) => {
+                                *dq.active.write().unwrap() = dq.queue.lock().unwrap().pop();
+                            }
+                            Err(err) => {
+                                if let Some(fd) = &mut *dq.active.write().unwrap() {
+                                    fd.error = Some(err);
+                                    dq.errors.write().unwrap().push(fd.clone());
+                                }
+                                *dq.active.write().unwrap() = dq.queue.lock().unwrap().pop();
+                            }
+                        }
+                    }
+                    None => {
+                        return;
+                    }
+                }
+            }
+        });
+    }
+}
+
+
+pub(crate) async fn queue_download_file(
     req: web::Json<FileDownloadRequest>,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -228,49 +277,25 @@ pub(crate) async fn download_file(
 
         match reqwest::Url::parse(&req.url) {
             Ok(_url) => {
-                let client = reqwest::Client::new();
-                let mut headers = header::HeaderMap::new();
-                for (key, value) in &download.headers {
-                    headers.insert(
-                        HeaderName::from_bytes(key.as_bytes()).unwrap(),
-                        HeaderValue::from_bytes(value.as_bytes()).unwrap(),
-                    );
+                let filename_re = download._re_filename.as_ref().unwrap();
+                let filename = filename_re.replace_all(&unidecode(&req.filename).replace(' ', "_"), "").to_string();
+                let file_name = filename.clone();
+                let file_dir = get_download_directory(download, &filename);
+                let mut file_path: PathBuf = file_dir.clone();
+                file_path.push(&filename);
+                let file_download = FileDownload {
+                    file_dir,
+                    file_path,
+                    filename,
+                    url: _url,
+                    size: 0,
+                    error: None,
+                };
+                _app_state.downloads.queue.lock().unwrap().push(file_download);
+                if _app_state.downloads.active.read().unwrap().is_none() {
+                    run_download_queue(download, Arc::clone(&_app_state.downloads));
                 }
-                match client.get(_url).headers(headers).send().await {
-                    Ok(response) => {
-                        let filename_re = download._re_filename.as_ref().unwrap();
-                        let filename = filename_re.replace_all(&unidecode(&req.filename).replace(' ', "_"), "").to_string();
-                        let file_dir = get_download_directory(download, &filename);
-                        match fs::create_dir_all(&file_dir) {
-                            Ok(_) => {
-                                let path = file_dir.join(filename.as_str());
-                                let download_id = Uuid::new_v4().to_string();
-                                let response_download_id = download_id.clone();
-                                actix_rt::spawn(async move {
-                                    let downloads = _app_state.downloads.clone();
-                                    match async_download_file(&download_id, &path, response, downloads.clone()).await {
-                                        Ok(_) => {
-                                            downloads.lock().unwrap().remove(&download_id);
-                                        }
-                                        Err(err) => {
-                                            downloads.lock().unwrap().remove(&download_id);
-                                            let _ = fs::remove_file(&path);
-                                            error!("{}", err);
-                                        }
-                                    }
-                                });
-                                HttpResponse::Ok().json(json!({"download_id": response_download_id}))
-                            }
-                            Err(err) => HttpResponse::InternalServerError().json(json!({"error": format!("{}", err)}))
-                        }
-                    }
-                    Err(err) => HttpResponse::InternalServerError().json(json!({"error": format!("{}", err)})),
-                }
-
-                //
-                // use rocket::futures::TryStreamExt; // for map_err() call below:
-                // let reader = StreamReader::new(response.bytes_stream().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
-                // rocket::response::Stream::chunked(reader, 4096)
+                HttpResponse::Ok().json(json!({"success": file_name}))
             }
             Err(_) => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
         }
@@ -307,6 +332,6 @@ pub(crate) fn v1_api_register() -> Scope {
         .route("/config/serverinfo", web::post().to(config_api_proxy_server_info))
         .route("/playlist", web::post().to(playlist))
         .route("/playlist/update", web::post().to(playlist_update))
-        .route("/file/download", web::post().to(download_file))
-        .route("/file/download/{did}", web::get().to(download_file_info))
+        .route("/file/download", web::post().to(queue_download_file))
+        .route("/file/download/info", web::get().to(download_file_info))
 }

@@ -12,8 +12,6 @@ import {FileDownloadInfo, FileDownloadResponse} from "../../model/file-download"
 
 const VALID_VIDEO_FILES = ['mkv', 'mp4', 'avi'];
 
-type DownloadInfo = {filename: string, filesize: number};
-
 export type PlaylistTreeState = { [key: number]: boolean };
 
 interface PlaylistTreeProps {
@@ -32,7 +30,8 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const services = useServices();
     const [videoExtensions, setVideoExtensions] = useState<string[]>([]);
-    const [downloads, setDownloads] = useState<Record<string, DownloadInfo>>({})
+    const [download, setDownload] = useState<FileDownloadInfo>(undefined)
+    const downloading = useRef(false);
 
     useEffect(() => {
         if (serverConfig) {
@@ -40,28 +39,6 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         }
         return noop;
     }, [serverConfig]);
-
-
-    const setDownloadsInfo = useCallback((info: FileDownloadInfo) => {
-        if (info.finished == undefined && info.filesize == undefined) {
-            setDownloads((downloads) => {
-                downloads[info.download_id] = {filename: info.filename, filesize: 0};
-                return {...downloads};
-            });
-        } else {
-            if (info.filesize != undefined) {
-                setDownloads((downloads) => {
-                    downloads[info.download_id].filesize = info.filesize;
-                    return {...downloads};
-                });
-            } else {
-                setDownloads((downloads) => {
-                    delete downloads[info.download_id];
-                    return {...downloads};
-                });
-            }
-        }
-    }, []);
 
     const getPlaylistItemById = useCallback((itemId: string): PlaylistItem => {
         const id = parseInt(itemId);
@@ -103,16 +80,28 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         }
     }, [enqueueSnackbar, getPlaylistItemById, onCopy]);
 
-    const startPollingDownload = useCallback((downloadId: string) => {
-        let subs: Subscription = services.file().getDownloadInfo(downloadId).subscribe({
-            next: (info: FileDownloadInfo) => setDownloadsInfo(info),
-            error: (err) => enqueueSnackbar("Download file failed!", {variant: 'error'}),
-            complete: () => subs.unsubscribe()
+    const startPollingDownload = useCallback(() => {
+        let subs: Subscription = services.file().getDownloadInfo().subscribe({
+            next: (info: FileDownloadInfo) => {
+                if (info.finished === true) {
+                    setDownload(undefined);
+                } else {
+                    setDownload(info);
+                }
+            },
+            error: (err) => {
+                enqueueSnackbar("Download file failed!", {variant: 'error'});
+                setDownload(undefined);
+            },
+            complete: () => {
+                subs.unsubscribe();
+                setDownload(undefined);
+            }
         });
-    },  [setDownloadsInfo, enqueueSnackbar, services]);
+    }, [setDownload, enqueueSnackbar, services]);
 
     const handleDownloadUrl = useCallback((e: any) => {
-        if (! serverConfig.video.download?.directory) {
+        if (!serverConfig.video.download?.directory) {
             enqueueSnackbar("Please updated the server configuration and add video.download directory and headers!", {variant: 'error'})
         } else {
             const item = getPlaylistItemById(e.target.dataset.item);
@@ -125,11 +114,14 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 }
 
                 if (VALID_VIDEO_FILES.includes(ext)) {
-                    filename = filename + '.' + ext;
-                    services.file().download({url: item.header.url, filename}).pipe(first()).subscribe({
+                    services.file().download({
+                        url: item.header.url,
+                        filename: filename + '.' + ext
+                    }).pipe(first()).subscribe({
                         next: (download: FileDownloadResponse) => {
-                            setDownloadsInfo({download_id: download.download_id, filename: filename});
-                            startPollingDownload(download.download_id)
+                            if (download.success) {
+                                startPollingDownload();
+                            }
                         },
                         error: err => enqueueSnackbar("Download failed!", {variant: 'error'}),
                         complete: noop,
@@ -139,7 +131,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 }
             }
         }
-    }, [serverConfig, enqueueSnackbar, getPlaylistItemById, services, startPollingDownload, setDownloadsInfo]);
+    }, [serverConfig, enqueueSnackbar, getPlaylistItemById, services, startPollingDownload]);
 
     const handlePlayUrl = useCallback((e: any) => {
         if (onPlay) {
@@ -151,14 +143,14 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     }, [onPlay, getPlaylistItemById]);
 
     const isVideoFile = useCallback((entry: PlaylistItem): boolean => {
-            if (videoExtensions && entry.header.url) {
-                for (const ext of videoExtensions) {
-                    if (entry.header.url.endsWith(ext)) {
-                        return true;
-                    }
+        if (videoExtensions && entry.header.url) {
+            for (const ext of videoExtensions) {
+                if (entry.header.url.endsWith(ext)) {
+                    return true;
                 }
             }
-            return false;
+        }
+        return false;
     }, [videoExtensions]);
 
     const renderEntry = useCallback((entry: PlaylistItem, index: number): React.ReactNode => {
@@ -211,16 +203,16 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     }, [data, renderGroup]);
 
     const renderDownloads = useCallback((): React.ReactNode => {
-        const keys = Object.keys(downloads)
-        if (keys.length) {
-            let elements = keys.map(key => {
-                const info: DownloadInfo = downloads[key];
-                return <li key={key}>{info.filename}: {info.filesize ?  (info.filesize / 1_048_576).toFixed(2) : 0} MB</li>;
-            })
-            return <div className={'download-info'}><ul>{elements}</ul></div>;
+        if (download) {
+            return <div className={'download-info'}>
+                <ul>
+                    <li>{download.filename}: {download.filesize ? (download.filesize / 1_048_576).toFixed(2) : 0} MB</li>
+                    {download.errors?.length && <li>{download.errors}</li>}
+                </ul>
+            </div>;
         }
         return <></>;
-    }, [downloads]);
+    }, [download]);
 
     return <div className={'playlist-tree'}>{renderPlaylist()}{renderDownloads()}</div>;
 } 

@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use log::{debug, error};
 use path_absolutize::*;
 use reqwest::header;
-use reqwest::header::{HeaderName, HeaderValue};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{ConfigInput};
@@ -198,17 +199,22 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
 fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::RequestBuilder {
     let mut request = reqwest::Client::new().get(url);
     if input.headers.is_empty() {
-        let mut headers = header::HeaderMap::new();
-        for (key, value) in &input.headers {
-            headers.insert(
-                HeaderName::from_bytes(key.as_bytes()).unwrap(),
-                HeaderValue::from_bytes(value.as_bytes()).unwrap(),
-            );
-        }
-        debug!("Request with headers{:?}", &headers);
+        let headers = get_request_headers(&input.headers);
         request = request.headers(headers);
     }
     request
+}
+
+pub fn get_request_headers(defined_headers: &HashMap<String, String>) -> HeaderMap {
+    let mut headers = header::HeaderMap::new();
+    for (key, value) in defined_headers {
+        headers.insert(
+            HeaderName::from_bytes(key.as_bytes()).unwrap(),
+            HeaderValue::from_bytes(value.as_bytes()).unwrap(),
+        );
+    }
+    debug!("Request with headers{:?}", &headers);
+    headers
 }
 
 async fn download_json_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, String> {

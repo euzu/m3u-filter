@@ -24,8 +24,8 @@ export default class FileService {
         return this.fileApiService.download(req);
     }
 
-    getDownloadInfo(download_id: string): Observable<FileDownloadInfo> {
-        return this.fileApiService.getDownloadInfo(download_id);
+    getDownloadInfo(): Observable<FileDownloadInfo> {
+        return this.fileApiService.getDownloadInfo();
     }
 }
 

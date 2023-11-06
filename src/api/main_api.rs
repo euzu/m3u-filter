@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use actix_cors::Cors;
 use actix_files::NamedFile;
@@ -9,7 +8,7 @@ use actix_web::{App, get, HttpRequest, HttpServer, web};
 use actix_web::middleware::Logger;
 use crate::api::m3u_api::{m3u_api_register};
 
-use crate::api::api_model::{AppState};
+use crate::api::api_model::{AppState, DownloadQueue};
 use crate::api::scheduler::start_scheduler;
 use crate::api::v1_api::{v1_api_register};
 use crate::api::xmltv_api::{xmltv_api_register};
@@ -41,7 +40,11 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
     let shared_data = web::Data::new(AppState {
         config: cfg,
         targets,
-        downloads: Arc::new(Mutex::new(HashMap::new()))
+        downloads: Arc::from(DownloadQueue {
+            queue: Arc::from(Mutex::new(Vec::new())),
+            active: Arc::from(RwLock::new(None)),
+            errors: Arc::from(RwLock::new(Vec::new())),
+        })
     });
 
     // Scheduler

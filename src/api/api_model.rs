@@ -1,15 +1,37 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::path::{PathBuf};
+use std::sync::{Arc, Mutex, RwLock};
 use actix_web::web;
 use serde::{Deserialize, Serialize};
 use crate::model::api_proxy::{ApiProxyConfig};
 use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig};
 use crate::model::model_config::{default_as_empty_str, ProcessingOrder};
 
+#[derive(Serialize, Deserialize)]
+pub(crate) struct DownloadErrorInfo {
+    pub filename: String,
+    pub error: String,
+}
+
+#[derive(Clone)]
+pub(crate) struct FileDownload {
+    pub file_dir: PathBuf,
+    pub file_path: PathBuf,
+    pub filename: String,
+    pub url: reqwest::Url,
+    pub size: u64,
+    pub error: Option<String>,
+}
+
+pub(crate) struct DownloadQueue {
+    pub queue: Arc<Mutex<Vec<FileDownload>>>,
+    pub active: Arc<RwLock<Option<FileDownload>>>,
+    pub errors: Arc<RwLock<Vec<FileDownload>>>,
+}
+
 pub(crate) struct AppState {
     pub config: Arc<Config>,
     pub targets: Arc<ProcessTargets>,
-    pub downloads: Arc<Mutex<HashMap<String, u64>>>
+    pub downloads: Arc<DownloadQueue>
 }
 
 #[derive(Serialize)]

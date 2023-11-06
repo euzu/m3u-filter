@@ -4,12 +4,18 @@ export interface FileDownloadRequest {
 }
 
 export interface FileDownloadResponse {
-    download_id: string;
+    success: boolean;
 }
 
+export interface DownloadErrorInfo {
+    filename: string;
+    error: string;
+}
+
+
 export interface FileDownloadInfo {
-    download_id: string;
     filename?: string;
     finished?: boolean;
     filesize?: number;
+    errors?: DownloadErrorInfo[];
 }
