@@ -8,7 +8,7 @@ import {useSnackbar} from "notistack";
 import {getIconByName} from "../../icons/icons";
 import {useServices} from "../../provider/service-provider";
 import ServerConfig from "../../model/server-config";
-import {FileDownloadResponse} from "../../model/file-download";
+import {FileDownloadInfo} from "../../model/file-download";
 
 const VALID_VIDEO_FILES = ['mkv', 'mp4', 'avi'];
 
@@ -97,7 +97,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                         url: item.header.url,
                         filename: filename + '.' + ext
                     }).pipe(first()).subscribe({
-                        next: (_: FileDownloadResponse) => {},
+                        next: (_: FileDownloadInfo) => {},
                         error: _ => enqueueSnackbar("Download failed!", {variant: 'error'}),
                         complete: noop,
                     });

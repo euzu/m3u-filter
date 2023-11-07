@@ -1,6 +1,6 @@
 import ApiService, {DefaultApiService} from "./api-service";
 import {Observable, throwError} from "rxjs";
-import {FileDownloadInfo, FileDownloadRequest, FileDownloadResponse} from "../model/file-download";
+import {FileDownloadInfo, FileDownloadRequest} from "../model/file-download";
 import {first} from "rxjs/operators";
 
 //const FILE_API_PATH = 'file';
@@ -8,14 +8,14 @@ const FILE_DOWNLOAD_API_PATH = 'file/download';
 const FILE_DOWNLOAD_INFO_API_PATH =FILE_DOWNLOAD_API_PATH + '/info';
 
 export default interface FileApiService extends ApiService {
-    download(req: FileDownloadRequest): Observable<FileDownloadResponse>;
+    download(req: FileDownloadRequest): Observable<FileDownloadInfo>;
     getDownloadInfo(): Observable<FileDownloadInfo>;
 }
 
 export class DefaultFileApiService extends DefaultApiService implements FileApiService {
-    download(req: FileDownloadRequest): Observable<FileDownloadResponse> {
+    download(req: FileDownloadRequest): Observable<FileDownloadInfo> {
         if (req.url) {
-            return this.post<FileDownloadResponse>(FILE_DOWNLOAD_API_PATH, req);
+            return this.post<FileDownloadInfo>(FILE_DOWNLOAD_API_PATH, req);
         }
         return throwError(() => new Error('Invalid arguments'));
     }

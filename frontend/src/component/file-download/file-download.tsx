@@ -73,7 +73,16 @@ export default function FileDownload(props: FileDownloadProps) {
     }, []);
 
     useEffect(() => {
-        const sub = services.file().subscribeDownloadNotification(() => startPoll());
+        const sub = services.file().subscribeDownloadNotification((info: FileDownloadInfo) => {
+            setDownloads((downloads: any) => {
+                if (!downloads[info.uuid]) {
+                    downloads[info.uuid] = info;
+                    return {...downloads};
+                }
+                return downloads;
+            });
+            startPoll();
+        });
         return () => sub.unsubscribe();
     }, [services, startPoll])
 

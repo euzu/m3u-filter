@@ -55,15 +55,25 @@ impl FileDownload {
             Ok(url) => {
                 let filename_re = download_cfg._re_filename.as_ref().unwrap();
                 let tmp_filename = filename_re.replace_all(&unidecode(req_filename)
-                    .replace(' ', "_"), "").to_string();
-                let filname_path = Path::new(&tmp_filename);
-                let file_stem = filname_path.file_stem().and_then(OsStr::to_str).unwrap_or("");
-                let file_ext = filname_path.extension().and_then(OsStr::to_str).unwrap_or("");
+                    .replace(' ', "_"), "")
+                    .replace("__", "_")
+                    .replace("_-_", "-").to_string();
+                let filename_path = Path::new(&tmp_filename);
+                let file_stem = filename_path.file_stem().and_then(OsStr::to_str).unwrap_or("").trim_matches(FILENAME_TRIM_PATTERNS);
+                let file_ext = filename_path.extension().and_then(OsStr::to_str).unwrap_or("");
 
-                let filename = format!("{}.{}", file_stem.trim_matches(FILENAME_TRIM_PATTERNS), file_ext);
+                let mut filename = format!("{}.{}", file_stem, file_ext);
                 let file_dir = get_download_directory(download_cfg, file_stem);
                 let mut file_path: PathBuf = file_dir.clone();
                 file_path.push(&filename);
+                let mut x: usize = 1;
+                while file_path.is_file() {
+                    filename = format!("{}_{}.{}", file_stem, x, file_ext);
+                    file_path = file_dir.clone();
+                    file_path.push(&filename);
+                    x += 1;
+                }
+
                 file_path.to_str()?;
 
                 Some(FileDownload {

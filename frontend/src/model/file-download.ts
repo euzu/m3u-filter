@@ -3,10 +3,6 @@ export interface FileDownloadRequest {
     filename: string;
 }
 
-export interface FileDownloadResponse {
-    success: boolean;
-}
-
 export interface DownloadErrorInfo {
     uuid: string;
     filename: string;

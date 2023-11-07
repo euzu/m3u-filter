@@ -1,12 +1,12 @@
 import {PlaylistItem, PlaylistGroup} from "../model/playlist";
 import FileSaver from "file-saver";
-import {Observer, Observable, Subject, Subscription, tap} from "rxjs";
+import {Observable, Subject, Subscription, tap} from "rxjs";
 import FileApiService, {DefaultFileApiService} from "../api/file-api-service";
-import {FileDownloadInfo, FileDownloadRequest, FileDownloadResponse} from "../model/file-download";
+import {FileDownloadInfo, FileDownloadRequest} from "../model/file-download";
 
 export default class FileService {
 
-    private downloadNotification = new Subject<boolean>();
+    private downloadNotification = new Subject<FileDownloadInfo>();
     constructor(private fileApiService: FileApiService = new DefaultFileApiService()) {
     }
 
@@ -14,8 +14,8 @@ export default class FileService {
         return this.downloadNotification.subscribe(observer as any);
     }
 
-    private notifyDownload() {
-        this.downloadNotification.next(true);
+    private notifyDownload(info: FileDownloadInfo) {
+        this.downloadNotification.next(info);
     }
 
     save(playlist: PlaylistGroup[]) {
@@ -30,8 +30,8 @@ export default class FileService {
         FileSaver.saveAs(blob, "playlist.m3u");
     }
 
-    download(req: FileDownloadRequest): Observable<FileDownloadResponse> {
-        return this.fileApiService.download(req).pipe(tap((result) => result?.success && this.notifyDownload() ));
+    download(req: FileDownloadRequest): Observable<FileDownloadInfo> {
+        return this.fileApiService.download(req).pipe(tap((result) => this.notifyDownload(result) ));
     }
 
     getDownloadInfo(): Observable<FileDownloadInfo> {

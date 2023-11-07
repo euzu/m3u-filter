@@ -4,7 +4,7 @@ use std::io::{ErrorKind, Write};
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 use actix_web::{HttpResponse, web};
-use serde_json::{json};
+use serde_json::{json, Value};
 use crate::api::api_model::{AppState, DownloadErrorInfo, DownloadQueue, FileDownload, FileDownloadRequest};
 use crate::model::config::{VideoDownloadConfig};
 use crate::utils::{bytes_to_megabytes, get_request_headers};
@@ -93,6 +93,12 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<Do
     Ok(())
 }
 
+macro_rules! download_info_response {
+    ($file_download:expr, $errors:expr) => {
+       HttpResponse::Ok().json(json!({"uuid": $file_download.uuid, "filename":  $file_download.filename, "filesize": $file_download.size, "errors": $errors}))
+    }
+}
+
 pub(crate) async fn queue_download_file(
     req: web::Json<FileDownloadRequest>,
     _app_state: web::Data<AppState>,
@@ -103,7 +109,7 @@ pub(crate) async fn queue_download_file(
         }
         match FileDownload::new(req.url.as_str(), req.filename.as_str(), download_cfg) {
             Some(file_download) => {
-                let file_name = file_download.filename.to_owned();
+                let response = download_info_response!(file_download, Value::Null);
                 _app_state.downloads.queue.lock().unwrap().push(file_download);
                 if _app_state.downloads.active.read().unwrap().is_none() {
                     match run_download_queue(download_cfg, Arc::clone(&_app_state.downloads)) {
@@ -111,7 +117,7 @@ pub(crate) async fn queue_download_file(
                         Err(err) => return HttpResponse::InternalServerError().json(json!({"error": err})),
                     }
                 }
-                HttpResponse::Ok().json(json!({"success": file_name}))
+                response
             }
             None => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
         }
@@ -119,7 +125,6 @@ pub(crate) async fn queue_download_file(
         HttpResponse::BadRequest().json(json!({"error": "Server config missing video.download configuration"}))
     }
 }
-
 
 pub(crate) async fn download_file_info(
     _app_state: web::Data<AppState>,
@@ -133,6 +138,6 @@ pub(crate) async fn download_file_info(
     match &*_app_state.downloads.active.read().unwrap() {
         None => HttpResponse::Ok().json(json!({"finished": true, "errors": errors})),
         Some(file_download) =>
-            HttpResponse::Ok().json(json!({"uuid": file_download.uuid, "filename":  file_download.filename, "filesize": file_download.size, "errors": errors}))
+            download_info_response!(file_download, errors)
     }
 }
