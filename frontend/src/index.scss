@@ -10,8 +10,15 @@ body {
   font-family: sans-serif;
   background-color: var(--background-color);
   height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-content: stretch;
+  align-items: stretch;
 }
 
 #root {
-  height: 100%;
+  display: flex;
+  flex-flow: column;
+  flex: 1 1 auto;
+  box-sizing: border-box;
 }

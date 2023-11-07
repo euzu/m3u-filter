@@ -96,7 +96,7 @@ export default function App(props: AppProps) {
         <div className="app">
             <div className={'app-header'}>
                 <div className={'app-header__caption'}><span className={'app-header__logo'}>{getIconByName('Logo')}</span>m3u-filter</div>
-                <div className={'app-header__toolbar'}><button onClick={handlePreferences}>{getIconByName('Config')}</button></div>
+                <div className={'app-header__toolbar'}><button title="Configuration" onClick={handlePreferences}>{getIconByName('Config')}</button></div>
             </div>
             <div className={'app-main' + (preferencesVisible ? '' : '  hidden')}>
                 <div className={'app-content'}>

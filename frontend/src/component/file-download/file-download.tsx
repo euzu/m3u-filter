@@ -32,13 +32,13 @@ export default function FileDownload(props: FileDownloadProps) {
                 next: (info: FileDownloadInfo) => {
                     const errors: DownloadErrorInfo[] = info.errors;
                     info.errors = undefined;
-                    info.ts = Date.now();
+                    info.ts_modified = Date.now();
                     if (info.finished === true) {
                         downloading.current = false;
                         if (errors?.length) {
                             setDownloads((downloads: any) => {
                                 if (attachErrors(errors, downloads)) {
-                                   return {...downloads};
+                                    return {...downloads};
                                 } else {
                                     return downloads;
                                 }
@@ -72,11 +72,16 @@ export default function FileDownload(props: FileDownloadProps) {
         });
     }, []);
 
+    const handleClearAll = useCallback(() => {
+        setDownloads({});
+    }, []);
+
     useEffect(() => {
         const sub = services.file().subscribeDownloadNotification((info: FileDownloadInfo) => {
             setDownloads((downloads: any) => {
                 if (!downloads[info.uuid]) {
-                    info.ts = Date.now();
+                    info.ts_created = Date.now();
+                    info.ts_modified = info.ts_created;
                     downloads[info.uuid] = info;
                     return {...downloads};
                 }
@@ -90,29 +95,39 @@ export default function FileDownload(props: FileDownloadProps) {
     const renderDownloads = useCallback((): React.ReactNode => {
         const info_list = Object.keys(downloads).map(key => downloads[key]);
         if (info_list.length) {
-            info_list.sort((a, b) => b.ts - a.ts)
-            return <div className={'download-info'}>
-                <ul>
-                    {info_list.map(download => {
-                        return <li key={download.uuid}>
+            info_list.sort((a, b) => {
+                const ats = a.finished ? a.ts_created : a.ts_modified;
+                const bts = b.finished ? b.ts_created : b.ts_modified;
+                return bts - ats;
+            })
+            return <div className={'file-download'}>
+                <div className={'download-info'}>
+                    <div className={'download-info__toolbar'}>
+                        <button title={'Clear All'} onClick={handleClearAll}>{getIconByName('DeleteSweep')}</button>
+                    </div>
+                    <div className={'download-info__content'}>
+                        <ul>
+                            {info_list.map(download => {
+                                return <li key={download.uuid}>
                             <span className={'download-info__remove_btn'} data-uuid={download.uuid}
-                                  onClick={handleDeleteClick}>{getIconByName('Delete')}</span>
-                            <span className={'download-info__content'}>{download.filename}:
-                             <span
-                                 className={'download-info__filesize'}>{download.filesize ? (download.filesize / 1_048_576).toFixed(2) : 0} MB</span>
-                         </span>
-                            {download.error && <span className={'download-info__error'}>{download.error}</span>}
-                        </li>;
-                    })
-                    }
-                </ul>
+                                  onClick={handleDeleteClick}>{getIconByName('Delete')}
+                            </span>
+                                    <span className={'download-info__content'}>{download.filename}:
+                                <span
+                                    className={'download-info__filesize'}>{download.filesize ? (download.filesize / 1_048_576).toFixed(2) : 0} MB
+                                </span>
+                             </span>
+                                    {download.error && <span className={'download-info__error'}>{download.error}</span>}
+                                </li>;
+                            })
+                            }
+                        </ul>
+                    </div>
+                </div>
             </div>;
         }
         return <></>
     }, [downloads, handleDeleteClick]);
 
-    return <div className={'file-download'}>
-        {renderDownloads()}
-    </div>;
-
+    return renderDownloads();
 }

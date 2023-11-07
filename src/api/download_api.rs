@@ -72,9 +72,14 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<Do
                     loop {
                         if dq.active.read().unwrap().deref().is_some() {
                             match download_file(Arc::clone(&dq.active), &client).await {
-                                Ok(_) => {}
+                                Ok(_) => {
+                                    if let Some(fd) = &mut *dq.active.write().unwrap() {
+                                        fd.finished = true;
+                                    }
+                                }
                                 Err(err) => {
                                     if let Some(fd) = &mut *dq.active.write().unwrap() {
+                                        fd.finished = true;
                                         fd.error = Some(err);
                                         dq.errors.write().unwrap().push(fd.clone());
                                     }
@@ -95,7 +100,8 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<Do
 
 macro_rules! download_info_response {
     ($file_download:expr, $errors:expr) => {
-       HttpResponse::Ok().json(json!({"uuid": $file_download.uuid, "filename":  $file_download.filename, "filesize": $file_download.size, "errors": $errors}))
+       HttpResponse::Ok().json(json!({"uuid": $file_download.uuid, "filename":  $file_download.filename,
+       "filesize": $file_download.size, "finished": $file_download.finished, "errors": $errors}))
     }
 }
 
@@ -130,7 +136,7 @@ pub(crate) async fn download_file_info(
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let error_list: &[DownloadErrorInfo] = &_app_state.downloads.errors.write().unwrap().drain(..)
-        .map(|e| DownloadErrorInfo {uuid: e.uuid, filename: e.filename, error: e.error.unwrap() }).collect::<Vec<DownloadErrorInfo>>();
+        .map(|e| DownloadErrorInfo { uuid: e.uuid, filename: e.filename, error: e.error.unwrap() }).collect::<Vec<DownloadErrorInfo>>();
     let errors = match serde_json::to_value(error_list) {
         Ok(value) => value,
         Err(_) => serde_json::Value::Null

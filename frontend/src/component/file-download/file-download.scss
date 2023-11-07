@@ -3,15 +3,33 @@
 .file-download {
    display: flex;
    flex-flow: column;
-   margin: 0 10px;
+   flex: 1 0 auto;
+   margin: 4px 10px;
    overflow: hidden;
-   max-height: 10rem;
+   max-height: 12rem;
+
   .download-info {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
     background-color: var(--popup-background-color);
     color: var(--popup-color);
     filter: drop-shadow(2px 2px 3px var(--popup-shadow-color));
     border: 1px solid var(--popup-border-color);
-    overflow: auto;
+    overflow: hidden;
+
+    &__toolbar {
+      flex: 0 0 auto;
+      padding: 4px;
+      background-color: var(--background-color);
+      button {
+        @include common.iconButton();
+      }
+    }
+
+    &__content {
+      overflow: auto;
+    }
 
     @include common.list();
 

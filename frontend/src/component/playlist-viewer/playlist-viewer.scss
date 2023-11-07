@@ -1,14 +1,25 @@
 .playlist-viewer {
+  display: flex;
+  flex-flow: column;
   flex: 1 1 auto;
   overflow: hidden;
-  overflow-y: auto;
   padding: 10px;
   color: var(--playlist-color);
+  box-sizing: border-box;
 
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   margin-left: 10px;
   margin-right: 10px;
+
+  &__content {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+    overflow: auto;
+    box-sizing: border-box;
+
+  }
 
   .group-label {
     display: flex;

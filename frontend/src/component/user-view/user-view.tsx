@@ -134,7 +134,7 @@ export default function UserView(props: UserViewProps) {
     return <div className={'user'}>
 
         <div className={'user__toolbar'}><label>User</label>
-            <button onClick={handleSave}>Save</button>
+            <button title={'Save'} onClick={handleSave}>Save</button>
         </div>
         <TabSet tabs={tabs} active={activeTarget} onTabChange={handleTabChange}></TabSet>
         <div className={'user__content'}>
@@ -145,7 +145,7 @@ export default function UserView(props: UserViewProps) {
                         <div className={'user__target-target'}>
                             <label className={(target as any).src ? '' : 'target-not-exists'}>{target.target}</label>
                             <div className={'user__target-target-toolbar'}>
-                                <button data-target={target.target}
+                                <button title={'New User'} data-target={target.target}
                                         onClick={handleUserAdd}>{getIconByName('PersonAdd')}</button>
                             </div>
                         </div>

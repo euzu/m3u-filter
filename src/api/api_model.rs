@@ -22,6 +22,7 @@ pub(crate) struct FileDownload {
     pub file_path: PathBuf,
     pub filename: String,
     pub url: reqwest::Url,
+    pub finished: bool,
     pub size: u64,
     pub error: Option<String>,
 }
@@ -82,6 +83,7 @@ impl FileDownload {
                     file_path,
                     filename,
                     url,
+                    finished: false,
                     size: 0,
                     error: None,
                 })

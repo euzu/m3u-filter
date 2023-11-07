@@ -25,7 +25,7 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
     return <div className={'playlist-filter'}>
         <InputField label={'Search'}>
             <input ref={textField} onKeyUp={handleKeyPress}/>
-            <button onClick={handleSearch}>{getIconByName('Search')}</button>
+            <button title={'Search'} onClick={handleSearch}>{getIconByName('Search')}</button>
         </InputField>
     </div>
 }

@@ -111,7 +111,9 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
     }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
 
     return <div className={'playlist-viewer'}>
-        <PlaylistTree data={data} state={checked} onCopy={onCopy} onPlay={onPlay} serverConfig={serverConfig}/>
+        <div className={'playlist-viewer__content'}>
+            <PlaylistTree data={data} state={checked} onCopy={onCopy} onPlay={onPlay} serverConfig={serverConfig}/>
+        </div>
     </div>
 });
 

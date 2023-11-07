@@ -47,7 +47,7 @@ export default function ServerInfoView(props: ServerInfoViewProps) {
 
     return <div className={'server-info'}>
         <div className={'server-info__toolbar'}><label>Server</label>
-            <button onClick={handleSave}>Save</button>
+            <button title={'Save'} onClick={handleSave}>Save</button>
         </div>
         <div className={'server-info__content'}>
             <div className={'server-info__content-table'}>

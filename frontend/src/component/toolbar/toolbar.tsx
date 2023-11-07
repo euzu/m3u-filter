@@ -7,7 +7,7 @@ interface ToolbarProps {
 
 export default function Toolbar(props: ToolbarProps) {
     return <div className={'toolbar'}>
-        <button onClick={props.onDownload}>
+        <button title={'Save'} onClick={props.onDownload}>
             Save
         </button>
     </div>

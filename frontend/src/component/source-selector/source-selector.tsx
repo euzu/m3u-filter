@@ -65,8 +65,8 @@ export default function SourceSelector(props: SourceSelectorProps) {
     return <div className={'source-selector'}>
         <InputField label={'Source'}>
             <input onKeyUp={handleKeyPress} ref={textField}/>
-            <button onClick={handleDownload}>{getIconByName('CloudDownload')}</button>
-            <button onClick={openPopup}>{getIconByName('ArrowDown')}</button>
+            <button title={'Download'} onClick={handleDownload}>{getIconByName('CloudDownload')}</button>
+            <button title={'Input List'} onClick={openPopup}>{getIconByName('ArrowDown')}</button>
         </InputField>
         <PopupMenu position={popupVisible} onHide={closePopup}>
             <ul>

@@ -5,7 +5,8 @@
   flex-flow: column;
   justify-content: center;
   overflow: hidden;
-  height: 100%;
+  flex: 1 1 auto;
+  //height: 100%;
   color: var(--text-color);
 
   .app-header {
@@ -42,16 +43,16 @@
     display: flex;
     flex-flow: column;
     justify-content: center;
-    flex-grow: 1;
+    flex: 1 1 auto;
     overflow: hidden;
-    height: 100%;
+    //height: 100%;
 
     .app-content {
       display: flex;
       flex-flow: column;
-      flex-grow: 1;
+      flex: 1 1 auto;
       overflow: hidden;
-      height: 100%;
+     //height: 100%;
     }
   }
 }

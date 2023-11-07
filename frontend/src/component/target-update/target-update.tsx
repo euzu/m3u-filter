@@ -35,7 +35,7 @@ export default function TargetUpdate(props: TargetUpdateProps) {
     }, [services, enqueueSnackbar]);
 
     return <div className={'target-update'}>
-        <div className={'target-update__toolbar'}><label>Update</label><button onClick={handleUpdate}>Start</button></div>
+        <div className={'target-update__toolbar'}><label>Update</label><button title={'Update'} onClick={handleUpdate}>Start</button></div>
         <div className={'target-update__content'}>
             <ul>
                 {targets.map(t => <li key={t}><Checkbox label={t} value={t} onSelect={handleSelect}></Checkbox></li>)}

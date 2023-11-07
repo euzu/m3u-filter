@@ -12,7 +12,8 @@ export interface DownloadErrorInfo {
 
 export interface FileDownloadInfo {
     uuid: string;
-    ts?: number;
+    ts_created?: number;
+    ts_modified?: number;
     filename?: string;
     finished?: boolean;
     filesize?: number;
