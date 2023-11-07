@@ -76,6 +76,7 @@ export default function FileDownload(props: FileDownloadProps) {
         const sub = services.file().subscribeDownloadNotification((info: FileDownloadInfo) => {
             setDownloads((downloads: any) => {
                 if (!downloads[info.uuid]) {
+                    info.ts = Date.now();
                     downloads[info.uuid] = info;
                     return {...downloads};
                 }
