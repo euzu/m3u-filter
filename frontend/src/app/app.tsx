@@ -17,6 +17,7 @@ import {PlaylistRequest} from "../model/playlist-request";
 import ServerConfig from "../model/server-config";
 import {getIconByName} from "../icons/icons";
 import Preferences from "../component/preferences/preferences";
+import FileDownload from "../component/file-download/file-download";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface AppProps {
@@ -114,6 +115,7 @@ export default function App(props: AppProps) {
                                     serverConfig={serverConfig}/>
                     <PlaylistVideo channel={videoChannel}/>
                     <Toolbar onDownload={handleSave}/>
+                    <FileDownload></FileDownload>
                     <Progress visible={progress}/>
                 </div>
             </div>

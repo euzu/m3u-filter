@@ -1,0 +1,51 @@
+@use '../../scss/common';
+
+.file-download {
+   display: flex;
+   flex-flow: column;
+   margin: 0 10px;
+   overflow: hidden;
+   max-height: 10rem;
+  .download-info {
+    background-color: var(--popup-background-color);
+    color: var(--popup-color);
+    filter: drop-shadow(2px 2px 3px var(--popup-shadow-color));
+    border: 1px solid var(--popup-border-color);
+    overflow: auto;
+
+    @include common.list();
+
+    ul li {
+      display: flex;
+      flex-flow: row;
+      gap: 4px;
+      align-items: flex-start;
+    }
+
+    &__content {
+      display: flex;
+      flex-flow: row wrap;
+      gap: 4px;
+    }
+
+    &__filesize {
+      white-space: nowrap;
+    }
+
+    &__error {
+      margin-left: 8px;
+      color: var(--attention-color);
+    }
+
+    &__remove_btn {
+      @include common.iconButton();
+      max-height: 0.8rem;
+      padding: 0 4px;
+      svg {
+        transform: scale(0.7);
+      }
+    }
+
+  }
+}
+

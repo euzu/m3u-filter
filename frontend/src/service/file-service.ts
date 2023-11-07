@@ -1,11 +1,21 @@
 import {PlaylistItem, PlaylistGroup} from "../model/playlist";
 import FileSaver from "file-saver";
-import {Observable} from "rxjs";
+import {Observer, Observable, Subject, Subscription, tap} from "rxjs";
 import FileApiService, {DefaultFileApiService} from "../api/file-api-service";
 import {FileDownloadInfo, FileDownloadRequest, FileDownloadResponse} from "../model/file-download";
+
 export default class FileService {
 
+    private downloadNotification = new Subject<boolean>();
     constructor(private fileApiService: FileApiService = new DefaultFileApiService()) {
+    }
+
+    subscribeDownloadNotification<T>(observer: (value: T) => void): Subscription {
+        return this.downloadNotification.subscribe(observer as any);
+    }
+
+    private notifyDownload() {
+        this.downloadNotification.next(true);
     }
 
     save(playlist: PlaylistGroup[]) {
@@ -21,7 +31,7 @@ export default class FileService {
     }
 
     download(req: FileDownloadRequest): Observable<FileDownloadResponse> {
-        return this.fileApiService.download(req);
+        return this.fileApiService.download(req).pipe(tap((result) => result?.success && this.notifyDownload() ));
     }
 
     getDownloadInfo(): Observable<FileDownloadInfo> {

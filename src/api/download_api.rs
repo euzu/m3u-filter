@@ -1,9 +1,7 @@
 use std::fs::File;
 use std::{fs, io};
-use std::ffi::OsStr;
 use std::io::{ErrorKind, Write};
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use actix_web::{HttpResponse, web};
 use serde_json::{json};
@@ -12,22 +10,19 @@ use crate::model::config::{VideoDownloadConfig};
 use crate::utils::{bytes_to_megabytes, get_request_headers};
 use futures::stream::TryStreamExt;
 use log::{info};
-use reqwest::header::HeaderMap;
-use unidecode::unidecode;
 
-async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, headers: HeaderMap) -> Result<(), String> {
-    let client = reqwest::Client::new();
-    let file_download = active.read().unwrap().as_ref().unwrap().clone();
-    match client.get(file_download.url.clone()).headers(headers).send().await {
+async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwest::Client) -> Result<(), String> {
+    let file_download = { active.read().unwrap().as_ref().unwrap().clone() };
+    match client.get(file_download.url.clone()).send().await {
         Ok(response) => {
             match fs::create_dir_all(&file_download.file_dir) {
                 Ok(_) => {
-                    let file_path_str = file_download.file_path.to_str().unwrap_or("?");
+                    let file_path_str = file_download.file_path.to_str().unwrap();
+                    info!("Downloading {}", file_path_str);
                     match File::create(&file_download.file_path) {
                         Ok(mut file) => {
-                            info!("Downloading {}", file_download.file_path.to_str().unwrap_or("?"));
-                            let mut stream = response.bytes_stream().map_err(|err| io::Error::new(ErrorKind::Other, err));
                             let mut downloaded: u64 = 0;
+                            let mut stream = response.bytes_stream().map_err(|err| io::Error::new(ErrorKind::Other, err));
                             loop {
                                 match stream.try_next().await {
                                     Ok(item) => {
@@ -56,118 +51,88 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, headers: Heade
                         Err(err) => Err(format!("Error while writing to file: {} {}", file_path_str, err))
                     }
                 }
-                Err(err) => Err(format!("Error while creating directory to file: {} {}", &file_download.file_dir.to_str().unwrap_or("?"), err))
+                Err(err) => Err(format!("Error while creating directory for file: {} {}", &file_download.file_dir.to_str().unwrap_or("?"), err))
             }
         }
         Err(err) => Err(format!("Error while opening url: {} {}", &file_download.url, err))
     }
 }
 
-pub(crate) async fn download_file_info(
-    _app_state: web::Data<AppState>,
-) -> HttpResponse {
-    let error_list: &[DownloadErrorInfo] = &_app_state.downloads.errors.write().unwrap().drain(..)
-        .map(|e| DownloadErrorInfo { filename: e.filename, error: e.error.unwrap() }).collect::<Vec<DownloadErrorInfo>>();
-    let errors = match serde_json::to_string(error_list) {
-        Ok(value) => value,
-        Err(_) => "[]".to_string()
+fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<DownloadQueue>) -> Result<(), String> {
+    let next_download = {
+        download_queue.as_ref().queue.lock().unwrap().pop()
     };
-    match &*_app_state.downloads.active.read().unwrap() {
-        None => HttpResponse::Ok().json(json!({"finished": true, "errors": errors})),
-        Some(file_download) =>
-            HttpResponse::Ok().json(json!({"filename":  file_download.filename, "filesize": file_download.size, "errors": errors}))
-    }
-}
-
-fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<DownloadQueue>) {
-    if let Some(file_download) = download_queue.as_ref().queue.lock().unwrap().pop() {
-        *download_queue.as_ref().active.write().unwrap() = Some(file_download);
+    if next_download.is_some() {
+        { *download_queue.as_ref().active.write().unwrap() = next_download; }
         let headers = get_request_headers(&download_cfg.headers);
         let dq = Arc::clone(&download_queue);
-        actix_rt::spawn(async move {
-            loop {
-                let opt: Option<FileDownload> = {
-                    dq.active.read().unwrap().deref().clone()
-                };
-                match opt {
-                    Some(_) => {
-                        match download_file(Arc::clone(&dq.active), headers.clone()).await {
-                            Ok(_) => {
-                                *dq.active.write().unwrap() = dq.queue.lock().unwrap().pop();
-                            }
-                            Err(err) => {
-                                if let Some(fd) = &mut *dq.active.write().unwrap() {
-                                    fd.error = Some(err);
-                                    dq.errors.write().unwrap().push(fd.clone());
+        match reqwest::Client::builder().default_headers(headers).build() {
+            Ok(client) => {
+                actix_rt::spawn(async move {
+                    loop {
+                        if dq.active.read().unwrap().deref().is_some() {
+                            match download_file(Arc::clone(&dq.active), &client).await {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    if let Some(fd) = &mut *dq.active.write().unwrap() {
+                                        fd.error = Some(err);
+                                        dq.errors.write().unwrap().push(fd.clone());
+                                    }
                                 }
-                                *dq.active.write().unwrap() = dq.queue.lock().unwrap().pop();
                             }
+                            *dq.active.write().unwrap() = dq.queue.lock().unwrap().pop();
+                        } else {
+                            break;
                         }
                     }
-                    None => {
-                        return;
-                    }
-                }
+                });
             }
-        });
-    }
-}
-
-fn get_download_directory(download: &VideoDownloadConfig, filename: &String) -> PathBuf {
-    if download.organize_into_directories {
-        let mut file_stem = Path::new(&filename).file_stem().and_then(OsStr::to_str).unwrap_or("");
-        if let Some(re) = &download._re_episode_pattern {
-            if let Some(captures) = re.captures(file_stem) {
-                if let Some(episode) = captures.name("episode") {
-                    if !episode.as_str().is_empty() {
-                        file_stem = &file_stem[..episode.start()];
-                    }
-                }
-            }
+            Err(_) => return Err("Failed to build http client".to_string()),
         }
-        let re_ending = download._re_remove_filename_ending.as_ref().unwrap();
-        let dir_name = re_ending.replace(file_stem, "");
-        let file_dir: PathBuf = [download.directory.as_ref().unwrap(), dir_name.as_ref()].iter().collect();
-        file_dir
-    } else {
-        PathBuf::from(download.directory.as_ref().unwrap())
     }
+    Ok(())
 }
 
 pub(crate) async fn queue_download_file(
     req: web::Json<FileDownloadRequest>,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    if let Some(download) = &_app_state.config.video.as_ref().unwrap().download {
-        if download.directory.is_none() {
+    if let Some(download_cfg) = &_app_state.config.video.as_ref().unwrap().download {
+        if download_cfg.directory.is_none() {
             return HttpResponse::BadRequest().json(json!({"error": "Server config missing video.download.directory configuration"}));
         }
-
-        match reqwest::Url::parse(&req.url) {
-            Ok(_url) => {
-                let filename_re = download._re_filename.as_ref().unwrap();
-                let filename = filename_re.replace_all(&unidecode(&req.filename).replace(' ', "_"), "").to_string();
-                let file_name = filename.clone();
-                let file_dir = get_download_directory(download, &filename);
-                let mut file_path: PathBuf = file_dir.clone();
-                file_path.push(&filename);
-                let file_download = FileDownload {
-                    file_dir,
-                    file_path,
-                    filename,
-                    url: _url,
-                    size: 0,
-                    error: None,
-                };
+        match FileDownload::new(req.url.as_str(), req.filename.as_str(), download_cfg) {
+            Some(file_download) => {
+                let file_name = file_download.filename.to_owned();
                 _app_state.downloads.queue.lock().unwrap().push(file_download);
                 if _app_state.downloads.active.read().unwrap().is_none() {
-                    run_download_queue(download, Arc::clone(&_app_state.downloads));
+                    match run_download_queue(download_cfg, Arc::clone(&_app_state.downloads)) {
+                        Ok(_) => {}
+                        Err(err) => return HttpResponse::InternalServerError().json(json!({"error": err})),
+                    }
                 }
                 HttpResponse::Ok().json(json!({"success": file_name}))
             }
-            Err(_) => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
+            None => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
         }
     } else {
         HttpResponse::BadRequest().json(json!({"error": "Server config missing video.download configuration"}))
+    }
+}
+
+
+pub(crate) async fn download_file_info(
+    _app_state: web::Data<AppState>,
+) -> HttpResponse {
+    let error_list: &[DownloadErrorInfo] = &_app_state.downloads.errors.write().unwrap().drain(..)
+        .map(|e| DownloadErrorInfo {uuid: e.uuid, filename: e.filename, error: e.error.unwrap() }).collect::<Vec<DownloadErrorInfo>>();
+    let errors = match serde_json::to_value(error_list) {
+        Ok(value) => value,
+        Err(_) => serde_json::Value::Null
+    };
+    match &*_app_state.downloads.active.read().unwrap() {
+        None => HttpResponse::Ok().json(json!({"finished": true, "errors": errors})),
+        Some(file_download) =>
+            HttpResponse::Ok().json(json!({"uuid": file_download.uuid, "filename":  file_download.filename, "filesize": file_download.size, "errors": errors}))
     }
 }

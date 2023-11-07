@@ -3,12 +3,12 @@ import './playlist-tree.scss';
 import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
 import copyToClipboard from "../../utils/clipboard";
 import {first} from "rxjs/operators";
-import {noop, Subscription} from "rxjs";
+import {noop} from "rxjs";
 import {useSnackbar} from "notistack";
 import {getIconByName} from "../../icons/icons";
 import {useServices} from "../../provider/service-provider";
 import ServerConfig from "../../model/server-config";
-import {FileDownloadInfo, FileDownloadResponse} from "../../model/file-download";
+import {FileDownloadResponse} from "../../model/file-download";
 
 const VALID_VIDEO_FILES = ['mkv', 'mp4', 'avi'];
 
@@ -30,8 +30,6 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const services = useServices();
     const [videoExtensions, setVideoExtensions] = useState<string[]>([]);
-    const [download, setDownload] = useState<FileDownloadInfo>(undefined)
-    const downloading = useRef(false);
 
     useEffect(() => {
         if (serverConfig) {
@@ -74,31 +72,12 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
             onCopy(item);
             copyToClipboard(item.header.url).pipe(first()).subscribe({
                 next: value => enqueueSnackbar(value ? "URL copied to clipboard" : "Copy to clipboard failed!", {variant: value ? 'success' : 'error'}),
-                error: err => enqueueSnackbar("Copy to clipboard failed!", {variant: 'error'}),
+                error: _ => enqueueSnackbar("Copy to clipboard failed!", {variant: 'error'}),
                 complete: noop,
             });
         }
     }, [enqueueSnackbar, getPlaylistItemById, onCopy]);
 
-    const startPollingDownload = useCallback(() => {
-        let subs: Subscription = services.file().getDownloadInfo().subscribe({
-            next: (info: FileDownloadInfo) => {
-                if (info.finished === true) {
-                    setDownload(undefined);
-                } else {
-                    setDownload(info);
-                }
-            },
-            error: (err) => {
-                enqueueSnackbar("Download file failed!", {variant: 'error'});
-                setDownload(undefined);
-            },
-            complete: () => {
-                subs.unsubscribe();
-                setDownload(undefined);
-            }
-        });
-    }, [setDownload, enqueueSnackbar, services]);
 
     const handleDownloadUrl = useCallback((e: any) => {
         if (!serverConfig.video.download?.directory) {
@@ -118,12 +97,8 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                         url: item.header.url,
                         filename: filename + '.' + ext
                     }).pipe(first()).subscribe({
-                        next: (download: FileDownloadResponse) => {
-                            if (download.success) {
-                                startPollingDownload();
-                            }
-                        },
-                        error: err => enqueueSnackbar("Download failed!", {variant: 'error'}),
+                        next: (_: FileDownloadResponse) => {},
+                        error: _ => enqueueSnackbar("Download failed!", {variant: 'error'}),
                         complete: noop,
                     });
                 } else {
@@ -131,7 +106,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 }
             }
         }
-    }, [serverConfig, enqueueSnackbar, getPlaylistItemById, services, startPollingDownload]);
+    }, [serverConfig, enqueueSnackbar, getPlaylistItemById, services]);
 
     const handlePlayUrl = useCallback((e: any) => {
         if (onPlay) {
@@ -202,17 +177,5 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         </React.Fragment>;
     }, [data, renderGroup]);
 
-    const renderDownloads = useCallback((): React.ReactNode => {
-        if (download) {
-            return <div className={'download-info'}>
-                <ul>
-                    <li>{download.filename}: {download.filesize ? (download.filesize / 1_048_576).toFixed(2) : 0} MB</li>
-                    {download.errors?.length && <li>{download.errors}</li>}
-                </ul>
-            </div>;
-        }
-        return <></>;
-    }, [download]);
-
-    return <div className={'playlist-tree'}>{renderPlaylist()}{renderDownloads()}</div>;
+    return <div className={'playlist-tree'}>{renderPlaylist()}</div>;
 } 

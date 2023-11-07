@@ -57,6 +57,8 @@ struct Args {
     log_level: Option<String>,
 }
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() {
     let args = Args::parse();
     init_logger(&args.log_level.unwrap_or("info".to_string()));
@@ -66,7 +68,8 @@ fn main() {
     let mut cfg = read_config(config_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
     let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
-    info!("Current time {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+    info!("Version: {}", VERSION);
+    info!("Current time: {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
     info!("Working dir: {:?}", &cfg.working_dir);
 
     if let Err(err) = read_mappings(args.mapping, &mut cfg) {

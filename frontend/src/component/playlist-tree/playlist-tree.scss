@@ -114,19 +114,4 @@
       }
     }
   }
-
-}
-
-.download-info {
-  position: fixed;
-  left: 12px;
-  top: 12px;
-  background-color: var(--popup-background-color);
-  color: var(--popup-color);
-  filter: drop-shadow(2px 2px 3px var(--popup-shadow-color));
-  border: 1px solid var(--popup-border-color);
-  z-index: 100;
-
-  @include common.list-hover();
-
 }
