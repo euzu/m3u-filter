@@ -127,7 +127,7 @@ export default function FileDownload(props: FileDownloadProps) {
             </div>;
         }
         return <></>
-    }, [downloads, handleDeleteClick]);
+    }, [downloads, handleDeleteClick, handleClearAll]);
 
     return renderDownloads();
 }

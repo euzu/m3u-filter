@@ -71,6 +71,7 @@ fn main() {
     info!("Version: {}", VERSION);
     info!("Current time: {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
     info!("Working dir: {:?}", &cfg.working_dir);
+    info!("Config file: {}", &config_file);
 
     if let Err(err) = read_mappings(args.mapping, &mut cfg) {
         exit!("{}", err);

@@ -13,6 +13,7 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
 
     match read_mapping(mappings_file.as_str()) {
         Ok(mappings) => {
+            info!("Mappings File: {}", &mappings_file);
             if mappings.is_none() { debug!("no mapping loaded"); }
             handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, cfg.set_mappings(mappings));
             Ok(())
@@ -29,6 +30,7 @@ pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: 
             warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
         }
         Some(mut config) => {
+            info!("Api Proxy File: {}", &api_proxy_config_file);
             config._file_path = api_proxy_config_file;
             cfg.set_api_proxy(Some(config));
         }
