@@ -7,6 +7,7 @@
 * new options for downloading media files from web-ui 
   - `organize_into_directories`
   - `episode_pattern`
+* Web-UI - Download View with multi download support
 
 # v1.1.2(2023-11-03)
 * Fixed epg for xtream
