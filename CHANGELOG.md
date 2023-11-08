@@ -8,6 +8,7 @@
   - `organize_into_directories`
   - `episode_pattern`
 * Web-UI - Download View with multi download support
+* Added WebSearch Url `web_search: 'https://www.imdb.com/search/title/?title={}'` under video configuration.
 
 # v1.1.2(2023-11-03)
 * Fixed epg for xtream

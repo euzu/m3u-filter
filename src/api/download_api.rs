@@ -60,7 +60,7 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
 
 fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<DownloadQueue>) -> Result<(), String> {
     let next_download = {
-        download_queue.as_ref().queue.lock().unwrap().pop()
+        download_queue.as_ref().queue.lock().unwrap().pop_front()
     };
     if next_download.is_some() {
         { *download_queue.as_ref().active.write().unwrap() = next_download; }
@@ -85,7 +85,7 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<Do
                                     }
                                 }
                             }
-                            *dq.active.write().unwrap() = dq.queue.lock().unwrap().pop();
+                            *dq.active.write().unwrap() = dq.queue.lock().unwrap().pop_front();
                         } else {
                             break;
                         }
@@ -116,7 +116,7 @@ pub(crate) async fn queue_download_file(
         match FileDownload::new(req.url.as_str(), req.filename.as_str(), download_cfg) {
             Some(file_download) => {
                 let response = download_info_response!(file_download, Value::Null);
-                _app_state.downloads.queue.lock().unwrap().push(file_download);
+                _app_state.downloads.queue.lock().unwrap().push_back(file_download);
                 if _app_state.downloads.active.read().unwrap().is_none() {
                     match run_download_queue(download_cfg, Arc::clone(&_app_state.downloads)) {
                         Ok(_) => {}

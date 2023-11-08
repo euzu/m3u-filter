@@ -81,10 +81,12 @@ export interface SourceConfig {
 
 export interface VideoConfig {
     extensions: string[];
-    download: {
+    download?: {
         headers: Record<string, string>,
         directory: string;
+        episode_pattern: string;
     }
+    web_search?: string;
 }
 
 export interface Credentials {

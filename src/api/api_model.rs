@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
@@ -94,7 +95,7 @@ impl FileDownload {
 }
 
 pub(crate) struct DownloadQueue {
-    pub queue: Arc<Mutex<Vec<FileDownload>>>,
+    pub queue: Arc<Mutex<VecDeque<FileDownload>>>,
     pub active: Arc<RwLock<Option<FileDownload>>>,
     pub errors: Arc<RwLock<Vec<FileDownload>>>,
 }

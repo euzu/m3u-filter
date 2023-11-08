@@ -13,6 +13,7 @@ messaging:
     chat_ids:
       - <your telegram chat_id>
 video:
+  web_search: 'https://www.imdb.com/search/title/?title={}'
   extensions:
     - mkv
     - mp4

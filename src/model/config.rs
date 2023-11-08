@@ -442,7 +442,10 @@ pub(crate) struct VideoDownloadConfig {
 pub(crate) struct VideoConfig {
     #[serde(default = "default_as_empty_list")]
     pub extensions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub download: Option<VideoDownloadConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_search: Option<String>
 }
 
 impl VideoConfig {
@@ -603,6 +606,7 @@ impl Config {
                 self.video = Some(VideoConfig {
                     extensions: vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()],
                     download: None,
+                    web_search: None,
                 });
             }
             Some(video) => {

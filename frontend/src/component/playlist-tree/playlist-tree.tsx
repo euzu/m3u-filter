@@ -33,7 +33,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
 
     useEffect(() => {
         if (serverConfig) {
-            setVideoExtensions(serverConfig.video.extensions);
+            setVideoExtensions(serverConfig.video?.extensions);
         }
         return noop;
     }, [serverConfig]);
@@ -78,6 +78,24 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         }
     }, [enqueueSnackbar, getPlaylistItemById, onCopy]);
 
+    const handleWebSearch = useCallback((e: any) => {
+        const item = getPlaylistItemById(e.target.dataset.item);
+        if (item) {
+            let title = item.header.title;
+            let pattern = serverConfig.video.download?.episode_pattern;
+            if (pattern) {
+                pattern = pattern.replace('?P<episode>', '?<episode>');
+                const matches = title.match(pattern);
+                if (matches?.groups?.episode) {
+                    const idx = title.indexOf(matches?.groups?.episode);
+                    title = title.substring(0, idx).trim();
+                }
+            }
+            const url = serverConfig.video.web_search.replace("{}", title);
+            window.open(url, "imdb");
+        }
+    }, [getPlaylistItemById, serverConfig?.video?.web_search]);
+
 
     const handleDownloadUrl = useCallback((e: any) => {
         if (!serverConfig.video.download?.directory) {
@@ -97,7 +115,8 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                         url: item.header.url,
                         filename: filename + '.' + ext
                     }).pipe(first()).subscribe({
-                        next: (_: FileDownloadInfo) => {},
+                        next: (_: FileDownloadInfo) => {
+                        },
                         error: _ => enqueueSnackbar("Download failed!", {variant: 'error'}),
                         complete: noop,
                     });
@@ -138,16 +157,23 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                     {getIconByName('PlayArrow')}
                 </div>
                 {isVideoFile(entry) &&
-                    <div className={'tool-button'} data-item={entry.id} onClick={handleDownloadUrl}>
-                        {getIconByName('Download')}
-                    </div>
+                    <>
+                        <div className={'tool-button'} data-item={entry.id} onClick={handleDownloadUrl}>
+                            {getIconByName('Download')}
+                        </div>
+                        {serverConfig.video?.web_search &&
+                            <div className={'tool-button'} data-item={entry.id} onClick={handleWebSearch}>
+                                {getIconByName('WebSearch')}
+                            </div>
+                        }
+                    </>
                 }
             </div>
             <div className={'tree-channel-content'}>
                 <div className={'tree-channel-nr'}>{index + 1}</div>
                 {entry.header.name}</div>
         </div>
-    }, [handleClipboardUrl, handlePlayUrl, handleDownloadUrl, isVideoFile]);
+    }, [handleClipboardUrl, handlePlayUrl, handleDownloadUrl, isVideoFile, handleWebSearch, serverConfig]);
 
     const renderGroup = useCallback((group: PlaylistGroup): React.ReactNode => {
         return <div className={'tree-group'} key={group.id}>

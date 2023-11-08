@@ -380,16 +380,19 @@ It has 2 entries `extensions` and `download`.
 - `extensions` are a list of video file extensions like `mp4`, `avi`, `mkv`.  
 When you have input `m3u` and output `xtream` the url's with the matching endings will be categorized as `video`.
 
-- `download` is optional and is only necessary if you want to download the video files from the ui 
+- `download` is _optional_ and is only necessary if you want to download the video files from the ui 
 to a specific directory. if defined, the download button from the `ui` is available.
   - `headers` _optional_, download headers
   - `organize_into_directories` _optional_, orgainize downloads into directories  
   - `episode_pattern` _optional_ if you download episodes, the suffix like `S01.E01` should be removed to place all 
 files into one folder. The named capture group `episode` is mandatory.  
 Example: `.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*`
+- `web_search` is _optional_, example: `https://www.imdb.com/search/title/?title={}`, 
+define `download.episode_pattern` to remove episode suffix from titles. 
 
 ```yaml
 video:
+  web_search: 'https://www.imdb.com/search/title/?title={}'
   extensions:
     - mkv
     - mp4
