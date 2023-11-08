@@ -64,6 +64,13 @@
       }
     }
 
+    &__status {
+      max-height: 0.8rem;
+      padding: 0 4px;
+      svg {
+        transform: scale(0.7);
+      }
+    }
   }
 }
 

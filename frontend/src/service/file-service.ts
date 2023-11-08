@@ -2,7 +2,7 @@ import {PlaylistItem, PlaylistGroup} from "../model/playlist";
 import FileSaver from "file-saver";
 import {Observable, Subject, Subscription, tap} from "rxjs";
 import FileApiService, {DefaultFileApiService} from "../api/file-api-service";
-import {FileDownloadInfo, FileDownloadRequest} from "../model/file-download";
+import {DownloadInfo, FileDownloadInfo, FileDownloadRequest} from "../model/file-download";
 
 export default class FileService {
 
@@ -34,7 +34,7 @@ export default class FileService {
         return this.fileApiService.download(req).pipe(tap((result) => this.notifyDownload(result) ));
     }
 
-    getDownloadInfo(): Observable<FileDownloadInfo> {
+    getDownloadInfo(): Observable<DownloadInfo> {
         return this.fileApiService.getDownloadInfo();
     }
 }

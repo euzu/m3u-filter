@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 use actix_web::{HttpResponse, web};
 use serde_json::{json, Value};
-use crate::api::api_model::{AppState, DownloadErrorInfo, DownloadQueue, FileDownload, FileDownloadRequest};
+use crate::api::api_model::{AppState, DownloadQueue, FileDownload, FileDownloadRequest};
 use crate::model::config::{VideoDownloadConfig};
 use crate::utils::{bytes_to_megabytes, get_request_headers};
 use futures::stream::TryStreamExt;
@@ -75,13 +75,14 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<Do
                                 Ok(_) => {
                                     if let Some(fd) = &mut *dq.active.write().unwrap() {
                                         fd.finished = true;
+                                        dq.finished.write().unwrap().push(fd.clone());
                                     }
                                 }
                                 Err(err) => {
                                     if let Some(fd) = &mut *dq.active.write().unwrap() {
                                         fd.finished = true;
                                         fd.error = Some(err);
-                                        dq.errors.write().unwrap().push(fd.clone());
+                                        dq.finished.write().unwrap().push(fd.clone());
                                     }
                                 }
                             }
@@ -98,10 +99,12 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<Do
     Ok(())
 }
 
-macro_rules! download_info_response {
-    ($file_download:expr, $errors:expr) => {
-       HttpResponse::Ok().json(json!({"uuid": $file_download.uuid, "filename":  $file_download.filename,
-       "filesize": $file_download.size, "finished": $file_download.finished, "errors": $errors}))
+
+macro_rules! download_info {
+    ($file_download:expr) => {
+       json!({"uuid": $file_download.uuid, "filename":  $file_download.filename,
+       "filesize": $file_download.size, "finished": $file_download.finished,
+       "error": $file_download.error})
     }
 }
 
@@ -115,7 +118,7 @@ pub(crate) async fn queue_download_file(
         }
         match FileDownload::new(req.url.as_str(), req.filename.as_str(), download_cfg) {
             Some(file_download) => {
-                let response = download_info_response!(file_download, Value::Null);
+                let response = HttpResponse::Ok().json(download_info!(file_download));
                 _app_state.downloads.queue.lock().unwrap().push_back(file_download);
                 if _app_state.downloads.active.read().unwrap().is_none() {
                     match run_download_queue(download_cfg, Arc::clone(&_app_state.downloads)) {
@@ -135,15 +138,16 @@ pub(crate) async fn queue_download_file(
 pub(crate) async fn download_file_info(
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let error_list: &[DownloadErrorInfo] = &_app_state.downloads.errors.write().unwrap().drain(..)
-        .map(|e| DownloadErrorInfo { uuid: e.uuid, filename: e.filename, error: e.error.unwrap() }).collect::<Vec<DownloadErrorInfo>>();
-    let errors = match serde_json::to_value(error_list) {
-        Ok(value) => value,
-        Err(_) => serde_json::Value::Null
-    };
+    let finished_list: &[Value] = &_app_state.downloads.finished.write().unwrap().drain(..)
+        .map(|fd| download_info!(fd)).collect::<Vec<Value>>();
+
     match &*_app_state.downloads.active.read().unwrap() {
-        None => HttpResponse::Ok().json(json!({"finished": true, "errors": errors})),
+        None => HttpResponse::Ok().json(json!({
+            "completed": true, "downloads": finished_list
+        })),
         Some(file_download) =>
-            download_info_response!(file_download, errors)
+            HttpResponse::Ok().json(json!({
+            "completed": false, "downloads": finished_list, "active": download_info!(file_download)
+        }))
     }
 }

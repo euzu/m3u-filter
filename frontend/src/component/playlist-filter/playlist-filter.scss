@@ -2,4 +2,14 @@
   display: flex;
   flex-flow: row nowrap;
   padding: 10px;
+
+  &__option-active {
+    box-sizing: border-box !important;
+    transform: scale(0.8);
+    background-color: var(--option-active-background-color) !important;
+    color: var(--option-active-color) !important;
+    svg {
+      color: var(--option-active-color) !important;
+    }
+  }
 }

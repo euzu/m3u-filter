@@ -1,7 +1,7 @@
 import React, {useRef, useState, useCallback, useMemo, useEffect} from 'react';
 import './app.scss';
 import SourceSelector from "../component/source-selector/source-selector";
-import PlaylistViewer, {IPlaylistViewer} from "../component/playlist-viewer/playlist-viewer";
+import PlaylistViewer, {IPlaylistViewer, SearchRequest} from "../component/playlist-viewer/playlist-viewer";
 import {useSnackbar} from 'notistack';
 import Toolbar from "../component/toolbar/toolbar";
 import {PlaylistGroup, PlaylistItem} from "../model/playlist";
@@ -25,7 +25,7 @@ interface AppProps {
 }
 
 export default function App(props: AppProps) {
-    const searchChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
+    const searchChannel = useMemo<Subject<SearchRequest>>(() => new Subject<SearchRequest>(), []);
     const [progress, setProgress] = useState<boolean>(false);
     const [playlist, setPlaylist] = useState<PlaylistGroup[]>([]);
     const [serverConfig, setServerConfig] = useState<ServerConfig>(undefined);
@@ -58,8 +58,8 @@ export default function App(props: AppProps) {
     }, [services]);
 
 
-    const handleFilter = useCallback((filter: string): void => {
-        searchChannel.next(filter);
+    const handleFilter = useCallback((filter: string, regexp: boolean): void => {
+        searchChannel.next({filter, regexp});
     }, [searchChannel]);
 
     const handleProgress = useCallback((value: boolean) => {

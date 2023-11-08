@@ -9,13 +9,6 @@ use crate::model::api_proxy::{ApiProxyConfig};
 use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig};
 use crate::model::model_config::{default_as_empty_str, ProcessingOrder};
 
-#[derive(Serialize, Deserialize)]
-pub(crate) struct DownloadErrorInfo {
-    pub uuid: String,
-    pub filename: String,
-    pub error: String,
-}
-
 #[derive(Clone)]
 pub(crate) struct FileDownload {
     pub uuid: String,
@@ -97,7 +90,7 @@ impl FileDownload {
 pub(crate) struct DownloadQueue {
     pub queue: Arc<Mutex<VecDeque<FileDownload>>>,
     pub active: Arc<RwLock<Option<FileDownload>>>,
-    pub errors: Arc<RwLock<Vec<FileDownload>>>,
+    pub finished: Arc<RwLock<Vec<FileDownload>>>,
 }
 
 pub(crate) struct AppState {

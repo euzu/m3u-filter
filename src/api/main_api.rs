@@ -44,7 +44,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
         downloads: Arc::from(DownloadQueue {
             queue: Arc::from(Mutex::new(VecDeque::new())),
             active: Arc::from(RwLock::new(None)),
-            errors: Arc::from(RwLock::new(Vec::new())),
+            finished: Arc::from(RwLock::new(Vec::new())),
         })
     });
 

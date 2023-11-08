@@ -3,13 +3,6 @@ export interface FileDownloadRequest {
     filename: string;
 }
 
-export interface DownloadErrorInfo {
-    uuid: string;
-    filename: string;
-    error: string;
-}
-
-
 export interface FileDownloadInfo {
     uuid: string;
     ts_created?: number;
@@ -18,5 +11,10 @@ export interface FileDownloadInfo {
     finished?: boolean;
     filesize?: number;
     error?: string;
-    errors?: DownloadErrorInfo[];
+}
+
+export interface DownloadInfo {
+    completed: boolean;
+    active?: FileDownloadInfo;
+    downloads?: FileDownloadInfo[];
 }

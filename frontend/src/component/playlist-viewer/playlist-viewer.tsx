@@ -14,14 +14,18 @@ function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: bool
     return null;
 }
 
-function textMatch(text: string, criteria: string): boolean {
-    return (text.toLowerCase().indexOf(criteria) > -1);
+function textMatch(text: string, searchRequest: SearchRequest): boolean {
+    if (!searchRequest.regexp) {
+        return (text.toLowerCase().indexOf(searchRequest.filter) > -1);
+    } else {
+        return text.match(searchRequest.filter) != null;
+    }
 }
 
-function filterMatchingChannels(grp: PlaylistGroup, criteria: string): PlaylistGroup {
+function filterMatchingChannels(grp: PlaylistGroup, searchRequest: SearchRequest): PlaylistGroup {
     let channels: PlaylistItem[] = [];
     for (const c of grp.channels) {
-        if (textMatch(c.header.name, criteria)) {
+        if (textMatch(c.header.name, searchRequest)) {
             channels.push(c);
         }
     }
@@ -35,15 +39,17 @@ function filterMatchingChannels(grp: PlaylistGroup, criteria: string): PlaylistG
     return undefined;
 }
 
-function filterMatchingGroups(gl: PlaylistGroup[], criteria: string): Observable<PlaylistGroup[]> {
+function filterMatchingGroups(gl: PlaylistGroup[], searchRequest: SearchRequest): Observable<PlaylistGroup[]> {
     return new Observable<PlaylistGroup[]>((observer) => {
-        const lcrit = criteria.toLowerCase();
+        if (!searchRequest.regexp) {
+            searchRequest.filter.toLowerCase()
+        }
         const result: PlaylistGroup[] = [];
         for (const g of gl) {
-            if (textMatch(g.title, lcrit)) {
+            if (textMatch(g.title, searchRequest)) {
                 result.push(g);
             } else {
-                const matches = filterMatchingChannels(g, lcrit);
+                const matches = filterMatchingChannels(g, searchRequest);
                 if (matches) {
                     result.push(matches);
                 }
@@ -54,6 +60,12 @@ function filterMatchingGroups(gl: PlaylistGroup[], criteria: string): Observable
     })
 }
 
+export interface SearchRequest  {
+    filter: string,
+    regexp: boolean
+}
+
+
 export interface IPlaylistViewer {
     getFilteredPlaylist: () => PlaylistGroup[];
 }
@@ -61,7 +73,7 @@ export interface IPlaylistViewer {
 interface PlaylistViewerProps {
     serverConfig: ServerConfig;
     playlist: PlaylistGroup[];
-    searchChannel: Observable<string>;
+    searchChannel: Observable<SearchRequest>;
     onProgress: (value: boolean) => void;
     onCopy: (playlistItem: PlaylistItem) => void;
     onPlay?: (playlistItem: PlaylistItem) => void;
@@ -85,7 +97,8 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
     }, [playlist]);
 
     useEffect(() => {
-        const sub = searchChannel.subscribe((criteria: string) => {
+        const sub = searchChannel.subscribe((searchRequest: SearchRequest) => {
+            let criteria = searchRequest.filter;
             if (criteria == null || !criteria.length || !criteria.trim().length) {
                 setData(playlist);
             } else {
@@ -93,7 +106,8 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
                 if (trimmedCrit.length < 2) {
                     enqueueSnackbar("Minimum search criteria length is 2", {variant: 'info'});
                 } else {
-                    filterMatchingGroups(playlist, trimmedCrit).pipe(
+                    searchRequest.filter = trimmedCrit;
+                    filterMatchingGroups(playlist, searchRequest).pipe(
                         tap(() => onProgress && onProgress(true)),
                         finalize(() => onProgress && onProgress(false)),
                         first())

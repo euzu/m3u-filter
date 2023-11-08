@@ -72,7 +72,11 @@ mv "$LIN_ARC" "release_${VERSION}" && \
 mv "$WIN_ARC"  "release_${VERSION}" && \
 mv checksum.txt "release_${VERSION}" && \
 rm -rf "$LIN_DIR" "$DARWIN_DIR" "$WIN_DIR" && \
+git add . && \
+git commit -m "release ${VERSION}" && \
 git tag -a "$VERSION" -m "$VERSION" && \
+git push && \
+git push --tags
 echo "done!"
 
 

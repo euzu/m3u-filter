@@ -1,4 +1,7 @@
 # Changelog
+# v1.1.4(2023-11-??)
+* Added regexp search in Web-UI
+
 # v1.1.3(2023-11-08)
 * added new target options 
   - `xtream_skip_live_direct_source`

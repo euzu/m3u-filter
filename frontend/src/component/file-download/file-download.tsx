@@ -1,20 +1,10 @@
 import React, {useCallback, useEffect, useRef, useState} from "react";
 import './file-download.scss';
 import {Subscription} from "rxjs";
-import {DownloadErrorInfo, FileDownloadInfo} from "../../model/file-download";
+import {DownloadInfo, FileDownloadInfo} from "../../model/file-download";
 import {useServices} from "../../provider/service-provider";
 import {useSnackbar} from "notistack";
 import {getIconByName} from "../../icons/icons";
-
-const attachErrors = (errors: DownloadErrorInfo[], downloads: Record<string, FileDownloadInfo>): boolean => {
-    errors.forEach(err => {
-        const downl = downloads[err.uuid];
-        if (downl) {
-            downl.error = err.error;
-        }
-    });
-    return !!errors.length;
-}
 
 interface FileDownloadProps {
 }
@@ -29,25 +19,17 @@ export default function FileDownload(props: FileDownloadProps) {
         if (!downloading.current) {
             downloading.current = true;
             let subs: Subscription = services.file().getDownloadInfo().subscribe({
-                next: (info: FileDownloadInfo) => {
-                    const errors: DownloadErrorInfo[] = info.errors;
-                    info.errors = undefined;
-                    info.ts_modified = Date.now();
-                    if (info.finished === true) {
+                next: (info: DownloadInfo) => {
+                    if (info.completed === true) {
                         downloading.current = false;
-                        if (errors?.length) {
-                            setDownloads((downloads: any) => {
-                                if (attachErrors(errors, downloads)) {
-                                    return {...downloads};
-                                } else {
-                                    return downloads;
-                                }
-                            });
-                        }
-                    } else {
+                    }
+                    const new_downloads = info.downloads || [];
+                    if (info.active) {
+                        new_downloads.push(info.active);
+                    }
+                    if (new_downloads.length) {
                         setDownloads(downloads => {
-                            downloads[info.uuid] = info;
-                            attachErrors(errors, downloads);
+                            new_downloads.forEach(d => downloads[d.uuid] = d);
                             return {...downloads};
                         });
                     }
@@ -109,14 +91,16 @@ export default function FileDownload(props: FileDownloadProps) {
                         <ul>
                             {info_list.map(download => {
                                 return <li key={download.uuid}>
-                            <span className={'download-info__remove_btn'} data-uuid={download.uuid}
-                                  onClick={handleDeleteClick}>{getIconByName('Delete')}
-                            </span>
-                                    <span className={'download-info__content'}>{download.filename}:
-                                <span
-                                    className={'download-info__filesize'}>{download.filesize ? (download.filesize / 1_048_576).toFixed(2) : 0} MB
+                                <span className={'download-info__remove_btn'} data-uuid={download.uuid}
+                                      onClick={handleDeleteClick}>{getIconByName('Delete')}
                                 </span>
-                             </span>
+                                    <span
+                                        className={'download-info__status'}>{getIconByName(download.error ? 'Error' : (download.finished ? 'CheckMark' : 'Hourglass'))}</span>
+                                    <span className={'download-info__content'}>{download.filename}:
+                                    <span
+                                        className={'download-info__filesize'}>{download.filesize ? (download.filesize / 1_048_576).toFixed(2) : 0} MB
+                                    </span>
+                                 </span>
                                     {download.error && <span className={'download-info__error'}>{download.error}</span>}
                                 </li>;
                             })
