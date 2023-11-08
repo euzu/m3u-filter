@@ -1,3 +1,9 @@
+
+[![GitHub](https://img.shields.io/github/license/euzu/m3u-filter?color=2c8f00)](https://github.com/euzu/m3u-filter/blob/master/LICENSE)
+![GitHub last commit (by committer)](https://img.shields.io/github/last-commit/euzu/m3u-filter?color=ff7c00)
+![GitHub Release Date - Published_At](https://img.shields.io/github/release-date/euzu/m3u-filter?color=004899)
+
+
 # m3u-filter
 
 m3u-filter is a simple application which can:
