@@ -688,7 +688,12 @@ Following log levels are supported:
  
 Use the `-l` or `-log-level` cli-argument to specify the log-level. 
 
-## 5. Compilation
+## 6. Web-UI
+
+![m3u-filter-tree](https://github.com/euzu/m3u-filter/assets/33094714/0455d598-1953-4b69-b9ab-d741e81f0031)
+![m3u-filter-prefs](https://github.com/euzu/m3u-filter/assets/33094714/9763c11a-fc12-4e0b-93f5-6f05546dd628)
+
+## 6. Compilation
 
 ### Static binary for docker
 #### Install prerequisites
@@ -761,20 +766,4 @@ rustup toolchain install stable-x86_64-pc-windows-gnu
 Compile it with:
 ```sh
 cargo build --release --target x86_64-pc-windows-gnu
-```
-
-## 6. The EXTM3U format is an extension of the M3U format.
-m3u has become almost a standard for the formation of playlists of media players and media devices.
-
-A file in the EXTM3U format is a text file with the extension m3u or m3u8.
-
-An example of the contents of the file in the EXTM3U format
-```
-#EXTM3U
-#EXTINF:-1 tvg-name="Channel 1" tvg-logo="http://site.domain/channel1_logo.png" group-title="Group 1",Channel 1
-http://site.domain/channel1
-#EXTINF:-1 tvg-name="Channel 2" tvg-logo="http://site.domain/channel2_logo.png"  group-title="Group 2",Channel 2
-http://site.domain/channel2
-#EXTINF:-1 tvg-name="Channel 3" tvg-logo="http://site.domain/channel3_logo.png"  group-title="Group 2",Channel 3
-http://site.domain/channel3
 ```
