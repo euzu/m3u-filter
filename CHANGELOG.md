@@ -1,5 +1,5 @@
 # Changelog
-# v1.1.3(2023-11-??)
+# v1.1.3(2023-11-08)
 * added new target options 
   - `xtream_skip_live_direct_source`
   - `xtream_skip_video_direct_source`
