@@ -94,7 +94,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
             const url = serverConfig.video.web_search.replace("{}", title);
             window.open(url, "imdb");
         }
-    }, [getPlaylistItemById, serverConfig?.video?.web_search]);
+   }, [getPlaylistItemById, serverConfig]);
 
 
     const handleDownloadUrl = useCallback((e: any) => {

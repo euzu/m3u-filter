@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
@@ -41,7 +42,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
         config: cfg,
         targets,
         downloads: Arc::from(DownloadQueue {
-            queue: Arc::from(Mutex::new(Vec::new())),
+            queue: Arc::from(Mutex::new(VecDeque::new())),
             active: Arc::from(RwLock::new(None)),
             errors: Arc::from(RwLock::new(Vec::new())),
         })
