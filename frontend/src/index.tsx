@@ -7,7 +7,7 @@ import {ServiceProvider} from "./provider/service-provider";
 
 const container = document.getElementById('root');
 const root = createRoot(container);
-root.render(    <SnackbarProvider maxSnack={3} autoHideDuration={1500}>
+root.render(    <SnackbarProvider maxSnack={3} autoHideDuration={1500} anchorOrigin={ ({vertical: 'top', horizontal: 'center'}) }>
         <ServiceProvider>
             <App/>
         </ServiceProvider>

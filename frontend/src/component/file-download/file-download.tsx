@@ -71,6 +71,7 @@ export default function FileDownload(props: FileDownloadProps) {
             });
             startPoll();
         });
+        startPoll();
         return () => sub.unsubscribe();
     }, [services, startPoll])
 

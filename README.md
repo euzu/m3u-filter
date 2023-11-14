@@ -1,18 +1,11 @@
-
-[![GitHub](https://img.shields.io/github/license/euzu/m3u-filter?color=2c8f00)](https://github.com/euzu/m3u-filter/blob/master/LICENSE)
-![GitHub last commit (by committer)](https://img.shields.io/github/last-commit/euzu/m3u-filter?color=ff7c00)
-![GitHub Release Date - Published_At](https://img.shields.io/github/release-date/euzu/m3u-filter?color=004899)
-
-
 # m3u-filter
 
 m3u-filter is a simple application which can:
   - filter, rename, map and sort entries out of a playlist in EXTM3U, XTREAM or Kodi format.
-  - merge multiple sources into playlist(s)
-  - act as simple xtream server after processing entries
+  - can process multiple inputs and can create multiple outputs from this input files trough target definitions.
+  - act as simple xtream or m3u server after processing entries
   - can schedule updates in server mode
   - can run as cli-command for serving processed playlists through web-server like nginx or apache.
-  - can process multiple inputs and can create multiple files from this input files trough target definitions.
   - can define multiple targets for filtering if you want to create multiple playlists from a big playlist.
   - use regular expressions for matching
   - define filter as statements like `filter: (Group ~ "^FR.*") AND NOT(Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~".*MOVIES.*")`
@@ -43,11 +36,14 @@ run it in server mode and open the web-ui to see the contents of the playlist, f
 the filtered groups as a new playlist.
 
 ## Starting in server mode for Web-UI
-If you want to see the contents of a playlist, you can simply start with the `-s` (`--server`)
-argument. Other arguments are ignored. A server is started. You can open a browser to view the Web-UI.
-According to your configuration, use the printed url on console.
-The UI allows you to download a list. You can download the list with the Save Button.
-The downloaded list only contains *non-selected* entries.
+The Web-UI is available in server mode. You need to start `m3u-filter` with the `-s` (`--server`) option.
+On the first page you can select one of the defined input sources in the configuration, or write an url to the text field.
+The contents of the playlist are displayed in the tree-view. Each link has one or more buttons. 
+The first is for copying the url into clipboard. The others are visible if you have configured the `video`section. 
+Based on the stream type, you will be able to download or search in a configured movie database for this entry.   
+
+In the tree-view each entry has a checkbox in front. Selecting the checkbox means **discarding** this entry from the 
+manual download when you hit the `Save` button.
 
 ## 1. `config.yml`
 
@@ -425,9 +421,9 @@ You could be banned from your server. Twice a day should be enough.
 
 ## 2. `mapping.yml`
 Has the root item `mappings` which has the following top level entries:
--`templates` _optional_
--`tags` _optional_
--`mapping` _mandatory_
+- `templates` _optional_
+- `tags` _optional_
+- `mapping` _mandatory_
 
 ### 2.1 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
@@ -453,9 +449,9 @@ Has the following top level entries:
 
 ### 2.3 `mapping`
 Has the following top level entries:
--`id` _mandatory_
--`match_as_ascii` _optional_ default is `false`
--`mapper` _mandatory_
+- `id` _mandatory_
+- `match_as_ascii` _optional_ default is `false`
+- `mapper` _mandatory_
 
 ### 2.3.1 `id`
 Is referenced in the `config.yml`, should be a unique identifier
@@ -683,7 +679,6 @@ user:
       - {username: x3452, password: ztrhgrGZrt83hjerter, token: 4342sdfr3424}
 ```
 
-important: if the given `target`is of type  
 
 ## 4. Logging
 Following log levels are supported:
@@ -715,19 +710,19 @@ cargo build --target x86_64-unknown-linux-musl --release
 #### Dockerize
 Dockerfile
 ```
-FROM alpine as app-builder
+FROM gcr.io/distroless/base-debian12 as build
 
 FROM scratch
 
 WORKDIR /
-COPY ./m3u-filter /
-COPY ./config.yml /
+
+COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+COPY ["./m3u-filter", "./config.yml",  "./api-proxy.yml",  "./mapping.yml", "/"]
 COPY ./web /web
 
-# the tls certificates:
-COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-
-CMD ["./m3u-filter", "-s", "-c", "./config.yml"]
+CMD ["/m3u-filter", "-s", "-c", "/config.yml"]
 ```
 Image
 ```
@@ -745,6 +740,8 @@ services:
       - ./data:/data
     ports:
       - "8901:8901"
+    environment:
+      - TZ=Europe/Paris
     restart: unless-stopped
 ```
 

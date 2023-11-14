@@ -1,3 +1,5 @@
+@use '../../scss/common';
+
 .preferences {
   display: flex;
   flex-flow: row;
@@ -6,16 +8,38 @@
   justify-content: center;
   gap: 18px;
 
-  @media (max-width:980px) {
-    flex-flow: row wrap;
-    overflow: auto;
-    > * {
-      flex-grow: 1;
+  &__content {
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: flex-start;
+    gap: 12px;
+    max-width: 900px;
+    flex: 1 1 auto;
+  }
+
+  &__panels {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+  }
+
+  &__sidebar {
+    display: flex;
+    flex-flow: column;
+    max-width: 32px;
+    min-width: 32px;
+    gap: 4px;
+
+    button {
+      @include common.iconButton();
+      border: 2px solid var(--icon-button-background-color);
+    }
+
+    button.selected {
+      color: var(--icon-button-hover-color);
+      background-color: var(--icon-button-hover-background-color);
+      border: 2px solid var(--icon-button-hover-color);
     }
   }
 
-
-  //.user {
-  //  max-height: 90%;
-  //}
 }
