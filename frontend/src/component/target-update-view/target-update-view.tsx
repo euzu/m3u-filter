@@ -1,16 +1,16 @@
 import React, {useCallback, useMemo, useRef} from "react";
-import './target-update.scss';
+import './target-update-view.scss';
 import ServerConfig from "../../model/server-config";
 import ConfigUtils from "../../utils/config-utils";
 import Checkbox from "../checkbox/checkbox";
 import {useServices} from "../../provider/service-provider";
 import {useSnackbar} from "notistack";
 
-interface TargetUpdateProps {
+interface TargetUpdateViewProps {
     config: ServerConfig
 }
 
-export default function TargetUpdate(props: TargetUpdateProps) {
+export default function TargetUpdateView(props: TargetUpdateViewProps) {
     const {config} = props;
 
     const services = useServices();

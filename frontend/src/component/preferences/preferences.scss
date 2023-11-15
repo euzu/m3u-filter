@@ -11,6 +11,10 @@
   &__content {
     display: flex;
     flex-flow: row nowrap;
+    @media (max-width: 600px) {
+      flex-flow: column;
+    }
+
     justify-content: flex-start;
     gap: 12px;
     max-width: 900px;
@@ -26,13 +30,16 @@
   &__sidebar {
     display: flex;
     flex-flow: column;
+    @media (max-width: 600px) {
+      flex-flow: row;
+    }
     max-width: 32px;
     min-width: 32px;
     gap: 4px;
 
     button {
       @include common.iconButton();
-      border: 2px solid var(--icon-button-background-color);
+      border: 2px solid transparent;
     }
 
     button.selected {

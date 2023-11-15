@@ -1,11 +1,11 @@
 import React, {useCallback, useMemo} from "react";
-import './server-info-view.scss';
+import './api-proxy-view.scss';
 import ServerConfig, {ServerInfo} from "../../model/server-config";
 import {useSnackbar} from "notistack";
 import {useServices} from "../../provider/service-provider";
 
 const isNumber = (value: string): boolean => {
-    return false;
+    return !isNaN(value as any);
 }
 
 const SERVER_INFO_FIELDS = [
@@ -18,11 +18,11 @@ const SERVER_INFO_FIELDS = [
     {name: 'message', caption: 'Message'},
 ];
 
-interface ServerInfoViewProps {
+interface ApiProxyViewProps {
     config: ServerConfig;
 }
 
-export default function ServerInfoView(props: ServerInfoViewProps) {
+export default function ApiProxyView(props: ApiProxyViewProps) {
     const {config} = props;
     const services = useServices();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
@@ -38,26 +38,26 @@ export default function ServerInfoView(props: ServerInfoViewProps) {
     const handleSave = useCallback(() => {
         if (serverInfo) {
             // @TODO validations
-            services.config().saveServerInfo(serverInfo).subscribe({
-                next: () => enqueueSnackbar("Server Info saved!", {variant: 'success'}),
-                error: (err) => enqueueSnackbar("Failed to save server info!", {variant: 'error'})
+            services.config().saveApiProxyConfig(serverInfo).subscribe({
+                next: () => enqueueSnackbar("Api proxy config saved!", {variant: 'success'}),
+                error: (err) => enqueueSnackbar("Failed to save api proxy config!", {variant: 'error'})
             });
         }
     }, [services, serverInfo, enqueueSnackbar]);
 
-    return <div className={'server-info'}>
-        <div className={'server-info__toolbar'}><label>Server</label>
+    return <div className={'api-proxy'}>
+        <div className={'api-proxy__toolbar'}><label>Api-Proxy</label>
             <button title={'Save'} onClick={handleSave}>Save</button>
         </div>
-        <div className={'server-info__content'}>
-            <div className={'server-info__content-table'}>
+        <div className={'api-proxy__content'}>
+            <div className={'api-proxy__content-table'}>
                 {
                     SERVER_INFO_FIELDS.map(field =>
-                        <div key={'server_info_field_' + field.name} className={'server-info__content-row'}>
-                            <div className={'server-info__content-col'}>
+                        <div key={'api-proxy_field_' + field.name} className={'api-proxy__content-row'}>
+                            <div className={'api-proxy__content-col  api-proxy__content-col-label'}>
                                 <label>{field.caption}</label>
                             </div>
-                            <div className={'server-info__content-table-col'}>
+                            <div className={'api-proxy__content-col api-proxy__content-col-value'}>
                                 <input defaultValue={(serverInfo as any)?.[field.name]} data-field={field.name}
                                        onChange={handleValueChange}></input>
                             </div>

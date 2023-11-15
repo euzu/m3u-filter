@@ -46,3 +46,60 @@
     }
   }
 }
+
+@mixin prefsForm() {
+  &__content {
+    display: flex;
+    flex-flow: column;
+
+    &-table {
+      margin: 8px 4px;
+      display: table;
+      width: auto;
+      border-collapse: separate;
+      border-spacing: 8px;
+    }
+
+    &-row {
+      display: table-row;
+      width: auto;
+      clear: both;
+    }
+
+    &-col {
+      display: table-cell;
+      padding: 6px;
+      &-label {
+        text-align: right;
+        width: 6em;
+      }
+
+      label {
+        font-weight: bold;
+        color: var(--label-color);
+        &:after {
+          content : ':'
+        }
+      }
+
+      input {
+        width: 100%;
+      }
+    }
+
+    &-help {
+      display: flex;
+      flex-flow: column;
+      gap:12px;
+      border-top: 1px solid var(--border-light-color);
+      padding-top: 12px;
+      color: var(--label-color);
+
+      pre {
+        margin: 0;
+      }
+    }
+
+  }
+
+}

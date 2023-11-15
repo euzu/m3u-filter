@@ -1,0 +1,17 @@
+@use '../../scss/common';
+@use '../../scss/preferences';
+
+.main-config {
+
+  @include preferences.prefsRoot();
+  @include preferences.prefsToolbar();
+  @include preferences.prefsInput();
+  @include preferences.prefsForm();
+
+  &__content-help-img {
+    width: 300px;
+    height: auto;
+    fill: currentColor;
+  }
+}
+

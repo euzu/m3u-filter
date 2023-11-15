@@ -4,14 +4,14 @@ import ServerConfig, {ServerInfo, TargetUser} from "../model/server-config";
 
 const SERVER_CONFIG_API_PATH = 'config';
 const SERVER_CONFIG_TARGET_USER_API_PATH = 'config/user';
-const SERVER_CONFIG_SERVER_INFO_API_PATH = 'config/serverinfo';
+const SERVER_CONFIG_SERVER_INFO_API_PATH = 'config/apiproxy';
 
 export default interface ConfigApiService extends ApiService {
     getServerConfig(): Observable<ServerConfig>;
 
     saveTargetUser(targetUser: TargetUser[]): Observable<any>;
 
-    saveServerInfo(serverInfo: ServerInfo): Observable<any>;
+    saveApiProxyConfig(serverInfo: ServerInfo): Observable<any>;
 }
 
 export class DefaultConfigApiService extends DefaultApiService implements ConfigApiService {
@@ -23,7 +23,7 @@ export class DefaultConfigApiService extends DefaultApiService implements Config
         return this.post<ServerConfig>(SERVER_CONFIG_TARGET_USER_API_PATH, targetUser);
     }
 
-    saveServerInfo(serverInfo: ServerInfo): Observable<any> {
+    saveApiProxyConfig(serverInfo: ServerInfo): Observable<any> {
         return this.post<ServerConfig>(SERVER_CONFIG_SERVER_INFO_API_PATH, serverInfo);
     }
 

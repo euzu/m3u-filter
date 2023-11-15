@@ -22,7 +22,7 @@ fn save_config_api_proxy(api_proxy: &mut ApiProxyConfig) -> Option<M3uFilterErro
     None
 }
 
-pub(crate) async fn config_api_proxy_user(
+pub(crate) async fn save_config_api_proxy_user(
     mut req: web::Json<Vec<TargetUser>>,
     mut _app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -36,7 +36,25 @@ pub(crate) async fn config_api_proxy_user(
     HttpResponse::Ok().finish()
 }
 
-pub(crate) async fn config_api_proxy_server_info(
+pub(crate) async fn save_main_config(
+    mut req: web::Json<ServerInfo>,
+    mut _app_state: web::Data<AppState>,
+) -> HttpResponse {
+    if req.0.is_valid() {
+        // if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
+        //     api_proxy.server = req.0;
+        //     if let Some(err) = save_config_api_proxy(api_proxy) {
+        //         return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+        //     }
+        // }
+        HttpResponse::Ok().finish()
+    } else {
+        HttpResponse::BadRequest().json(json!({"error": "Invalid content"}))
+    }
+}
+
+
+pub(crate) async fn save_config_api_proxy_config(
     mut req: web::Json<ServerInfo>,
     mut _app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -151,6 +169,10 @@ pub(crate) async fn config(
 
 
     let result = ServerConfig {
+        api: _app_state.config.api.clone(),
+        threads: _app_state.config.threads,
+        working_dir: _app_state.config.working_dir.to_owned(),
+        schedule: _app_state.config.schedule.clone(),
         video: _app_state.config.video.clone(),
         sources,
         api_proxy: _app_state.config._api_proxy.read().unwrap().clone(),
@@ -161,8 +183,9 @@ pub(crate) async fn config(
 pub(crate) fn v1_api_register() -> Scope {
     web::scope("/api/v1")
         .route("/config", web::get().to(config))
-        .route("/config/user", web::post().to(config_api_proxy_user))
-        .route("/config/serverinfo", web::post().to(config_api_proxy_server_info))
+        .route("/config", web::post().to(save_main_config))
+        .route("/config/user", web::post().to(save_config_api_proxy_user))
+        .route("/config/apiproxy", web::post().to(save_config_api_proxy_config))
         .route("/playlist", web::post().to(playlist))
         .route("/playlist/update", web::post().to(playlist_update))
         .route("/file/download", web::post().to(queue_download_file))

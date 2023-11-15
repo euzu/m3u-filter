@@ -3,8 +3,6 @@
 
 .target-update {
   @include preferences.prefsRoot();
-  flex: 1 1 auto;
-  overflow: hidden;
 
   @include common.list();
 
@@ -15,9 +13,7 @@
     overflow: auto;
     display: flex;
     flex-flow: column;
-    flex: 1 1 auto;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
     padding: 12px;
+
   }
 }

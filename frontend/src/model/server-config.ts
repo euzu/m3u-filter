@@ -84,9 +84,18 @@ export interface VideoConfig {
     download?: {
         headers: Record<string, string>,
         directory: string;
+        organize_into_directories: boolean;
         episode_pattern: string;
     }
     web_search?: string;
+}
+
+export interface MessaginConfig {
+    notify_on?: string [];
+    telegram?: {
+        bot_token: string;
+        chat_ids: string[];
+    }
 }
 
 export interface Credentials {
@@ -117,7 +126,12 @@ export interface ApiProxyConfig {
 }
 
 export default interface ServerConfig {
-    sources: SourceConfig[];
+    api: {host: string, port: number, web_root: string};
+    threads: number;
+    working_dir: string;
+    schedule: string;
+    messaging?: MessaginConfig;
     video?: VideoConfig;
+    sources: SourceConfig[];
     api_proxy?: ApiProxyConfig;
 }

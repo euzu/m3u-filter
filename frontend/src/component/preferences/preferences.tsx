@@ -2,21 +2,24 @@ import React, {useCallback, useState} from "react";
 import './preferences.scss';
 import ServerConfig from "../../model/server-config";
 import UserView from "../user-view/user-view";
-import TargetUpdate from "../target-update/target-update";
-import ServerInfoView from "../server-info-view/server-info-view";
+import TargetUpdateView from "../target-update-view/target-update-view";
+import ApiProxyInfoView from "../api-proxy-view/api-proxy-view";
 import {getIconByName} from "../../icons/icons";
 import Panel from "../panel/panel";
+import MainConfigView from "../main-config-view/main-config-view";
 
 enum SidebarAction {
     Update = 'update',
     User = 'user',
-    ApiServer = 'api_server'
+    ApiServer = 'api_server',
+    MainConfig = 'main_config'
 }
 
 const SIDEBAR_ACTIONS: { action: SidebarAction, icon: string }[] = [
     {action: SidebarAction.Update, icon: 'Refresh'},
     {action: SidebarAction.User, icon: 'User'},
     {action: SidebarAction.ApiServer, icon: 'ApiServer'},
+    {action: SidebarAction.MainConfig, icon: 'Config'},
 ];
 
 interface PreferencesProps {
@@ -44,13 +47,16 @@ export default function Preferences(props: PreferencesProps) {
             </div>
             <div className={'preferences__panels'}>
                 <Panel value={SidebarAction.Update} active={activePage}>
-                    <div className={'card'}><TargetUpdate config={config}></TargetUpdate></div>
+                    <div className={'card'}><TargetUpdateView config={config}></TargetUpdateView></div>
                 </Panel>
                 <Panel value={SidebarAction.User} active={activePage}>
                     <div className={'card'}><UserView config={config}></UserView></div>
                 </Panel>
                 <Panel value={SidebarAction.ApiServer} active={activePage}>
-                    <div className={'card'}><ServerInfoView config={config}></ServerInfoView></div>
+                    <div className={'card'}><ApiProxyInfoView config={config}></ApiProxyInfoView></div>
+                </Panel>
+                <Panel value={SidebarAction.MainConfig} active={activePage}>
+                    <div className={'card'}><MainConfigView config={config}></MainConfigView></div>
                 </Panel>
             </div>
         </div>
