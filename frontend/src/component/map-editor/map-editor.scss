@@ -1,0 +1,16 @@
+.map-editor {
+  display: flex;
+  flex-flow: column;
+
+  &__table {
+    display: flex;
+    flex-flow: column;
+  }
+
+  &__row {
+    display: flex;
+    flex-flow: row nowrap;
+  }
+
+
+}

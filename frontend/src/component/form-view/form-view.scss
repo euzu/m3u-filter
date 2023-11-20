@@ -1,0 +1,51 @@
+@use '../../scss/common';
+@use '../../scss/preferences';
+
+.form-view {
+  display: flex;
+  flex-flow: column;
+  box-sizing: border-box;
+
+  &__table {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+  }
+
+  &__row {
+    display: flex;
+    flex-flow: row nowrap;
+    flex: 1 0 auto;
+  }
+
+  &__col {
+    display: flex;
+    flex-flow: row;
+    padding: 6px;
+
+    &-label {
+      text-align: right;
+      width: 6em;
+      justify-content: flex-end;
+    }
+
+    &-value {
+      flex: 1 0 auto;
+    }
+
+    label {
+      font-weight: bold;
+      color: var(--label-color);
+
+      &:after {
+        content: ':'
+      }
+    }
+
+    input {
+      flex: 1 0 auto;
+    }
+    @include preferences.prefsInput();
+  }
+}
+

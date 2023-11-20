@@ -1,0 +1,20 @@
+.tag-select {
+  display: flex;
+  flex-flow: row wrap;
+  gap: 4px;
+  padding: 2px;
+
+  &__tag {
+    background-color: transparent;
+    color: var(--text-color);
+    padding: 3px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid var(--border-light-color);
+
+    &-selected {
+      background-color: var(--checkbox-checked-background-color);
+      color: var(--text-color);
+    }
+  }
+}

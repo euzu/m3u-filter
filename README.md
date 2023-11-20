@@ -1,7 +1,7 @@
 # m3u-filter
 
 m3u-filter is a simple application which can:
-  - filter, rename, map and sort entries out of a playlist in EXTM3U, XTREAM or Kodi format.
+  - filter, rename, map and sort entries out of a playlist and persist in EXTM3U, XTREAM or Kodi format.
   - can process multiple inputs and can create multiple outputs from this input files trough target definitions.
   - act as simple xtream or m3u server after processing entries
   - can schedule updates in server mode
@@ -13,20 +13,7 @@ m3u-filter is a simple application which can:
   - Send a telegram bot message when something goes wrong
   - Watch changes in groups and get a message on changes
 
-```
-  ------------                               |----> playlist_1  
- |  M3U_URL_1 | --> filter|map|rename|sort --|----> playlist_2 (optional)  --> publish in server mode for user
- |  M3U_URL_2 | (optional)
-  ------------                               |----> playlist_3 (optional)
-```
-
-```
-                                                                                    [define users for each playlist] 
-                                                                                              ^
-  ------------                               |----> m3u playlist (optional)                   |
- | XTREAM_URL | --> filter|map|rename|sort --|----> xtream playlist_1 (optional) --> publish in server mode for user 
-  ------------                               |----> xtream playlist_2 (optional)
-```
+![m3u-filter-overview](https://github.com/euzu/m3u-filter/assets/33094714/9a3449ac-c646-4bb4-a5ab-320a588d35c8)
 
 If you have a playlist which contains unwanted entries, you can create filter which include or discard entries
 based on the header information of the playlist entries, you can rename entries or map entries based on regular expressions.
@@ -697,7 +684,17 @@ Use the `-l` or `-log-level` cli-argument to specify the log-level.
 ## 6. Compilation
 
 ### Static binary for docker
-#### Install prerequisites
+
+#### `cross`compile
+
+Ease way to compile is a docker toolchain `cross`
+
+```sh
+rust install cross
+env  RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target x86_64-unknown-linux-musl
+```
+
+#### Manual compile - install prerequisites
 ```
 rustup update
 sudo apt-get install pkg-config musl-tools libssl-dev
@@ -770,3 +767,14 @@ Compile it with:
 ```sh
 cargo build --release --target x86_64-pc-windows-gnu
 ```
+
+### Cross compile for raspberry pi 2/3/4
+
+Ease way to compile is a docker toolchain `cross`
+
+```sh
+rust install cross
+env  RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target armv7-unknown-linux-musleabihf
+```
+
+

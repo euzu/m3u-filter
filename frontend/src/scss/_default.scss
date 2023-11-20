@@ -59,10 +59,15 @@ button {
   padding: 0 4px 4px 0;
 }
 
-
+select,
 input {
   background-color: transparent;
+  color: var(--text-color);
   &:focus {
     background-color: var(--background-color) !important;
   }
+}
+
+select {
+  padding: 2px 4px;
 }

@@ -3,19 +3,21 @@ import './api-proxy-view.scss';
 import ServerConfig, {ServerInfo} from "../../model/server-config";
 import {useSnackbar} from "notistack";
 import {useServices} from "../../provider/service-provider";
+import FormView, {FormFieldType} from "../form-view/from-view";
 
 const isNumber = (value: string): boolean => {
     return !isNaN(value as any);
 }
 
 const SERVER_INFO_FIELDS = [
-    {name: 'protocol', caption: 'Protocol', options: ['http', 'https']},
-    {name: 'ip', caption: 'IP'},
-    {name: 'http_port', caption: 'HTTP port', validator: isNumber},
-    {name: 'https_port', caption: 'HTTPS port', validator: isNumber},
-    {name: 'rtmp_port', caption: 'RTMP port', validator: isNumber},
-    {name: 'timezone', caption: 'Timezone'},
-    {name: 'message', caption: 'Message'},
+    {name: 'protocol', label: 'Protocol',  fieldType: FormFieldType.SINGLE_SELECT,
+        options:[{value: 'http', label:'http'}, {value: 'https', label:'https'}]},
+    {name: 'ip', label: 'IP',  fieldType: FormFieldType.TEXT},
+    {name: 'http_port', label: 'HTTP port', fieldType: FormFieldType.NUMBER, validator: isNumber},
+    {name: 'https_port', label: 'HTTPS port', fieldType: FormFieldType.NUMBER,validator: isNumber},
+    {name: 'rtmp_port', label: 'RTMP port', fieldType: FormFieldType.NUMBER,validator: isNumber},
+    {name: 'timezone', label: 'Timezone', fieldType: FormFieldType.TEXT},
+    {name: 'message', label: 'Message', fieldType: FormFieldType.TEXT},
 ];
 
 interface ApiProxyViewProps {
@@ -27,13 +29,6 @@ export default function ApiProxyView(props: ApiProxyViewProps) {
     const services = useServices();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const serverInfo = useMemo<ServerInfo>(() => config?.api_proxy?.server, [config]);
-
-    const handleValueChange = useCallback((evt: any) => {
-        const field = evt.target.dataset.field;
-        if (serverInfo) {
-            (serverInfo as any)[field] = evt.target.value;
-        }
-    }, [serverInfo]);
 
     const handleSave = useCallback(() => {
         if (serverInfo) {
@@ -50,21 +45,7 @@ export default function ApiProxyView(props: ApiProxyViewProps) {
             <button title={'Save'} onClick={handleSave}>Save</button>
         </div>
         <div className={'api-proxy__content'}>
-            <div className={'api-proxy__content-table'}>
-                {
-                    SERVER_INFO_FIELDS.map(field =>
-                        <div key={'api-proxy_field_' + field.name} className={'api-proxy__content-row'}>
-                            <div className={'api-proxy__content-col  api-proxy__content-col-label'}>
-                                <label>{field.caption}</label>
-                            </div>
-                            <div className={'api-proxy__content-col api-proxy__content-col-value'}>
-                                <input defaultValue={(serverInfo as any)?.[field.name]} data-field={field.name}
-                                       onChange={handleValueChange}></input>
-                            </div>
-                        </div>
-                    )
-                }
-            </div>
+            <FormView data={serverInfo} fields={SERVER_INFO_FIELDS}></FormView>
         </div>
     </div>
 }
