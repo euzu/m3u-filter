@@ -12,5 +12,4 @@ mod tests {
             Err(e) => {}
         }
     }
-
 }

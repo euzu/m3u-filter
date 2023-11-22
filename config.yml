@@ -59,6 +59,7 @@ sources:
         sort:
           groups:
             order: asc
+
         mapping:
           - France TNT
           - France Premium

@@ -196,7 +196,7 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
 }
 
 
-fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::RequestBuilder {
+pub(crate) fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::RequestBuilder {
     let mut request = reqwest::Client::new().get(url);
     if input.headers.is_empty() {
         let headers = get_request_headers(&input.headers);
@@ -205,7 +205,7 @@ fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::RequestBui
     request
 }
 
-pub fn get_request_headers(defined_headers: &HashMap<String, String>) -> HeaderMap {
+pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>) -> HeaderMap {
     let mut headers = header::HeaderMap::new();
     for (key, value) in defined_headers {
         headers.insert(

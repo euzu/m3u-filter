@@ -289,6 +289,19 @@ impl ConfigSource {
         handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
         Ok(index + (self.inputs.len() as u16))
     }
+
+    pub(crate) fn get_xtream_input_for_target(&self, target_name: &str) -> Option<&ConfigInput> {
+        for target in &self.targets {
+            if target.name.eq(target_name) {
+                for input in &self.inputs {
+                    if input.input_type.eq(&InputType::Xtream) {
+                        return Some(input)
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -297,7 +310,7 @@ pub(crate) struct InputAffix {
     pub value: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
 pub(crate) enum InputType {
     #[serde(rename = "m3u")]
     M3u,
@@ -510,6 +523,17 @@ impl Config {
             None => None
         }
     }
+
+    pub(crate) fn get_xtream_input_for_target(&self, target_name: &str) -> Option<&ConfigInput> {
+        for source in &self.sources {
+            match source.get_xtream_input_for_target(target_name) {
+                Some(cfg)  => return Some(cfg),
+                _ => {}
+            }
+        }
+        None
+    }
+
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {
         match self._api_proxy.read().unwrap().as_ref() {

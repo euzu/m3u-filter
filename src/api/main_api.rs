@@ -32,8 +32,9 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
     let port = cfg.api.port;
     let web_dir = cfg.api.web_root.to_string();
     let web_dir_path = PathBuf::from(&web_dir);
-    if !web_dir_path.exists() || !web_dir_path.is_dir() {
-        return Err(std::io::Error::new(ErrorKind::NotFound, format!("web_root does not exists or is not an directory: {:?}", &web_dir_path)));
+    if !&web_dir_path.exists() || !&web_dir_path.is_dir() {
+        return Err(std::io::Error::new(ErrorKind::NotFound,
+                                       format!("web_root does not exists or is not an directory: {:?}", &web_dir_path)));
     }
 
     let schedule = cfg.schedule.clone();
@@ -72,7 +73,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
         .service(m3u_api_register())
         .service(xmltv_api_register())
         .service(index)
-        .service(actix_files::Files::new("/", web_dir.to_string()))
+        .service(actix_files::Files::new("/", &web_dir_path))
     )
         .bind(format!("{}:{}", host, port))?
         .run().await

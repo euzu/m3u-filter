@@ -19,11 +19,9 @@ pub(crate) async fn serve_file(file_path: &Path, req: &HttpRequest) -> HttpRespo
     }
 }
 
-pub(crate) fn get_user_target<'a>(api_req: &'a web::Query<UserApiRequest>, app_state: &'a web::Data<AppState>) -> Option<(UserCredentials, &'a ConfigTarget)> {
-    let username = api_req.username.as_str().trim();
-    let password = api_req.password.as_str().trim();
+pub(crate) fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a web::Query<UserApiRequest>, app_state: &'a web::Data<AppState>) -> Option<(UserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() && !password.is_empty() {
-        app_state.config.get_target_for_user(username, password)
+       app_state.config.get_target_for_user(username, password)
     } else {
         let token = api_req.token.as_str().trim();
         if !token.is_empty() {
@@ -32,4 +30,11 @@ pub(crate) fn get_user_target<'a>(api_req: &'a web::Query<UserApiRequest>, app_s
             None
         }
     }
+}
+
+
+pub(crate) fn get_user_target<'a>(api_req: &'a web::Query<UserApiRequest>, app_state: &'a web::Data<AppState>) -> Option<(UserCredentials, &'a ConfigTarget)> {
+    let username = api_req.username.as_str().trim();
+    let password = api_req.password.as_str().trim();
+    get_user_target_by_credentials(username, password, api_req, app_state)
 }

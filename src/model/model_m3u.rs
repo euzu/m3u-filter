@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,16 @@ pub(crate) enum XtreamCluster {
     Live = 1,
     Video = 2,
     Series = 3,
+}
+
+impl Display for XtreamCluster {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            XtreamCluster::Live => "live",
+            XtreamCluster::Video => "video",
+            XtreamCluster::Series => "series",
+        })
+    }
 }
 
 pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::Live }

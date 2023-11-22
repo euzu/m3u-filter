@@ -91,6 +91,11 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                     title = title.substring(0, idx).trim();
                 }
             }
+            const dateSuffixMatch = title.match(/(.*?).\(\d+\)/);
+            if (dateSuffixMatch?.length > 1) {
+                title = dateSuffixMatch[1];
+            }
+
             const url = serverConfig.video.web_search.replace("{}", title);
             window.open(url, "imdb");
         }

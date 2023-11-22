@@ -149,6 +149,10 @@ pub(crate) struct UserApiRequest {
     pub token: String,
     #[serde(default = "default_as_empty_str")]
     pub action: String,
+    #[serde(default = "default_as_empty_str")]
+    pub series_id: String,
+    #[serde(default = "default_as_empty_str")]
+    pub vod_id: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

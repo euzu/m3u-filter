@@ -1,4 +1,4 @@
-use std::fs::OpenOptions;
+use std::fs::{File};
 use std::path::PathBuf;
 use chrono::Local;
 use log::{debug, error, info, warn};
@@ -111,10 +111,7 @@ pub(crate) fn save_api_proxy(config: &ApiProxyConfig) -> Result<(), M3uFilterErr
         Err(err) => {error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err)}
     }
     info!("Saving api proxy to {}", &path.to_str().unwrap_or("?"));
-    match OpenOptions::new().write(true)
-        .truncate(true)
-        .create(true)
-        .open(&path) {
+    match File::create(&path) {
         Ok(f) => {
             serde_yaml::to_writer(f, &config).unwrap();
             Ok(())

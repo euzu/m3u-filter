@@ -10,7 +10,7 @@ use crate::model::config::{Config, ConfigTarget};
 use crate::model::model_m3u::PlaylistGroup;
 use crate::utils::add_prefix_to_filename;
 
-fn check_write(res: std::io::Result<usize>) -> Result<(), std::io::Error> {
+fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error> {
     match res {
         Ok(_) => Ok(()),
         Err(_) => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unable to write file")),
@@ -107,18 +107,18 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
         if let Some(path) = get_m3u_file_path(cfg, filename) {
             match File::create(&path) {
                 Ok(mut m3u_file) => {
-                    match check_write(m3u_file.write(b"#EXTM3U\n")) {
+                    match check_write(m3u_file.write_all(b"#EXTM3U\n")) {
                         Ok(_) => (),
                         Err(e) => return cant_write_result!(&path, e),
                     }
                     for pg in new_playlist {
                         for pli in &pg.channels {
                             let content = pli.to_m3u(&target.options);
-                            match check_write(m3u_file.write(content.as_bytes())) {
+                            match check_write(m3u_file.write_all(content.as_bytes())) {
                                 Ok(_) => (),
                                 Err(e) => return cant_write_result!(&path, e),
                             }
-                            match check_write(m3u_file.write(b"\n")) {
+                            match check_write(m3u_file.write_all(b"\n")) {
                                 Ok(_) => (),
                                 Err(e) => return cant_write_result!(&path, e),
                             }
@@ -170,7 +170,7 @@ pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playl
                     let file_path = dir_path.join(format!("{}.strm", file_name));
                     match File::create(&file_path) {
                         Ok(mut strm_file) => {
-                            match check_write(strm_file.write(header.url.as_bytes())) {
+                            match check_write(strm_file.write_all(header.url.as_bytes())) {
                                 Ok(_) => (),
                                 Err(e) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e),
                             }
