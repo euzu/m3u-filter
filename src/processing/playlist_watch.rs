@@ -23,7 +23,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
             let save_path = path.clone();
             let mut changed = false;
             if path.exists() {
-                match load_tree(&path) {
+                match load_watch_tree(&path) {
                     Some(loaded_tree) => {
                         // Find elements in set2 but not in set1
                         let added_difference: BTreeSet<String> = new_tree.difference(&loaded_tree).cloned().collect();
@@ -39,7 +39,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
                 }
             }
             if changed {
-                match save_tree(&save_path, new_tree) {
+                match save_watch_tree(&save_path, new_tree) {
                     Ok(_) => {}
                     Err(err) => {
                         error!("failed to write watch_file {}: {}", &save_path.to_str().unwrap(), err)
@@ -76,7 +76,7 @@ fn handle_watch_notification(cfg: &Config, added: BTreeSet<String>, removed: BTr
     }
 }
 
-fn load_tree(path: &Path) -> Option<BTreeSet<String>> {
+fn load_watch_tree(path: &Path) -> Option<BTreeSet<String>> {
     match std::fs::read(path) {
         Ok(encoded) => {
             let decoded: BTreeSet<String> = bincode::deserialize(&encoded[..]).unwrap();
@@ -86,7 +86,7 @@ fn load_tree(path: &Path) -> Option<BTreeSet<String>> {
     }
 }
 
-fn save_tree(path: &Path, tree: BTreeSet<String>) -> std::io::Result<()> {
+fn save_watch_tree(path: &Path, tree: BTreeSet<String>) -> std::io::Result<()> {
     let encoded: Vec<u8> = bincode::serialize(&tree).unwrap();
     std::fs::write(path, encoded)
 }

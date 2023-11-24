@@ -9,7 +9,7 @@ use actix_web::{App, get, HttpRequest, HttpServer, web};
 use actix_web::middleware::Logger;
 use crate::api::m3u_api::{m3u_api_register};
 
-use crate::api::api_model::{AppState, DownloadQueue};
+use crate::api::api_model::{AppState, DownloadQueue, SharedLocks};
 use crate::api::scheduler::start_scheduler;
 use crate::api::v1_api::{v1_api_register};
 use crate::api::xmltv_api::{xmltv_api_register};
@@ -46,7 +46,8 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
             queue: Arc::from(Mutex::new(VecDeque::new())),
             active: Arc::from(RwLock::new(None)),
             finished: Arc::from(RwLock::new(Vec::new())),
-        })
+        }),
+        shared_locks: Arc::new(SharedLocks::new()),
     });
 
     // Scheduler

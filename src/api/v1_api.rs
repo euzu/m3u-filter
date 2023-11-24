@@ -3,7 +3,7 @@ use actix_web::{HttpResponse, Scope, web};
 use serde_json::{json};
 use crate::api::api_model::{AppState, PlaylistRequest, ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::download::{get_m3u_playlist, get_xtream_playlist};
-use crate::model::config::{ConfigInput, InputType, validate_targets};
+use crate::model::config::{ConfigInput, ConfigInputOptions, InputType, validate_targets};
 use log::{error};
 use crate::api::download_api::{download_file_info, queue_download_file};
 use crate::config_reader::save_api_proxy;
@@ -104,6 +104,9 @@ fn create_config_input_for_url(url: &str) -> ConfigInput {
         suffix: None,
         name: None,
         enabled: true,
+        options: Some(ConfigInputOptions {
+            xtream_info_cache: false,
+        })
     }
 }
 

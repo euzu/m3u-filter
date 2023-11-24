@@ -29,6 +29,8 @@ async fn m3u_api(
 pub(crate) fn m3u_api_register() -> Vec<Resource> {
     vec![
         web::resource("/get.php").route(web::get().to(m3u_api)),
+        web::resource("/get.php").route(web::post().to(m3u_api)),
+        web::resource("/apiget").route(web::get().to(m3u_api)),
         web::resource("/m3u").route(web::get().to(m3u_api))
     ]
 }

@@ -341,6 +341,13 @@ impl FromStr for InputType {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct ConfigInputOptions {
+    #[serde(default = "default_as_false")]
+    pub xtream_info_cache: bool,
+}
+
+
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -368,6 +375,9 @@ pub(crate) struct ConfigInput {
     pub name: Option<String>,
     #[serde(default = "default_as_true")]
     pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<ConfigInputOptions>,
+
 }
 
 impl ConfigInput {

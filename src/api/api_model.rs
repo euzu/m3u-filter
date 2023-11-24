@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
@@ -87,6 +87,34 @@ impl FileDownload {
     }
 }
 
+
+pub(crate) struct SharedLocks {
+    shared_locks: Arc<RwLock<HashMap<String, Arc<RwLock<String>>>>>,
+}
+
+impl SharedLocks {
+    pub(crate) fn new() -> Self {
+        SharedLocks {
+            shared_locks: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub(crate) fn get_lock(&self, key: &str) -> Arc<RwLock<String>> {
+        {
+            let lock = self.shared_locks.read().unwrap();
+            match lock.get(key) {
+                None => {}
+                Some(file) => return file.clone(),
+            }
+        }
+        let mut lock = self.shared_locks.write().unwrap();
+        let file = Arc::new(RwLock::new(key.to_string() ));
+        lock.insert(key.to_string(), file.clone());
+        file
+    }
+}
+
+
 pub(crate) struct DownloadQueue {
     pub queue: Arc<Mutex<VecDeque<FileDownload>>>,
     pub active: Arc<RwLock<Option<FileDownload>>>,
@@ -97,6 +125,7 @@ pub(crate) struct AppState {
     pub config: Arc<Config>,
     pub targets: Arc<ProcessTargets>,
     pub downloads: Arc<DownloadQueue>,
+    pub shared_locks: Arc<SharedLocks>,
 }
 
 #[derive(Serialize)]
@@ -153,6 +182,10 @@ pub(crate) struct UserApiRequest {
     pub series_id: String,
     #[serde(default = "default_as_empty_str")]
     pub vod_id: String,
+    #[serde(default = "default_as_empty_str")]
+    pub stream_id: String,
+    #[serde(default = "default_as_empty_str")]
+    pub limit: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

@@ -124,13 +124,13 @@ pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &St
                                 let mut content = String::new();
                                 match std::io::BufReader::new(file).read_to_string(&mut content) {
                                     Ok(_) => Some(content),
-                                    Err(err) =>  {
+                                    Err(err) => {
                                         let file_str = &filepath.to_str().unwrap_or("?");
                                         error!("cant read file: {} {}", file_str,  err);
-                                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err)
+                                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
                                     }
                                 }
-                            },
+                            }
                             Err(err) => {
                                 let file_str = &filepath.to_str().unwrap_or("?");
                                 error!("cant read file: {} {}", file_str,  err);
@@ -204,6 +204,16 @@ pub(crate) fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest:
     }
     request
 }
+//
+// pub(crate) fn get_client_request_sync(input: &ConfigInput, url: url::Url) -> reqwest::blocking::RequestBuilder {
+//     let mut request = reqwest::blocking::Client::new().get(url);
+//     if input.headers.is_empty() {
+//         let headers = get_request_headers(&input.headers);
+//         request = request.headers(headers);
+//     }
+//     request
+// }
+
 
 pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>) -> HeaderMap {
     let mut headers = header::HeaderMap::new();
@@ -278,7 +288,7 @@ pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
 pub(crate) fn add_prefix_to_filename(path: &Path, prefix: &str, ext: Option<&str>) -> PathBuf {
     let file_name = path.file_name().unwrap_or_default();
     let new_file_name = format!("{}{}", prefix, file_name.to_string_lossy());
-    let result =  path.with_file_name(new_file_name);
+    let result = path.with_file_name(new_file_name);
     match ext {
         None => result,
         Some(extension) => result.with_extension(extension)
@@ -287,7 +297,7 @@ pub(crate) fn add_prefix_to_filename(path: &Path, prefix: &str, ext: Option<&str
 
 pub(crate) fn path_exists(file_path: &Path) -> bool {
     if let Ok(metadata) = fs::metadata(file_path) {
-        return metadata.is_file()
+        return metadata.is_file();
     }
     false
 }

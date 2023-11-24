@@ -1,6 +1,9 @@
 # Changelog
 # v1.1.4(2023-11-??)
 * Added regexp search in Web-UI
+* Added config Web-UI
+* Added xtream vod_info and series_info 
+* Added input options with attribute xtream_info_cache to cache get_vod_info and get_series_info on disc
 
 # v1.1.3(2023-11-08)
 * added new target options 

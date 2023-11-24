@@ -99,6 +99,8 @@ Each input has the following attributes:
   - `pasword`only mandatory for type `xtream`
   - `prefix` is optional, it is applied to the given field with the given value
   - `suffix` is optional, it is applied to the given field with the given value
+  - `options` is optional, 
+     + `xtream_info_cache` true or false, vod_info and series_info can be cached to disc to reduce network traffic to provider.
 
 `persist` should be different for `m3u` and `xtream` types. For `m3u` use full filename like `./playlist_{}.m3u`.
 For `xtream` use a prefix like `./playlist_`

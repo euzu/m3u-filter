@@ -11,7 +11,10 @@ use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationRespons
 use crate::model::api_proxy::{UserCredentials};
 use crate::model::config::{Config};
 use crate::model::model_config::{TargetType};
-use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, xtream_get_all, xtream_get_series_info, xtream_get_vod_info};
+use crate::model::model_m3u::XtreamCluster;
+use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD,
+                                           xtream_get_all,
+                                           xtream_get_short_epg, xtream_get_stream_info};
 use crate::utils::get_client_request;
 
 fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
@@ -50,9 +53,9 @@ async fn xtream_player_api_stream(
     context: &str,
     username: &str,
     password: &str,
-    stream_id: &str,
+    action_path: &str,
 ) -> HttpResponse {
-    if let Some((_user, target)) = get_user_target_by_credentials(&username, &password, api_req, _app_state) {
+    if let Some((_user, target)) = get_user_target_by_credentials(username, password, api_req, _app_state) {
         let target_name = &target.name;
         if target.has_output(&TargetType::Xtream) {
             match _app_state.config.get_xtream_input_for_target(target_name) {
@@ -60,7 +63,7 @@ async fn xtream_player_api_stream(
                 Some(input) => {
                     let username = input.username.as_ref().unwrap().clone();
                     let password = input.password.as_ref().unwrap().clone();
-                    let stream_url = format!("{}/{}/{}/{}/{}", input.url, context, username, password, stream_id);
+                    let stream_url = format!("{}/{}/{}/{}/{}", input.url, context, username, password, action_path);
                     let url = reqwest::Url::parse(&stream_url).unwrap();
                     let client = get_client_request(input, url);
                     if let Ok(response) = client.send().await {
@@ -102,6 +105,28 @@ async fn xtream_player_api_movie_stream(
     xtream_player_api_stream(&api_req, &_app_state, "movie", &username, &password, &stream_id).await
 }
 
+async fn xtream_player_api_timeshift_stream(
+    api_req: web::Query<UserApiRequest>,
+    path: web::Path<(String, String, String, String, String)>,
+    _app_state: web::Data<AppState>,
+) -> HttpResponse {
+    let (username, password, duration, start, stream_id) = path.into_inner();
+    let action_path = format!("{}/{}/{}", duration, start, stream_id);
+    xtream_player_api_stream(&api_req, &_app_state, "timeshift", &username, &password, &action_path).await
+}
+
+async fn xtream_get_stream_info_response(app_state: &AppState, target_name: &str, stream_id: &str, cluster: XtreamCluster,
+                                         user: &UserCredentials) -> HttpResponse {
+    match FromStr::from_str(stream_id) {
+        Ok(xtream_stream_id) => {
+            match xtream_get_stream_info(app_state, target_name, xtream_stream_id, cluster, user).await {
+                Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
+                Err(_) => HttpResponse::NoContent().finish()
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().finish()
+    }
+}
 
 async fn xtream_player_api(
     api_req: web::Query<UserApiRequest>,
@@ -119,25 +144,19 @@ async fn xtream_player_api(
 
                 match action {
                     "get_series_info" => {
-                        match FromStr::from_str(api_req.series_id.trim()) {
-                            Ok(stream_id) => {
-                                match xtream_get_series_info(&_app_state.config, target_name, stream_id) {
-                                    Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
-                                    Err(_) => HttpResponse::NoContent().finish()
-                                }
-                            }
-                            Err(_) => HttpResponse::BadRequest().finish()
-                        }
+                        xtream_get_stream_info_response(&_app_state, target_name,
+                                                        api_req.series_id.trim(),
+                                                        XtreamCluster::Series, &user).await
                     }
                     "get_vod_info" => {
-                        match FromStr::from_str(api_req.vod_id.trim()) {
-                            Ok(stream_id) => {
-                                match xtream_get_vod_info(&_app_state.config, target_name, stream_id) {
-                                    Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
-                                    Err(_) => HttpResponse::NoContent().finish()
-                                }
-                            }
-                            Err(_) => HttpResponse::BadRequest().finish()
+                        xtream_get_stream_info_response(&_app_state, target_name,
+                                                        api_req.vod_id.trim(),
+                                                        XtreamCluster::Video, &user).await
+                    }
+                    "get_short_epg" => {
+                        match xtream_get_short_epg(&_app_state, target_name, api_req.stream_id.trim(), api_req.limit.trim(), &user).await {
+                            Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
+                            Err(_) => HttpResponse::NoContent().finish()
                         }
                     }
                     _ => {
@@ -187,9 +206,16 @@ async fn xtream_player_api(
 pub(crate) fn xtream_api_register() -> Vec<Resource> {
     vec![
         web::resource("/player_api.php").route(web::get().to(xtream_player_api)),
+        web::resource("/player_api.php").route(web::post().to(xtream_player_api)),
         web::resource("/xtream").route(web::get().to(xtream_player_api)),
         web::resource("/live/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream)),
         web::resource("/movie/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_movie_stream)),
         web::resource("/series/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_series_stream)),
+        web::resource("/timeshift/{username}/{password}/{duration}/{start}{stream_id}").route(web::get().to(xtream_player_api_timeshift_stream)),
+        /* TODO
+        web::resource("/hlsr/{token}/{username}/{password}/{channel}/{hash}/{chunk}").route(web::get().to(xtream_player_api_hlsr_stream))
+        web::resource("/hls/{token}/{chunk}").route(web::get().to(xtream_player_api_hls_stream))
+        web::resource("/play/{token}/{type}").route(web::get().to(xtream_player_api_play_stream))
+         */
     ]
 }
