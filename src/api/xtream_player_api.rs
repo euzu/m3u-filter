@@ -1,15 +1,15 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
-use std::io::Error;
+use std::io::{Error};
 use std::str::FromStr;
 use actix_web::{HttpRequest, HttpResponse, web, Resource};
 use chrono::{Duration, Local};
-use log::debug;
+use log::{debug};
 
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::model::api_proxy::{UserCredentials};
-use crate::model::config::{Config};
+use crate::model::config::{Config, InputType};
 use crate::model::model_config::{TargetType};
 use crate::model::model_m3u::XtreamCluster;
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD,
@@ -58,18 +58,30 @@ async fn xtream_player_api_stream(
     if let Some((_user, target)) = get_user_target_by_credentials(username, password, api_req, _app_state) {
         let target_name = &target.name;
         if target.has_output(&TargetType::Xtream) {
-            match _app_state.config.get_xtream_input_for_target(target_name) {
-                None => {}
-                Some(input) => {
-                    let username = input.username.as_ref().unwrap().clone();
-                    let password = input.password.as_ref().unwrap().clone();
-                    let stream_url = format!("{}/{}/{}/{}/{}", input.url, context, username, password, action_path);
-                    let url = reqwest::Url::parse(&stream_url).unwrap();
-                    let client = get_client_request(input, url);
-                    if let Ok(response) = client.send().await {
-                        if response.status().is_success() {
-                            return HttpResponse::Ok().streaming(response.bytes_stream());
+            if let Some(input) = match _app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
+                None => _app_state.config.get_input_for_target(target_name, &InputType::M3u),
+                Some(inp) => Some(inp)
+            } {
+                let (uname, passwd, base_url) = match &input.input_type {
+                    InputType::M3u => (username, password, "/"),
+                    InputType::Xtream => (
+                        input.username.as_ref().unwrap().as_str(),
+                        input.password.as_ref().unwrap().as_str(),
+                        input.url.as_str()
+                    )
+                };
+
+                let stream_url = format!("{}/{}/{}/{}/{}", base_url, context, uname, passwd, action_path);
+                let url = reqwest::Url::parse(&stream_url).unwrap();
+                let client = get_client_request(input, url);
+                if let Ok(response) = client.send().await {
+                    if response.status().is_success() {
+                        let mut response_builder = HttpResponse::Ok();
+                        for (key, value) in response.headers().iter() {
+                            //error!("{:?} => {:?}", &key, &value);
+                            response_builder.insert_header((key.as_str(), value));
                         }
+                        return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
                     }
                 }
             }

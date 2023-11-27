@@ -290,11 +290,11 @@ impl ConfigSource {
         Ok(index + (self.inputs.len() as u16))
     }
 
-    pub(crate) fn get_xtream_input_for_target(&self, target_name: &str) -> Option<&ConfigInput> {
+    pub(crate)fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
         for target in &self.targets {
             if target.name.eq(target_name) {
                 for input in &self.inputs {
-                    if input.input_type.eq(&InputType::Xtream) {
+                    if input.input_type.eq(input_type) {
                         return Some(input)
                     }
                 }
@@ -534,16 +534,15 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_xtream_input_for_target(&self, target_name: &str) -> Option<&ConfigInput> {
+    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
         for source in &self.sources {
-            match source.get_xtream_input_for_target(target_name) {
+            match source.get_input_for_target(target_name, input_type) {
                 Some(cfg)  => return Some(cfg),
                 _ => {}
             }
         }
         None
     }
-
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {
         match self._api_proxy.read().unwrap().as_ref() {

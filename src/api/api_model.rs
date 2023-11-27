@@ -45,6 +45,13 @@ fn get_download_directory(download_cfg: &VideoDownloadConfig, filestem: &str) ->
 const FILENAME_TRIM_PATTERNS: &[char] = &['.', '-', '_'];
 
 impl FileDownload {
+
+// TODO read header size info  and restart support
+// "content-type" => ".../..."
+// "content-length" => "1975828544"
+// "accept-ranges" => "0-1975828544"
+// "content-range" => "bytes 0-1975828543/1975828544"
+
     pub fn new(req_url: &str, req_filename: &str, download_cfg: &VideoDownloadConfig) -> Option<FileDownload> {
         match reqwest::Url::parse(req_url) {
             Ok(url) => {
