@@ -13,12 +13,12 @@ async fn m3u_api(
     match get_user_target(&api_req, &_app_state) {
         Some((_, target)) => {
             let filename = target.get_m3u_filename();
-            match get_m3u_file_path(&_app_state.config, &filename) {
-                Some(file_path) => {
-                    serve_file(&file_path, &req).await
+            if filename.is_some() {
+                if let Some(file_path) = get_m3u_file_path(&_app_state.config, &filename) {
+                    return serve_file(&file_path, &req).await;
                 }
-                None => HttpResponse::NoContent().finish()
             }
+            HttpResponse::NoContent().finish()
         }
         None => {
             HttpResponse::BadRequest().finish()

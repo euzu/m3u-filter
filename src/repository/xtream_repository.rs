@@ -165,7 +165,9 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                     match header.xtream_cluster {
                         XtreamCluster::Live => {
                             document.insert("stream_id".to_string(), stream_id_value);
-                            if !skip_live_direct_source {
+                            if skip_live_direct_source {
+                                document.insert("direct_source".to_string(), Value::String("".to_string()));
+                            } else {
                                 document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
                             }
                             document.insert("thumbnail".to_string(), Value::String(header.logo_small.as_ref().clone()));
@@ -177,7 +179,9 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                         }
                         XtreamCluster::Video => {
                             document.insert("stream_id".to_string(), stream_id_value);
-                            if !skip_video_direct_source {
+                            if skip_video_direct_source {
+                                document.insert("direct_source".to_string(), Value::String("".to_string()));
+                            } else {
                                 document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
                             }
                             document.insert("custom_sid".to_string(), Value::String("".to_string()));

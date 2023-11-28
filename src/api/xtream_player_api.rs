@@ -202,8 +202,7 @@ async fn xtream_player_api(
                     }
                 }
             } else {
-                debug!("Target has not output xtream {}", target_name);
-                HttpResponse::BadRequest().finish()
+                HttpResponse::Ok().json(get_user_info(&user, &_app_state.config))
             }
         }
         _ => {
