@@ -72,6 +72,7 @@ async fn xtream_player_api_stream(
                 };
 
                 let stream_url = format!("{}/{}/{}/{}/{}", base_url, context, uname, passwd, action_path);
+                debug!("Try to open stream {}", &stream_url);
                 let url = reqwest::Url::parse(&stream_url).unwrap();
                 let client = get_client_request(input, url);
                 if let Ok(response) = client.send().await {
@@ -82,6 +83,8 @@ async fn xtream_player_api_stream(
                             response_builder.insert_header((key.as_str(), value));
                         }
                         return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
+                    } else {
+                        debug!("Failed to open stream got status {} for {}", response.status(), &stream_url)
                     }
                 }
             }

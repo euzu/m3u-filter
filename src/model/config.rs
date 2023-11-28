@@ -536,10 +536,7 @@ impl Config {
 
     pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
         for source in &self.sources {
-            match source.get_input_for_target(target_name, input_type) {
-                Some(cfg)  => return Some(cfg),
-                _ => {}
-            }
+            if let Some(cfg) = source.get_input_for_target(target_name, input_type) { return Some(cfg) }
         }
         None
     }
