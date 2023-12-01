@@ -72,7 +72,7 @@ pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFi
             }
         }
         _ => {
-            warn!("cant read mapping file: {}", mapping_file.to_str().unwrap());
+            warn!("cant read mapping file: {}", mapping_file.to_str().unwrap_or("?"));
             Ok(None)
         }
     }

@@ -5,16 +5,14 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Error, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-use log::error;
+use log::{error};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
-use crate::model::config::{Config, ConfigTarget, InputType};
+use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::model_m3u::{PlaylistGroup, PlaylistItemHeader, XtreamCluster};
 use crate::{create_m3u_filter_error_result, utils};
 use crate::api::api_model::AppState;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::UserCredentials;
-use crate::utils::{get_client_request};
 
 type IndexTree = BTreeMap<i32, (u32, u16)>;
 
@@ -87,14 +85,13 @@ fn get_info_collection_and_idx_path(path: &Path, cluster: &XtreamCluster) -> (Pa
     (get_info_collection_path(path, collection), get_info_idx_path(path, collection))
 }
 
-fn write_xtream_info(app_state: &AppState, target_name: &str, stream_id: i32, cluster: &XtreamCluster, content: &String, index_tree: &mut IndexTree) -> Result<(), Error> {
+fn write_xtream_info(app_state: &AppState, target_name: &str, stream_id: i32, cluster: &XtreamCluster,
+                     content: &str, index_tree: &mut IndexTree) -> Result<(), Error> {
     if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
         let (col_path, idx_path) = get_info_collection_and_idx_path(&path, cluster);
         let mut comp: Vec<u8> = Vec::new();
         lzma_rs::lzma_compress(&mut BufReader::new(content.as_bytes()), &mut comp)?;
         let size = comp.len();
-        let lock = app_state.shared_locks.get_lock(target_name);
-        let shared_lock = lock.write().unwrap();
         match OpenOptions::new()
             .create(true)
             .write(true)
@@ -106,9 +103,10 @@ fn write_xtream_info(app_state: &AppState, target_name: &str, stream_id: i32, cl
                 file.flush()?;
                 index_tree.insert(stream_id, (offset as u32, size as u16));
                 write_index(&idx_path, index_tree)?;
-                drop(shared_lock);
             }
-            Err(err) => return Err(err)
+            Err(err) => {
+                return Err(err)
+            }
         }
     }
     Ok(())
@@ -338,94 +336,60 @@ fn seek_read(
     Ok(buf)
 }
 
-pub(crate) async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_id: i32,
-                                           cluster: XtreamCluster,
-                                           user: &UserCredentials) -> Result<String, Error> {
-    if let Some(target_input) = app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
-        let cache_info = target_input.options.as_ref()
-            .map(|o| o.xtream_info_cache).unwrap_or(false);
-        let mut index_tree: Option<IndexTree> = None;
-        if cache_info {
-            if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
-                let (col_path, idx_path) = get_info_collection_and_idx_path(&path, &cluster);
-                let lock = app_state.shared_locks.get_lock(target_name);
-                let shared_lock = lock.read().unwrap();
-                if idx_path.exists() && col_path.exists() {
-                    index_tree = load_index(&idx_path);
-                    if let Some(idx_map) = &index_tree {
-                        if let Some((offset, size)) = idx_map.get(&stream_id) {
-                            let mut reader = BufReader::new(File::open(&col_path).unwrap());
-                            if let Ok(bytes) = seek_read(&mut reader, *offset, *size) {
-                                let mut decomp: Vec<u8> = Vec::new();
-                                let _ = lzma_rs::lzma_decompress(&mut bytes.as_slice(), &mut decomp);
-                                drop(shared_lock);
-                                return Ok(String::from_utf8(decomp).unwrap());
-                            }
+
+pub(crate) async fn xtream_get_stored_stream_info(
+    app_state: &AppState, target_name: &str, stream_id: i32,
+    cluster: &XtreamCluster, target_input: &ConfigInput) -> Result<String, ()> {
+    let cache_info = target_input.options.as_ref()
+        .map(|o| o.xtream_info_cache).unwrap_or(false);
+    if cache_info {
+        if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
+            let (col_path, idx_path) = get_info_collection_and_idx_path(&path, &cluster);
+            let lock = app_state.shared_locks.get_lock(target_name);
+            let shared_lock = lock.read().unwrap();
+            if idx_path.exists() && col_path.exists() {
+                let index_tree = load_index(&idx_path);
+                if let Some(idx_map) = &index_tree {
+                    if let Some((offset, size)) = idx_map.get(&stream_id) {
+                        let mut reader = BufReader::new(File::open(&col_path).unwrap());
+                        if let Ok(bytes) = seek_read(&mut reader, *offset, *size) {
+                            let mut decomp: Vec<u8> = Vec::new();
+                            let _ = lzma_rs::lzma_decompress(&mut bytes.as_slice(), &mut decomp);
+                            drop(shared_lock);
+                            return Ok(String::from_utf8(decomp).unwrap());
                         }
                     }
                 }
-                drop(shared_lock);
             }
+            drop(shared_lock);
         }
-
-        let (action, stream_id_field) = match cluster {
-            XtreamCluster::Live => ("get_live_info", "live_id"),
-            XtreamCluster::Video => ("get_vod_info", "vod_id"),
-            XtreamCluster::Series => ("get_series_info", "series_id"),
-        };
-
-        let info_url = format!("{}/player_api.php?username={}&password={}&action={}&{}={}",
-                               target_input.url, &user.username, &user.password, action,
-                               stream_id_field, stream_id);
-        let url = reqwest::Url::parse(&info_url).unwrap();
-        let client = get_client_request(target_input, url);
-        if let Ok(response) = client.send().await {
-            if response.status().is_success() {
-                match response.text().await {
-                    Ok(content) => {
-                        if cache_info {
-                            if index_tree.is_none() {
-                                index_tree = Some(IndexTree::new());
-                            }
-                            match write_xtream_info(app_state, target_name, stream_id, &cluster, &content,
-                                                    index_tree.as_mut().unwrap()) {
-                                Ok(_) => {}
-                                Err(err) => { error!("{}", err.to_string()); }
-                            }
-                        }
-                        return Ok(content);
-                    }
-                    Err(err) => { error!("Failed to download info {}", err.to_string()); }
-                }
-            }
-        }
-    //} else if let Some(target_input) = app_state.config.get_input_for_target(target_name, &InputType::M3u) {
-      // TODO return dummy data ?
     }
-    Err(Error::new(std::io::ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}", target_name, &cluster, stream_id)))
+    Err(())
 }
 
-pub(crate) async fn xtream_get_short_epg(app_state: &AppState, target_name: &str, stream_id: &str, limit: &str, user: &UserCredentials) -> Result<String, Error> {
-    if let Some(target_input) = app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
-        let mut info_url = format!("{}/player_api.php?username={}&password={}&action=get_short_epg&stream_id={}",
-                                   target_input.url, &user.username, &user.password, stream_id);
-        if !(limit.is_empty() || limit.eq("0")) {
-            info_url = format!("{}&limit={}", info_url, limit);
-        }
-        let url = reqwest::Url::parse(&info_url).unwrap();
-        let client = get_client_request(target_input, url);
-        if let Ok(response) = client.send().await {
-            if response.status().is_success() {
-                match response.text().await {
-                    Ok(content) => {
-                        return Ok(content);
+pub(crate) async fn xtream_persist_stream_info(
+    app_state: &AppState, target_name: &str, stream_id: i32,
+    cluster: &XtreamCluster, target_input: &ConfigInput, content: &str) {
+    let cache_info = target_input.options.as_ref()
+        .map(|o| o.xtream_info_cache).unwrap_or(false);
+    if cache_info {
+        if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
+                let lock = app_state.shared_locks.get_lock(target_name);
+                let shared_lock = lock.write().unwrap();
+                let mut index_tree = {
+                    let (col_path, idx_path) = get_info_collection_and_idx_path(&path, cluster);
+                    if idx_path.exists() && col_path.exists() {
+                        load_index(&idx_path).unwrap_or_default()
+                    } else {
+                        IndexTree::new()
                     }
-                    Err(err) => { error!("Failed to download epg {}", err.to_string()); }
+                };
+                match write_xtream_info(app_state, target_name, stream_id, cluster, content,
+                                        &mut index_tree) {
+                    Ok(_) => {}
+                    Err(err) => { error!("{}", err.to_string()); }
                 }
-            }
+                drop(shared_lock);
         }
-    //} else if let Some(target_input) = app_state.config.get_input_for_target(target_name, &InputType::M3u) {
-        // TODO return dummy data ?
     }
-    Err(Error::new(std::io::ErrorKind::Other, format!("Cant find short epg with id: {}/{}", target_name, stream_id)))
 }

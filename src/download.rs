@@ -46,8 +46,8 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
 
 pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let mut playlist: Vec<PlaylistGroup> = Vec::new();
-    let username = input.username.as_ref().unwrap().clone();
-    let password = input.password.as_ref().unwrap().clone();
+    let username = input.username.as_ref().map_or("", |v| v);
+    let password = input.password.as_ref().map_or("", |v| v);
     let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);
     let stream_base_url = format!("{}/{}/{}", input.url, username, password);
 

@@ -101,7 +101,7 @@ fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
 }
 
 fn init_logger(log_level: &str) {
-    let mut log_builder = Builder::new();
+    let mut log_builder = Builder::from_default_env();
     // Set the log level based on the parsed value
     match log_level.to_lowercase().as_str() {
         "trace" => log_builder.filter_level(LevelFilter::Trace),

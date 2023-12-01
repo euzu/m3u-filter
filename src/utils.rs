@@ -4,7 +4,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use log::{debug, error};
 use path_absolutize::*;
-use reqwest::header;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
@@ -196,10 +195,10 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
 }
 
 
-pub(crate) fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest::RequestBuilder {
+pub(crate) fn get_client_request(input: &ConfigInput, url: url::Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
     let mut request = reqwest::Client::new().get(url);
     if input.headers.is_empty() {
-        let headers = get_request_headers(&input.headers);
+        let headers = get_request_headers(&input.headers, custom_headers);
         request = request.headers(headers);
     }
     request
@@ -215,20 +214,29 @@ pub(crate) fn get_client_request(input: &ConfigInput, url: url::Url) -> reqwest:
 // }
 
 
-pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>) -> HeaderMap {
-    let mut headers = header::HeaderMap::new();
+pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, custom_headers: Option<&HashMap<&str, &[u8]>>) -> HeaderMap {
+    debug!("Custom header: {:?}", custom_headers);
+    let mut headers = HeaderMap::new();
     for (key, value) in defined_headers {
         headers.insert(
             HeaderName::from_bytes(key.as_bytes()).unwrap(),
-            HeaderValue::from_bytes(value.as_bytes()).unwrap(),
-        );
+            HeaderValue::from_bytes(value.as_bytes()).unwrap());
+    }
+    if let Some(custom) = custom_headers {
+        for (key, value) in custom {
+            if !("host".eq(*key) || headers.contains_key(*key)) {
+                headers.insert(
+                    HeaderName::from_bytes(key.as_bytes()).unwrap(),
+                    HeaderValue::from_bytes(value).unwrap());
+            }
+        }
     }
     debug!("Request with headers{:?}", &headers);
     headers
 }
 
 async fn download_json_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, String> {
-    let request = get_client_request(input, url);
+    let request = get_client_request(input, url, None);
     match request.send().await {
         Ok(response) => {
             if response.status().is_success() {
@@ -260,7 +268,7 @@ pub(crate) async fn get_input_json_content(input: &ConfigInput, url_str: &String
 }
 
 async fn download_text_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<String, String> {
-    let request = get_client_request(input, url);
+    let request = get_client_request(input, url, None);
     match request.send().await {
         Ok(response) => {
             if response.status().is_success() {

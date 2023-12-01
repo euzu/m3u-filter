@@ -17,38 +17,41 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
         Ok(response) => {
             match fs::create_dir_all(&file_download.file_dir) {
                 Ok(_) => {
-                    let file_path_str = file_download.file_path.to_str().unwrap();
-                    info!("Downloading {}", file_path_str);
-                    match File::create(&file_download.file_path) {
-                        Ok(mut file) => {
-                            let mut downloaded: u64 = 0;
-                            let mut stream = response.bytes_stream().map_err(|err| io::Error::new(ErrorKind::Other, err));
-                            loop {
-                                match stream.try_next().await {
-                                    Ok(item) => {
-                                        match item {
-                                            Some(chunk) => {
-                                                match file.write_all(&chunk) {
-                                                    Ok(_) => {
-                                                        downloaded += chunk.len() as u64;
-                                                        active.write().unwrap().as_mut().unwrap().size = downloaded;
+                    if let Some(file_path_str) = file_download.file_path.to_str() {
+                        info!("Downloading {}", file_path_str);
+                        match File::create(&file_download.file_path) {
+                            Ok(mut file) => {
+                                let mut downloaded: u64 = 0;
+                                let mut stream = response.bytes_stream().map_err(|err| io::Error::new(ErrorKind::Other, err));
+                                loop {
+                                    match stream.try_next().await {
+                                        Ok(item) => {
+                                            match item {
+                                                Some(chunk) => {
+                                                    match file.write_all(&chunk) {
+                                                        Ok(_) => {
+                                                            downloaded += chunk.len() as u64;
+                                                            active.write().unwrap().as_mut().unwrap().size = downloaded;
+                                                        }
+                                                        Err(err) => return Err(format!("Error while writing to file: {} {}", file_path_str, err))
                                                     }
-                                                    Err(err) => return Err(format!("Error while writing to file: {} {}", file_path_str, err))
+                                                }
+                                                None => {
+                                                    let megabytes = bytes_to_megabytes(downloaded);
+                                                    info!("Downloaded {}, filesize: {}MB", file_path_str, megabytes);
+                                                    active.write().unwrap().as_mut().unwrap().size = downloaded;
+                                                    return Ok(());
                                                 }
                                             }
-                                            None => {
-                                                let megabytes = bytes_to_megabytes(downloaded);
-                                                info!("Downloaded {}, filesize: {}MB", file_path_str, megabytes);
-                                                active.write().unwrap().as_mut().unwrap().size = downloaded;
-                                                return Ok(());
-                                            }
                                         }
+                                        Err(err) => return Err(format!("Error while writing to file: {} {}", file_path_str, err))
                                     }
-                                    Err(err) => return Err(format!("Error while writing to file: {} {}", file_path_str, err))
                                 }
                             }
+                            Err(err) => Err(format!("Error while writing to file: {} {}", file_path_str, err))
                         }
-                        Err(err) => Err(format!("Error while writing to file: {} {}", file_path_str, err))
+                    } else {
+                        Err("Error file-download file-path unknown".to_string())
                     }
                 }
                 Err(err) => Err(format!("Error while creating directory for file: {} {}", &file_download.file_dir.to_str().unwrap_or("?"), err))
@@ -64,7 +67,7 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<Do
     };
     if next_download.is_some() {
         { *download_queue.as_ref().active.write().unwrap() = next_download; }
-        let headers = get_request_headers(&download_cfg.headers);
+        let headers = get_request_headers(&download_cfg.headers, None);
         let dq = Arc::clone(&download_queue);
         match reqwest::Client::builder().default_headers(headers).build() {
             Ok(client) => {

@@ -7,21 +7,20 @@ use crate::model::config::ConfigTarget;
 
 pub(crate) async fn serve_file(file_path: &Path, req: &HttpRequest) -> HttpResponse {
     if file_path.exists() {
-        let file = actix_files::NamedFile::open_async(file_path).await.unwrap()
-            .set_content_type(mime::APPLICATION_JSON)
-            .disable_content_disposition();
-        let mut result = file.into_response(req);
-        let headers = result.headers_mut();
-        headers.insert(CACHE_CONTROL, HeaderValue::from_bytes("no-cache".as_bytes()).unwrap());
-        result
-    } else {
-        HttpResponse::NoContent().finish()
+        if let Ok(file) = actix_files::NamedFile::open_async(file_path).await {
+            let mut result = file.set_content_type(mime::APPLICATION_JSON)
+                .disable_content_disposition().into_response(req);
+            let headers = result.headers_mut();
+            headers.insert(CACHE_CONTROL, HeaderValue::from_bytes("no-cache".as_bytes()).unwrap());
+            return result;
+        }
     }
+    HttpResponse::NoContent().finish()
 }
 
 pub(crate) fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a web::Query<UserApiRequest>, app_state: &'a web::Data<AppState>) -> Option<(UserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() && !password.is_empty() {
-       app_state.config.get_target_for_user(username, password)
+        app_state.config.get_target_for_user(username, password)
     } else {
         let token = api_req.token.as_str().trim();
         if !token.is_empty() {

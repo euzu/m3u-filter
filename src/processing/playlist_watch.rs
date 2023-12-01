@@ -34,7 +34,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
                         }
                     }
                     None => {
-                        error!("failed to load watch_file {}", &path.to_str().unwrap());
+                        error!("failed to load watch_file {}", &path.to_str().unwrap_or_default());
                     }
                 }
             }
@@ -42,7 +42,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
                 match save_watch_tree(&save_path, new_tree) {
                     Ok(_) => {}
                     Err(err) => {
-                        error!("failed to write watch_file {}: {}", &save_path.to_str().unwrap(), err)
+                        error!("failed to write watch_file {}: {}", &save_path.to_str().unwrap_or_default(), err)
                     }
                 }
             }
