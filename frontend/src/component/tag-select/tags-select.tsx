@@ -1,6 +1,7 @@
 import './tag-select.scss';
 import {useCallback, useEffect, useMemo, useState} from "react";
 import {noop} from "rxjs";
+import {genUuid} from "../../utils/uuid";
 
 interface TagSelectProps {
     name: string;
@@ -13,7 +14,7 @@ interface TagSelectProps {
 export default function TagSelect(props: TagSelectProps) {
     const {name, multi, options, defaultValues, onSelect} = props;
     const [selected, setSelected] = useState<Record<number, boolean>>({});
-    const uuid = useMemo(() => Date.now() + '-' + Math.floor(Math.random() * 99999), []);
+    const uuid = useMemo(() => genUuid(), []);
 
     useEffect(() => {
         if (defaultValues && options) {

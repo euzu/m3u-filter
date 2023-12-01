@@ -1,6 +1,7 @@
 import './map-editor.scss';
 
 import {KeyboardEvent, useCallback, useEffect, useMemo, useState} from "react";
+import {genUuid} from "../../utils/uuid";
 
 interface KeyValue {
     key: string;
@@ -17,7 +18,7 @@ interface MapEditorProps {
 
 export default function MapEditor(props: MapEditorProps) {
     const {name, values, onChange} = props;
-    const uuid = useMemo(() => Date.now() + '-' + Math.floor(Math.random() * 99999), []);
+    const uuid = useMemo(() => genUuid(), []);
     const [data, setData] = useState<KeyValue[]>(mapToList(values) || []);
 
     useEffect(() => {
