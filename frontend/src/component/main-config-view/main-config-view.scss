@@ -12,10 +12,35 @@
     flex-flow: column;
   }
 
-  &__content-help-img {
-    max-width: 360px;
-    height: auto;
-    fill: currentColor;
+  &__content {
+
+    display: flex;
+    flex-flow: column;
+    gap: 4px;
+    align-items: center;
+
+    &-help {
+
+      &-img {
+        max-width: 360px;
+        height: auto;
+        fill: currentColor;
+      }
+    }
   }
+
+  &__restart {
+    display: flex;
+    flex-flow: row;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    color: var(--label-color);
+
+    &-warn-icon {
+      color: var(--warn-color);
+    }
+  }
+
 }
 

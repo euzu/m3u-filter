@@ -72,7 +72,7 @@ export default function FormView(props: FormViewProps) {
                 return <input defaultValue={data?.[field.name]} data-field={field.name}
                               onChange={handleValueChange}></input>;
         }
-    }, [data, handleValueChange,handleCheckboxChange]);
+    }, [data, handleChange, handleValueChange,handleCheckboxChange]);
 
     return <div className={'form-view'}>
         <div className={'form-view__table'}>

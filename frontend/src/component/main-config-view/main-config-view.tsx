@@ -2,9 +2,9 @@ import React, {useCallback, useMemo, useState} from "react";
 import './main-config-view.scss';
 import ServerConfig from "../../model/server-config";
 import {useSnackbar} from "notistack";
-import {useServices} from "../../provider/service-provider";
 import FormView, {FormFieldType} from "../form-view/from-view";
 import TabSet from "../tab-set/tab-set";
+import {getIconByName} from "../../icons/icons";
 
 const isNumber = (value: string): boolean => {
     return !isNaN(value as any);
@@ -56,7 +56,7 @@ interface MainConfigViewProps {
 
 export default function MainConfigView(props: MainConfigViewProps) {
     const {config} = props;
-    const services = useServices();
+    //const services = useServices();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [activeTab, setActiveTab] = useState<string>('api');
     const apiConfig = useMemo(() => config?.api || {}, [config]);
@@ -75,7 +75,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
         if (mainConfig && apiConfig) {
             enqueueSnackbar("not implemented!", {variant: 'error'})
 
-            console.log(mainConfig, apiConfig, videoConfig, videoDownloadConfig, messagingNotifyConfig);
+            //console.log(mainConfig, apiConfig, videoConfig, videoDownloadConfig, messagingNotifyConfig);
 
             // @TODO validations
             // services.config().saveServerInfo(serverInfo).subscribe({
@@ -83,7 +83,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
             //     error: (err) => enqueueSnackbar("Failed to save api proxy config!", {variant: 'error'})
             // });
         }
-    }, [services, mainConfig, apiConfig, enqueueSnackbar]);
+    }, [mainConfig, apiConfig, enqueueSnackbar]);
 
     const handleTabChange = useCallback((tab: string) => {
         setActiveTab(tab);
@@ -99,7 +99,6 @@ export default function MainConfigView(props: MainConfigViewProps) {
             <div className={'main-config__content-form'  + ('api' !== activeTab ? ' hidden' : '')}>
                 <FormView data={apiConfig} fields={CONFIG_API_FIELDS}></FormView>
                 <div className={'main-config__content-help'}>
-                    <span>You need to restart to apply changes.</span>
                     <span>Schedule example:</span>
                     {scheduleImage}
                 </div>
@@ -115,6 +114,11 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 <FormView data={videoConfig} fields={CONFIG_VIDEO_FIELDS}></FormView>
                 <FormView data={videoDownloadConfig} fields={CONFIG_VIDEO_DOWNLOAD_FIELDS}></FormView>
             </div>
+        </div>
+
+        <div className={'main-config__restart'}>
+            <span className="main-config__restart-warn-icon">{getIconByName('Warn')}</span>
+            <span>You need to restart to apply changes.</span>
         </div>
     </div>
 }

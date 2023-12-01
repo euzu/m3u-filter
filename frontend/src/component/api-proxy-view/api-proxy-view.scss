@@ -6,5 +6,16 @@
   @include preferences.prefsRoot();
   @include preferences.prefsToolbar();
   @include preferences.prefsForm();
+
+  &__content-help{
+    display: flex;
+    flex-flow: row;
+    gap: 4px;
+    align-items: center;
+    &-warn-icon {
+      color: var(--warn-color);
+    }
+  }
+
 }
 

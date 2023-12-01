@@ -4,6 +4,7 @@ import ServerConfig, {ServerInfo} from "../../model/server-config";
 import {useSnackbar} from "notistack";
 import {useServices} from "../../provider/service-provider";
 import FormView, {FormFieldType} from "../form-view/from-view";
+import {getIconByName} from "../../icons/icons";
 
 const isNumber = (value: string): boolean => {
     return !isNaN(value as any);
@@ -46,6 +47,10 @@ export default function ApiProxyView(props: ApiProxyViewProps) {
         </div>
         <div className={'api-proxy__content'}>
             <FormView data={serverInfo} fields={SERVER_INFO_FIELDS}></FormView>
+        </div>
+        <div className="api-proxy__content-help">
+            <span className="api-proxy__content-help-warn-icon">{getIconByName('Warn')}</span>
+            <span>You need to restart to apply changes.</span>
         </div>
     </div>
 }

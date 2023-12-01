@@ -1,15 +1,13 @@
 import './map-editor.scss';
 
-
 import {KeyboardEvent, useCallback, useEffect, useMemo, useState} from "react";
-import {noop} from "rxjs";
 
 interface KeyValue {
     key: string;
     value: string;
 }
 
-const mapToList = (data: Record<string, string>) => Object.keys(data).map(key => ({key, value: data[key]}));
+const mapToList = (data: Record<string, string>) => data ? Object.keys(data).map(key => ({key, value: data[key]})) : [];
 
 interface MapEditorProps {
     name: string;
@@ -24,7 +22,7 @@ export default function MapEditor(props: MapEditorProps) {
 
     useEffect(() => {
         onChange(name, data as any);
-    }, [data]);
+    }, [data, name, onChange]);
 
     const handleValueChange = useCallback((target: any) => {
         const is_key = target.dataset.field === 'key';
