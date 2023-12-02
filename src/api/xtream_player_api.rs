@@ -119,7 +119,7 @@ async fn xtream_player_api_stream(
                             if response.status().is_success() {
                                 let mut response_builder = HttpResponse::Ok();
                                 response.headers().iter().for_each(|(k, v)| {
-                                    println!("{}: {}", k, String::from_utf8_lossy(v.as_bytes()));
+                                    //debug!("{}: {}", k, String::from_utf8_lossy(v.as_bytes()));
                                     response_builder.insert_header((k, v));
                                 });
                                 return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
