@@ -1,14 +1,15 @@
 use std::path::{PathBuf};
 use actix_web::{HttpRequest, HttpResponse, Resource, web};
 use log::{info};
+use url::Url;
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest};
-use crate::model::config::{Config, ConfigTarget};
+use crate::model::config::{Config, ConfigTarget, InputType};
 use crate::model::model_config::TargetType;
 use crate::repository::m3u_repository::get_m3u_epg_file_path;
 use crate::repository::xtream_repository::{get_xtream_epg_file_path, get_xtream_storage_path};
-use crate::utils::path_exists;
+use crate::utils::{get_client_request, path_exists};
 
 
 fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<PathBuf> {
@@ -25,7 +26,7 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
             }
             TargetType::Xtream => {
                 if let Some(storage_path) = get_xtream_storage_path(config, &target.name) {
-                    let epg_path=  get_xtream_epg_file_path(&storage_path);
+                    let epg_path = get_xtream_epg_file_path(&storage_path);
                     if path_exists(&epg_path) {
                         return Some(epg_path);
                     } else {
@@ -44,15 +45,39 @@ async fn xmltv_api(
     req: HttpRequest,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    match get_user_target(&api_req, &_app_state) {
-        Some((_, target)) => {
-            match get_epg_path_for_target(&_app_state.config, target) {
-                None => HttpResponse::NoContent().finish(),
-                Some(epg_path) => serve_file(&epg_path, &req).await
+    if let Some((_, target)) = get_user_target(&api_req, &_app_state) {
+        match get_epg_path_for_target(&_app_state.config, target) {
+            None => {
+                // if no epg_url is provided for input, we did not process the xmltv for our channels.
+                // we are now delivering the original untouched xmltv.
+                // if you want to use xmltv then provide the url in the config to filter unnecessary content.
+                let target_name = &target.name;
+                if let Some(input) = _app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
+                    let epg_url = input.epg_url.as_ref().map_or("".to_string(), |s| s.to_owned());
+                    let api_url = if  epg_url.is_empty() {
+                        format!("{}/xmltv.php?username={}&password={}",
+                                input.url.as_str(),
+                                input.username.as_ref().unwrap_or(&"".to_string()).as_str(),
+                                input.password.as_ref().unwrap_or(&"".to_string()).as_str(),
+                        )
+                    } else { epg_url.to_string() };
+                    if let Ok(url) = Url::parse(&api_url) {
+                        let client = get_client_request(input, url, None);
+                        if let Ok(response) = client.send().await {
+                            if response.status().is_success() {
+                                if let Ok(content) = response.text().await {
+                                    return HttpResponse::Ok().content_type(mime::TEXT_XML).body(content);
+                                }
+                            }
+                        }
+                    }
+                }
             }
+            Some(epg_path) => return serve_file(&epg_path, &req).await
         }
-        None => HttpResponse::BadRequest().finish()
     }
+    HttpResponse::Ok().content_type(mime::TEXT_XML).body(
+        r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)
 }
 
 pub(crate) fn xmltv_api_register() -> Vec<Resource> {

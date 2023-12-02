@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -203,19 +203,8 @@ pub(crate) fn get_client_request(input: &ConfigInput, url: url::Url, custom_head
     }
     request
 }
-//
-// pub(crate) fn get_client_request_sync(input: &ConfigInput, url: url::Url) -> reqwest::blocking::RequestBuilder {
-//     let mut request = reqwest::blocking::Client::new().get(url);
-//     if input.headers.is_empty() {
-//         let headers = get_request_headers(&input.headers);
-//         request = request.headers(headers);
-//     }
-//     request
-// }
-
 
 pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, custom_headers: Option<&HashMap<&str, &[u8]>>) -> HeaderMap {
-    debug!("Custom header: {:?}", custom_headers);
     let mut headers = HeaderMap::new();
     for (key, value) in defined_headers {
         headers.insert(
@@ -223,8 +212,10 @@ pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, cus
             HeaderValue::from_bytes(value.as_bytes()).unwrap());
     }
     if let Some(custom) = custom_headers {
+        let header_keys: HashSet<String> = headers.keys().map(|k| k.as_str().to_lowercase()).collect();
         for (key, value) in custom {
-            if !("host".eq(*key) || headers.contains_key(*key)) {
+            let key_lc = key.to_lowercase();
+            if !("host" == key_lc || header_keys.contains(key_lc.as_str())) {
                 headers.insert(
                     HeaderName::from_bytes(key.as_bytes()).unwrap(),
                     HeaderValue::from_bytes(value).unwrap());

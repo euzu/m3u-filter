@@ -7,6 +7,12 @@ import {useSnackbar} from "notistack";
 import {useServices} from "../../provider/service-provider";
 import ConfigUtils from "../../utils/config-utils";
 import TabSet, {TabSetTab} from "../tab-set/tab-set";
+import TagSelect from "../tag-select/tags-select";
+
+const PROXY_OPTIONS = [
+    { value: 'reverse', label: 'Reverse' },
+    { value: 'redirect', label: 'Redirect' }
+];
 
 interface UserViewProps {
     config: ServerConfig;
@@ -66,7 +72,8 @@ export default function UserView(props: UserViewProps) {
             target.credentials.push({
                 username,
                 password: TextGenerator.generatePassword(),
-                token: TextGenerator.generatePassword()
+                token: TextGenerator.generatePassword(),
+                proxy: 'reverse'
             });
             setTargets([...targets]);
         }
@@ -95,6 +102,16 @@ export default function UserView(props: UserViewProps) {
             } else if (field === 'token') {
                 target.credentials[idx].token = evt.target.value;
             }
+        }
+    }, [targets]);
+
+    const handleChange = useCallback((fieldWithTargetAndIndex: string, value: any) => {
+        const sep_idx = fieldWithTargetAndIndex.lastIndexOf('-');
+        const target_name = fieldWithTargetAndIndex.substring(0, sep_idx);
+        const target = targets.find(target => target.target === target_name);
+        if (target) {
+            const idx = parseInt(fieldWithTargetAndIndex.substring(sep_idx+1));
+            target.credentials[idx].proxy = value;
         }
     }, [targets]);
 
@@ -174,6 +191,14 @@ export default function UserView(props: UserViewProps) {
                                                        data-field={field} onChange={handleValueChange}></input>
                                             </div>
                                         )}
+                                        <div key={'target_' + target.target + '_proxy_' + usr.username}
+                                             className={'user__target-user-col'}>
+                                            <div className={'user__target-user-col-label'}><label>Proxy</label></div>
+
+                                            <TagSelect options={PROXY_OPTIONS} name={target.target + '-' + idx}
+                                                       defaultValues={(usr as any)?.['proxy']} multi={false} onSelect={handleChange}></TagSelect>
+                                        </div>
+
                                         <div className={'user__target-user-col user__target-user-col-toolbar'}>
                                             <span data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
                                                 {getIconByName('PersonRemove')}

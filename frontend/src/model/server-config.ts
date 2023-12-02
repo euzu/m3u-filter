@@ -102,6 +102,7 @@ export interface Credentials {
     username: string;
     password: string;
     token: string;
+    proxy: 'redirect' | 'reverse';
 }
 
 export interface TargetUser {

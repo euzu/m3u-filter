@@ -9,4 +9,4 @@ server:
 user:
   - target: pl1
     credentials:
-      - {username: x3452, password: ztrhgrGZrt83hjerter, token: 4243234wer234er234}
+      - {username: x3452, password: ztrhgrGZrt83hjerter, token: 4243234wer234er234, proxy: redirect}

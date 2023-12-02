@@ -1,12 +1,56 @@
 use std::collections::HashSet;
+use std::str::FromStr;
+use enum_iterator::Sequence;
+use crate::create_m3u_filter_error_result;
 
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
+pub(crate) enum ProxyType {
+    #[serde(rename = "reverse")]
+    Reverse,
+    #[serde(rename = "redirect")]
+    Redirect,
+}
+
+impl ProxyType {
+    fn default() -> ProxyType {
+        ProxyType::Reverse
+    }
+}
+
+impl ToString for ProxyType {
+    fn to_string(&self) -> String {
+        match self {
+            ProxyType::Reverse => "reverse".to_string(),
+            ProxyType::Redirect => "redirect".to_string()
+        }
+    }
+}
+
+impl FromStr for ProxyType {
+    type Err = M3uFilterError;
+
+    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+        if s.eq("reverse") {
+            Ok(ProxyType::Reverse)
+        } else if s.eq("redirect") {
+            Ok(ProxyType::Redirect)
+        } else {
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UserCredentials {
     pub username: String,
     pub password: String,
     pub token: Option<String>,
+    #[serde(default = "ProxyType::default")]
+    pub proxy: ProxyType
 }
 
 impl UserCredentials {

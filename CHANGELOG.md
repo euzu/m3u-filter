@@ -4,6 +4,7 @@
 * Added config Web-UI
 * Added xtream vod_info and series_info, stream seek. 
 * Added input options with attribute xtream_info_cache to cache get_vod_info and get_series_info on disc
+* for xtream api added proxy types reverse and redirect to user credentials.
 
 # v1.1.3(2023-11-08)
 * added new target options 

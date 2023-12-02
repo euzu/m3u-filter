@@ -344,7 +344,7 @@ pub(crate) async fn xtream_get_stored_stream_info(
         .map(|o| o.xtream_info_cache).unwrap_or(false);
     if cache_info {
         if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
-            let (col_path, idx_path) = get_info_collection_and_idx_path(&path, &cluster);
+            let (col_path, idx_path) = get_info_collection_and_idx_path(&path, cluster);
             let lock = app_state.shared_locks.get_lock(target_name);
             let shared_lock = lock.read().unwrap();
             if idx_path.exists() && col_path.exists() {
