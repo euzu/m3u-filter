@@ -236,6 +236,7 @@ pub(crate) struct ServerConfig {
     pub api: ConfigApi,
     pub threads: u8,
     pub working_dir: String,
+    pub backup_dir: Option<String>,
     pub schedule: Option<String>,
     pub sources: Vec<ServerSourceConfig>,
     pub video: Option<VideoConfig>,

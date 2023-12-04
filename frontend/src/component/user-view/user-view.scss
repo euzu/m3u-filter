@@ -1,6 +1,10 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
 
+.tag-select {
+  min-width: 160px;
+}
+
 .user {
   @include preferences.prefsRoot();
   @include preferences.prefsToolbar();

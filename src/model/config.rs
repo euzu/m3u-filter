@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
@@ -505,12 +506,17 @@ pub(crate) struct Config {
     pub api: ConfigApi,
     pub sources: Vec<ConfigSource>,
     pub working_dir: String,
+    pub backup_dir: Option<String>,
     pub templates: Option<Vec<PatternTemplate>>,
     pub video: Option<VideoConfig>,
     pub schedule: Option<String>,
     pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _config_file_path: String,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _sources_file_path: String,
 }
 
 impl Config {
@@ -592,6 +598,16 @@ impl Config {
 
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         self.working_dir = get_working_path(&self.working_dir);
+        if self.backup_dir.is_none() {
+            self.backup_dir = Some(PathBuf::from(&self.working_dir).join(".backup").into_os_string().to_string_lossy().to_string());
+        }
+        let backupdir = PathBuf::from(self.backup_dir.as_ref().unwrap());
+        if ! backupdir.exists() {
+            match std::fs::create_dir(backupdir) {
+                Ok(_) => {}
+                Err(err) => { error!("Could not create backup dir {} {}", self.backup_dir.as_ref().unwrap(), err)}
+            }
+        }
         self.api.prepare();
         self.prepare_api_web_root();
         if let Some(templates) = &mut self.templates {

@@ -11,8 +11,8 @@ use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ServerInfo, TargetUser};
 use crate::processing::playlist_processor::exec_processing;
 
-fn save_config_api_proxy(api_proxy: &mut ApiProxyConfig) -> Option<M3uFilterError> {
-    match save_api_proxy(api_proxy) {
+fn save_config_api_proxy(backup_dir: &str, api_proxy: &mut ApiProxyConfig) -> Option<M3uFilterError> {
+    match save_api_proxy(backup_dir, api_proxy) {
         Ok(_) => {}
         Err(err) => {
             error!("Failed to save api_proxy.yml {}", err.to_string());
@@ -29,7 +29,8 @@ pub(crate) async fn save_config_api_proxy_user(
     req.0.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.trim());
     if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
         api_proxy.user = req.0;
-        if let Some(err) = save_config_api_proxy(api_proxy) {
+        let backup_dir = _app_state.config.backup_dir.as_ref().unwrap().as_str();
+        if let Some(err) = save_config_api_proxy(backup_dir, api_proxy) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
     }
@@ -61,7 +62,8 @@ pub(crate) async fn save_config_api_proxy_config(
     if req.0.is_valid() {
         if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
             api_proxy.server = req.0;
-            if let Some(err) = save_config_api_proxy(api_proxy) {
+            let backup_dir = _app_state.config.backup_dir.as_ref().unwrap().as_str();
+            if let Some(err) = save_config_api_proxy(backup_dir, api_proxy) {
                 return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
             }
         }
@@ -175,6 +177,7 @@ pub(crate) async fn config(
         api: _app_state.config.api.clone(),
         threads: _app_state.config.threads,
         working_dir: _app_state.config.working_dir.to_owned(),
+        backup_dir: _app_state.config.backup_dir.to_owned(),
         schedule: _app_state.config.schedule.clone(),
         video: _app_state.config.video.clone(),
         sources,

@@ -176,6 +176,8 @@ export default function UserView(props: UserViewProps) {
                                         <label>Password</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
                                         <label>Token</label></div>
+                                    <div className={'user__target-user-col user__target-user-col-header'}>
+                                        <label>Proxy</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}></div>
                                 </div>
 
@@ -192,11 +194,10 @@ export default function UserView(props: UserViewProps) {
                                             </div>
                                         )}
                                         <div key={'target_' + target.target + '_proxy_' + usr.username}
-                                             className={'user__target-user-col'}>
+                                             className={'user__target-user-col '}>
                                             <div className={'user__target-user-col-label'}><label>Proxy</label></div>
-
                                             <TagSelect options={PROXY_OPTIONS} name={target.target + '-' + idx}
-                                                       defaultValues={(usr as any)?.['proxy']} multi={false} onSelect={handleChange}></TagSelect>
+                                                       defaultValues={(usr as any)?.['proxy']} radio={true} multi={false} onSelect={handleChange}></TagSelect>
                                         </div>
 
                                         <div className={'user__target-user-col user__target-user-col-toolbar'}>

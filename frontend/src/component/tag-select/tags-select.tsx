@@ -9,10 +9,11 @@ interface TagSelectProps {
     defaultValues?: any[];
     onSelect: (name: string, values: any) => void;
     multi?: boolean;
+    radio?: boolean;
 }
 
 export default function TagSelect(props: TagSelectProps) {
-    const {name, multi, options, defaultValues, onSelect} = props;
+    const {name, multi, options, defaultValues, onSelect, radio} = props;
     const [selected, setSelected] = useState<Record<number, boolean>>({});
     const uuid = useMemo(() => genUuid(), []);
 
@@ -42,9 +43,16 @@ export default function TagSelect(props: TagSelectProps) {
                 selections[idx] = !!!selections[idx];
                 return {...selections};
             }
+            if (radio) {
+                if (!!selections[idx]) {
+                    return selections;
+                } else {
+                    return {[idx]: !!!selections[idx]} as any;
+                }
+            }
             return {[idx]: !!!selections[idx]} as any;
         });
-    }, [multi]);
+    }, [multi, radio]);
 
     return <div className={'tag-select'}>
         {options.map((o, idx) =>

@@ -42,15 +42,18 @@ pub(crate) fn read_config(config_file: &str, sources_file: &str) -> Result<Confi
     let files = vec![std::path::PathBuf::from(config_file), std::path::PathBuf::from(sources_file)];
     match MultiFileReader::new(&files) {
         Ok(file) => {
-            let mut cfg: Config = match serde_yaml::from_reader(file) {
-                Ok(result) => result,
-                Err(e) => {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant read config file: {}", e);
+            match serde_yaml::from_reader::<_, Config>(file) {
+                Ok(mut result) => {
+                    result._config_file_path = config_file.to_string();
+                    result._sources_file_path = sources_file.to_string();
+                    match result.prepare() {
+                        Ok(_) => Ok(result),
+                        Err(err) => Err(err)
+                    }
                 }
-            };
-            match cfg.prepare() {
-                Ok(_) => Ok(cfg),
-                Err(err) => Err(err)
+                Err(e) => {
+                    create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant read config file: {}", e)
+                }
             }
         }
         Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err)
@@ -104,13 +107,14 @@ pub(crate) fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
     }
 }
 
-pub(crate) fn save_api_proxy(config: &ApiProxyConfig) -> Result<(), M3uFilterError>{
+pub(crate) fn save_api_proxy(backup_dir: &str, config: &ApiProxyConfig) -> Result<(), M3uFilterError> {
     let path = PathBuf::from(&config._file_path);
-    let backup_path = PathBuf::from(format!("{}_{}", &config._file_path, Local::now().format("%Y%m%d_%H%M%S")));
+    let filename = path.file_name().map_or("api-proxy.yml".to_string(), |f| f.to_string_lossy().to_string());
+    let backup_path = PathBuf::from(backup_dir).join(format!("{}_{}", filename, Local::now().format("%Y%m%d_%H%M%S")));
 
     match std::fs::copy(&path, &backup_path) {
         Ok(_) => {}
-        Err(err) => {error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err)}
+        Err(err) => { error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err) }
     }
     info!("Saving api proxy to {}", &path.to_str().unwrap_or("?"));
     match File::create(&path) {
@@ -120,5 +124,4 @@ pub(crate) fn save_api_proxy(config: &ApiProxyConfig) -> Result<(), M3uFilterErr
         }
         Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not write file {}: {}", &path.to_str().unwrap_or("?"), err)
     }
-
 }
