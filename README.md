@@ -44,8 +44,6 @@ This means, even disabled inputs and targets are processed when the given target
 Top level entries in the config files are:
 * `api`
 * `working_dir`
-* `templates` _optional_
-* `sources`
 * `threads` _optional_
 * `messaging`  _optional_
 * `video` _optional_
@@ -65,7 +63,92 @@ Default is `0`.
 
 With this configuration, you should create a `data` directory where you execute the binary.
 
-### 1.4 `templates`
+### 1.4 `messaging`
+`messaging` is an optional configuration for receiving messages.
+Currently only telegram is supported.
+
+Messaging is Opt-In, you need to set the `notify_on` message types which are
+- `info`
+- `stats`
+- `error`
+
+```yaml
+messaging:
+  notify_on:
+    - info
+    - stats
+    - error
+  telegram:
+    bot_token: '<telegram bot token>'
+    chat_ids:
+      - '<telegram chat id>'
+```
+
+For more information: [Telegram bots](https://core.telegram.org/bots/tutorial)
+
+### 1.5 `video`
+`video` is optional.
+
+It has 2 entries `extensions` and `download`.
+
+- `extensions` are a list of video file extensions like `mp4`, `avi`, `mkv`.  
+When you have input `m3u` and output `xtream` the url's with the matching endings will be categorized as `video`.
+
+- `download` is _optional_ and is only necessary if you want to download the video files from the ui 
+to a specific directory. if defined, the download button from the `ui` is available.
+  - `headers` _optional_, download headers
+  - `organize_into_directories` _optional_, orgainize downloads into directories  
+  - `episode_pattern` _optional_ if you download episodes, the suffix like `S01.E01` should be removed to place all 
+files into one folder. The named capture group `episode` is mandatory.  
+Example: `.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*`
+- `web_search` is _optional_, example: `https://www.imdb.com/search/title/?title={}`, 
+define `download.episode_pattern` to remove episode suffix from titles. 
+
+```yaml
+video:
+  web_search: 'https://www.imdb.com/search/title/?title={}'
+  extensions:
+    - mkv
+    - mp4
+    - avi
+  download:
+    headers:
+      User-Agent: "AppleTV/tvOS/9.1.1."
+      Accept: "video/*"
+    directory: /tmp/
+    organize_into_directories: true
+    episode_pattern: '.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*'
+```
+
+### 1.5 `schedule`
+Schedule is optional.
+Format is
+```yaml
+#   sec  min   hour   day of month   month   day of week   year
+schedule: "0  0  8,20  *  *  *  *"
+```
+
+At the given times the complete processing is started. Do not start it every second or minute.
+You could be banned from your server. Twice a day should be enough.
+
+
+## Example config file
+```yaml
+threads: 4
+working_dir: ./data
+api:
+  host: localhost
+  port: 8901
+  web_root: ./web
+```
+
+## 2. `source.yml`
+
+Has the following top level entries:
+* `templates` _optional_
+* `sources`
+
+### 2.1 `templates`
 If you have a lot of repeats in you regexps, you can use `templates` to make your regexps cleaner.
 You can reference other templates in templates with `!name!`.
 ```yaml
@@ -79,36 +162,36 @@ With this definition you can use `delimiter` and `quality` in your regexp's surr
 
 This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp string.
 
-### 1.5. `sources`
+### 2.2. `sources`
 `sources` is a sequence of source definitions, which have two top level entries:
 -`inputs`
 -`targets`
 
-### 1.5.1 `inputs`
+### 2.2.1 `inputs`
 `inputs` is a list of sources.
 
 Each input has the following attributes:
 
-  - `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
-  - `enabled` is optional, default is true, if you disable the processing is skipped 
-  - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
-  - `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is `http://<hostname>:<port>`
-  - `epg_url` _optional_ xmltv url
-  - `headers` is optional, used only for type `xtream`
-  - `username` only mandatory for type `xtream`
-  - `pasword`only mandatory for type `xtream`
-  - `prefix` is optional, it is applied to the given field with the given value
-  - `suffix` is optional, it is applied to the given field with the given value
-  - `options` is optional, 
-     + `xtream_info_cache` true or false, vod_info and series_info can be cached to disc to reduce network traffic to provider.
+- `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
+- `enabled` is optional, default is true, if you disable the processing is skipped
+- `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
+- `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is `http://<hostname>:<port>`
+- `epg_url` _optional_ xmltv url
+- `headers` is optional, used only for type `xtream`
+- `username` only mandatory for type `xtream`
+- `pasword`only mandatory for type `xtream`
+- `prefix` is optional, it is applied to the given field with the given value
+- `suffix` is optional, it is applied to the given field with the given value
+- `options` is optional,
+    + `xtream_info_cache` true or false, vod_info and series_info can be cached to disc to reduce network traffic to provider.
 
 `persist` should be different for `m3u` and `xtream` types. For `m3u` use full filename like `./playlist_{}.m3u`.
 For `xtream` use a prefix like `./playlist_`
 
 `prefix` and `suffix` are appended after all processing is done, but before sort.
 They have 2 fields:
-  - `field` can be `name` , `group`, `title`
-  - `value` a static text
+- `field` can be `name` , `group`, `title`
+- `value` a static text
 
 Example input config for `m3u`
 ```yaml
@@ -144,7 +227,7 @@ sources:
 ```
 
 
-### 1.5.2 `targets`
+### 2.2.2 `targets`
 Has the following top level entries:
 - `enabled` _optional_ default is `true`, if you disable the processing is skipped
 - `name` _optional_ default is `default`, if not default it has to be unique, for running selective targets
@@ -157,15 +240,15 @@ Has the following top level entries:
 - `mapping` _optional_
 - `watch` _optional_
 
-### 1.5.2.1 `sort`
+### 2.2.2.1 `sort`
 Has three top level attributes
 - `match_as_ascii` _optional_ default is `false`
 - `groups`
 - `channels`
 
-#### `groups` 
+#### `groups`
 has one top level attribute `order` which can be set to `asc`or `desc`.
-#### `channels` 
+#### `channels`
 is a list of sort configurations for groups. Each configuration has 3 top level entries.
 - `field` can be  `group`, `title`, `name` or `url`.
 - `group_pattern` is a regular expression like `'^TR.:\s?(.*)'` which is matched against group title.
@@ -181,23 +264,23 @@ sort:
     - { field: name,  group_pattern: '^DE.*',  order: asc }
 ```
 
-### 1.5.2.2 `output`
+### 2.2.2.2 `output`
 
 Is a list of output format:
-Each format has 2 properties 
-- `type` 
+Each format has 2 properties
+- `type`
 - `filename`
 
 `type` is _mandatory_  for `m3u`, `strm` and `xtream`.  
 `filename` is _mandatory_ if type `m3u` or `strm`, otherwise ignored
 
-`strm` output has additional options 
+`strm` output has additional options
 - `underscore_whitespace`
-- `cleanup` 
+- `cleanup`
 - `kodi_style`.
 
-`xtream` output has additional options 
-- `xtream_skip_live_direct_source` 
+`xtream` output has additional options
+- `xtream_skip_live_direct_source`
 - `xtream_skip_video_direct_source`
 
 ```yaml
@@ -206,12 +289,12 @@ output:
     filename: {}.m3u
 ```
 
-### 1.5.2.3 `processing_order`
+### 2.2.2.3 `processing_order`
 The processing order (Filter, Rename and Map) can be configured for each target with:
 `processing_order: frm` (valid values are: frm, fmr, rfm, rmf, mfr, mrf. default is frm)
 
-### 1.5.2.4 `options`
-- ignore_logo `true` or `false` 
+### 2.2.2.4 `options`
+- ignore_logo `true` or `false`
 - underscore_whitespace `true` or `false`
 - cleanup `true` or `false`
 - kodi_style `true` or `false`
@@ -223,24 +306,24 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 - `cleanup` deletes the directory given at `filename`.
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 
-### 1.5.2.5 `filter`
+### 2.2.2.5 `filter`
 The filter is a string with a filter statement.
 The filter can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
 Filter fields are `Group`, `Title`, `Name` and `Url`.
 Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group ~ "^AU.*")`
 
-If you use characters like `+ | [ ] ( )` in filters don't forget to escape them!!  
+If you use characters like `+ | [ ] ( )` in filters don't forget to escape them!!
 
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.  
 To test the regular expression i use [regex101.com](https://regex101.com/).
 Don't forget to select `Rust` option which is under the `FLAVOR` section on the left.
 
-### 1.5.2.6 `rename`
+### 2.2.2.6 `rename`
 Is a List of rename configurations. Each configuration has 3 top level entries.
 - `field` can be  `group`, `title`, `name` or `url`.
 - `pattern` is a regular expression like `'^TR.:\s?(.*)'`
-- `new_name` can contain capture groups variables addressed with `$1`,`$2`,... 
+- `new_name` can contain capture groups variables addressed with `$1`,`$2`,...
 
 `rename` supports capture groups. Each group can be addressed with `$1`, `$2` .. in the `new_name` attribute.
 
@@ -253,18 +336,12 @@ In the above example each entry starting with `DE` will be prefixed with `1.`.
 
 (_Please be aware of the processing order. If you first map, you should match the mapped entries!_)
 
-### 1.5.2.7 `mapping`
+### 2.2.2.7 `mapping`
 `mapping: <list of mapping id's>`
 The mappings are defined in a file `mapping.yml`. The filename can be given as `-m` argument.
 
-## Example config file
+## Example source.yml file
 ```yaml
-threads: 4
-working_dir: ./data
-api:
-  host: localhost
-  port: 8901
-  web_root: ./web
 templates:
 - name: PROV1_TR
   value: >-
@@ -324,9 +401,9 @@ sources:
             new_name: 1. DE$1
 ```
 
-### 1.5.2.8 `watch`
+### 2.5.2.8 `watch`
 For each target with a *unique name*, you can define a watched groups.
-It is a list of final group names from this target playlist. 
+It is a list of final group names from this target playlist.
 Final means in this case: the name in the resulting playlist after applying all steps
 of transformation.
 
@@ -337,76 +414,9 @@ watch:
   - 'FR | Series'
 ```
 
-Changes from this groups will be printed as info on console and send to 
+Changes from this groups will be printed as info on console and send to
 the configured messaging (f.e. telegram channel).
 
-### 1.6 `messaging`
-`messaging` is an optional configuration for receiving messages.
-Currently only telegram is supported.
-
-Messaging is Opt-In, you need to set the `notify_on` message types which are
-- `info`
-- `stats`
-- `error`
-
-```yaml
-messaging:
-  notify_on:
-    - info
-    - stats
-    - error
-  telegram:
-    bot_token: '<telegram bot token>'
-    chat_ids:
-      - '<telegram chat id>'
-```
-
-For more information: [Telegram bots](https://core.telegram.org/bots/tutorial)
-
-### 1.7 `video`
-`video` is optional.
-
-It has 2 entries `extensions` and `download`.
-
-- `extensions` are a list of video file extensions like `mp4`, `avi`, `mkv`.  
-When you have input `m3u` and output `xtream` the url's with the matching endings will be categorized as `video`.
-
-- `download` is _optional_ and is only necessary if you want to download the video files from the ui 
-to a specific directory. if defined, the download button from the `ui` is available.
-  - `headers` _optional_, download headers
-  - `organize_into_directories` _optional_, orgainize downloads into directories  
-  - `episode_pattern` _optional_ if you download episodes, the suffix like `S01.E01` should be removed to place all 
-files into one folder. The named capture group `episode` is mandatory.  
-Example: `.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*`
-- `web_search` is _optional_, example: `https://www.imdb.com/search/title/?title={}`, 
-define `download.episode_pattern` to remove episode suffix from titles. 
-
-```yaml
-video:
-  web_search: 'https://www.imdb.com/search/title/?title={}'
-  extensions:
-    - mkv
-    - mp4
-    - avi
-  download:
-    headers:
-      User-Agent: "AppleTV/tvOS/9.1.1."
-      Accept: "video/*"
-    directory: /tmp/
-    organize_into_directories: true
-    episode_pattern: '.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*'
-```
-
-### 1.7 `schedule`
-Schedule is optional.
-Format is
-```yaml
-#   sec  min   hour   day of month   month   day of week   year
-schedule: "0  0  8,20  *  *  *  *"
-```
-
-At the given times the complete processing is started. Do not start it every second or minute.
-You could be banned from your server. Twice a day should be enough.
 
 ## 2. `mapping.yml`
 Has the root item `mappings` which has the following top level entries:
@@ -720,7 +730,7 @@ WORKDIR /
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY ["./m3u-filter", "./config.yml",  "./api-proxy.yml",  "./mapping.yml", "/"]
+COPY ["./m3u-filter", "./config.yml", "./source.yml", "./api-proxy.yml",  "./mapping.yml", "/"]
 COPY ./web /web
 
 CMD ["/m3u-filter", "-s", "-c", "/config.yml"]

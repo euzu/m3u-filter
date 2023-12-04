@@ -48,9 +48,10 @@ async fn xmltv_api(
     if let Some((_, target)) = get_user_target(&api_req, &_app_state) {
         match get_epg_path_for_target(&_app_state.config, target) {
             None => {
-                // if no epg_url is provided for input, we did not process the xmltv for our channels.
-                // we are now delivering the original untouched xmltv.
-                // if you want to use xmltv then provide the url in the config to filter unnecessary content.
+                // If no epg_url is provided for input, we did not process the xmltv for our channels.
+                // We are now delivering the original untouched xmltv.
+                // If you want to use xmltv then provide the url in the config to filter unnecessary content.
+                // If you have multiple xtream sources, the first one will be used for epg
                 let target_name = &target.name;
                 if let Some(input) = _app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
                     let epg_url = input.epg_url.as_ref().map_or("".to_string(), |s| s.to_owned());

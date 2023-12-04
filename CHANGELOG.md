@@ -1,5 +1,6 @@
 # Changelog
 # v1.1.4(2023-11-??)
+* Breaking change, `config.yml` splitted into `config.yml` and `source.yml`
 * Added regexp search in Web-UI
 * Added config Web-UI
 * Added xtream vod_info and series_info, stream seek. 

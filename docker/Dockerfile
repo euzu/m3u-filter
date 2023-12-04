@@ -7,7 +7,7 @@ WORKDIR /
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY ["./m3u-filter", "./config.yml",  "./api-proxy.yml",  "./mapping.yml", "/"]
+COPY ["./m3u-filter", "./config.yml",  "./source.yml", "./api-proxy.yml",  "./mapping.yml", "/"]
 COPY ./web /web
 
 CMD ["./m3u-filter", "-s", "-c", "./config.yml"]

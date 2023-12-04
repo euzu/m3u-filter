@@ -48,6 +48,10 @@ pub(crate) fn get_default_config_path() -> String {
     get_default_file_path("config.yml".to_string())
 }
 
+pub(crate) fn get_default_sources_path() -> String {
+    get_default_file_path("source.yml".to_string())
+}
+
 pub(crate) fn get_default_mappings_path() -> String {
     get_default_file_path("mapping.yml".to_string())
 }

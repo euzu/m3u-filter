@@ -7,6 +7,7 @@ use crate::model::config::Config;
 use crate::model::mapping::Mappings;
 use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, utils};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::multi_file_reader::MultiFileReader;
 
 pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
     let mappings_file: String = args_mapping.unwrap_or(utils::get_default_mappings_path());
@@ -37,8 +38,9 @@ pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: 
     }
 }
 
-pub(crate) fn read_config(config_file: &str) -> Result<Config, M3uFilterError> {
-    match utils::open_file(&std::path::PathBuf::from(config_file)) {
+pub(crate) fn read_config(config_file: &str, sources_file: &str) -> Result<Config, M3uFilterError> {
+    let files = vec![std::path::PathBuf::from(config_file), std::path::PathBuf::from(sources_file)];
+    match MultiFileReader::new(&files) {
         Ok(file) => {
             let mut cfg: Config = match serde_yaml::from_reader(file) {
                 Ok(result) => result,

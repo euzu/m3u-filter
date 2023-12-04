@@ -25,6 +25,7 @@ mod messaging;
 mod test;
 mod api;
 mod processing;
+mod multi_file_reader;
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
@@ -39,6 +40,10 @@ struct Args {
     /// The target to process
     #[arg(short, long)]
     target: Option<Vec<String>>,
+
+    /// The mapping file
+    #[arg(short = 'i', long)]
+    source: Option<String>,
 
     /// The mapping file
     #[arg(short, long)]
@@ -63,9 +68,11 @@ fn main() {
     let args = Args::parse();
     init_logger(&args.log_level.unwrap_or("info".to_string()));
 
-    let default_config_path = utils::get_default_config_path();
-    let config_file: String = args.config.unwrap_or(default_config_path);
-    let mut cfg = read_config(config_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
+    let config_file: String = args.config.unwrap_or(utils::get_default_config_path());
+    let sources_file: String = args.source.unwrap_or(utils::get_default_sources_path());
+
+
+    let mut cfg = read_config(config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
     let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
     info!("Version: {}", VERSION);
