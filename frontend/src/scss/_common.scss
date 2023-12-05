@@ -37,10 +37,9 @@
   &:hover {
     background-color: var(--text-button-hover-background-color);
     color: var(--text-button-hover-color);
-    border: none;
+    border: 1px solid transparent;
     outline: none;
   }
-
 }
 
 @mixin list {

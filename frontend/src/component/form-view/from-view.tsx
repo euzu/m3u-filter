@@ -65,7 +65,7 @@ export default function FormView(props: FormViewProps) {
                 return <TagSelect options={field.options} name={field.name}
                                   defaultValues={data?.[field.name]} multi={false} onSelect={handleChange}></TagSelect>
             case FormFieldType.MAP:
-                return <MapEditor onChange={handleChange} name={field.name} values={data?.[field.name]}></MapEditor>
+                return <div className="form-view__map-editor"><MapEditor onChange={handleChange} name={field.name} values={data?.[field.name]}></MapEditor></div>
             case FormFieldType.TAGS:
                 return <TagInput onChange={handleChange} name={field.name} values={data?.[field.name]}></TagInput>
             case FormFieldType.NUMBER:

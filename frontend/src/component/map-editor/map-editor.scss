@@ -1,15 +1,60 @@
+@use '../../scss/common';
+
 .map-editor {
   display: flex;
   flex-flow: column;
+  gap: 8px;
+
+  &__toolbar {
+    flex: 0 0 auto;
+    width: 4em;
+    span {
+      @include common.iconButton();
+    }
+  }
 
   &__table {
     display: flex;
     flex-flow: column;
+    gap: 4px;
   }
 
   &__row {
     display: flex;
     flex-flow: row nowrap;
+    gap: 20px;
+  }
+
+  &__col  {
+    display: flex;
+    align-items: center;
+  }
+
+  &__col-key, &__col-value {
+    flex: 1;
+    border: 1px solid var(--border-color);
+    padding: 0 4px;
+  }
+
+  &__input {
+    display: flex;
+    flex-flow: row wrap;
+    gap: 20px;
+    align-items: center;
+    flex: 1;
+    &-key, &-value {
+      flex: 1;
+      display: flex;
+      gap: 10px;
+    }
+
+    &-toolbar {
+      width: 4em;
+    }
+
+    button {
+      @include common.textButton();
+    }
   }
 
 

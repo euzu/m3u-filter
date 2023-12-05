@@ -1,7 +1,8 @@
 import './map-editor.scss';
 
-import {KeyboardEvent, useCallback, useEffect, useMemo, useState} from "react";
+import React, {KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {genUuid} from "../../utils/uuid";
+import {getIconByName} from "../../icons/icons";
 
 interface KeyValue {
     key: string;
@@ -9,7 +10,8 @@ interface KeyValue {
 }
 
 const mapToList = (data: Record<string, string>) => data ? Object.keys(data).map(key => ({key, value: data[key]})) : [];
-const listToMap = (data: KeyValue[]) => data ? data.reduce((acc: any, curVal) => acc[curVal.key] = curVal.value, {}) : undefined;
+const listToMap = (data: KeyValue[]) => data?.reduce((acc: any, curVal) => {acc[curVal.key] = curVal.value; return acc;}, {});
+const containsKey = (key: string, data: KeyValue[]) => data?.find((keyValue: KeyValue) => keyValue.key === key);
 
 interface MapEditorProps {
     name: string;
@@ -20,46 +22,57 @@ interface MapEditorProps {
 export default function MapEditor(props: MapEditorProps) {
     const {name, values, onChange} = props;
     const uuid = useMemo(() => genUuid(), []);
-    const [data, setData] = useState<KeyValue[]>(mapToList(values) || []);
+    const keyRef = useRef<HTMLInputElement>();
+    const valRef = useRef<HTMLInputElement>();
+    const [data, setData] = useState<KeyValue[]>([]);
+
+    useEffect(() => {
+        if (values) {
+            setData(mapToList(values));
+        }
+    }, [values]);
 
     useEffect(() => {
         onChange(name, listToMap(data));
     }, [data, name, onChange]);
 
-    const handleValueChange = useCallback((target: any) => {
-        const is_key = target.dataset.field === 'key';
-        const idx = target.dataset.idx;
-        setData((values) => {
-            if (is_key) {
-                values[idx].key = target.value;
-            } else {
-                values[idx].value = target.value;
-            }
-            return [...values];
-        });
+    const handleHeaderRemove = useCallback((event: any) => {
+        const key = event.target.dataset.key;
+        if (key) {
+            setData(data => data?.filter((keyValue: KeyValue) => keyValue.key !== key));
+        }
+
     }, []);
 
-    const handleKeyPress = useCallback((event: KeyboardEvent<any>) => {
-        if (event.key === 'Enter') {
-            handleValueChange(event.target as any);
+    const handleAddKeyValue = useCallback((event: any) => {
+        let key = keyRef.current?.value?.trim();
+        let value = valRef.current?.value?.trim();
+        if (key.length> 0 && value.length > 0) {
+            setData(data => {
+                if (!containsKey(key, data)) {
+                    data.push({key, value});
+                    return [...data];
+                }
+                return data;
+            });
         }
-    }, [handleValueChange]);
-
-    const handleBlur = useCallback((event: any) => {
-        handleValueChange(event.target as any);
-    }, [handleValueChange]);
+    }, []);
 
     return <div className={'map-editor'}>
+        <div className={'map-editor__input'}>
+            <div className='map-editor__input-key'><input ref={keyRef}></input></div>
+            <div className='map-editor__input-value'><input ref={valRef}></input></div>
+            <div className='map-editor__input-toolbar'><button onClick={handleAddKeyValue}>Add</button></div>
+        </div>
         <div className={'map-editor__table'}>
-            {Object.keys(data)?.map((key: any, idx) =>
-                <div key={uuid + '-' + idx} className={'map-editor__row'}>
-                    <div className={'map-editor__col map-editor__col-key'}>
-                        <input data-idx={idx} data-field={'key'} defaultValue={data?.[idx].key} onKeyUp={handleKeyPress}
-                               onBlur={handleBlur}></input>
-                    </div>
-                    <div className={'map-editor__col map-editor__col-value'}>
-                        <input data-idx={idx} data-field={'value'} defaultValue={data?.[idx].value as any}
-                               onKeyUp={handleKeyPress} onBlur={handleBlur}></input>
+            {data?.map((keyValue: KeyValue, idx) =>
+                <div key={uuid + '-' + keyValue.key + idx} className={'map-editor__row'}>
+                    <div className={'map-editor__col map-editor__col-key'}>{keyValue.key}</div>
+                    <div className={'map-editor__col map-editor__col-value'}>{keyValue.value}</div>
+                    <div className={'map-editor__col map-editor__toolbar'}>
+                           <span data-key={keyValue.key} onClick={handleHeaderRemove}>
+                               {getIconByName('Delete')}
+                           </span>
                     </div>
                 </div>
             )}

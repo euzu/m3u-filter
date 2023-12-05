@@ -6,6 +6,13 @@
   flex-flow: column;
   box-sizing: border-box;
 
+  &__map-editor {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    flex: 1;
+  }
+
   &__table {
     display: flex;
     flex-flow: column;

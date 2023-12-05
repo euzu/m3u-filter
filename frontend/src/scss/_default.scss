@@ -26,9 +26,9 @@
 
 button {
   cursor: pointer;
-  &:active {
-    transform: scale(0.90); /* Scaling button to 0.98 to its original size */
-  }
+  //&:active {
+  //  transform: scale(0.90); /* Scaling button to 0.98 to its original size */
+  //}
 }
 
 .hidden {
