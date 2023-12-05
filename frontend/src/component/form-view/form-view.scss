@@ -25,12 +25,14 @@
 
     &-label {
       text-align: right;
-      width: 6em;
+      width: 7em;
       justify-content: flex-end;
+      align-items: center;
     }
 
     &-value {
       flex: 1 0 auto;
+      align-items: center;
     }
 
     label {

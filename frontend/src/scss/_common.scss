@@ -12,6 +12,11 @@
   svg {
     color: var(--text-color);
   }
+  &:hover {
+    svg {
+      color: var(--text-button-hover-color);
+    }
+  }
 
   &:focus,
   &:hover {

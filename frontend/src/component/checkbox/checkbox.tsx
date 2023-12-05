@@ -1,15 +1,16 @@
-import React, {useCallback, useRef} from "react";
+import React, {useCallback, useRef, useState} from "react";
 import './checkbox.scss';
 
 interface CheckboxProps {
     label?: string;
     value: any;
+    checked: boolean;
     onSelect: (checked: boolean, value: any, evt?: any) => void;
 }
 
 export default function Checkbox(props: CheckboxProps) {
 
-    const {label, value, onSelect} = props;
+    const {label, value, onSelect, checked} = props;
     const inputRef = useRef<HTMLInputElement>();
 
     const handleSelect = useCallback((evt: any) => {
@@ -22,12 +23,12 @@ export default function Checkbox(props: CheckboxProps) {
     if (label) {
         return <label className="checkbox-container" onClick={handleSelect}>
             {label}
-            <input ref={inputRef}  type="checkbox"/>
+            <input ref={inputRef}  type="checkbox" defaultChecked={checked}/>
             <span className="checkmark"></span>
         </label>;
     } else {
         return <div className="checkbox-container" onClick={handleSelect}>
-            <input ref={inputRef} type="checkbox"/>
+            <input ref={inputRef} type="checkbox" defaultChecked={checked}/>
             <span className="checkmark"></span>
         </div>
     }

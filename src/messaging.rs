@@ -11,7 +11,6 @@ pub(crate) enum MsgKind {
     Error,
 }
 
-
 fn is_enabled(kind: &MsgKind, cfg: &MessagingConfig) -> bool {
     cfg.notify_on.contains(kind)
 }

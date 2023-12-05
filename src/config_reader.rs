@@ -1,9 +1,10 @@
 use std::fs::{File};
-use std::path::PathBuf;
+use std::path::{PathBuf};
 use chrono::Local;
 use log::{debug, error, info, warn};
+use serde::Serialize;
 use crate::model::api_proxy::ApiProxyConfig;
-use crate::model::config::Config;
+use crate::model::config::{Config, ConfigDto};
 use crate::model::mapping::Mappings;
 use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, utils};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
@@ -107,16 +108,19 @@ pub(crate) fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
     }
 }
 
-pub(crate) fn save_api_proxy(backup_dir: &str, config: &ApiProxyConfig) -> Result<(), M3uFilterError> {
-    let path = PathBuf::from(&config._file_path);
-    let filename = path.file_name().map_or("api-proxy.yml".to_string(), |f| f.to_string_lossy().to_string());
+fn write_config_file<T>(file_path: &str, backup_dir: &str, config: &T, default_name: &str) -> Result<(), M3uFilterError>
+    where
+        T: ?Sized + Serialize {
+    let path = PathBuf::from(file_path);
+    let filename = path.file_name().map_or(default_name.to_string(), |f| f.to_string_lossy().to_string());
     let backup_path = PathBuf::from(backup_dir).join(format!("{}_{}", filename, Local::now().format("%Y%m%d_%H%M%S")));
+
 
     match std::fs::copy(&path, &backup_path) {
         Ok(_) => {}
         Err(err) => { error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err) }
     }
-    info!("Saving api proxy to {}", &path.to_str().unwrap_or("?"));
+    info!("Saving file to {}", &path.to_str().unwrap_or("?"));
     match File::create(&path) {
         Ok(f) => {
             serde_yaml::to_writer(f, &config).unwrap();
@@ -124,4 +128,12 @@ pub(crate) fn save_api_proxy(backup_dir: &str, config: &ApiProxyConfig) -> Resul
         }
         Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not write file {}: {}", &path.to_str().unwrap_or("?"), err)
     }
+}
+
+pub(crate) fn save_api_proxy(file_path: &str, backup_dir: &str, config: &ApiProxyConfig) -> Result<(), M3uFilterError> {
+    write_config_file(file_path, backup_dir, config, "api-proxy.yml")
+}
+
+pub(crate) fn save_main_config(file_path: &str, backup_dir: &str, config: &ConfigDto) -> Result<(), M3uFilterError> {
+    write_config_file(file_path, backup_dir, config, "config.yml")
 }

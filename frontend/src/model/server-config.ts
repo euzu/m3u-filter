@@ -79,23 +79,27 @@ export interface SourceConfig {
     targets: TargetConfig[];
 }
 
+export interface VideoDownloadConfig {
+    headers: Record<string, string>,
+    directory: string;
+    organize_into_directories: boolean;
+    episode_pattern: string;
+}
+
 export interface VideoConfig {
     extensions: string[];
-    download?: {
-        headers: Record<string, string>,
-        directory: string;
-        organize_into_directories: boolean;
-        episode_pattern: string;
-    }
+    download?: VideoDownloadConfig,
     web_search?: string;
 }
 
-export interface MessaginConfig {
-    notify_on?: string [];
-    telegram?: {
-        bot_token: string;
-        chat_ids: string[];
-    }
+export interface TelegramConfig {
+    bot_token: string;
+    chat_ids: string[];
+}
+
+export interface MessagingConfig {
+    notify_on?: string[];
+    telegram?: TelegramConfig;
 }
 
 export interface Credentials {
@@ -110,7 +114,7 @@ export interface TargetUser {
     credentials: Credentials[];
 }
 
-export interface ServerInfo {
+export interface ApiProxyServerInfo {
     protocol: string;
     ip: string;
     http_port: string;
@@ -118,21 +122,30 @@ export interface ServerInfo {
     rtmp_port: string;
     timezone: string;
     message: string;
-
 }
 
 export interface ApiProxyConfig {
-    server: ServerInfo;
+    server: ApiProxyServerInfo;
     user: TargetUser[];
 }
 
-export default interface ServerConfig {
-    api: {host: string, port: number, web_root: string};
+export interface ServerApiConfig {
+    host: string;
+    port: number;
+    web_root: string
+}
+
+export interface ServerMainConfig {
+    api: ServerApiConfig;
     threads: number;
     working_dir: string;
+    backup_dir: string;
     schedule: string;
-    messaging?: MessaginConfig;
+    messaging?: MessagingConfig;
     video?: VideoConfig;
+}
+
+export default interface ServerConfig extends ServerMainConfig {
     sources: SourceConfig[];
     api_proxy?: ApiProxyConfig;
 }

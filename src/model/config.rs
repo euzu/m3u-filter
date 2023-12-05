@@ -484,11 +484,13 @@ impl VideoConfig {
                 }
 
                 if let Some(episode_pattern) = &downl.episode_pattern {
-                    let re = regex::Regex::new(episode_pattern);
-                    if re.is_err() {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", episode_pattern);
+                    if !episode_pattern.is_empty() {
+                        let re = regex::Regex::new(episode_pattern);
+                        if re.is_err() {
+                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", episode_pattern);
+                        }
+                        downl._re_episode_pattern = Some(re.unwrap());
                     }
-                    downl._re_episode_pattern = Some(re.unwrap());
                 }
 
                 downl._re_filename = Some(regex::Regex::new(r"[^A-Za-z0-9_.-]").unwrap());
@@ -496,6 +498,41 @@ impl VideoConfig {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct ConfigDto {
+    #[serde(default = "default_as_zero")]
+    pub threads: u8,
+    pub api: ConfigApi,
+    pub working_dir: String,
+    pub backup_dir: Option<String>,
+    pub video: Option<VideoConfig>,
+    pub schedule: Option<String>,
+    pub messaging: Option<MessagingConfig>,
+}
+
+impl ConfigDto {
+
+    pub fn is_valid(&self) -> bool {
+        if self.api.host.is_empty() {
+            return false;
+        }
+
+        if let Some(video) = &self.video {
+            if let Some(download) = &video.download {
+                if let Some(episode_pattern) = &download.episode_pattern {
+                    if ! episode_pattern.is_empty() {
+                        let re = regex::Regex::new(episode_pattern);
+                        if re.is_err() {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        true
     }
 }
 

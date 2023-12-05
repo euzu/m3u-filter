@@ -6,7 +6,7 @@ use actix_web::web;
 use serde::{Deserialize, Serialize};
 use unidecode::unidecode;
 use crate::model::api_proxy::{ApiProxyConfig};
-use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig, ConfigApi};
+use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig, ConfigApi, MessagingConfig};
 use crate::model::model_config::{default_as_empty_str, ProcessingOrder};
 
 #[derive(Clone)]
@@ -239,6 +239,7 @@ pub(crate) struct ServerConfig {
     pub backup_dir: Option<String>,
     pub schedule: Option<String>,
     pub sources: Vec<ServerSourceConfig>,
+    pub messaging: Option<MessagingConfig>,
     pub video: Option<VideoConfig>,
     pub api_proxy: Option<ApiProxyConfig>,
 }

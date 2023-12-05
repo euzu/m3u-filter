@@ -99,7 +99,7 @@ fn default_as_443() -> String { "443".to_string() }
 fn default_as_1935() -> String { "1935".to_string() }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ServerInfo {
+pub(crate) struct ApiProxyServerInfo {
     pub protocol: String,
     pub ip: String,
     pub http_port: String,
@@ -111,7 +111,7 @@ pub(crate) struct ServerInfo {
     pub message: String,
 }
 
-impl ServerInfo {
+impl ApiProxyServerInfo {
     pub fn is_valid(&mut self) -> bool {
         self.protocol = self.protocol.trim().to_string();
         if self.protocol.is_empty() {
@@ -153,7 +153,7 @@ impl ServerInfo {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ApiProxyConfig {
-    pub server: ServerInfo,
+    pub server: ApiProxyServerInfo,
     pub user: Vec<TargetUser>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _file_path: String,

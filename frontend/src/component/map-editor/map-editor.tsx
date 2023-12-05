@@ -9,6 +9,7 @@ interface KeyValue {
 }
 
 const mapToList = (data: Record<string, string>) => data ? Object.keys(data).map(key => ({key, value: data[key]})) : [];
+const listToMap = (data: KeyValue[]) => data ? data.reduce((acc: any, curVal) => acc[curVal.key] = curVal.value, {}) : undefined;
 
 interface MapEditorProps {
     name: string;
@@ -22,7 +23,7 @@ export default function MapEditor(props: MapEditorProps) {
     const [data, setData] = useState<KeyValue[]>(mapToList(values) || []);
 
     useEffect(() => {
-        onChange(name, data as any);
+        onChange(name, listToMap(data));
     }, [data, name, onChange]);
 
     const handleValueChange = useCallback((target: any) => {

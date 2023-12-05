@@ -17,7 +17,17 @@
     display: flex;
     flex-flow: column;
     gap: 4px;
-    align-items: center;
+    align-items: stretch;
+
+    &-form {
+      &__section-title {
+        color: var(--label-color);
+        font-weight: bold;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 4px;
+        margin: 8px 0;
+      }
+    }
 
     &-help {
 
@@ -25,6 +35,10 @@
         max-width: 360px;
         height: auto;
         fill: currentColor;
+      }
+
+      pre {
+        display: inline;
       }
     }
   }

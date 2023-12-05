@@ -1,0 +1,19 @@
+@import "~react-tagsinput/react-tagsinput.css";
+
+.react-tagsinput {
+  background-color: inherit !important;
+  border: none !important;
+
+  &-tag {
+    background-color: var(--checkbox-checked-background-color) !important;
+    color: var(--text-color) !important;
+    border: 1px solid var(--border-light-color) !important;
+
+  }
+  &-remove {
+    color: var(--text-color) !important;
+    &:hover {
+      color: var(--tab-active-color) !important;
+    }
+  }
+}

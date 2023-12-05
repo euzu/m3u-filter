@@ -1,6 +1,6 @@
 import React, {useCallback, useMemo} from "react";
 import './api-proxy-view.scss';
-import ServerConfig, {ServerInfo} from "../../model/server-config";
+import ServerConfig, {ApiProxyServerInfo} from "../../model/server-config";
 import {useSnackbar} from "notistack";
 import {useServices} from "../../provider/service-provider";
 import FormView, {FormFieldType} from "../form-view/from-view";
@@ -29,7 +29,7 @@ export default function ApiProxyView(props: ApiProxyViewProps) {
     const {config} = props;
     const services = useServices();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
-    const serverInfo = useMemo<ServerInfo>(() => config?.api_proxy?.server, [config]);
+    const serverInfo = useMemo<ApiProxyServerInfo>(() => config?.api_proxy?.server, [config]);
 
     const handleSave = useCallback(() => {
         if (serverInfo) {

@@ -3,10 +3,11 @@ import './form-view.scss';
 import Checkbox from "../checkbox/checkbox";
 import TagSelect from "../tag-select/tags-select";
 import MapEditor from "../map-editor/map-editor";
+import TagInput from "../tag-input/tag-input";
 
-export const isNumber = (value: string): boolean => {
-    return !isNaN(value as any);
-}
+// export const isNumber = (value: string): boolean => {
+//     return !isNaN(value as any);
+// }
 
 export enum FormFieldType {
     TEXT = 'text',
@@ -42,9 +43,8 @@ export default function FormView(props: FormViewProps) {
     }, [data]);
 
     const handleCheckboxChange = useCallback((checked: boolean, value: any, evt?: any) => {
-        const field = evt.target.dataset.field;
         if (data) {
-            data[field] = checked;
+            data[value] = checked;
         }
     }, [data]);
 
@@ -57,7 +57,7 @@ export default function FormView(props: FormViewProps) {
     const getFieldInput = useCallback((field: FormField) => {
         switch (field.fieldType) {
             case FormFieldType.CHECK:
-                return <Checkbox label={undefined} value={field.name} onSelect={handleCheckboxChange}></Checkbox>
+                return <Checkbox label={undefined} value={field.name} checked={data?.[field.name]} onSelect={handleCheckboxChange}></Checkbox>
             case FormFieldType.MULTI_SELECT:
                 return <TagSelect options={field.options} name={field.name}
                                   defaultValues={data?.[field.name]} multi={true} onSelect={handleChange}></TagSelect>
@@ -66,6 +66,8 @@ export default function FormView(props: FormViewProps) {
                                   defaultValues={data?.[field.name]} multi={false} onSelect={handleChange}></TagSelect>
             case FormFieldType.MAP:
                 return <MapEditor onChange={handleChange} name={field.name} values={data?.[field.name]}></MapEditor>
+            case FormFieldType.TAGS:
+                return <TagInput onChange={handleChange} name={field.name} values={data?.[field.name]}></TagInput>
             case FormFieldType.NUMBER:
             case FormFieldType.TEXT:
             default:
