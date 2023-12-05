@@ -104,31 +104,45 @@ async fn xtream_player_api_stream(
             } {
                 if let Some(stream_url) = get_xtream_player_api_stream_url(target_input, context, action_path) {
                     if user.proxy == ProxyType::Redirect {
+                        debug!("Redirecting stream request to {}", stream_url);
                         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
                     }
 
                     let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
-                    // let he: HashMap<String, String> = req_headers.iter().map(|(k, v)| (k.to_string(), String::from_utf8_lossy(v).to_string())).collect();
-                    // debug!("Incomming request headers {:?}", he);
                     debug!("Try to open stream {}", &stream_url);
                     if let Ok(url) = Url::parse(&stream_url) {
                         let client = get_client_request(target_input, url, Some(&req_headers));
-                        if let Ok(response) = client.send().await {
-                            if response.status().is_success() {
-                                let mut response_builder = HttpResponse::Ok();
-                                response.headers().iter().for_each(|(k, v)| {
-                                    //debug!("{}: {}", k, String::from_utf8_lossy(v.as_bytes()));
-                                    response_builder.insert_header((k, v));
-                                });
-                                return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
-                            } else {
-                                debug!("Failed to open stream got status {} for {}", response.status(), &stream_url)
+                        match client.send().await {
+                            Ok(response) => {
+                                if response.status().is_success() {
+                                    let mut response_builder = HttpResponse::Ok();
+                                    response.headers().iter().for_each(|(k, v)| {
+                                        response_builder.insert_header((k, v));
+                                    });
+                                    return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
+                                } else {
+                                    debug!("Failed to open stream got status {} for {}", response.status(), &stream_url)
+                                }
+                            }
+                            Err(err) => {
+                                error!("Received failure from server {}:  {}", &stream_url, err)
                             }
                         }
+                    } else {
+                        error!("Url is malformed {}", &stream_url)
                     }
+                } else {
+                    debug!("Cant figure out stream url for target {}, context {}, action {}",
+                        target_name, context, action_path);
                 }
+            } else {
+                debug!("Cant find input definition for target {}", target_name);
             }
+        } else {
+            debug!("Target has no xtream output {}", target_name);
         }
+    } else {
+        debug!("Could not find any user {}", username);
     }
     HttpResponse::BadRequest().finish()
 }

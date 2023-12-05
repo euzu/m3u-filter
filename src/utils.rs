@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use log::{debug, error};
+use log::{debug, error, Level};
 use path_absolutize::*;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use crate::create_m3u_filter_error_result;
@@ -201,10 +201,8 @@ pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBu
 
 pub(crate) fn get_client_request(input: &ConfigInput, url: url::Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
     let mut request = reqwest::Client::new().get(url);
-    if input.headers.is_empty() {
-        let headers = get_request_headers(&input.headers, custom_headers);
-        request = request.headers(headers);
-    }
+    let headers = get_request_headers(&input.headers, custom_headers);
+    request = request.headers(headers);
     request
 }
 
@@ -223,10 +221,15 @@ pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, cus
                 headers.insert(
                     HeaderName::from_bytes(key.as_bytes()).unwrap(),
                     HeaderValue::from_bytes(value).unwrap());
+            } else {
+                debug!("Ignoring request header {}={}", key_lc, String::from_utf8_lossy(value));
             }
         }
     }
-    debug!("Request with headers{:?}", &headers);
+    if log::max_level() == Level::Debug {
+        let he: HashMap<String, String> = headers.iter().map(|(k, v)| (k.to_string(), String::from_utf8_lossy(v.as_bytes()).to_string())).collect();
+        debug!("Request headers {:?}", he);
+    }
     headers
 }
 
