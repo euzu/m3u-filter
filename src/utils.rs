@@ -34,12 +34,11 @@ pub(crate) fn get_exe_path() -> PathBuf {
 
 fn get_default_file_path(file: String) -> String {
     let path: PathBuf = get_exe_path();
-    let working_dir_file = format!("./{}", file);
-    let config_path = path.join(file);
+    let config_path = path.join(file.as_str());
     String::from(if config_path.exists() {
-        config_path.to_str().unwrap_or(working_dir_file.as_str())
+        config_path.to_str().unwrap_or(file.as_str())
     } else {
-        working_dir_file.as_str()
+        file.as_str()
     })
 }
 

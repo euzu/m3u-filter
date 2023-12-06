@@ -69,6 +69,8 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
             .max_age(3600)
         )
         .app_data(shared_data.clone())
+        // this is necessary because of the xtream api route without specific prefix
+        .service(actix_files::Files::new("/static", web_dir_path.join("static")))
         .service(v1_api_register())
         .service(xtream_api_register())
         .service(m3u_api_register())
