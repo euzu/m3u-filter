@@ -29,7 +29,7 @@ impl Display for XtreamCluster {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
             XtreamCluster::Live => "live",
-            XtreamCluster::Video => "video",
+            XtreamCluster::Video => "movie",
             XtreamCluster::Series => "series",
         })
     }

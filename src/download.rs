@@ -30,7 +30,7 @@ fn prepare_file_path(input: &ConfigInput, working_dir: &String, action: &str) ->
 pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let url = input.url.to_owned();
     let persist_file_path = prepare_file_path(input, working_dir, "");
-    match utils::get_input_text_content(input, working_dir,&url, persist_file_path).await {
+    match utils::get_input_text_content(input, working_dir, &url, persist_file_path).await {
         Ok(text) => {
             let lines = text.lines().map(String::from).collect();
             (m3u_parser::parse_m3u(cfg, &lines), vec![])
@@ -49,7 +49,6 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
     let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);
-    let stream_base_url = format!("{}/{}/{}", input.url, username, password);
 
     let mut errors = vec![];
     let category_id_cnt = AtomicI32::new(0);
@@ -63,7 +62,7 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
             Ok(category_content) => {
                 match utils::get_input_json_content(input, &stream_url, stream_file_path).await {
                     Ok(stream_content) => {
-                        match xtream_parser::parse_xtream(&category_id_cnt, xtream_cluster, &category_content, &stream_content, &stream_base_url) {
+                        match xtream_parser::parse_xtream(&category_id_cnt, xtream_cluster, &category_content,input.url.as_str(),username, password,  &stream_content) {
                             Ok(sub_playlist_opt) => {
                                 if let Some(mut sub_playlist) = sub_playlist_opt {
                                     sub_playlist.drain(..).for_each(|group| playlist.push(group));
@@ -94,7 +93,6 @@ pub(crate) async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &
                 }
                 Err(err) => (None, vec![err])
             }
-
         }
     }
 }

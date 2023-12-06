@@ -245,8 +245,10 @@ fn process_streams(xtream_cluster: &XtreamCluster, streams: &Value) -> Result<Ve
 pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32,
                            xtream_cluster: &XtreamCluster,
                            category: &Value,
-                           streams: &Value,
-                           stream_base_url: &String) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
+                           url: &str,
+                           username: &str,
+                           password: &str,
+                           streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match process_category(category) {
         Ok(mut categories) => {
             return match process_streams(xtream_cluster, streams) {
@@ -275,7 +277,17 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32,
                                     // source is meant to hold the original provider data
                                     source: default_as_empty_rc_str(),
                                     url: if stream.direct_source.is_empty() {
-                                        Rc::new(format!("{}/{}", stream_base_url, stream.get_stream_id()))
+                                        let stream_base_url = match xtream_cluster {
+                                            XtreamCluster::Live =>  format!("{}/live/{}/{}/{}.ts", url, username, password, &stream.get_stream_id()),
+                                            XtreamCluster::Video => {
+                                                let ext = stream.container_extension.as_ref().map_or("mp4", |e| e.as_str());
+                                                format!("{}/live/{}/{}/{}.{}", url, username, password, &stream.get_stream_id(), ext)
+                                            },
+                                            XtreamCluster::Series =>
+                                                format!("{}/player_api.php?username={}&password={}&action=get_series_info&series_id={}",
+                                                        url, username, password, &stream.get_stream_id())
+                                        };
+                                        Rc::new(stream_base_url)
                                     } else {
                                         Rc::clone(&stream.direct_source)
                                     },
