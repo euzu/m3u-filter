@@ -1,6 +1,6 @@
 # Changelog
-# v1.1.4(2023-11-??)
-* Breaking change, `config.yml` splitted into `config.yml` and `source.yml`
+# v1.1.4(2023-12-06)
+* Breaking change, `config.yml` split into `config.yml` and `source.yml`
 * Added `backup_dir` property to `config.yml` to store backups of changed config files.
 * Added regexp search in Web-UI
 * Added config Web-UI
