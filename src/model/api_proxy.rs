@@ -16,7 +16,7 @@ pub(crate) enum ProxyType {
 
 impl ProxyType {
     fn default() -> ProxyType {
-        ProxyType::Reverse
+        ProxyType::Redirect
     }
 }
 

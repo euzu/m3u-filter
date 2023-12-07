@@ -641,7 +641,7 @@ You can specify the path for the file with the  `-a` cli argument.
 `username` and `password`are mandatory for credentials. `username` is unique.
 The `token` is _optional_. If defined it should be unique. The `token`can be used
 instead of username+password
-`proxy` is _optional_. If defined it can be `reverse` or `redirect`. Default is `reverse`.
+`proxy` is _optional_. If defined it can be `reverse` or `redirect`. Default is `redirect`.
 
 To access the api for: 
 - `xtream` use url like `http://192.169.1.2/player_api.php?username={}&password={}`

@@ -1,4 +1,7 @@
 # Changelog
+# v1.1.5(2023-12-??)
+* Changed api-proxy user default proxy type from `reverse` to `redirect`
+
 # v1.1.4(2023-12-06)
 * Breaking change, `config.yml` split into `config.yml` and `source.yml`
 * Added `backup_dir` property to `config.yml` to store backups of changed config files.
