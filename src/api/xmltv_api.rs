@@ -1,10 +1,11 @@
 use std::path::{PathBuf};
 use actix_web::{HttpRequest, HttpResponse, Resource, web};
-use log::{info};
+use log::{debug, info};
 use url::Url;
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest};
+use crate::model::api_proxy::ProxyType;
 use crate::model::config::{Config, ConfigTarget, InputType};
 use crate::model::model_config::TargetType;
 use crate::repository::m3u_repository::get_m3u_epg_file_path;
@@ -45,7 +46,7 @@ async fn xmltv_api(
     req: HttpRequest,
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    if let Some((_, target)) = get_user_target(&api_req, &_app_state) {
+    if let Some((user, target)) = get_user_target(&api_req, &_app_state) {
         match get_epg_path_for_target(&_app_state.config, target) {
             None => {
                 // If no epg_url is provided for input, we did not process the xmltv for our channels.
@@ -63,6 +64,10 @@ async fn xmltv_api(
                         )
                     } else { epg_url.to_string() };
                     if let Ok(url) = Url::parse(&api_url) {
+                        if user.proxy == ProxyType::Redirect {
+                            debug!("Redirecting epg request to {}", api_url);
+                            return HttpResponse::Found().insert_header(("Location", api_url)).finish();
+                        }
                         let client = get_client_request(input, url, None);
                         if let Ok(response) = client.send().await {
                             if response.status().is_success() {
