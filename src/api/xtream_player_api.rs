@@ -13,7 +13,7 @@ use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationRespons
 use crate::model::api_proxy::{ProxyType, UserCredentials};
 use crate::model::config::{Config, ConfigInput, InputType};
 use crate::model::model_config::{TargetType};
-use crate::model::model_m3u::XtreamCluster;
+use crate::model::model_playlist::XtreamCluster;
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD,
                                            xtream_get_all, xtream_get_stored_stream_info, xtream_persist_stream_info};
 use crate::utils::{get_client_request};

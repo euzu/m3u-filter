@@ -1,227 +1,16 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
-use serde::{Deserialize, Deserializer, Serialize};
-use serde::de::DeserializeOwned;
 use serde_json::Value;
-use crate::create_m3u_filter_error_result;
+use crate::{create_m3u_filter_error_result};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::model::config::ConfigInput;
 
 use crate::model::model_config::{default_as_empty_rc_str};
-use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
-
-fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
-
-fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
-    deserializer: D,
-) -> Result<Option<T>, D::Error>
-    where
-        D: Deserializer<'de>,
-{
-    // we define a local enum type inside of the function
-    // because it is untagged, serde will deserialize as the first variant
-    // that it can
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum MaybeNumber<U> {
-        // if it can be parsed as Option<T>, it will be
-        Value(Option<U>),
-        // otherwise try parsing as a string
-        NumberString(String),
-    }
-
-    // deserialize into local enum
-    let value: MaybeNumber<T> = Deserialize::deserialize(deserializer)?;
-    match value {
-        // if parsed as T or None, return that
-        MaybeNumber::Value(value) => Ok(value),
-
-        // (if it is any other string)
-        MaybeNumber::NumberString(string) => {
-            match serde_json::from_str::<T>(string.as_str()) {
-                Ok(val) => Ok(Some(val)),
-                Err(_) => Ok(None)
-            }
-        }
-    }
-}
-
-fn value_to_string_array(value: &[Value]) -> Option<Vec<String>> {
-    Some(value.iter().filter_map(value_to_string).collect())
-}
-
-fn value_to_string(v: &Value) -> Option<String> {
-    match v {
-        Value::Bool(value) => Some(value.to_string()),
-        Value::Number(value) => Some(value.to_string()),
-        Value::String(value) => Some(value.to_string()),
-        _ => None,
-    }
-}
-
-fn deserialize_as_option_rc_string<'de, D>(deserializer: D) -> Result<Option<Rc<String>>, D::Error>
-    where
-        D: Deserializer<'de>,
-{
-    let value: Value = Deserialize::deserialize(deserializer)?;
-
-    match &value {
-        Value::String(s) => Ok(Some(Rc::new(s.to_owned()))),
-        Value::Number(s) => Ok(Some(Rc::new(s.to_string()))),
-        _ => Ok(None),
-    }
-}
-
-fn deserialize_as_rc_string<'de, D>(deserializer: D) -> Result<Rc<String>, D::Error>
-    where
-        D: Deserializer<'de>,
-{
-    let value: Value = Deserialize::deserialize(deserializer)?;
-
-    match &value {
-        Value::String(s) => Ok(Rc::new(s.to_owned())),
-        _ => Ok(Rc::new(value.to_string())),
-    }
-}
-
-fn deserialize_as_string_array<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
-    where
-        D: Deserializer<'de>,
-{
-    Value::deserialize(deserializer).map(|v| match v {
-        Value::Array(value) => value_to_string_array(&value),
-        _ => None,
-    })
-}
-
-#[derive(Deserialize)]
-struct XtreamCategory {
-    #[serde(deserialize_with = "deserialize_as_rc_string")]
-    pub category_id: Rc<String>,
-    #[serde(deserialize_with = "deserialize_as_rc_string")]
-    pub category_name: Rc<String>,
-    //pub parent_id: i32,
-    #[serde(default = "default_as_empty_list")]
-    pub channels: Vec<PlaylistItem>,
-}
-
-impl XtreamCategory {
-    fn add(&mut self, item: PlaylistItem) {
-        self.channels.push(item);
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct XtreamStream {
-    #[serde(default, deserialize_with = "deserialize_as_rc_string")]
-    pub name: Rc<String>,
-    #[serde(default, deserialize_with = "deserialize_as_rc_string")]
-    pub category_id: Rc<String>,
-    #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    pub stream_id: Option<i32>,
-    #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    pub series_id: Option<i32>,
-    #[serde(default = "default_as_empty_rc_str", deserialize_with = "deserialize_as_rc_string")]
-    pub stream_icon: Rc<String>,
-    #[serde(default = "default_as_empty_rc_str", deserialize_with = "deserialize_as_rc_string")]
-    pub direct_source: Rc<String>,
-
-    // optional attributes
-    #[serde(default, deserialize_with = "deserialize_as_string_array")]
-    backdrop_path: Option<Vec<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    added: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    cast: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    container_extension: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    cover: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    director: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    episode_run_time: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    genre: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    last_modified: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    plot: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    rating: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    rating_5based: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    release_date: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    stream_type: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    title: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    year: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    youtube_trailer: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    epg_channel_id: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    tv_archive: Option<i32>,
-    #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    tv_archive_duration: Option<i32>,
-}
-
-macro_rules! add_str_property_if_exists {
-    ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::String(v.to_string()))));
-    }
-}
-macro_rules! add_i64_property_if_exists {
-    ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from(i64::from(*v))))));
-    }
-}
-
-macro_rules! add_f64_property_if_exists {
-    ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from_f64(f64::from(*v)).unwrap()))));
-    }
-}
-
-impl XtreamStream {
-    pub(crate) fn get_stream_id(&self) -> String {
-        self.stream_id.map_or_else(|| self.series_id.map_or_else(|| String::from(""), |seid| format!("{}", seid)), |sid| format!("{}", sid))
-    }
-
-    pub(crate) fn get_additional_properties(&self) -> Option<Vec<(String, Value)>> {
-        let mut result = vec![];
-        if let Some(bdpath) = self.backdrop_path.as_ref() {
-            if !bdpath.is_empty() {
-                result.push((String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.get(0).unwrap()))]))));
-            }
-        }
-        add_str_property_if_exists!(result, self.added, "added");
-        add_str_property_if_exists!(result, self.cast, "cast");
-        add_str_property_if_exists!(result, self.container_extension, "container_extension");
-        add_str_property_if_exists!(result, self.cover, "cover");
-        add_str_property_if_exists!(result, self.director, "director");
-        add_str_property_if_exists!(result, self.episode_run_time, "episode_run_time");
-        add_str_property_if_exists!(result, self.genre, "genre");
-        add_str_property_if_exists!(result, self.last_modified, "last_modified");
-        add_str_property_if_exists!(result, self.plot, "plot");
-        add_f64_property_if_exists!(result, self.rating, "rating");
-        add_f64_property_if_exists!(result, self.rating_5based, "rating_5based");
-        add_str_property_if_exists!(result, self.release_date, "release_date");
-        add_str_property_if_exists!(result, self.stream_type, "stream_type");
-        add_str_property_if_exists!(result, self.title, "title");
-        add_str_property_if_exists!(result, self.year, "year");
-        add_str_property_if_exists!(result, self.youtube_trailer, "youtube_trailer");
-        //add_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
-        add_i64_property_if_exists!(result, self.tv_archive, "tv_archive");
-        add_i64_property_if_exists!(result, self.tv_archive_duration, "tv_archive_duration");
-        if result.is_empty() { None } else { Some(result) }
-    }
-}
+use crate::model::model_playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::model::model_xtream::{XtreamCategory, XtreamSeriesInfo, XtreamStream};
 
 fn process_category(category: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(category.to_owned()) {
@@ -242,15 +31,61 @@ fn process_streams(xtream_cluster: &XtreamCluster, streams: &Value) -> Result<Ve
     }
 }
 
-pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32,
+pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigInput) -> Result<Option<Vec<PlaylistItem>>, M3uFilterError> {
+    let url = input.url.as_str();
+    let username = input.username.as_ref().map_or("", |v| v);
+    let password = input.password.as_ref().map_or("", |v| v);
+
+    match serde_json::from_value::<XtreamSeriesInfo>(info.to_owned()) {
+        Ok(series_info) => {
+            let result: Vec<PlaylistItem> = series_info.episodes.values().flatten().map(|episode|
+                PlaylistItem {
+                    header: RefCell::new(PlaylistItemHeader {
+                        id: Rc::new(episode.id.to_owned()),
+                        name: Rc::new(episode.title.to_owned()),
+                        logo: Rc::new(episode.info.movie_image.to_owned()),
+                        logo_small: default_as_empty_rc_str(),
+                        group: Rc::new(group_title.to_string()),
+                        title: Rc::new(episode.title.to_owned()),
+                        parent_code: default_as_empty_rc_str(),
+                        audio_track: default_as_empty_rc_str(),
+                        time_shift: default_as_empty_rc_str(),
+                        rec: default_as_empty_rc_str(),
+                        // source is meant to hold the original provider data
+                        source: default_as_empty_rc_str(),
+                        url: if episode.direct_source.is_empty() {
+                            let ext = episode.container_extension.to_owned();
+                            let stream_base_url = format!("{}/series/{}/{}/{}.{}", url, username, password, episode.id.as_str(), ext);
+                            Rc::new(stream_base_url)
+                        } else {
+                            Rc::new(episode.direct_source.to_owned())
+                        },
+                        epg_channel_id: None,
+                        item_type: PlaylistItemType::Series,
+                        xtream_cluster: XtreamCluster::Series,
+                        additional_properties: episode.get_additional_properties(&series_info),
+                        series_fetched: false,
+                    })
+                }).collect();
+            if result.is_empty() { Ok(None) } else { Ok(Some(result)) }
+        }
+        Err(err) => {
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to process series info {}", &err)
+        }
+    }
+}
+
+pub(crate) fn parse_xtream(cat_id_cnt: &AtomicU32,
                            xtream_cluster: &XtreamCluster,
                            category: &Value,
-                           url: &str,
-                           username: &str,
-                           password: &str,
+                           input: &ConfigInput,
                            streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match process_category(category) {
         Ok(mut categories) => {
+            let url = input.url.as_str();
+            let username = input.username.as_ref().map_or("", |v| v);
+            let password = input.password.as_ref().map_or("", |v| v);
+
             return match process_streams(xtream_cluster, streams) {
                 Ok(streams) => {
                     let group_map: HashMap::<Rc<String>, RefCell<XtreamCategory>> =
@@ -278,11 +113,11 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32,
                                     source: default_as_empty_rc_str(),
                                     url: if stream.direct_source.is_empty() {
                                         let stream_base_url = match xtream_cluster {
-                                            XtreamCluster::Live =>  format!("{}/live/{}/{}/{}.ts", url, username, password, &stream.get_stream_id()),
+                                            XtreamCluster::Live => format!("{}/live/{}/{}/{}.ts", url, username, password, &stream.get_stream_id()),
                                             XtreamCluster::Video => {
                                                 let ext = stream.container_extension.as_ref().map_or("mp4", |e| e.as_str());
-                                                format!("{}/live/{}/{}/{}.{}", url, username, password, &stream.get_stream_id(), ext)
-                                            },
+                                                format!("{}/movie/{}/{}/{}.{}", url, username, password, &stream.get_stream_id(), ext)
+                                            }
                                             XtreamCluster::Series =>
                                                 format!("{}/player_api.php?username={}&password={}&action=get_series_info&series_id={}",
                                                         url, username, password, &stream.get_stream_id())
@@ -292,8 +127,14 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32,
                                         Rc::clone(&stream.direct_source)
                                     },
                                     epg_channel_id: stream.epg_channel_id.clone(),
+                                    item_type: match xtream_cluster {
+                                        XtreamCluster::Live => PlaylistItemType::Live,
+                                        XtreamCluster::Video => PlaylistItemType::Movie,
+                                        XtreamCluster::Series => PlaylistItemType::SeriesInfo,
+                                    },
                                     xtream_cluster: xtream_cluster.clone(),
                                     additional_properties: stream.get_additional_properties(),
+                                    series_fetched: false,
                                 }),
                             };
                             grp.add(item);
@@ -307,7 +148,7 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicI32,
                             id: cat_id_cnt.load(Ordering::Relaxed),
                             xtream_cluster: xtream_cluster.clone(),
                             title: Rc::clone(&cat.category_name),
-                            channels: cat.channels.clone(),
+                            channels: cat.channels.clone()
                         }
                     }).collect()))
                 }

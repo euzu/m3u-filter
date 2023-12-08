@@ -11,14 +11,14 @@ use log::{debug, error, info};
 use unidecode::unidecode;
 
 use crate::{Config, get_errors_notify_message, model::config, valid_property};
-use crate::download::{get_m3u_playlist, get_xmltv, get_xtream_playlist};
+use crate::download::{get_m3u_playlist, get_xmltv, get_xtream_playlist, get_xtream_playlist_series};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{MsgKind, send_message};
 use crate::model::config::{ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::model::model_config::{AFFIX_FIELDS, ItemField, ProcessingOrder, SortOrder::{Asc, Desc}, TargetType};
-use crate::model::model_m3u::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
+use crate::model::model_playlist::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::model::stats::{InputStats, PlaylistStats};
 use crate::model::xmltv::{Epg};
 use crate::processing::playlist_watch::process_group_watch;
@@ -44,7 +44,7 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                 id: pg.id,
                 title: pg.title.clone(),
                 channels,
-                xtream_cluster: pg.xtream_cluster.clone(),
+                xtream_cluster: pg.xtream_cluster.clone()
             });
         }
     });
@@ -207,7 +207,7 @@ fn map_channel(channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
         let provider = ValueProvider { pli: ref_chan.clone() };
         let mut mock_processor = MockValueProcessor {};
         for m in &mapping.mapper {
-            let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: m};
+            let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: m };
             match &m._filter {
                 Some(filter) => {
                     if filter.filter(&provider, &mut mock_processor) {
@@ -236,7 +236,7 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
         // if the group names are changed, restructure channels to the right groups
         // we use
         let mut new_groups: Vec<PlaylistGroup> = Vec::new();
-        let mut grp_id: i32 = 0;
+        let mut grp_id: u32 = 0;
         for playlist_group in new_playlist {
             for channel in &playlist_group.channels {
                 let cluster = &channel.header.borrow().xtream_cluster;
@@ -249,7 +249,7 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
                             id: grp_id,
                             title: Rc::clone(title),
                             channels: vec![channel.clone()],
-                            xtream_cluster: cluster.clone(),
+                            xtream_cluster: cluster.clone()
                         })
                     }
                 }
@@ -271,6 +271,10 @@ fn is_input_enabled(enabled_inputs: usize, input_enabled: bool, input_id: u16, u
     input_enabled
 }
 
+fn is_target_enabled(target: &ConfigTarget, user_targets: &ProcessTargets) -> bool {
+    (!user_targets.enabled && target.enabled) || (user_targets.enabled && user_targets.has_target(target.id))
+}
+
 async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
     let source = cfg.sources.get(source_idx).unwrap();
     let mut all_playlist = Vec::new();
@@ -278,7 +282,6 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
     let mut errors = vec![];
     let mut stats = HashMap::<u16, InputStats>::new();
     for input in &source.inputs {
-        //if input.enabled || (user_targets.enabled && user_targets.has_input(input.id)) {
         let input_id = input.id;
         if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
             let (playlist, mut error_list) = match input.input_type {
@@ -286,7 +289,9 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                 InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir).await,
             };
             let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
-                get_xmltv(&cfg, input, &cfg.working_dir).await } else { (None, vec![])
+                get_xmltv(&cfg, input, &cfg.working_dir).await
+            } else {
+                (None, vec![])
             };
             error_list.drain(..).for_each(|err| errors.push(err));
             tvguide_errors.drain(..).for_each(|err| errors.push(err));
@@ -306,7 +311,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                     FetchedPlaylist {
                         input,
                         playlist,
-                        epg: tvguide
+                        epg: tvguide,
                     }
                 );
             }
@@ -330,16 +335,14 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Source at {} input is empty", source_idx)));
     } else {
         debug!("Input has {} groups", all_playlist.len());
-        source.targets.iter().for_each(|target| {
-            let should_process = (!user_targets.enabled && target.enabled)
-                || (user_targets.enabled && user_targets.has_target(target.id));
-            if should_process {
-                match process_playlist(&mut all_playlist, target, &cfg, &mut stats) {
+        for target in &source.targets {
+            if is_target_enabled(target, &user_targets) {
+                match process_playlist(&mut all_playlist, target, &cfg, &mut stats, &mut errors).await {
                     Ok(_) => {}
                     Err(mut err) => err.drain(..).for_each(|e| errors.push(e))
                 }
             }
-        });
+        }
     }
     (stats.drain().map(|(_, v)| v).collect(), errors)
 }
@@ -401,15 +404,16 @@ fn get_processing_pipe(target: &ConfigTarget) -> ProcessingPipe {
     }
 }
 
-pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
-                               target: &ConfigTarget, cfg: &Config,
-                               stats: &mut HashMap<u16, InputStats>) -> Result<(), Vec<M3uFilterError>> {
+pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
+                                         target: &ConfigTarget, cfg: &Config,
+                                         stats: &mut HashMap<u16, InputStats>,
+                                         errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
     let pipe = get_processing_pipe(target);
 
     debug!("Processing order is {}", &target.processing_order);
 
     let mut new_fetched_playlists: Vec<FetchedPlaylist> = vec![];
-    playlists.iter_mut().for_each(|fpl| {
+    for fpl in playlists.iter_mut() {
         let mut new_fpl = FetchedPlaylist {
             input: fpl.input,
             playlist: fpl.playlist.clone(), // we need to clone, because of multiple target definitions, we cant change the initial playlist.
@@ -422,6 +426,24 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
                 new_fpl.playlist = v;
             }
         }
+        let resolve_series =
+            if let Some(options) = &target.options {
+                options.xtream_resolve_series && fpl.input.input_type == InputType::Xtream && target.has_output(&TargetType::M3u)
+            } else {
+                false
+            };
+        if resolve_series {
+            get_xtream_playlist_series(fpl, errors).await;
+            // the original list has now resolved the series info items.
+            // wee need to pipe them an put them into
+            // TODO
+            //for plg in fpl.playlist {
+                // 1. extract series playlistitems per group
+                // 2. run processing pipe
+                // 3. assign results to the new_fpl groups.
+            //}
+        }
+
         // stats
         let input_stats = stats.get_mut(&new_fpl.input.id);
         if let Some(stat) = input_stats {
@@ -432,7 +454,7 @@ pub(crate) fn process_playlist(playlists: &mut [FetchedPlaylist],
         }
 
         new_fetched_playlists.push(new_fpl);
-    });
+    }
 
     apply_affixes(&mut new_fetched_playlists);
     let mut new_playlist = vec![];
@@ -491,7 +513,7 @@ fn persist_playlist(playlist: &[PlaylistGroup], epg: Option<Epg>,
             Ok(_) => {
                 if !playlist.is_empty() {
                     match write_epg(target, cfg, &epg, output) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(err) => errors.push(err)
                     }
                 }

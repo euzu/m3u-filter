@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
+use crate::model::model_config::{default_as_false};
 use crate::model::xmltv::TVGuide;
 
 // https://de.wikipedia.org/wiki/M3U
@@ -37,6 +38,17 @@ impl Display for XtreamCluster {
 
 pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::Live }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum PlaylistItemType {
+    Live = 1,
+    Movie = 2,
+    Series = 3,
+    SeriesInfo = 4,
+}
+
+pub(crate) fn default_playlist_item_type() -> PlaylistItemType { PlaylistItemType::Live }
+
+
 pub(crate) trait FieldAccessor {
     fn get_field(&self, field: &str) -> Option<Rc<String>>;
     fn set_field(&mut self, field: &str, value: &str) -> bool;
@@ -62,6 +74,10 @@ pub(crate) struct PlaylistItemHeader {
     pub xtream_cluster: XtreamCluster,
     #[serde(skip_serializing, skip_deserializing)]
     pub additional_properties: Option<Vec<(String, Value)>>,
+    #[serde(default = "default_playlist_item_type", skip_serializing, skip_deserializing)]
+    pub item_type:  PlaylistItemType,
+    #[serde(default = "default_as_false", skip_serializing, skip_deserializing)]
+    pub series_fetched: bool, // only used for series_info
 }
 
 macro_rules! update_fields {
@@ -143,9 +159,10 @@ impl PlaylistItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistGroup {
-    pub id: i32,
+    pub id: u32,
     pub title: Rc<String>,
     pub channels: Vec<PlaylistItem>,
     #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
     pub xtream_cluster: XtreamCluster,
 }
+

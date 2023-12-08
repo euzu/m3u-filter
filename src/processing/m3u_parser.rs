@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use crate::model::config::Config;
 use crate::model::model_config::default_as_empty_rc_str;
-use crate::model::model_m3u::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, XtreamCluster};
+use crate::model::model_playlist::{default_playlist_item_type, default_stream_cluster, PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 
 fn token_value(it: &mut std::str::Chars) -> String {
     if let Some(oc) = it.next() {
@@ -67,8 +67,10 @@ fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistIt
         source: Rc::new(content.to_owned()),
         url: Rc::new(url),
         epg_channel_id: None,
-        xtream_cluster: XtreamCluster::Live,
+        item_type: default_playlist_item_type(),
+        xtream_cluster: default_stream_cluster(),
         additional_properties: None,
+        series_fetched: false,
     }
 }
 
@@ -124,6 +126,7 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
         if url.ends_with(suffix) {
             // TODO find Series based on group or configured names
             plih.xtream_cluster = XtreamCluster::Video;
+            plih.item_type = PlaylistItemType::Movie;
             break;
         }
     }
@@ -182,7 +185,7 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
     }
 
     let mut result: Vec<PlaylistGroup> = vec![];
-    for (grp_id, (key, channels)) in (1_i32..).zip(groups.into_iter()) {
+    for (grp_id, (key, channels)) in (1_u32..).zip(groups.into_iter()) {
         let cluster = channels.first().map(|pli| pli.header.borrow().xtream_cluster.clone());
         result.push(PlaylistGroup { id: grp_id, xtream_cluster: cluster.unwrap(), title: Rc::clone(&key), channels });
     }

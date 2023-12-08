@@ -9,7 +9,7 @@ use log::{error};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
-use crate::model::model_m3u::{PlaylistGroup, PlaylistItemHeader, XtreamCluster};
+use crate::model::model_playlist::{PlaylistGroup, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::{create_m3u_filter_error_result, utils};
 use crate::api::api_model::AppState;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
@@ -147,8 +147,12 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                 }));
 
                 for pli in &plg.channels {
-                    channel_num += 1;
                     let header = &pli.header.borrow();
+                    if header.item_type == PlaylistItemType::Series {
+                        // we skip resolved series, because this is only necessary when writing m3u files
+                        continue;
+                    }
+                    channel_num += 1;
                     let mut document = serde_json::Map::from_iter([
                         ("category_id".to_string(), Value::String(format!("{}", &plg.id))),
                         ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(plg.id.to_owned()))]))),

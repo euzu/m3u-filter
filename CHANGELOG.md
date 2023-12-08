@@ -1,6 +1,7 @@
 # Changelog
 # v1.1.5(2023-12-??)
 * Changed api-proxy user default proxy type from `reverse` to `redirect`
+* Added `xtream_resolve_series` option for `m3u` target 
 
 # v1.1.4(2023-12-06)
 * Breaking change, `config.yml` split into `config.yml` and `source.yml`

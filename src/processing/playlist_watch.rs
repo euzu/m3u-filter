@@ -4,7 +4,7 @@ use log::{error, info};
 use regex::Regex;
 use crate::messaging::{MsgKind, send_message};
 use crate::model::config::Config;
-use crate::model::model_m3u::PlaylistGroup;
+use crate::model::model_playlist::PlaylistGroup;
 use crate::utils;
 
 pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) {

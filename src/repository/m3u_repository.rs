@@ -7,7 +7,7 @@ use log::error;
 use crate::{create_m3u_filter_error_result, utils};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::model_m3u::PlaylistGroup;
+use crate::model::model_playlist::{PlaylistGroup, PlaylistItemType};
 use crate::utils::add_prefix_to_filename;
 
 fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error> {
@@ -113,6 +113,10 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
                     }
                     for pg in new_playlist {
                         for pli in &pg.channels {
+                            if pli.header.borrow().item_type == PlaylistItemType::SeriesInfo {
+                                // we skip series info, because this is only necessary when writing xtream files
+                                continue;
+                            }
                             let content = pli.to_m3u(&target.options);
                             match check_write(m3u_file.write_all(content.as_bytes())) {
                                 Ok(_) => (),

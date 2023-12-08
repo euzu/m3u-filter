@@ -281,13 +281,18 @@ Each format has 2 properties
 - `kodi_style`.
 
 `xtream` output has additional options
-- `xtream_skip_live_direct_source`
-- `xtream_skip_video_direct_source`
+- `xtream_skip_live_direct_source`  if true the direct_source property from provider for live is ignored
+- `xtream_skip_video_direct_source`  if true the direct_source property from provider for movies is ignored
+
+`m3u` output has additional options
+- `xtream_resolve_series` `This is option is currently ignored because of mass requests its highly possible that you are banned` 
+if you have xtream input and m3u output, the series are fetched and resolved.
+This can cause a lot of requests to the provider. Be cautious when using this option.
 
 ```yaml
 output:
   - type: m3u
-    filename: {}.m3u
+    filename: playlist.m3u
 ```
 
 ### 2.2.2.3 `processing_order`

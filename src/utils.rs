@@ -254,7 +254,7 @@ async fn download_json_content(input: &ConfigInput, url: url::Url, persist_filep
     }
 }
 
-pub(crate) async fn get_input_json_content(input: &ConfigInput, url_str: &String, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
+pub(crate) async fn get_input_json_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
     match url_str.parse::<url::Url>() {
         Ok(url) => match download_json_content(input, url, persist_filepath).await {
             Ok(content) => Ok(content),

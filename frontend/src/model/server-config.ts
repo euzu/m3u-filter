@@ -41,7 +41,10 @@ export interface TargetConfig {
         ignore_logo: boolean,
         underscore_whitespace: boolean,
         cleanup: boolean,
-        kodi_style: boolean
+        kodi_style: boolean,
+        xtream_skip_live_direct_source: boolean,
+        xtream_skip_video_direct_source: boolean,
+        xtream_resolve_series: boolean,
     },
     sort: {
         match_as_ascii: boolean,

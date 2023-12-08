@@ -157,6 +157,8 @@ pub(crate) struct ConfigTargetOptions {
     pub xtream_skip_live_direct_source: bool,
     #[serde(default = "default_as_false")]
     pub xtream_skip_video_direct_source: bool,
+    #[serde(default = "default_as_false")]
+    pub xtream_resolve_series: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
