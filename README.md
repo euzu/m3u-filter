@@ -4,6 +4,7 @@ m3u-filter is a simple application which can:
   - filter, rename, map and sort entries out of a playlist and persist in EXTM3U, XTREAM or Kodi format.
   - can process multiple inputs and can create multiple outputs from this input files trough target definitions.
   - act as simple xtream or m3u server after processing entries
+  - act as `redirect` or `reverse` proxy for xtream 
   - can schedule updates in server mode
   - can run as cli-command for serving processed playlists through web-server like nginx or apache.
   - can define multiple targets for filtering if you want to create multiple playlists from a big playlist.
