@@ -73,50 +73,30 @@ pub(crate) fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
             attributes: None,
             children: vec![],
         };
-
         let mut channel_ids: Vec<&String> = vec![];
-        let mut program_ids: Vec<&String> = vec![];
-
-            tv_guides.iter().for_each(|guide| {
-           if epg.attributes.is_none() {
-               epg.attributes = guide.attributes.clone();
-           }
-           guide.children.iter().for_each(|c| {
-               let add_child = match c.name.as_str() {
-                   "channel" => {
-                       let chan_id = c.get_attribute_value("id");
-                       match chan_id {
-                           Some(id) => {
-                               if channel_ids.contains(&id) {
-                                   false
-                               } else {
-                                   channel_ids.push(id);
-                                   true
-                               }
-                           },
-                           None => false,
-                       }
-                   },
-                   "programme" => {
-                       let chan_id = c.get_attribute_value("channel");
-                       match chan_id {
-                           Some(id) => {
-                               if program_ids.contains(&id) {
-                                   false
-                               } else {
-                                   program_ids.push(id);
-                                   true
-                               }
-                           },
-                           None => false,
-                       }
-                   }
-                   _ => false,
-               };
-               if add_child {
-                   epg.children.push(c.clone())
-               }
-           });
+        tv_guides.iter().for_each(|guide| {
+            if epg.attributes.is_none() {
+                epg.attributes = guide.attributes.clone();
+            }
+            guide.children.iter().for_each(|c| {
+                if c.name.as_str() == "channel" {
+                    if let Some(chan_id) = c.get_attribute_value("id") {
+                        if !channel_ids.contains(&chan_id) {
+                            channel_ids.push(chan_id);
+                            epg.children.push(c.clone())
+                        }
+                    }
+                }
+            });
+            guide.children.iter().for_each(|c| {
+                if c.name.as_str() == "programme" {
+                    if let Some(chan_id) = c.get_attribute_value("channel") {
+                        if channel_ids.contains(&chan_id) {
+                            epg.children.push(c.clone());
+                        }
+                    }
+                }
+            });
         });
         Some(epg)
     }
