@@ -143,6 +143,8 @@ impl ConfigRename {
     }
 }
 
+fn default_as_two() -> u16 { 2 }
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigTargetOptions {
     #[serde(default = "default_as_false")]
@@ -159,6 +161,8 @@ pub(crate) struct ConfigTargetOptions {
     pub xtream_skip_video_direct_source: bool,
     #[serde(default = "default_as_false")]
     pub xtream_resolve_series: bool,
+    #[serde(default = "default_as_two")]
+    pub xtream_resolve_series_delay: u16,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

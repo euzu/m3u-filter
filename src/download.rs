@@ -41,11 +41,11 @@ pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_
     }
 }
 
-
-pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>, errors: &mut Vec<M3uFilterError>) {
+pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
     let input = fpl.input;
+    let mut result: Vec<PlaylistGroup> = vec![];
     for plg in &mut fpl.playlist {
-        let mut group_series: Option<Vec<PlaylistItem>> = None;
+        let mut group_series: Vec<PlaylistItem> = vec![];
         for pli in &plg.channels {
             let (fetch_series, series_info_url) = {
                 let mut header = pli.header.borrow_mut();
@@ -60,20 +60,31 @@ pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>
                     Ok(series_content) => {
                         match parse_xtream_series_info(&series_content, pli.header.borrow().group.as_str(), input) {
                             Ok(series_info) => {
-                                group_series = series_info;
+                                if let Some(mut series) = series_info {
+                                    series.drain(..).for_each(|item| group_series.push(item));
+                                }
                             }
                             Err(err) => errors.push(err),
                         }
                     }
                     Err(err) => errors.push(err)
                 };
-                sleep(std::time::Duration::new(2, 0)); // 2 seconds between
+                if resolve_delay > 0 {
+                    sleep(std::time::Duration::new(resolve_delay as u64, 0)); // 2 seconds between
+                }
             }
         }
-        if let Some(mut series) = group_series {
-            series.drain(..).for_each(|spli| plg.channels.push(spli));
+        if !group_series.is_empty() {
+            let group = PlaylistGroup {
+                id: plg.id,
+                title: plg.title.clone(),
+                channels: group_series,
+                xtream_cluster: XtreamCluster::Series,
+            };
+            result.push(group);
         }
     }
+    result
 }
 
 

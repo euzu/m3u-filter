@@ -19,6 +19,17 @@ pub(crate) struct FetchedPlaylist<'a> {
     pub epg: Option<TVGuide>,
 }
 
+impl FetchedPlaylist<'_> {
+    pub(crate) fn update_playlist(&mut self, plg: &PlaylistGroup) {
+        for grp in self.playlist.iter_mut() {
+            if grp.id == plg.id {
+                plg.channels.iter().for_each(|item| grp.channels.push(item.clone()));
+                return;
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum XtreamCluster {
     Live = 1,

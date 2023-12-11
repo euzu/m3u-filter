@@ -426,22 +426,30 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
                 new_fpl.playlist = v;
             }
         }
-        let resolve_series =
+        let (resolve_series, resolve_series_delay) =
             if let Some(options) = &target.options {
-                options.xtream_resolve_series && fpl.input.input_type == InputType::Xtream && target.has_output(&TargetType::M3u)
+                (options.xtream_resolve_series && fpl.input.input_type == InputType::Xtream && target.has_output(&TargetType::M3u),
+                 options.xtream_resolve_series_delay)
             } else {
-                false
+                (false, 0)
             };
         if resolve_series {
-            get_xtream_playlist_series(fpl, errors).await;
-            // the original list has now resolved the series info items.
-            // wee need to pipe them an put them into
-            // TODO
-            //for plg in fpl.playlist {
-                // 1. extract series playlistitems per group
-                // 2. run processing pipe
-                // 3. assign results to the new_fpl groups.
-            //}
+            let mut series_playlist = get_xtream_playlist_series(fpl, errors, resolve_series_delay).await;
+            // original content saved into original list
+            for plg in &series_playlist {
+                fpl.update_playlist(plg);
+            }
+            // run processing pipe over new items
+            for f in &pipe {
+                let r = f(&mut series_playlist, target);
+                if let Some(v) = r {
+                    series_playlist = v;
+                }
+            }
+            // assign new items to the new playlist
+            for plg in &series_playlist {
+                new_fpl.update_playlist(plg);
+            }
         }
 
         // stats
