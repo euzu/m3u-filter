@@ -285,7 +285,9 @@ Each format has 2 properties
 - `xtream_skip_video_direct_source`  if true the direct_source property from provider for movies is ignored
 
 `m3u` output has additional options
-- `xtream_resolve_series` is set to `true` and you have xtream input and m3u output, the series are fetched and resolved.
+Because xtream api delivers only the metadata to series, we need to fetch the series and resolve them. But be aware,
+each series info entry needs to be fetched one by one. 
+- `xtream_resolve_series` if is set to `true` and you have xtream input and m3u output, the series are fetched and resolved.
 This can cause a lot of requests to the provider. Be cautious when using this option.  
 - `xtream_resolve_series_delay` to avoid a provider ban you can set the seconds between series_info_request's. Default is 2 seconds.
 But be aware that the more series entries there are, the longer the process takes. 
