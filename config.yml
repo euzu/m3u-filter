@@ -9,10 +9,13 @@ messaging:
     - error
     - info
     - stats
+    - watch
   telegram:
     bot_token: '<your telegram bot token>'
     chat_ids:
       - <your telegram chat_id>
+  rest:
+    url: http://<ip>/<maybe_path>/<notification>
 video:
   web_search: 'https://www.imdb.com/search/title/?title={}'
   extensions:

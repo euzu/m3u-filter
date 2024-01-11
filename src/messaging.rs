@@ -1,4 +1,5 @@
 use log::{debug, error};
+use reqwest::header;
 use crate::model::config::{MessagingConfig};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -9,6 +10,8 @@ pub(crate) enum MsgKind {
     Stats,
     #[serde(rename = "error")]
     Error,
+    #[serde(rename = "watch")]
+    Watch,
 }
 
 fn is_enabled(kind: &MsgKind, cfg: &MessagingConfig) -> bool {
@@ -27,6 +30,22 @@ pub(crate) fn send_message(kind: &MsgKind, cfg: &Option<MessagingConfig>, msg: &
                         Err(e) => error!("Text message wasn't sent to {} because of: {}", chat_id, e)
                     }
                 };
+            }
+
+            if let Some(rest) = &messaging.rest {
+                let url = rest.url.to_owned();
+                let data = msg.to_owned();
+                actix_rt::spawn(async move {
+                    let client = reqwest::Client::new();
+                    match client.post(&url)
+                        .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                        .body(data)
+                        .send()
+                        .await {
+                        Ok(_) => debug!("Text message sent successfully to rest api"),
+                        Err(e) => error!("Text message wasn't sent to rest api because of: {}", e)
+                    }
+                });
             }
         }
     }

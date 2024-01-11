@@ -213,6 +213,7 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
                     if response.status().is_success() {
                         match response.text().await {
                             Ok(content) => {
+                                // TODO we are not replacing direct_source, we should add an option to do this.
                                 xtream_persist_stream_info(app_state, target_name, stream_id, cluster,
                                                            target_input, content.as_str()).await;
                                 return Ok(content);

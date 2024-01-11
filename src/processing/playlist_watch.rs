@@ -72,7 +72,7 @@ fn handle_watch_notification(cfg: &Config, added: BTreeSet<String>, removed: BTr
     if !message.is_empty() {
         let msg = format!("Changes {}/{}\n{}", target_name, group_name, message.join(""));
         info!("{}", &msg);
-        send_message(&MsgKind::Info, &cfg.messaging, &msg);
+        send_message(&MsgKind::Watch, &cfg.messaging, &msg);
     }
 }
 

@@ -446,10 +446,16 @@ pub(crate) struct TelegramMessagingConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct RestMessagingConfig {
+    pub url: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MessagingConfig {
     #[serde(default = "default_as_empty_list")]
     pub notify_on: Vec<MsgKind>,
     pub telegram: Option<TelegramMessagingConfig>,
+    pub rest: Option<RestMessagingConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

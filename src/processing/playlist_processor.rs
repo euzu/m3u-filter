@@ -535,7 +535,7 @@ fn persist_playlist(playlist: &[PlaylistGroup], epg: Option<Epg>,
 
 pub(crate) async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let (stats, errors) = process_sources(cfg.to_owned(), targets.to_owned()).await;
-    let stats_msg = format!("Stats: {}", stats.iter().map(|stat| stat.to_string()).collect::<Vec<String>>().join("\n"));
+    let stats_msg = format!("{{\"stats\": {}}}", stats.iter().map(|stat| stat.to_string()).collect::<Vec<String>>().join("\n"));
     // print stats
     info!("{}", stats_msg);
     // send stats
@@ -544,6 +544,7 @@ pub(crate) async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTarget
     errors.iter().for_each(|err| error!("{}", err.message));
     // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
-        send_message(&MsgKind::Error, &cfg.messaging, message.as_str());
+        let error_msg = format!("{{\"errors\": \"{}\"}}",message.as_str());
+        send_message(&MsgKind::Error, &cfg.messaging, error_msg.as_str());
     }
 }

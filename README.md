@@ -11,7 +11,7 @@ m3u-filter is a simple application which can:
   - use regular expressions for matching
   - define filter as statements like `filter: (Group ~ "^FR.*") AND NOT(Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~".*MOVIES.*")`
   - DRY - define templates and use them, don't repeat yourself
-  - Send a telegram bot message when something goes wrong
+  - Send a telegram bot or rest message when something goes wrong
   - Watch changes in groups and get a message on changes
 
 ![m3u-filter-overview](https://github.com/euzu/m3u-filter/assets/33094714/9a3449ac-c646-4bb4-a5ab-320a588d35c8)
@@ -66,12 +66,14 @@ With this configuration, you should create a `data` directory where you execute 
 
 ### 1.4 `messaging`
 `messaging` is an optional configuration for receiving messages.
-Currently only telegram is supported.
+Currently only  and rest is supported.
 
 Messaging is Opt-In, you need to set the `notify_on` message types which are
 - `info`
 - `stats`
 - `error`
+
+`telegram` and `rest` configurations are optional.
 
 ```yaml
 messaging:
@@ -83,6 +85,8 @@ messaging:
     bot_token: '<telegram bot token>'
     chat_ids:
       - '<telegram chat id>'
+  rest:
+    url: '<api url as POST endpoint for json data>'
 ```
 
 For more information: [Telegram bots](https://core.telegram.org/bots/tutorial)
@@ -426,6 +430,13 @@ watch:
 Changes from this groups will be printed as info on console and send to
 the configured messaging (f.e. telegram channel).
 
+To get the watch notifications over messaging notify_on `watch` should be enabled.  
+In `config.yml`
+```yaml
+messaging:
+  notify_on:
+    - watch
+```
 
 ## 2. `mapping.yml`
 Has the root item `mappings` which has the following top level entries:

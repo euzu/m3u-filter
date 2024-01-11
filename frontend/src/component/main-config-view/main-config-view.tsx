@@ -12,6 +12,7 @@ import FormView, {FormFieldType} from "../form-view/from-view";
 import TabSet from "../tab-set/tab-set";
 import {getIconByName} from "../../icons/icons";
 import {useServices} from "../../provider/service-provider";
+import {MessageKind} from "../../model/message-kind";
 
 const isNumber = (value: string): boolean => {
     return !isNaN(value as any);
@@ -22,6 +23,7 @@ const CONFIG_API_FIELDS = [
     {name: 'port', label: 'Port', fieldType: FormFieldType.NUMBER, validator: isNumber},
     {name: 'web_root', label: 'Web-Root', fieldType: FormFieldType.TEXT, validator: undefined},
 ];
+
 const CONFIG_FIELDS = [
     {name: 'threads', label: 'Threads', fieldType: FormFieldType.NUMBER, validator: isNumber},
     {name: 'working_dir', label: 'Working dir', fieldType: FormFieldType.TEXT, validator: undefined},
@@ -32,33 +34,33 @@ const CONFIG_FIELDS = [
 const CONFIG_MESSAGING_FIELDS = [
     {
         name: 'notify_on', label: 'Notify on', fieldType: FormFieldType.MULTI_SELECT, options:
-            [{value: 'error', label: 'Error'}, {value: 'info', label: 'Info'}, {value: 'stats', label: 'Stats'}]
+            Object.keys(MessageKind).map((key) => ({value: (MessageKind as any)[key], label: key}))
     },
-]
+];
 
 const CONFIG_TELEGRAM_FIELDS = [
     {name: 'bot_token', label: 'Bot Token', fieldType: FormFieldType.TEXT},
     {name: 'chat_ids', label: 'Chat Ids', fieldType: FormFieldType.TAGS},
-]
+];
 
 const CONFIG_VIDEO_FIELDS = [
     {name: 'web_search', label: 'Web Search Url', fieldType: FormFieldType.TEXT},
     {name: 'extensions', label: 'Extensions', fieldType: FormFieldType.TEXT},
-]
+];
 
 const CONFIG_VIDEO_DOWNLOAD_FIELDS = [
     {name: 'headers', label: 'Headers', fieldType: FormFieldType.MAP},
     {name: 'directory', label: 'Directory', fieldType: FormFieldType.TEXT},
     {name: 'organize_into_directories', label: 'Organize Into Directories', fieldType: FormFieldType.CHECK},
     {name: 'episode_pattern', label: 'Episode Pattern', fieldType: FormFieldType.TEXT},
-]
+];
 
 const TABS = [
     {label: 'Api', key: 'api'},
     {label: 'Main', key: 'main'},
     {label: 'Messaging', key: 'messaging'},
     {label: 'Video', key: 'video'}
-]
+];
 
 interface MainConfigViewProps {
     config: ServerConfig;

@@ -1,7 +1,9 @@
 # Changelog
-# v1.1.5(2023-12-??)
+# v1.1.5(2024-01-11)
 * Changed api-proxy user default proxy type from `reverse` to `redirect`
 * Added `xtream_resolve_series` and `xtream_resolve_series_delay` option for `m3u` target 
+* Messaging calling rest endpoint added
+* Messaging added 'Watch' option as OptIn
 
 # v1.1.4(2023-12-06)
 * Breaking change, `config.yml` split into `config.yml` and `source.yml`

@@ -8,7 +8,7 @@ pub(crate) struct PlaylistStats {
 
 impl ToString for PlaylistStats {
     fn to_string(&self) -> String {
-        format!("{{groups: {}, channels: {}}}", self.group_count, self.channel_count)
+        format!("{{\"groups\": {}, \"channels\": {}}}", self.group_count, self.channel_count)
     }
 }
 
@@ -23,7 +23,7 @@ pub(crate) struct InputStats {
 
 impl ToString for InputStats {
     fn to_string(&self) -> String {
-        format!("{{name: {}, type: {}, errors: {}, raw: {}, processed: {}}}",
+        format!("{{\"name\": {}, \"type\": {}, \"errors\": {}, \"raw\": {}, \"processed\": {}}}",
                 self.name, self.input_type.to_string(), self.error_count,
                 self.raw_stats.to_string(), self.processed_stats.to_string())
     }
