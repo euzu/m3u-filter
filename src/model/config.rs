@@ -197,6 +197,8 @@ pub(crate) struct ConfigTarget {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub watch: Option<Vec<String>>,
     #[serde(skip_serializing, skip_deserializing)]
+    pub _watch_re: Option<Vec<regex::Regex>>,
+    #[serde(skip_serializing, skip_deserializing)]
     pub _filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _mapping: Option<Vec<Mapping>>,
@@ -242,6 +244,16 @@ impl ConfigTarget {
 
         if m3u_cnt > 1 || strm_cnt > 1 || xtream_cnt > 1 {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Multiple output formats with same type : {}", self.name);
+        }
+
+        if let Some(watch) = &self.watch {
+            let regexps: Result<Vec<regex::Regex>, _> = watch.iter().map(|s| regex::Regex::new(s)).collect();
+            match regexps {
+                Ok(watch_re) => self._watch_re = Some(watch_re),
+                Err(err) => {
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Invalid watch regular expression: {}", err);
+                }
+            }
         }
 
         match get_filter(&self.filter, templates) {
@@ -297,12 +309,12 @@ impl ConfigSource {
         Ok(index + (self.inputs.len() as u16))
     }
 
-    pub(crate)fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
+    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
         for target in &self.targets {
             if target.name.eq(target_name) {
                 for input in &self.inputs {
                     if input.input_type.eq(input_type) {
-                        return Some(input)
+                        return Some(input);
                     }
                 }
             }
@@ -481,7 +493,7 @@ pub(crate) struct VideoConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download: Option<VideoDownloadConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub web_search: Option<String>
+    pub web_search: Option<String>,
 }
 
 impl VideoConfig {
@@ -526,7 +538,6 @@ pub(crate) struct ConfigDto {
 }
 
 impl ConfigDto {
-
     pub fn is_valid(&self) -> bool {
         if self.api.host.is_empty() {
             return false;
@@ -535,7 +546,7 @@ impl ConfigDto {
         if let Some(video) = &self.video {
             if let Some(download) = &video.download {
                 if let Some(episode_pattern) = &download.episode_pattern {
-                    if ! episode_pattern.is_empty() {
+                    if !episode_pattern.is_empty() {
                         let re = regex::Regex::new(episode_pattern);
                         if re.is_err() {
                             return false;
@@ -591,7 +602,7 @@ impl Config {
 
     pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
         for source in &self.sources {
-            if let Some(cfg) = source.get_input_for_target(target_name, input_type) { return Some(cfg) }
+            if let Some(cfg) = source.get_input_for_target(target_name, input_type) { return Some(cfg); }
         }
         None
     }
@@ -651,10 +662,10 @@ impl Config {
             self.backup_dir = Some(PathBuf::from(&self.working_dir).join(".backup").into_os_string().to_string_lossy().to_string());
         }
         let backupdir = PathBuf::from(self.backup_dir.as_ref().unwrap());
-        if ! backupdir.exists() {
+        if !backupdir.exists() {
             match std::fs::create_dir(backupdir) {
                 Ok(_) => {}
-                Err(err) => { error!("Could not create backup dir {} {}", self.backup_dir.as_ref().unwrap(), err)}
+                Err(err) => { error!("Could not create backup dir {} {}", self.backup_dir.as_ref().unwrap(), err) }
             }
         }
         self.api.prepare();
@@ -709,7 +720,7 @@ impl Config {
                     Ok(_) => {}
                     Err(err) => return Err(err)
                 }
-            },
+            }
         };
         Ok(())
     }

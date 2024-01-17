@@ -1,4 +1,9 @@
 # Changelog
+# v1.1.6(2024-xx-xx)
+* watch filter are now regular expressions 
+* Fixed watch file not created problem
+* UI responds immediately to update request
+
 # v1.1.5(2024-01-11)
 * Changed api-proxy user default proxy type from `reverse` to `redirect`
 * Added `xtream_resolve_series` and `xtream_resolve_series_delay` option for `m3u` target 

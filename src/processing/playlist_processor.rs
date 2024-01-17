@@ -119,8 +119,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
                 let regexp = channel_sort.re.as_ref().unwrap();
                 new_playlist.iter_mut().for_each(|group| {
                     let group_title = if *match_as_ascii { Rc::new(unidecode(&group.title)) } else { Rc::clone(&group.title) };
-                    let is_match = regexp.is_match(group_title.as_str());
-                    if is_match {
+                    if regexp.is_match(group_title.as_str()) {
                         group.channels.sort_by(|a, b| {
                             let raw_value_a = get_field_value(a, &channel_sort.field);
                             let raw_value_b = get_field_value(b, &channel_sort.field);
@@ -489,14 +488,14 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
     if !new_playlist.is_empty() {
         sort_playlist(target, &mut new_playlist);
 
-        if target.watch.is_some() {
+        if target._watch_re.is_some() {
             if default_as_default().eq_ignore_ascii_case(&target.name) {
                 error!("cant watch a target with no unique name");
             } else {
-                let titles = target.watch.as_ref().unwrap();
+                let watch_re = target._watch_re.as_ref().unwrap();
                 new_playlist.iter().for_each(|pl| {
-                    if titles.contains(&pl.title) {
-                        process_group_watch(cfg, &target.name, pl)
+                    if watch_re.iter().any(|r| r.is_match(&pl.title)) {
+                         process_group_watch(cfg, &target.name, pl)
                     }
                 });
             }

@@ -93,7 +93,7 @@ pub(crate) async fn playlist_update(
     let process_targets = validate_targets(&user_targets, &_app_state.config.sources);
     match process_targets {
         Ok(valid_targets) => {
-            exec_processing(Arc::clone(&_app_state.config), Arc::new(valid_targets)).await;
+            actix_rt::spawn(exec_processing(Arc::clone(&_app_state.config), Arc::new(valid_targets)));
             HttpResponse::Ok().finish()
         }
         Err(err) => {

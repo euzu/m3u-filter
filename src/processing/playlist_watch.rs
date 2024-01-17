@@ -35,8 +35,11 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
                     }
                     None => {
                         error!("failed to load watch_file {}", &path.to_str().unwrap_or_default());
+                        changed = true;
                     }
                 }
+            } else {
+                changed = true;
             }
             if changed {
                 match save_watch_tree(&save_path, new_tree) {
