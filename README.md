@@ -415,16 +415,16 @@ sources:
 ```
 
 ### 2.5.2.8 `watch`
-For each target with a *unique name*, you can define a watched groups.
-It is a list of final group names from this target playlist.
+For each target with a *unique name*, you can define watched groups.
+It is a list of regular expression matching final group names from this target playlist. 
 Final means in this case: the name in the resulting playlist after applying all steps
 of transformation.
 
 For example given the following configuration:
 ```yaml
 watch:
-  - 'FR | Movies'
-  - 'FR | Series'
+  - 'FR - Movies \(202[34]\)'
+  - 'FR - Series'
 ```
 
 Changes from this groups will be printed as info on console and send to
