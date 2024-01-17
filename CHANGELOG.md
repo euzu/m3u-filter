@@ -1,5 +1,5 @@
 # Changelog
-# v1.1.6(2024-xx-xx)
+# v1.1.6(2024-01-17)
 * watch filter are now regular expressions 
 * Fixed watch file not created problem
 * UI responds immediately to update request
