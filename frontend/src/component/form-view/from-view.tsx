@@ -10,6 +10,7 @@ import TagInput from "../tag-input/tag-input";
 // }
 
 export enum FormFieldType {
+    READONLY= 'readonly',
     TEXT = 'text',
     NUMBER = 'number',
     MULTI_SELECT = 'multi_select',
@@ -56,6 +57,8 @@ export default function FormView(props: FormViewProps) {
 
     const getFieldInput = useCallback((field: FormField) => {
         switch (field.fieldType) {
+            case FormFieldType.READONLY:
+                return <span>{data?.[field.name]}</span>;
             case FormFieldType.CHECK:
                 return <Checkbox label={undefined} value={field.name} checked={data?.[field.name]} onSelect={handleCheckboxChange}></Checkbox>
             case FormFieldType.MULTI_SELECT:

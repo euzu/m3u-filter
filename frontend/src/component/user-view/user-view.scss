@@ -10,7 +10,7 @@
   @include preferences.prefsToolbar();
 
   min-height: 400px;
-  max-height: 400px;
+  max-height: 480px;
 
   &__content {
     display: flex;
@@ -81,6 +81,7 @@
       &-table {
         margin: 8px 4px;
         display: table;
+        table-layout: auto;
         width: auto;
         border-collapse: collapse;
       }
@@ -104,6 +105,9 @@
         vertical-align: bottom;
         input {
           border: none !important;
+          @media (min-width: 981px) {
+            width: 100%;
+          }
         }
 
         &-toolbar {

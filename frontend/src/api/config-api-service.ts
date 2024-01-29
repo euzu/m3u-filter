@@ -14,7 +14,7 @@ export default interface ConfigApiService extends ApiService {
 
     saveTargetUser(targetUser: TargetUser[]): Observable<any>;
 
-    saveApiProxyConfig(serverInfo: ApiProxyServerInfo): Observable<any>;
+    saveApiProxyConfig(serverInfo: ApiProxyServerInfo[]): Observable<any>;
 }
 
 export class DefaultConfigApiService extends DefaultApiService implements ConfigApiService {
@@ -30,7 +30,7 @@ export class DefaultConfigApiService extends DefaultApiService implements Config
         return this.post<ServerConfig>(SERVER_CONFIG_TARGET_USER_API_PATH, targetUser);
     }
 
-    saveApiProxyConfig(serverInfo: ApiProxyServerInfo): Observable<any> {
+    saveApiProxyConfig(serverInfo: ApiProxyServerInfo[]): Observable<any> {
         return this.post<ServerConfig>(SERVER_CONFIG_SERVER_INFO_API_PATH, serverInfo);
     }
 

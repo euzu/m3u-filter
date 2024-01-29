@@ -57,7 +57,16 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_p
 
 
 fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
-    let server = cfg._api_proxy.read().unwrap().as_ref().unwrap().server.clone();
+    let server_info_list = cfg._api_proxy.read().unwrap().as_ref().unwrap().server.clone();
+    let server_info_name = match &user.server {
+        Some(server_name) => server_name.as_str(),
+        None => "default"
+    };
+    let server_info = match server_info_list.iter().find(|c| c.name.eq(server_info_name)) {
+        Some(info) => info,
+        None => server_info_list.first().unwrap(),
+    };
+
     let now = Local::now();
     XtreamAuthorizationResponse {
         user_info: XtreamUserInfo {
@@ -68,18 +77,18 @@ fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationRes
             exp_date: (now + Duration::days(365)).timestamp(),// fake
             is_trial: "0".to_string(),
             max_connections: "1".to_string(),
-            message: server.message.to_string(),
+            message: server_info.message.to_string(),
             password: user.password.to_string(),
             username: user.username.to_string(),
             status: "Active".to_string(),
         },
         server_info: XtreamServerInfo {
-            url: server.ip.to_string(),
-            port: server.http_port,
-            https_port: server.https_port,
-            server_protocol: server.protocol.clone(),
-            rtmp_port: server.rtmp_port,
-            timezone: server.timezone.to_string(),
+            url: server_info.host.to_owned(),
+            port: server_info.http_port.to_owned(),
+            https_port: server_info.https_port.to_owned(),
+            server_protocol: server_info.protocol.clone(),
+            rtmp_port: server_info.rtmp_port.to_owned(),
+            timezone: server_info.timezone.to_string(),
             timestamp_now: now.timestamp(),
             time_now: now.format("%Y-%m-%d %H:%M:%S").to_string(),
         },

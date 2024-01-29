@@ -1,12 +1,22 @@
 server:
-  protocol: http
-  ip: 192.168.9.3
-  http_port: 80
-  https_port:
-  rtmp_port:
-  timezone: Europe/Paris
-  message: Welcome to m3u-filter
+  - name: default
+    protocol: http
+    host: 192.168.9.3
+    http_port: 80
+    https_port:
+    rtmp_port:
+    timezone: Europe/Paris
+    message: Welcome to m3u-filter
+  - name: extern
+    protocol: https
+    host: m3u-filter.mydns.com
+    http_port: 8900
+    https_port:
+    rtmp_port:
+    timezone: Europe/Paris
+    message: Welcome to m3u-filter
 user:
   - target: pl1
     credentials:
-      - {username: x3452, password: ztrhgrGZrt83hjerter, token: 4243234wer234er234, proxy: redirect}
+      - {username: x3452, password: ztrhgrGZrt83hjerter, token: 4243234wer234er234, proxy: redirect, server: default}
+      - {username: x3453, password: kljlkjorn87jfkhksdh, token: 43dfgerrt345345ss4, proxy: reverse, server: extern}

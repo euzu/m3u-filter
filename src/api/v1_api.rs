@@ -67,21 +67,23 @@ pub(crate) async fn save_config_main(
 
 
 pub(crate) async fn save_config_api_proxy_config(
-    mut req: web::Json<ApiProxyServerInfo>,
+    req: web::Json<Vec<ApiProxyServerInfo>>,
     mut _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    if req.0.is_valid() {
-        if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
-            api_proxy.server = req.0;
-            let backup_dir = _app_state.config.backup_dir.as_ref().unwrap().as_str();
-            if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy) {
-                return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
-            }
+    let mut req_api_proxy = req.0;
+    for server_info in &mut req_api_proxy {
+        if ! server_info.is_valid() {
+            return HttpResponse::BadRequest().json(json!({"error": "Invalid content"}));
         }
-        HttpResponse::Ok().finish()
-    } else {
-        HttpResponse::BadRequest().json(json!({"error": "Invalid content"}))
     }
+    if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
+        api_proxy.server = req_api_proxy;
+        let backup_dir = _app_state.config.backup_dir.as_ref().unwrap().as_str();
+        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy) {
+            return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+        }
+    }
+    HttpResponse::Ok().finish()
 }
 
 pub(crate) async fn playlist_update(

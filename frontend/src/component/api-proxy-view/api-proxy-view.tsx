@@ -11,9 +11,10 @@ const isNumber = (value: string): boolean => {
 }
 
 const SERVER_INFO_FIELDS = [
+    {name: 'name', label: 'Name',  fieldType: FormFieldType.READONLY},
     {name: 'protocol', label: 'Protocol',  fieldType: FormFieldType.SINGLE_SELECT,
         options:[{value: 'http', label:'http'}, {value: 'https', label:'https'}]},
-    {name: 'ip', label: 'IP',  fieldType: FormFieldType.TEXT},
+    {name: 'host', label: 'Host',  fieldType: FormFieldType.TEXT},
     {name: 'http_port', label: 'HTTP port', fieldType: FormFieldType.NUMBER, validator: isNumber},
     {name: 'https_port', label: 'HTTPS port', fieldType: FormFieldType.NUMBER,validator: isNumber},
     {name: 'rtmp_port', label: 'RTMP port', fieldType: FormFieldType.NUMBER,validator: isNumber},
@@ -29,7 +30,7 @@ export default function ApiProxyView(props: ApiProxyViewProps) {
     const {config} = props;
     const services = useServices();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
-    const serverInfo = useMemo<ApiProxyServerInfo>(() => config?.api_proxy?.server, [config]);
+    const serverInfo = useMemo<ApiProxyServerInfo[]>(() => config?.api_proxy?.server, [config]);
 
     const handleSave = useCallback(() => {
         if (serverInfo) {
@@ -46,7 +47,12 @@ export default function ApiProxyView(props: ApiProxyViewProps) {
             <button title={'Save'} onClick={handleSave}>Save</button>
         </div>
         <div className={'api-proxy__content'}>
-            <FormView data={serverInfo} fields={SERVER_INFO_FIELDS}></FormView>
+            <div className={'api-proxy__content-area'}>
+            {serverInfo?.map(server => <div className={"card"}>
+                    <FormView data={server} fields={SERVER_INFO_FIELDS}></FormView>
+                </div>)
+            }
+            </div>
         </div>
         <div className="api-proxy__content-help">
             <span className="api-proxy__content-help-warn-icon">{getIconByName('Warn')}</span>

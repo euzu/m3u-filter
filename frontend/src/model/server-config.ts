@@ -118,8 +118,9 @@ export interface TargetUser {
 }
 
 export interface ApiProxyServerInfo {
+    name: string;
     protocol: string;
-    ip: string;
+    host: string;
     http_port: string;
     https_port: string;
     rtmp_port: string;
@@ -128,7 +129,7 @@ export interface ApiProxyServerInfo {
 }
 
 export interface ApiProxyConfig {
-    server: ApiProxyServerInfo;
+    server: ApiProxyServerInfo[];
     user: TargetUser[];
 }
 

@@ -18,7 +18,7 @@ export default class ConfigService {
         return this.configApiService.saveTargetUser(targetUser);
     }
 
-    saveApiProxyConfig(serverInfo: ApiProxyServerInfo) {
+    saveApiProxyConfig(serverInfo: ApiProxyServerInfo[]) {
         return this.configApiService.saveApiProxyConfig(serverInfo);
     }
 }

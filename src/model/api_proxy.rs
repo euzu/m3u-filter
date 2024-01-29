@@ -50,7 +50,8 @@ pub(crate) struct UserCredentials {
     pub password: String,
     pub token: Option<String>,
     #[serde(default = "ProxyType::default")]
-    pub proxy: ProxyType
+    pub proxy: ProxyType,
+    pub server: Option<String>,
 }
 
 impl UserCredentials {
@@ -100,8 +101,9 @@ fn default_as_1935() -> String { "1935".to_string() }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ApiProxyServerInfo {
+    pub name: String,
     pub protocol: String,
-    pub ip: String,
+    pub host: String,
     pub http_port: String,
     #[serde(default = "default_as_443")]
     pub https_port: String,
@@ -117,8 +119,8 @@ impl ApiProxyServerInfo {
         if self.protocol.is_empty() {
             return false;
         }
-        self.ip = self.ip.trim().to_string();
-        if self.ip.is_empty() {
+        self.host = self.host.trim().to_string();
+        if self.host.is_empty() {
             return false;
         }
         self.http_port = self.http_port.trim().to_string();
@@ -153,7 +155,7 @@ impl ApiProxyServerInfo {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ApiProxyConfig {
-    pub server: ApiProxyServerInfo,
+    pub server: Vec<ApiProxyServerInfo>,
     pub user: Vec<TargetUser>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _file_path: String,
@@ -164,6 +166,20 @@ impl ApiProxyConfig {
         let mut usernames = HashSet::new();
         let mut tokens = HashSet::new();
         let mut errors = Vec::new();
+        if self.server.is_empty() {
+            errors.push("No serverinfo defined".to_string());
+        } else {
+            let mut name_set = HashSet::new();
+            for server in &self.server {
+                if server.name.trim().is_empty() {
+                    errors.push("Server info name is empty ".to_owned());
+                } else if name_set.contains(server.name.as_str()) {
+                    errors.push(format!("Non unique server info name found {}", &server.name));
+                } else {
+                    name_set.insert(server.name.clone());
+                }
+            }
+        }
         for target_user in &mut self.user {
             for user in &mut target_user.credentials {
                 if usernames.contains(&user.username) {
@@ -178,6 +194,12 @@ impl ApiProxyConfig {
                         errors.push(format!("Non unique token found {}", &user.username));
                     } else {
                         tokens.insert(token.to_string());
+                    }
+                }
+
+                if let Some(server_info_name) = &user.server {
+                    if ! &self.server.iter().any(|server_info| server_info.name.eq(server_info_name)) {
+                        errors.push(format!("No server info with name {} found for user {}", server_info_name, &user.username));
                     }
                 }
             }

@@ -1,11 +1,25 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
 
+
 .api-proxy {
 
   @include preferences.prefsRoot();
   @include preferences.prefsToolbar();
   @include preferences.prefsForm();
+
+  &__content {
+    display: flex;
+    flex-flow: column;
+    gap: 8px;
+    overflow: auto;
+    max-height: 480px;
+    &-area {
+      display: flex;
+      flex-flow: column;
+      gap: 8px;
+    }
+  }
 
   &__content-help{
     display: flex;

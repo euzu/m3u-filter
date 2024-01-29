@@ -658,10 +658,17 @@ you need to create a `api-proxy.yml` configuration.
 
 You can specify the path for the file with the  `-a` cli argument. 
 
+The configuration contains the server info for xtream accounts and user definitions.
+You can define multiple server with unique names, one should be named `default`.
+
+Iptv player can act differently and use the direct-source attribute or can compose the url based on the server info.
+You should set `xtream_skip_live_direct_source` and `xtream_skip_video_direct_source` to `true` to avoid this problem.
+
 `username` and `password`are mandatory for credentials. `username` is unique.
 The `token` is _optional_. If defined it should be unique. The `token`can be used
 instead of username+password
 `proxy` is _optional_. If defined it can be `reverse` or `redirect`. Default is `redirect`.
+`server` is _optional_. It should match one server definition, if not given the server with the name `default` is used or the first one.  
 
 To access the api for: 
 - `xtream` use url like `http://192.169.1.2/player_api.php?username={}&password={}`
@@ -684,19 +691,30 @@ When you define credentials for a `target`, ensure that this target has
 `output` format  `xtream`or `m3u`.
 
 
+If you use `https` you need a ssl terminator. `m3u-filter` does not support https traffic. 
+
 ```yaml
 server:
-  protocol: http
-  ip: 192.168.0.3
-  http_port: 80
-  https_port: 443
-  rtmp_port: 0
-  timezone: Europe/Paris
-  message: Welcome to m3u-filter
+  - name: default 
+    protocol: http
+    host: 192.168.0.3
+    http_port: 80
+    https_port: 443
+    rtmp_port: 0
+    timezone: Europe/Paris
+    message: Welcome to m3u-filter
+  - name: external
+    protocol: http
+    host: my_external_domain.com
+    http_port: 80
+    https_port: 443
+    rtmp_port: 0
+    timezone: Europe/Paris
+    message: Welcome to m3u-filter
 user:
   - target: pl1
     credentials:
-      - {username: x3452, password: ztrhgrGZ, token: 4342sd, proxy: reverse}
+      - {username: x3452, password: ztrhgrGZ, token: 4342sd, proxy: reverse, server: external}
       - {username: x3451, password: secret, token: abcde, proxy: redirect}
 ```
 

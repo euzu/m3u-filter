@@ -25,9 +25,12 @@ export default function UserView(props: UserViewProps) {
     const [targets, setTargets] = useState<TargetUser[]>([]);
     const [activeTarget, setActiveTarget] = useState<string>(undefined);
     const [tabs, setTabs] = useState<TabSetTab[]>([]);
+    const [serverOptions, setServerOptions] = useState<{value: string, label: string}[]>([]);
 
     useEffect(() => {
         if (config) {
+            const serverOptions =  config?.api_proxy?.server?.map(serverInfo => ({ value: serverInfo.name, label: serverInfo.name }));
+            setServerOptions(serverOptions || []);
             const target_names = ConfigUtils.getTargetNames(config);
             const missing = config?.api_proxy?.user.filter(target => !target_names.includes(target.target));
             const result: TargetUser[] = target_names?.map(name => ({
@@ -106,12 +109,13 @@ export default function UserView(props: UserViewProps) {
     }, [targets]);
 
     const handleChange = useCallback((fieldWithTargetAndIndex: string, value: any) => {
-        const sep_idx = fieldWithTargetAndIndex.lastIndexOf('-');
-        const target_name = fieldWithTargetAndIndex.substring(0, sep_idx);
+        const parts = fieldWithTargetAndIndex.split('@');
+        const target_name = parts[0];
         const target = targets.find(target => target.target === target_name);
         if (target) {
-            const idx = parseInt(fieldWithTargetAndIndex.substring(sep_idx+1));
-            target.credentials[idx].proxy = value;
+            const idx = parseInt(parts[1]);
+            const credentials: any = target.credentials[idx];
+            credentials[parts[2]] = value;
         }
     }, [targets]);
 
@@ -177,6 +181,8 @@ export default function UserView(props: UserViewProps) {
                                     <div className={'user__target-user-col user__target-user-col-header'}>
                                         <label>Token</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
+                                        <label>Server</label></div>
+                                    <div className={'user__target-user-col user__target-user-col-header'}>
                                         <label>Proxy</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}></div>
                                 </div>
@@ -193,13 +199,18 @@ export default function UserView(props: UserViewProps) {
                                                        data-field={field} onChange={handleValueChange}></input>
                                             </div>
                                         )}
+                                        <div key={'target_' + target.target + '_server_' + usr.username}
+                                             className={'user__target-user-col '}>
+                                            <div className={'user__target-user-col-label'}><label>Proxy</label></div>
+                                            <TagSelect options={serverOptions} name={target.target + '@' + idx + '@server'}
+                                                       defaultValues={(usr as any)?.['server']} radio={true} multi={false} onSelect={handleChange}></TagSelect>
+                                        </div>
                                         <div key={'target_' + target.target + '_proxy_' + usr.username}
                                              className={'user__target-user-col '}>
                                             <div className={'user__target-user-col-label'}><label>Proxy</label></div>
-                                            <TagSelect options={PROXY_OPTIONS} name={target.target + '-' + idx}
+                                            <TagSelect options={PROXY_OPTIONS} name={target.target + '@' + idx + '@proxy'}
                                                        defaultValues={(usr as any)?.['proxy']} radio={true} multi={false} onSelect={handleChange}></TagSelect>
                                         </div>
-
                                         <div className={'user__target-user-col user__target-user-col-toolbar'}>
                                             <span data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
                                                 {getIconByName('PersonRemove')}
