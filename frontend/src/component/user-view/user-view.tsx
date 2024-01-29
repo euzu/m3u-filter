@@ -201,7 +201,7 @@ export default function UserView(props: UserViewProps) {
                                         )}
                                         <div key={'target_' + target.target + '_server_' + usr.username}
                                              className={'user__target-user-col '}>
-                                            <div className={'user__target-user-col-label'}><label>Proxy</label></div>
+                                            <div className={'user__target-user-col-label'}><label>Server</label></div>
                                             <TagSelect options={serverOptions} name={target.target + '@' + idx + '@server'}
                                                        defaultValues={(usr as any)?.['server']} radio={true} multi={false} onSelect={handleChange}></TagSelect>
                                         </div>
