@@ -2,7 +2,7 @@
 
 # v1.1.7(2024-01-xx)
 * Renamed api-proxy.yml server info field `ip` to `host`
-* In api-proxy.yml assign server config to user
+* Multiple server-config for xtream api. In api-proxy.yml assign server config to user
 
 # v1.1.6(2024-01-17)
 * Watch filter are now regular expressions 
