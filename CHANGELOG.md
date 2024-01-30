@@ -1,6 +1,6 @@
 # Changelog
 
-# v1.1.7(2024-01-xx)
+# v1.1.7(2024-01-30)
 * Renamed api-proxy.yml server info field `ip` to `host`
 * Multiple server-config for xtream api. In api-proxy.yml assign server config to user
 
