@@ -690,6 +690,7 @@ If you use the endpoints through rest calls, you can use, for the sake of simpli
 When you define credentials for a `target`, ensure that this target has
 `output` format  `xtream`or `m3u`.
 
+The `proxy` property can be `reverse`or `redirect`. `reverse` means the streams are going through m3u-filter, `redirect` means the streams are comming from your provider.
 
 If you use `https` you need a ssl terminator. `m3u-filter` does not support https traffic. 
 

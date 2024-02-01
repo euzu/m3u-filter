@@ -48,7 +48,7 @@ export default function ApiProxyView(props: ApiProxyViewProps) {
         </div>
         <div className={'api-proxy__content'}>
             <div className={'api-proxy__content-area'}>
-            {serverInfo?.map(server => <div className={"card"}>
+            {serverInfo?.map((server, idx) => <div className={"card"} key={server.name + idx}>
                     <FormView data={server} fields={SERVER_INFO_FIELDS}></FormView>
                 </div>)
             }

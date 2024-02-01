@@ -9,18 +9,36 @@ use crate::model::api_proxy::{ApiProxyConfig};
 use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig, ConfigApi, MessagingConfig};
 use crate::model::model_config::{default_as_empty_str, ProcessingOrder};
 
+/// File-Download information.
 #[derive(Clone)]
 pub(crate) struct FileDownload {
+    /// uuid of the download for identification.
     pub uuid: String,
+    /// file_dir is the directory where the download should be placed.
     pub file_dir: PathBuf,
+    /// file_path is the complete path including the filename.
     pub file_path: PathBuf,
+    /// filename is the filename.
     pub filename: String,
+    /// url is the download url.
     pub url: reqwest::Url,
+    /// finished is true, if download is finished, otherweise false
     pub finished: bool,
+    /// the filesize.
     pub size: u64,
+    /// Optional error if something goes wrong during downloading.
     pub error: Option<String>,
 }
 
+/// Returns the directory for th file download.
+/// if option `organize_into_directories` is set, the root directory is determined.
+/// - For series, the episode pattern is used to determine the sub directory for the series.
+/// - For vod files, the title is used to determine the sub directory.
+///
+/// # Arguments
+/// * `download_cfg` the download configuration
+/// * `filestem` the prepared filestem to use as sub directory
+///
 fn get_download_directory(download_cfg: &VideoDownloadConfig, filestem: &str) -> PathBuf {
     if download_cfg.organize_into_directories {
         let mut file_stem = filestem;

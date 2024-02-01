@@ -15,10 +15,10 @@ function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: bool
 }
 
 function textMatch(text: string, searchRequest: SearchRequest): boolean {
-    if (!searchRequest.regexp) {
-        return (text.toLowerCase().indexOf(searchRequest.filter) > -1);
+    if (searchRequest.regexp) {
+        return text.toLowerCase().match(searchRequest.filter) != null;
     } else {
-        return text.match(searchRequest.filter) != null;
+        return (text.toLowerCase().indexOf(searchRequest.filter) > -1);
     }
 }
 
@@ -41,9 +41,7 @@ function filterMatchingChannels(grp: PlaylistGroup, searchRequest: SearchRequest
 
 function filterMatchingGroups(gl: PlaylistGroup[], searchRequest: SearchRequest): Observable<PlaylistGroup[]> {
     return new Observable<PlaylistGroup[]>((observer) => {
-        if (!searchRequest.regexp) {
-            searchRequest.filter.toLowerCase()
-        }
+        searchRequest.filter = searchRequest.filter.toLowerCase();
         const result: PlaylistGroup[] = [];
         for (const g of gl) {
             if (textMatch(g.title, searchRequest)) {
