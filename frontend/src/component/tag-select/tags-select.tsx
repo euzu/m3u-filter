@@ -19,9 +19,11 @@ export default function TagSelect(props: TagSelectProps) {
 
     useEffect(() => {
         if (defaultValues && options) {
+            const valueIsArray = Array.isArray(defaultValues);
             const selections: Record<number, boolean> = {}
             for (let i = 0; i < options.length; i++) {
-                selections[i] = defaultValues.includes(options[i].value);
+                const optionValue = options[i].value;
+                selections[i] = valueIsArray ? defaultValues.includes(optionValue) : defaultValues == optionValue;
             }
             setSelected(selections);
         }

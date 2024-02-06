@@ -3,7 +3,7 @@ import './preferences.scss';
 import ServerConfig from "../../model/server-config";
 import UserView from "../user-view/user-view";
 import TargetUpdateView from "../target-update-view/target-update-view";
-import ApiProxyInfoView from "../api-proxy-view/api-proxy-view";
+import ApiProxyView from "../api-proxy-view/api-proxy-view";
 import {getIconByName} from "../../icons/icons";
 import Panel from "../panel/panel";
 import MainConfigView from "../main-config-view/main-config-view";
@@ -53,7 +53,7 @@ export default function Preferences(props: PreferencesProps) {
                     <div className={'card'}><UserView config={config}></UserView></div>
                 </Panel>
                 <Panel value={SidebarAction.ApiServer} active={activePage}>
-                    <div className={'card'}><ApiProxyInfoView config={config}></ApiProxyInfoView></div>
+                    <div className={'card'}><ApiProxyView config={config}></ApiProxyView></div>
                 </Panel>
                 <Panel value={SidebarAction.MainConfig} active={activePage}>
                     <div className={'card'}><MainConfigView config={config}></MainConfigView></div>
