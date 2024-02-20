@@ -1,0 +1,102 @@
+$card-width: 180px;
+$card-height: 200px;
+.playlist-gallery {
+  display: flex;
+  flex-flow: row nowrap;
+  overflow: hidden;
+
+  &__categories {
+    display: flex;
+    flex-flow: column;
+    border: 1px solid var(--border-color);
+    max-width: 250px;
+    min-width: 250px;
+    overflow-y: auto;
+
+    .selected-group {
+      color: var(--tool-button-hover-color);
+      background-color: var(--tool-button-hover-background-color);
+    }
+
+    &-group {
+      padding: 8px 4px;
+      min-height: 2rem;
+      box-sizing: border-box;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      cursor: pointer;
+
+      &:not(:first-child) {
+        border-top: 1px solid var(--border-color);
+      }
+
+      &:hover {
+        background-color: var(--tab-hover-background-color);
+        color: var(--tab-hover-color);
+      }
+
+      &:active {
+        transform: scale(0.95);
+      }
+
+    }
+  }
+
+  &__showcase {
+    display: flex;
+    flex-flow: row wrap;
+    gap: 8px;
+    padding: 8px;
+    align-content: flex-start;
+    overflow-y: auto;
+    justify-content: flex-start;
+
+    &-card {
+      display: flex;
+      flex-flow: column;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      height: $card-height;
+      width: $card-width;
+      overflow: hidden;
+      cursor: pointer;
+
+      &:hover {
+        border: 1px solid var(--text-button-hover-color);
+      }
+
+      &-header {
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        padding: 8px 4px;
+        overflow: hidden;
+        flex: 0 0 auto;
+      }
+
+      &-content {
+        display: flex;
+        flex-flow: column;
+        justify-content: center;
+        align-items: center;
+        flex: 1 1 auto;
+        background-color: var(--shocase-card-background);
+
+        img {
+          aspect-ratio: 1 / 1;
+          max-width: $card-width;
+          width: 80%;
+        }
+      }
+
+      &-footer {
+        display: flex;
+        flex-flow: row nowrap;
+        gap: 4px;
+        justify-content: center;
+        align-items: center;
+        flex: 1 1 auto;
+      }
+    }
+  }
+}

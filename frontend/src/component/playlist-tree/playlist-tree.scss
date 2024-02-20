@@ -60,26 +60,6 @@
           align-items: center;
           gap: 3px;
 
-          .tool-button {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 1.1rem;
-            width: 1.1rem;
-            border-radius: var(--border-radius);
-            background-color: var(--tool-button-background-color);
-            color: var(--tool-button-color);
-
-            svg {
-              width: 1rem;
-              height: 1rem;
-            }
-
-            &:hover {
-              color: var(--tool-button-hover-color);
-              background-color: var(--tool-button-hover-background-color);
-            }
-          }
         }
 
         .tree-channel-content {

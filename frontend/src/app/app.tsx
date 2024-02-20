@@ -18,6 +18,7 @@ import ServerConfig from "../model/server-config";
 import {getIconByName} from "../icons/icons";
 import Preferences from "../component/preferences/preferences";
 import FileDownload from "../component/file-download/file-download";
+import {FileDownloadInfo} from "../model/file-download";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface AppProps {
@@ -74,6 +75,51 @@ export default function App(props: AppProps) {
         clipboardChannel.next(playlistItem.header.url);
     }, [clipboardChannel]);
 
+    const handleOnDownload = useCallback((playlistItem: PlaylistItem): void => {
+        let filename = playlistItem.header.title;
+        const parts = playlistItem.header.url.split('.');
+        let ext = undefined;
+        if (parts.length > 1) {
+            ext = parts[parts.length - 1];
+        }
+
+        if (serverConfig.video?.extensions?.includes(ext)) {
+            services.file().download({
+                url: playlistItem.header.url,
+                filename: filename + '.' + ext
+            }).pipe(first()).subscribe({
+                next: (_: FileDownloadInfo) => {
+                },
+                error: _ => enqueueSnackbar("Download failed!", {variant: 'error'}),
+                complete: noop,
+            });
+        } else {
+            enqueueSnackbar("Invalid filetype!", {variant: 'error'})
+        }
+    }, [clipboardChannel, serverConfig]);
+
+    const handleOnWebSearch = useCallback((playlistItem: PlaylistItem): void => {
+        if (playlistItem) {
+            let title = playlistItem.header.title;
+            let pattern = serverConfig.video.download?.episode_pattern;
+            if (pattern) {
+                pattern = pattern.replace('?P<episode>', '?<episode>');
+                const matches = title.match(pattern);
+                if (matches?.groups?.episode) {
+                    const idx = title.indexOf(matches?.groups?.episode);
+                    title = title.substring(0, idx).trim();
+                }
+            }
+            const dateSuffixMatch = title.match(/(.*?).\(\d+\)/);
+            if (dateSuffixMatch?.length > 1) {
+                title = dateSuffixMatch[1];
+            }
+
+            const url = serverConfig.video.web_search.replace("{}", title);
+            window.open(url, "imdb");
+        }
+    }, [serverConfig]);
+
     useEffect(() => {
         services.config().getServerConfig().pipe(first()).subscribe({
             next: (cfg: ServerConfig) => {
@@ -112,6 +158,8 @@ export default function App(props: AppProps) {
                     <PlaylistFilter onFilter={handleFilter}/>
                     <PlaylistViewer ref={viewerRef} playlist={playlist} searchChannel={searchChannel}
                                     onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}
+                                    onDownload={handleOnDownload}
+                                    onWebSearch={handleOnWebSearch}
                                     serverConfig={serverConfig}/>
                     <PlaylistVideo channel={videoChannel}/>
                     <Toolbar onDownload={handleSave}/>

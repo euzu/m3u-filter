@@ -34,11 +34,11 @@ mod multi_file_reader;
 #[command(about = "Extended M3U playlist filter", long_about = None)]
 struct Args {
     /// The config file
-    #[arg(short, long)]
+    #[arg(short = 'c', long)]
     config: Option<String>,
 
     /// The target to process
-    #[arg(short, long)]
+    #[arg(short = 't', long)]
     target: Option<Vec<String>>,
 
     /// The mapping file
@@ -46,19 +46,19 @@ struct Args {
     source: Option<String>,
 
     /// The mapping file
-    #[arg(short, long)]
+    #[arg(short = 'm', long)]
     mapping: Option<String>,
 
     /// The user file
-    #[arg(short, long = "api-proxy")]
+    #[arg(short = 'a', long = "api-proxy")]
     api_proxy: Option<String>,
 
     /// Run in server mode
-    #[arg(short, long, default_value_t = false, default_missing_value = "true")]
+    #[arg(short = 's', long, default_value_t = false, default_missing_value = "true")]
     server: bool,
 
     /// log level
-    #[arg(short, long = "log-level", default_missing_value = "info")]
+    #[arg(short = 'l', long = "log-level", default_missing_value = "info")]
     log_level: Option<String>,
 }
 

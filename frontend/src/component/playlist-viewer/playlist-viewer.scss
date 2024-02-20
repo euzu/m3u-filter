@@ -12,13 +12,20 @@
   margin-left: 10px;
   margin-right: 10px;
 
+  &__header {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 4px;
+  }
+
   &__content {
     display: flex;
     flex-flow: column;
     flex: 1 1 auto;
     overflow: auto;
     box-sizing: border-box;
-
   }
 
   .group-label {

@@ -1,7 +1,8 @@
 # Changelog
 
 # v1.1.8(2024-02-??)
-# Fixed WebUI Option-Select  
+* Fixed WebUI Option-Select  
+* WebUI: added gallery view as second view for playlist 
 
 # v1.1.7(2024-01-30)
 * Renamed api-proxy.yml server info field `ip` to `host`

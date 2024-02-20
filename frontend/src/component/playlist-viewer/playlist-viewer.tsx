@@ -1,4 +1,4 @@
-import React, {forwardRef, useImperativeHandle, useMemo, useEffect, useState} from "react";
+import React, {forwardRef, useImperativeHandle, useMemo, useEffect, useState, useCallback} from "react";
 import './playlist-viewer.scss';
 import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
 import PlaylistTree, {PlaylistTreeState} from "../playlist-tree/playlist-tree";
@@ -6,6 +6,8 @@ import {Observable, noop, tap, finalize} from "rxjs";
 import {useSnackbar} from "notistack";
 import {first} from "rxjs/operators";
 import ServerConfig from "../../model/server-config";
+import PlaylistGallery from "../playlist-gallery/playlist.gallery";
+import {getIconByName} from "../../icons/icons";
 
 function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: boolean }): PlaylistGroup[] {
     if (playlist) {
@@ -75,12 +77,16 @@ interface PlaylistViewerProps {
     onProgress: (value: boolean) => void;
     onCopy: (playlistItem: PlaylistItem) => void;
     onPlay?: (playlistItem: PlaylistItem) => void;
+    onDownload?: (playlistItem: PlaylistItem) => void;
+    onWebSearch?: (playlistItem: PlaylistItem) => void;
 }
 
 const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: PlaylistViewerProps, ref: any) => {
-    const {serverConfig, playlist, searchChannel, onProgress, onCopy, onPlay} = props;
+    const {serverConfig, playlist, searchChannel,
+        onProgress, onCopy, onPlay, onDownload, onWebSearch} = props;
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [data, setData] = useState<PlaylistGroup[]>([]);
+    const [galleryView, setGalleryView] = useState<boolean>(localStorage.getItem("galleryView") === '1');
     const checked = useMemo((): PlaylistTreeState => ({}), []);
     const reference = useMemo(() => (
         {
@@ -122,9 +128,35 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
         return () => sub.unsubscribe();
     }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
 
+    const renderContent = () => {
+        if (galleryView) {
+            return <PlaylistGallery data={data} onCopy={onCopy} onPlay={onPlay}
+                                    onDownload={onDownload}
+                                    onWebSearch={onWebSearch}
+                                    serverConfig={serverConfig}/>
+        }
+        return <PlaylistTree data={data} state={checked}
+                             onCopy={onCopy} onPlay={onPlay}
+                             onDownload={onDownload}
+                             onWebSearch={onWebSearch}
+                             serverConfig={serverConfig}/>
+    }
+
+    const toggleView = useCallback(() => {
+        setGalleryView(data => {
+            localStorage.setItem("galleryView", data ? '0' : '1');
+            return !data;
+        });
+    }, []);
+
     return <div className={'playlist-viewer'}>
+        <div className={'playlist-viewer__header'}>
+            <div className={'tool-button'} onClick={toggleView}>
+                {getIconByName('Gallery')}
+            </div>
+        </div>
         <div className={'playlist-viewer__content'}>
-            <PlaylistTree data={data} state={checked} onCopy={onCopy} onPlay={onPlay} serverConfig={serverConfig}/>
+            {renderContent()}
         </div>
     </div>
 });
