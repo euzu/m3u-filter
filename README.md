@@ -801,14 +801,18 @@ version: '3'
 services:
   m3u-filter:
     container_name: m3u-filter
-    image: m3u-filter:latest
+    image: m3u-filter
+    user: "133:144"
     working_dir: /
     volumes:
+      - ./config:/config
       - ./data:/data
-    ports:
-      - "8901:8901"
+      - ./backup:/backup
+      - ./downloads:/downloads
     environment:
       - TZ=Europe/Paris
+    ports:
+      - "8901:8901"
     restart: unless-stopped
 ```
 
