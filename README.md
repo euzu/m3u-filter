@@ -52,7 +52,7 @@ Options:
 
 ## 1. `config.yml`
 
-For running in cli mode, you need to define a `config.yml` file which can be next to the executable or provided with the
+For running in cli mode, you need to define a `config.yml` file which can be xonfig directory next to the executable or provided with the
 `-c` cli argument.
 
 For running specific targets use the `-t` argument like `m3u-filter -t <target_name> -t <other_target_name>`.
