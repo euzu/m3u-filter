@@ -1,6 +1,6 @@
 # Changelog
 
-# v1.1.8(2024-03-??)
+# v1.1.8(2024-03-06)
 * Fixed WebUI Option-Select  
 * WebUI: added gallery view as second view for playlist
 * Breaking change config path. The config path is now default ./config. 
