@@ -33,21 +33,27 @@ mod multi_file_reader;
 #[command(version)]
 #[command(about = "Extended M3U playlist filter", long_about = None)]
 struct Args {
+
+    /// The config directory
+    #[arg(short = 'p', long = "config-path")]
+    config_path: Option<String>,
+
     /// The config file
-    #[arg(short = 'c', long)]
-    config: Option<String>,
+    #[arg(short = 'c', long = "config")]
+    config_file: Option<String>,
+
+    /// The source config file
+    #[arg(short = 'i', long = "source")]
+    source_file: Option<String>,
+
+    /// The mapping file
+    #[arg(short = 'm', long = "mapping")]
+    mapping_file: Option<String>,
+
 
     /// The target to process
     #[arg(short = 't', long)]
     target: Option<Vec<String>>,
-
-    /// The mapping file
-    #[arg(short = 'i', long)]
-    source: Option<String>,
-
-    /// The mapping file
-    #[arg(short = 'm', long)]
-    mapping: Option<String>,
 
     /// The user file
     #[arg(short = 'a', long = "api-proxy")]
@@ -68,19 +74,22 @@ fn main() {
     let args = Args::parse();
     init_logger(&args.log_level.unwrap_or("info".to_string()));
 
-    let config_file: String = args.config.unwrap_or(utils::get_default_config_path());
-    let sources_file: String = args.source.unwrap_or(utils::get_default_sources_path());
+    let config_path: String = args.config_path.unwrap_or(utils::get_default_config_path());
+    let config_file: String = args.config_file.unwrap_or(utils::get_default_config_file_path(&config_path));
+    let sources_file: String = args.source_file.unwrap_or(utils::get_default_sources_file_path(&config_path));
 
 
-    let mut cfg = read_config(config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
+    let mut cfg = read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
     let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
     info!("Version: {}", VERSION);
     info!("Current time: {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
     info!("Working dir: {:?}", &cfg.working_dir);
+    info!("Config dir: {:?}", &cfg._config_path);
     info!("Config file: {}", &config_file);
+    info!("Source file: {}", &sources_file);
 
-    if let Err(err) = read_mappings(args.mapping, &mut cfg) {
+    if let Err(err) = read_mappings(args.mapping_file, &mut cfg) {
         exit!("{}", err);
     }
 

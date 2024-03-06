@@ -6,10 +6,7 @@ services:
     working_dir: /
     volumes:
       - ./data:/data
-      # - ./config.yml:/config.yml
-      # - ./config.yml:/source.yml
-      # - ./api-proxy.yml:/api-proxy.yml
-      # - ./mapping.yml:/mapping.yml
+      - ./config:/config
     environment:
       - TZ=Europe/Paris
     ports:

@@ -32,31 +32,44 @@ pub(crate) fn get_exe_path() -> PathBuf {
     }
 }
 
-fn get_default_file_path(file: String) -> String {
+fn get_default_path(file: &str) -> String {
     let path: PathBuf = get_exe_path();
-    let config_path = path.join(file.as_str());
-    String::from(if config_path.exists() {
-        config_path.to_str().unwrap_or(file.as_str())
+    let default_path = path.join(file);
+    String::from(if default_path.exists() {
+        default_path.to_str().unwrap_or(file)
     } else {
-        file.as_str()
+        file
     })
 }
 
+fn get_default_file_path(config_path: &str, file: &str) -> String {
+    let path: PathBuf = PathBuf::from(config_path);
+    let default_path = path.join(file);
+    String::from(if default_path.exists() {
+        default_path.to_str().unwrap_or(file)
+    } else {
+        file
+    })
+}
 
 pub(crate) fn get_default_config_path() -> String {
-    get_default_file_path("config.yml".to_string())
+    get_default_path("config")
 }
 
-pub(crate) fn get_default_sources_path() -> String {
-    get_default_file_path("source.yml".to_string())
+pub(crate) fn get_default_config_file_path(config_path: &str) -> String {
+    get_default_file_path(config_path, "config.yml")
 }
 
-pub(crate) fn get_default_mappings_path() -> String {
-    get_default_file_path("mapping.yml".to_string())
+pub(crate) fn get_default_sources_file_path(config_path: &str) -> String {
+    get_default_file_path(config_path, "source.yml")
 }
 
-pub(crate) fn get_default_api_proxy_config_path() -> String {
-    get_default_file_path("api-proxy.yml".to_string())
+pub(crate) fn get_default_mappings_path(config_path: &str) -> String {
+    get_default_file_path(config_path, "mapping.yml")
+}
+
+pub(crate) fn get_default_api_proxy_config_path(config_path: &str) -> String {
+    get_default_file_path(config_path, "api-proxy.yml")
 }
 
 pub(crate) fn get_working_path(wd: &String) -> String {

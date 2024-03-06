@@ -72,7 +72,7 @@ pub(crate) async fn save_config_api_proxy_config(
 ) -> HttpResponse {
     let mut req_api_proxy = req.0;
     for server_info in &mut req_api_proxy {
-        if ! server_info.is_valid() {
+        if !server_info.is_valid() {
             return HttpResponse::BadRequest().json(json!({"error": "Invalid content"}));
         }
     }
@@ -121,7 +121,7 @@ fn create_config_input_for_url(url: &str) -> ConfigInput {
         enabled: true,
         options: Some(ConfigInputOptions {
             xtream_info_cache: false,
-        })
+        }),
     }
 }
 
@@ -158,7 +158,6 @@ pub(crate) async fn playlist(
 pub(crate) async fn config(
     _app_state: web::Data<AppState>,
 ) -> HttpResponse {
-
     let map_input = |i: &ConfigInput| ServerInputConfig {
         id: i.id,
         input_type: i.input_type.clone(),
@@ -201,12 +200,13 @@ pub(crate) async fn config(
         api_proxy: config._api_proxy.read().unwrap().clone(),
     };
 
-    let mut result = match  read_config(_app_state.config._config_file_path.as_str(),
-                              _app_state.config._sources_file_path.as_str()) {
+    let mut result = match read_config(_app_state.config._config_path.as_str(),
+                                       _app_state.config._config_file_path.as_str(),
+                                       _app_state.config._sources_file_path.as_str()) {
         Ok(mut cfg) => {
             let _ = cfg.prepare();
             map_config(&cfg)
-        },
+        }
         Err(_) => map_config(&_app_state.config)
     };
 

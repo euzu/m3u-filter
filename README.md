@@ -33,10 +33,27 @@ Based on the stream type, you will be able to download or search in a configured
 In the tree-view each entry has a checkbox in front. Selecting the checkbox means **discarding** this entry from the 
 manual download when you hit the `Save` button.
 
+## Command line Arguments
+```
+Usage: m3u-filter [OPTIONS]
+
+Options:
+  -p, --config-path <CONFIG_PATH>  The config directory
+  -c, --config <CONFIG_FILE>       The config file
+  -i, --source <SOURCE_FILE>       The source config file
+  -m, --mapping <MAPPING_FILE>     The mapping file
+  -t, --target <TARGET>            The target to process
+  -a, --api-proxy <API_PROXY>      The user file
+  -s, --server                     Run in server mode
+  -l, --log-level <LOG_LEVEL>      log level
+  -h, --help                       Print help
+  -V, --version                    Print version
+```
+
 ## 1. `config.yml`
 
 For running in cli mode, you need to define a `config.yml` file which can be next to the executable or provided with the
-`-c` cli argument. It contains the filter, rename and mapping definitions.
+`-c` cli argument.
 
 For running specific targets use the `-t` argument like `m3u-filter -t <target_name> -t <other_target_name>`.
 Target names should be provided in the config. The -t option overrides `enabled` attributes of `input` and `target` elements.
@@ -769,10 +786,10 @@ WORKDIR /
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY ["./m3u-filter", "./config.yml", "./source.yml", "./api-proxy.yml",  "./mapping.yml", "/"]
+COPY ./m3u-filter /
 COPY ./web /web
 
-CMD ["/m3u-filter", "-s", "-c", "/config.yml"]
+CMD ["/m3u-filter", "-s", "-p", "/config"]
 ```
 Image
 ```

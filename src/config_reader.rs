@@ -11,7 +11,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::multi_file_reader::MultiFileReader;
 
 pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
-    let mappings_file: String = args_mapping.unwrap_or(utils::get_default_mappings_path());
+    let mappings_file: String = args_mapping.unwrap_or(utils::get_default_mappings_path(cfg._config_path.as_str()));
 
     match read_mapping(mappings_file.as_str()) {
         Ok(mappings) => {
@@ -25,7 +25,7 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
 }
 
 pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
-    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(utils::get_default_api_proxy_config_path());
+    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(utils::get_default_api_proxy_config_path(cfg._config_path.as_str()));
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str());
     match api_proxy_config {
         None => {
@@ -39,12 +39,13 @@ pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: 
     }
 }
 
-pub(crate) fn read_config(config_file: &str, sources_file: &str) -> Result<Config, M3uFilterError> {
+pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &str) -> Result<Config, M3uFilterError> {
     let files = vec![std::path::PathBuf::from(config_file), std::path::PathBuf::from(sources_file)];
     match MultiFileReader::new(&files) {
         Ok(file) => {
             match serde_yaml::from_reader::<_, Config>(file) {
                 Ok(mut result) => {
+                    result._config_path = config_path.to_string();
                     result._config_file_path = config_file.to_string();
                     result._sources_file_path = sources_file.to_string();
                     match result.prepare() {
