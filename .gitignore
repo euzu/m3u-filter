@@ -17,3 +17,6 @@
 node_modules
 yarn.lock
 *.log
+
+docker/web
+docker/m3u-filter
