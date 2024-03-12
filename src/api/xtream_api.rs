@@ -317,6 +317,7 @@ async fn xtream_player_api(
                                                         api_req.vod_id.trim(),
                                                         &XtreamCluster::Video).await
                     }
+                    "get_epg" |
                     "get_short_epg" => {
                         xtream_get_short_epg(_app_state, &user, target_name,
                                              api_req.stream_id.trim(),
@@ -381,7 +382,8 @@ async fn xtream_player_api_post(req: HttpRequest,
 
 pub(crate) fn xtream_api_register() -> Vec<Resource> {
     vec![
-        web::resource("/player_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)),
+        web::resource("/player_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)),
+        web::resource("/panel_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)),
         web::resource("/xtream").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)),
         web::resource("/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream_alt)),
         web::resource("/live/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream)),

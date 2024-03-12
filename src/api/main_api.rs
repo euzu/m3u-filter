@@ -13,7 +13,7 @@ use crate::api::api_model::{AppState, DownloadQueue, SharedLocks};
 use crate::api::scheduler::start_scheduler;
 use crate::api::v1_api::{v1_api_register};
 use crate::api::xmltv_api::{xmltv_api_register};
-use crate::api::xtream_player_api::{xtream_api_register};
+use crate::api::xtream_api::{xtream_api_register};
 use crate::model::config::{Config,ProcessTargets};
 
 #[get("/")]
