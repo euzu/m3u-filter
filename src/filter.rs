@@ -70,10 +70,27 @@ pub(crate) struct RegexWithCaptures {
     pub captures: Vec<String>,
 }
 
-
 #[derive(Parser)]
 //#[grammar = "filter.pest"]
-#[grammar_inline = "WHITESPACE = _{ \" \" | \"\\t\" }\nfield = { \"Group\" | \"Title\" | \"Name\" | \"Url\" }\nand = {\"AND\" | \"and\"}\nor = {\"OR\" | \"or\"}\nnot = { \"NOT\" | \"not\" }\nregexp = @{ \"\\\"\" ~ ( \"\\\\\\\"\" | (!\"\\\"\" ~ ANY) )* ~ \"\\\"\" }\ncomparison_value = _{ regexp }\ncomparison = { field ~ \"~\" ~ comparison_value }\nbool_op = { and | or}\nexpr_group = { \"(\" ~ expr ~ \")\" }\nexpr = {comparison ~ (bool_op ~ expr)* | expr_group ~ (bool_op ~ expr)* | not ~ expr ~ (bool_op ~ expr)* }\nstmt = { expr  ~ (bool_op ~ expr)* }\nmain = _{ SOI ~ stmt ~ EOI }"]
+#[grammar_inline = r#"
+WHITESPACE = _{ " " | "\t" }
+field = { ^"group" | ^"title" | ^"name" | ^"url" }
+and = { ^"and" }
+or = { ^"or" }
+not = { ^"not" }
+regexp = @{ "\"" ~ ( "\\\"" | (!"\"" ~ ANY) )* ~ "\"" }
+comparison_value = _{ regexp }
+comparison = { field ~ "~" ~ comparison_value }
+bool_op = { and | or}
+expr_group = { "(" ~ expr ~ ")" }
+expr = {
+  comparison ~ (bool_op ~ expr)*
+  | expr_group ~ (bool_op ~ expr)*
+  | not ~ expr ~ (bool_op ~ expr)*
+}
+stmt = { expr  ~ (bool_op ~ expr)* }
+main = _{ SOI ~ stmt ~ EOI }
+"#]
 struct FilterParser;
 
 #[derive(Debug, Clone)]
