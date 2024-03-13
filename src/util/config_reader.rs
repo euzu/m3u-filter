@@ -8,7 +8,7 @@ use crate::model::config::{Config, ConfigDto};
 use crate::model::mapping::Mappings;
 use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, utils};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::multi_file_reader::MultiFileReader;
+use crate::util::multi_file_reader::MultiFileReader;
 
 pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
     let mappings_file: String = args_mapping.unwrap_or(utils::get_default_mappings_path(cfg._config_path.as_str()));
