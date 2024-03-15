@@ -10,22 +10,21 @@ use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
 
-use crate::config_reader::{read_api_proxy_config, read_config, read_mappings};
 use crate::model::config::{Config, ProcessTargets, validate_targets};
 use crate::processing::playlist_processor::exec_processing;
+use crate::util::config_reader::{read_api_proxy_config, read_config, read_mappings};
+use crate::util::utils;
 
 mod m3u_filter_error;
-mod config_reader;
 mod model;
 mod filter;
 mod repository;
 mod download;
-mod utils;
 mod messaging;
 mod test;
 mod api;
 mod processing;
-mod multi_file_reader;
+mod util;
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]

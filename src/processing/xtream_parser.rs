@@ -42,6 +42,7 @@ pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &
                 PlaylistItem {
                     header: RefCell::new(PlaylistItemHeader {
                         id: Rc::new(episode.id.to_owned()),
+                        stream_id: Rc::new(episode.id.to_owned()),
                         name: Rc::new(episode.title.to_owned()),
                         logo: Rc::new(episode.info.movie_image.to_owned()),
                         logo_small: default_as_empty_rc_str(),
@@ -100,6 +101,7 @@ pub(crate) fn parse_xtream(cat_id_cnt: &AtomicU32,
                             let item = PlaylistItem {
                                 header: RefCell::new(PlaylistItemHeader {
                                     id: Rc::new(stream.get_stream_id()),
+                                    stream_id: Rc::new(stream.get_stream_id()),
                                     name: Rc::clone(&stream.name),
                                     logo: Rc::clone(&stream.stream_icon),
                                     logo_small: default_as_empty_rc_str(),

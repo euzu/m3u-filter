@@ -331,3 +331,9 @@ impl XtreamSeriesInfoEpisode {
         if result.is_empty() { None } else { Some(result) }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct MultiXtreamMapping {
+    pub stream_id: u32,
+    pub input_id: u16,
+}

@@ -107,6 +107,9 @@ async fn xtream_player_api_stream(
     if let Some((user, target)) = get_user_target_by_credentials(username, password, api_req, _app_state) {
         let target_name = &target.name;
         if target.has_output(&TargetType::Xtream) {
+
+             !! todo id mapping when multi_xtream !!
+
             if let Some(target_input) = match _app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
                 None => _app_state.config.get_input_for_target(target_name, &InputType::M3u),
                 Some(inp) => Some(inp)

@@ -1,8 +1,8 @@
 use std::cell::Ref;
 use std::collections::{BTreeMap, HashMap};
-use std::fs;
+use std::{fs, io};
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter, Error, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use log::{error};
@@ -13,6 +13,7 @@ use crate::model::model_playlist::{PlaylistGroup, PlaylistItemHeader, PlaylistIt
 use crate::{create_m3u_filter_error_result, utils};
 use crate::api::api_model::AppState;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::model::model_xtream::MultiXtreamMapping;
 
 type IndexTree = BTreeMap<i32, (u32, u16)>;
 
@@ -105,7 +106,7 @@ fn write_xtream_info(app_state: &AppState, target_name: &str, stream_id: i32, cl
                 write_index(&idx_path, index_tree)?;
             }
             Err(err) => {
-                return Err(err)
+                return Err(err);
             }
         }
     }
@@ -330,12 +331,12 @@ fn write_index(path: &PathBuf, index: &IndexTree) -> std::io::Result<()> {
 
 fn seek_read(
     reader: &mut (impl Read + Seek),
-    offset: u32,
+    offset: u64,
     amount_to_read: u16,
 ) -> Result<Vec<u8>, Error> {
     // A buffer filled with as many zeros as we'll read with read_exact
-    let mut buf = vec![0; amount_to_read as usize];
-    reader.seek(SeekFrom::Start(offset as u64))?;
+    let mut buf = vec![0u8; amount_to_read as usize];
+    reader.seek(SeekFrom::Start(offset))?;
     reader.read_exact(&mut buf)?;
     Ok(buf)
 }
@@ -356,7 +357,7 @@ pub(crate) async fn xtream_get_stored_stream_info(
                 if let Some(idx_map) = &index_tree {
                     if let Some((offset, size)) = idx_map.get(&stream_id) {
                         let mut reader = BufReader::new(File::open(&col_path).unwrap());
-                        if let Ok(bytes) = seek_read(&mut reader, *offset, *size) {
+                        if let Ok(bytes) = seek_read(&mut reader, *offset as u64, *size) {
                             let mut decomp: Vec<u8> = Vec::new();
                             let _ = lzma_rs::lzma_decompress(&mut bytes.as_slice(), &mut decomp);
                             drop(shared_lock);
@@ -378,22 +379,67 @@ pub(crate) async fn xtream_persist_stream_info(
         .map(|o| o.xtream_info_cache).unwrap_or(false);
     if cache_info {
         if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
-                let lock = app_state.shared_locks.get_lock(target_name);
-                let shared_lock = lock.write().unwrap();
-                let mut index_tree = {
-                    let (col_path, idx_path) = get_info_collection_and_idx_path(&path, cluster);
-                    if idx_path.exists() && col_path.exists() {
-                        load_index(&idx_path).unwrap_or_default()
-                    } else {
-                        IndexTree::new()
-                    }
-                };
-                match write_xtream_info(app_state, target_name, stream_id, cluster, content,
-                                        &mut index_tree) {
-                    Ok(_) => {}
-                    Err(err) => { error!("{}", err.to_string()); }
+            let lock = app_state.shared_locks.get_lock(target_name);
+            let shared_lock = lock.write().unwrap();
+            let mut index_tree = {
+                let (col_path, idx_path) = get_info_collection_and_idx_path(&path, cluster);
+                if idx_path.exists() && col_path.exists() {
+                    load_index(&idx_path).unwrap_or_default()
+                } else {
+                    IndexTree::new()
                 }
-                drop(shared_lock);
+            };
+            match write_xtream_info(app_state, target_name, stream_id, cluster, content,
+                                    &mut index_tree) {
+                Ok(_) => {}
+                Err(err) => { error!("{}", err.to_string()); }
+            }
+            drop(shared_lock);
         }
     }
+}
+
+fn get_id_mapping_path(path: &Path) -> PathBuf {
+    path.join("id_mapping.db")
+}
+
+pub(crate) fn write_xtream_mapping(mappings: &[MultiXtreamMapping], config: &Config, target_name: &str) -> io::Result<()> {
+    if let Some(path) = get_xtream_storage_path(config, target_name) {
+        let mut file = File::create(get_id_mapping_path(&path))?;
+        // We assume the mappings list is created with a counter as id
+        // and id 1 means the 0 index. We write all the data and can calculate the offset inside the
+        // file by  (u32 size + u16 size) * index.
+        for mapping in mappings {
+            file.write_all(&mapping.stream_id.to_le_bytes())?;
+            file.write_all(&mapping.input_id.to_le_bytes())?;
+        };
+        return Ok(());
+    }
+    Err(io::Error::new(ErrorKind::Other, format!("Failed to find the xtream storage path for {}", target_name)))
+}
+
+pub(crate) fn read_xtream_mapping(id: u32, config: &Config, target_name: &str) -> io::Result<Option<MultiXtreamMapping>> {
+    if id < 1 {
+        return Err(io::Error::new(ErrorKind::Other, "id should start with 1"));
+    }
+
+    if let Some(path) = get_xtream_storage_path(config, target_name) {
+        let mapping_file_path = get_id_mapping_path(&path);
+        if mapping_file_path.exists() {
+            let mut file = File::open(&mapping_file_path)?;
+            let index = (id - 1) as u64;
+            let mapping_size = 4 + 2; // u32 + u16
+            let offset = mapping_size * index;
+
+            file.seek(SeekFrom::Start(offset))?;
+            let mut stream_id_bytes = [0u8; 4];
+            file.read_exact(&mut stream_id_bytes)?;
+            let stream_id = u32::from_le_bytes(stream_id_bytes);
+            let mut input_id_bytes = [0u8; 2];
+            file.read_exact(&mut input_id_bytes)?;
+            let input_id = u16::from_le_bytes(input_id_bytes);
+            return Ok(Some(MultiXtreamMapping { stream_id, input_id }));
+        }
+    }
+    Ok(None)
 }

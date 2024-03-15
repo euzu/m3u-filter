@@ -301,6 +301,8 @@ impl ConfigTarget {
 pub(crate) struct ConfigSource {
     pub inputs: Vec<ConfigInput>,
     pub targets: Vec<ConfigTarget>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _multi_xtream_input: bool,
 }
 
 impl ConfigSource {
