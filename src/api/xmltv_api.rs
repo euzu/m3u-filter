@@ -54,7 +54,8 @@ async fn xmltv_api(
                 // If you want to use xmltv then provide the url in the config to filter unnecessary content.
                 // If you have multiple xtream sources, the first one will be used for epg
                 let target_name = &target.name;
-                if let Some(input) = _app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
+                let inputs = _app_state.config.get_input_for_target(target_name, &InputType::Xtream);
+                if let Some(&input) = inputs.first() {
                     let epg_url = input.epg_url.as_ref().map_or("".to_string(), |s| s.to_owned());
                     let api_url = if  epg_url.is_empty() {
                         format!("{}/xmltv.php?username={}&password={}",

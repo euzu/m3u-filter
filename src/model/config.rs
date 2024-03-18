@@ -604,11 +604,12 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
+    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Vec<&ConfigInput> {
+        let mut result = Vec::new();
         for source in &self.sources {
-            if let Some(cfg) = source.get_input_for_target(target_name, input_type) { return Some(cfg); }
+            if let Some(cfg) = source.get_input_for_target(target_name, input_type) { result.push(cfg); }
         }
-        None
+        result
     }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {
