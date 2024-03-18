@@ -54,26 +54,28 @@ async fn xmltv_api(
                 // If you want to use xmltv then provide the url in the config to filter unnecessary content.
                 // If you have multiple xtream sources, the first one will be used for epg
                 let target_name = &target.name;
-                let inputs = _app_state.config.get_input_for_target(target_name, &InputType::Xtream);
-                if let Some(&input) = inputs.first() {
-                    let epg_url = input.epg_url.as_ref().map_or("".to_string(), |s| s.to_owned());
-                    let api_url = if  epg_url.is_empty() {
-                        format!("{}/xmltv.php?username={}&password={}",
-                                input.url.as_str(),
-                                input.username.as_ref().unwrap_or(&"".to_string()).as_str(),
-                                input.password.as_ref().unwrap_or(&"".to_string()).as_str(),
-                        )
-                    } else { epg_url.to_string() };
-                    if let Ok(url) = Url::parse(&api_url) {
-                        if user.proxy == ProxyType::Redirect {
-                            debug!("Redirecting epg request to {}", api_url);
-                            return HttpResponse::Found().insert_header(("Location", api_url)).finish();
-                        }
-                        let client = get_client_request(input, url, None);
-                        if let Ok(response) = client.send().await {
-                            if response.status().is_success() {
-                                if let Ok(content) = response.text().await {
-                                    return HttpResponse::Ok().content_type(mime::TEXT_XML).body(content);
+
+                if let Some(inputs) = _app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
+                    if let Some(&input) = inputs.first() {
+                        let epg_url = input.epg_url.as_ref().map_or("".to_string(), |s| s.to_owned());
+                        let api_url = if epg_url.is_empty() {
+                            format!("{}/xmltv.php?username={}&password={}",
+                                    input.url.as_str(),
+                                    input.username.as_ref().unwrap_or(&"".to_string()).as_str(),
+                                    input.password.as_ref().unwrap_or(&"".to_string()).as_str(),
+                            )
+                        } else { epg_url.to_string() };
+                        if let Ok(url) = Url::parse(&api_url) {
+                            if user.proxy == ProxyType::Redirect {
+                                debug!("Redirecting epg request to {}", api_url);
+                                return HttpResponse::Found().insert_header(("Location", api_url)).finish();
+                            }
+                            let client = get_client_request(input, url, None);
+                            if let Ok(response) = client.send().await {
+                                if response.status().is_success() {
+                                    if let Ok(content) = response.text().await {
+                                        return HttpResponse::Ok().content_type(mime::TEXT_XML).body(content);
+                                    }
                                 }
                             }
                         }

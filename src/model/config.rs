@@ -311,14 +311,16 @@ impl ConfigSource {
         Ok(index + (self.inputs.len() as u16))
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
+    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<Vec<&ConfigInput>> {
+        let mut result = Vec::new();
         for target in &self.targets {
             if target.name.eq(target_name) {
                 for input in &self.inputs {
-                    if input.input_type.eq(input_type) {
-                        return Some(input);
+                    if input.enabled && input.input_type.eq(input_type) {
+                        result.push(input);
                     }
                 }
+                return Some(result);
             }
         }
         None
@@ -604,12 +606,13 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Vec<&ConfigInput> {
-        let mut result = Vec::new();
+    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<Vec<&ConfigInput>> {
         for source in &self.sources {
-            if let Some(cfg) = source.get_input_for_target(target_name, input_type) { result.push(cfg); }
+            if let Some(cfg) = source.get_input_for_target(target_name, input_type) {
+                return Some(cfg);
+            }
         }
-        result
+        None
     }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {

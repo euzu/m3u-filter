@@ -108,29 +108,20 @@ async fn xtream_player_api_stream(
         if target.has_output(&TargetType::Xtream) {
             let mut stream_id = action_path.to_owned();
             let mut input: Option<&ConfigInput> = None;
-            let mut inputs = _app_state.config.get_input_for_target(target_name, &InputType::Xtream);
-            if inputs.is_empty() {
-                inputs = _app_state.config.get_input_for_target(target_name, &InputType::M3u);
-                if !inputs.is_empty() {
-                    input = inputs.first().cloned();
+            if let Ok(num) = action_path.trim().parse() {
+                let (xtream_id, cfg_input) = get_xtream_input_for_stream_id(_app_state, target_name, num);
+                if cfg_input.is_some() {
+                    input = cfg_input;
+                    stream_id = xtream_id.to_string();
                 }
-            } else if inputs.len() > 1 {
-                if let Ok(num) = action_path.trim().parse() {
-                    if let Ok(Some(mapping)) = read_xtream_mapping(num, _app_state.config.as_ref(), target_name) {
-                        match inputs.iter().find(|&&inp| inp.id == mapping.input_id).cloned() {
-                            None => {
-                                input = inputs.first().cloned();
-                            }
-                            Some(cfg_input) => {
-                                input = Some(cfg_input);
-                                stream_id = mapping.stream_id.to_string();
-                            }
-                        }
-                    }
-                }
-            } else if !inputs.is_empty() {
-                input = inputs.first().cloned();
             }
+
+            if input.is_none() {
+                if let Some(m3u_inputs) = _app_state.config.get_input_for_target(target_name, &InputType::M3u) {
+                    input = m3u_inputs.first().cloned();
+                }
+            }
+
             if let Some(target_input) = input {
                 if let Some(stream_url) = get_xtream_player_api_stream_url(target_input, context, stream_id.as_str()) {
                     if user.proxy == ProxyType::Redirect {
@@ -229,35 +220,23 @@ async fn xtream_player_api_timeshift_stream(
 }
 
 
-fn get_xtream_input_for_stream_id<'a>(app_state: &'a AppState, target_name: &str, stream_id: i32) -> (i32, Option<&'a ConfigInput>){
-    let mut xtream_id = stream_id;
-    let inputs = app_state.config.get_input_for_target(target_name, &InputType::Xtream);
-    let input = if inputs.len() > 1 {
+fn get_xtream_input_for_stream_id<'a>(app_state: &'a AppState, target_name: &str, stream_id: i32) -> (i32, Option<&'a ConfigInput>) {
+    if let Some(inputs) = app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
         if let Ok(Some(mapping)) = read_xtream_mapping(stream_id as u32, app_state.config.as_ref(), target_name) {
-            match inputs.iter().find(|&&inp| inp.id == mapping.input_id).cloned() {
-                None => {
-                    inputs.first().cloned()
-                }
-                Some(cfg_input) => {
-                    xtream_id = mapping.stream_id as i32;
-                    Some(cfg_input)
-                }
+            if let Some(cfg_input) = inputs.iter().find(|&&inp| inp.id == mapping.input_id).cloned() {
+                return (mapping.stream_id as i32, Some(cfg_input));
             }
-        } else {
-            inputs.first().cloned()
         }
-    } else {
-        inputs.first().cloned()
-    };
-
-    (xtream_id, input)
+        return (stream_id, inputs.first().cloned());
+    }
+    (stream_id, None)
 }
 
 // TODO use u32 or i32 ??
 async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_id: i32,
                                 cluster: &XtreamCluster) -> Result<String, Error> {
     let (xtream_id, input) = get_xtream_input_for_stream_id(app_state, target_name, stream_id);
-    if let Some(target_input) = input  {
+    if let Some(target_input) = input {
         if let Ok(content) = xtream_get_stored_stream_info(app_state, target_name, xtream_id, cluster, target_input).await {
             return Ok(content);
         }
@@ -292,7 +271,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCreden
         Ok(xtream_stream_id) => {
             if user.proxy == ProxyType::Redirect {
                 let (xtream_id, input) = get_xtream_input_for_stream_id(app_state, target_name, xtream_stream_id);
-                if let Some(target_input) =  input {
+                if let Some(target_input) = input {
                     if let Some(info_url) = get_xtream_player_api_info_url(target_input, cluster, xtream_id) {
                         return HttpResponse::Found().insert_header(("Location", info_url)).finish();
                     }
@@ -309,7 +288,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCreden
 }
 
 async fn xtream_get_short_epg(app_state: &AppState, user: &UserCredentials, target_name: &str, stream_id: &str, limit: &str) -> HttpResponse {
-    let xtream_stream_id:i32 = match FromStr::from_str(stream_id) {
+    let xtream_stream_id: i32 = match FromStr::from_str(stream_id) {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().finish()
     };
