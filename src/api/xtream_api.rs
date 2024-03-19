@@ -95,10 +95,13 @@ fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationRes
 }
 
 fn separate_number_and_rest(input: &str) -> (String, String) {
-    let dot_index = input.find('.').unwrap_or(input.len());
-    let number_part = input[..dot_index].to_string();
-    let rest = input[dot_index..].to_string();
-    (number_part, rest)
+    if let Some(dot_index) = input.find('.') {
+        let number_part = input[..dot_index].to_string();
+        let rest = input[dot_index..].to_string();
+        (number_part, rest)
+    } else {
+        (input.to_string(), String::new())
+    }
 }
 
 async fn xtream_player_api_stream(
