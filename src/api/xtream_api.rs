@@ -94,6 +94,13 @@ fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationRes
     }
 }
 
+fn separate_number_and_rest(input: &str) -> (String, String) {
+    let dot_index = input.find('.').unwrap_or(input.len());
+    let number_part = input[..dot_index].to_string();
+    let rest = input[dot_index..].to_string();
+    (number_part, rest)
+}
+
 async fn xtream_player_api_stream(
     req: &HttpRequest,
     api_req: &web::Query<UserApiRequest>,
@@ -108,11 +115,13 @@ async fn xtream_player_api_stream(
         if target.has_output(&TargetType::Xtream) {
             let mut stream_id = action_path.to_owned();
             let mut input: Option<&ConfigInput> = None;
-            if let Ok(num) = action_path.trim().parse() {
+
+            let (action_stream_id, action_ext) = separate_number_and_rest(action_path);
+            if let Ok(num) = action_stream_id.trim().parse() {
                 let (xtream_id, cfg_input) = get_xtream_input_for_stream_id(_app_state, target_name, num);
                 if cfg_input.is_some() {
                     input = cfg_input;
-                    stream_id = xtream_id.to_string();
+                    stream_id = format!("{}{}", xtream_id.to_string(), action_ext);
                 }
             }
 
@@ -267,23 +276,23 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
 async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCredentials,
                                          target_name: &str, stream_id: &str,
                                          cluster: &XtreamCluster) -> HttpResponse {
-    match FromStr::from_str(stream_id) {
-        Ok(xtream_stream_id) => {
-            if user.proxy == ProxyType::Redirect {
-                let (xtream_id, input) = get_xtream_input_for_stream_id(app_state, target_name, xtream_stream_id);
-                if let Some(target_input) = input {
-                    if let Some(info_url) = get_xtream_player_api_info_url(target_input, cluster, xtream_id) {
-                        return HttpResponse::Found().insert_header(("Location", info_url)).finish();
-                    }
-                }
-            }
+    let xtream_stream_id: i32 = match FromStr::from_str(stream_id) {
+        Ok(id) => id,
+        Err(_) => return HttpResponse::BadRequest().finish()
+    };
 
-            match xtream_get_stream_info(app_state, target_name, xtream_stream_id, cluster).await {
-                Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
-                Err(_) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("{info:[]}"),
+    if user.proxy == ProxyType::Redirect {
+        let (xtream_id, input) = get_xtream_input_for_stream_id(app_state, target_name, xtream_stream_id);
+        if let Some(target_input) = input {
+            if let Some(info_url) = get_xtream_player_api_info_url(target_input, cluster, xtream_id) {
+                return HttpResponse::Found().insert_header(("Location", info_url)).finish();
             }
         }
-        Err(_) => HttpResponse::BadRequest().finish()
+    }
+
+    match xtream_get_stream_info(app_state, target_name, xtream_stream_id, cluster).await {
+        Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
+        Err(_) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("{info:[]}"),
     }
 }
 
