@@ -188,11 +188,8 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
 
 macro_rules! apply_pattern {
     ($pattern:expr, $provider:expr, $processor:expr) => {{
-            match $pattern {
-                Some(ptrn) => {
-                    ptrn.filter($provider, $processor);
-                },
-                _ => {}
+            if let Some(ptrn) = $pattern {
+               ptrn.filter($provider, $processor);
             };
     }};
 }

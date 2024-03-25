@@ -508,7 +508,7 @@ impl VideoConfig {
             Some(downl) => {
                 if downl.headers.is_empty() {
                     downl.headers.borrow_mut().insert("Accept".to_string(), "video/*".to_string());
-                    downl.headers.borrow_mut().insert("User-Agent".to_string(), "AppleTV/tvOS/9.1.1.".to_string());
+                    downl.headers.borrow_mut().insert("User-Agent".to_string(), "Apple TV; tvOS 13.3.1".to_string());
                 }
 
                 if let Some(episode_pattern) = &downl.episode_pattern {
