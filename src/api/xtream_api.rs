@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::io::{Error};
+use std::path::Path;
 use std::str::FromStr;
 use actix_web::{HttpRequest, HttpResponse, web, Resource};
 use chrono::{Duration, Local};
@@ -15,7 +16,12 @@ use crate::model::config::{Config, ConfigInput, InputType};
 use crate::model::model_config::{TargetType};
 use crate::model::model_playlist::XtreamCluster;
 use crate::repository::xtream_repository;
-use crate::utils::{request_utils};
+use crate::utils::{json_utils, request_utils};
+
+pub(crate) async fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
+    let filtered = json_utils::filter_json_file(file_path, filter);
+    HttpResponse::Ok().json(filtered)
+}
 
 fn get_xtream_player_api_action_url(input: &ConfigInput, action: &str) -> Option<String> {
     match input.input_type {
@@ -247,6 +253,7 @@ fn get_xtream_mapped_id_and_input_for_stream_id<'a>(app_state: &'a AppState, tar
 // TODO use u32 or i32 ??
 async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_id: i32,
                                 cluster: &XtreamCluster) -> Result<String, Error> {
+
     let (xtream_id, input) = get_xtream_mapped_id_and_input_for_stream_id(app_state, target_name, stream_id);
     if let Some(target_input) = input {
         if let Ok(content) = xtream_repository::xtream_get_stored_stream_info(app_state, target_name, xtream_id, cluster, target_input).await {
@@ -263,7 +270,7 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
                             Ok(content) => {
                                 // TODO we are not replacing direct_source, we should add an option to do this.
                                 xtream_repository::xtream_persist_stream_info(app_state, target_name, xtream_id, cluster,
-                                                           target_input, content.as_str()).await;
+                                                                              target_input, content.as_str()).await;
                                 return Ok(content);
                             }
                             Err(err) => { error!("Failed to download info {}", err.to_string()); }
@@ -328,7 +335,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &UserCredentials, targ
                                 error!("Failed to download epg {}", err.to_string());
                                 HttpResponse::NoContent().finish()
                             }
-                        }
+                        };
                     }
                 }
             }
@@ -371,17 +378,23 @@ async fn xtream_player_api(
                     }
                     _ => {
                         match match action {
-                            "get_live_categories" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_CAT_LIVE),
-                            "get_vod_categories" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_CAT_VOD),
-                            "get_series_categories" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_CAT_SERIES),
-                            "get_live_streams" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_LIVE),
-                            "get_vod_streams" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_VOD),
-                            "get_series" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_SERIES),
+
+                            "get_live_categories" => xtream_repository::xtream_get_collection_path(&_app_state.config, target_name, xtream_repository::COL_CAT_LIVE),
+                            "get_vod_categories" => xtream_repository::xtream_get_collection_path(&_app_state.config, target_name, xtream_repository::COL_CAT_VOD),
+                            "get_series_categories" => xtream_repository::xtream_get_collection_path(&_app_state.config, target_name, xtream_repository::COL_CAT_SERIES),
+                            "get_live_streams" => xtream_repository::xtream_get_collection_path(&_app_state.config, target_name, xtream_repository::COL_LIVE),
+                            "get_vod_streams" => xtream_repository::xtream_get_collection_path(&_app_state.config, target_name, xtream_repository::COL_VOD),
+                            "get_series" => xtream_repository::xtream_get_collection_path(&_app_state.config, target_name, xtream_repository::COL_SERIES),
                             _ => Err(Error::new(std::io::ErrorKind::Unsupported, format!("Cant find action: {}/{}", target_name, action))),
                         } {
                             Ok((path, content)) => {
                                 if let Some(file_path) = path {
-                                    serve_file(&file_path, req).await
+                                    let category_id = api_req.category_id.trim();
+                                    if !category_id.is_empty() {
+                                        serve_query(&file_path, &HashMap::from([("category_id", category_id)])).await
+                                    } else {
+                                        serve_file(&file_path, req).await
+                                    }
                                 } else if let Some(payload) = content {
                                     HttpResponse::Ok().body(payload)
                                 } else {

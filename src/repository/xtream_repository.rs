@@ -308,7 +308,7 @@ fn append_mandatory_fields(document: &mut Map<String, Value>, fields: &[&str]) {
     }
 }
 
-pub(crate) fn xtream_get_all(cfg: &Config, target_name: &str, collection_name: &str) -> Result<(Option<PathBuf>, Option<String>), Error> {
+pub(crate) fn xtream_get_collection_path(cfg: &Config, target_name: &str, collection_name: &str) -> Result<(Option<PathBuf>, Option<String>), Error> {
     if let Some(path) = get_xtream_storage_path(cfg, target_name) {
         let col_path = get_collection_path(&path, collection_name);
         if col_path.exists() {

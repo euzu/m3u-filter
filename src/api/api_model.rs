@@ -210,6 +210,8 @@ pub(crate) struct UserApiRequest {
     #[serde(default = "default_as_empty_str")]
     pub stream_id: String,
     #[serde(default = "default_as_empty_str")]
+    pub category_id: String,
+    #[serde(default = "default_as_empty_str")]
     pub limit: String,
 }
 
