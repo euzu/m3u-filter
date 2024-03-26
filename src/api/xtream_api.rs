@@ -14,11 +14,8 @@ use crate::model::api_proxy::{ProxyType, UserCredentials};
 use crate::model::config::{Config, ConfigInput, InputType};
 use crate::model::model_config::{TargetType};
 use crate::model::model_playlist::XtreamCluster;
-use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, read_xtream_mapping, xtream_get_all, xtream_get_stored_stream_info, xtream_persist_stream_info};
-use crate::utils::{get_client_request};
-use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD,
-                                           xtream_get_all, xtream_get_stored_stream_info, xtream_persist_stream_info};
-use crate::utils::request_utils;
+use crate::repository::xtream_repository;
+use crate::utils::{request_utils};
 
 fn get_xtream_player_api_action_url(input: &ConfigInput, action: &str) -> Option<String> {
     match input.input_type {
@@ -237,7 +234,7 @@ async fn xtream_player_api_timeshift_stream(
 
 fn get_xtream_mapped_id_and_input_for_stream_id<'a>(app_state: &'a AppState, target_name: &str, stream_id: i32) -> (i32, Option<&'a ConfigInput>) {
     if let Some(inputs) = app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
-        if let Ok(Some(mapping)) = read_xtream_mapping(stream_id as u32, app_state.config.as_ref(), target_name) {
+        if let Ok(Some(mapping)) = xtream_repository::read_xtream_mapping(stream_id as u32, app_state.config.as_ref(), target_name) {
             if let Some(cfg_input) = inputs.iter().find(|&&inp| inp.id == mapping.input_id).cloned() {
                 return (mapping.stream_id as i32, Some(cfg_input));
             }
@@ -252,7 +249,7 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
                                 cluster: &XtreamCluster) -> Result<String, Error> {
     let (xtream_id, input) = get_xtream_mapped_id_and_input_for_stream_id(app_state, target_name, stream_id);
     if let Some(target_input) = input {
-        if let Ok(content) = xtream_get_stored_stream_info(app_state, target_name, xtream_id, cluster, target_input).await {
+        if let Ok(content) = xtream_repository::xtream_get_stored_stream_info(app_state, target_name, xtream_id, cluster, target_input).await {
             return Ok(content);
         }
 
@@ -265,7 +262,7 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
                         match response.text().await {
                             Ok(content) => {
                                 // TODO we are not replacing direct_source, we should add an option to do this.
-                                xtream_persist_stream_info(app_state, target_name, xtream_id, cluster,
+                                xtream_repository::xtream_persist_stream_info(app_state, target_name, xtream_id, cluster,
                                                            target_input, content.as_str()).await;
                                 return Ok(content);
                             }
@@ -374,12 +371,12 @@ async fn xtream_player_api(
                     }
                     _ => {
                         match match action {
-                            "get_live_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_LIVE),
-                            "get_vod_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_VOD),
-                            "get_series_categories" => xtream_get_all(&_app_state.config, target_name, COL_CAT_SERIES),
-                            "get_live_streams" => xtream_get_all(&_app_state.config, target_name, COL_LIVE),
-                            "get_vod_streams" => xtream_get_all(&_app_state.config, target_name, COL_VOD),
-                            "get_series" => xtream_get_all(&_app_state.config, target_name, COL_SERIES),
+                            "get_live_categories" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_CAT_LIVE),
+                            "get_vod_categories" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_CAT_VOD),
+                            "get_series_categories" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_CAT_SERIES),
+                            "get_live_streams" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_LIVE),
+                            "get_vod_streams" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_VOD),
+                            "get_series" => xtream_repository::xtream_get_all(&_app_state.config, target_name, xtream_repository::COL_SERIES),
                             _ => Err(Error::new(std::io::ErrorKind::Unsupported, format!("Cant find action: {}/{}", target_name, action))),
                         } {
                             Ok((path, content)) => {

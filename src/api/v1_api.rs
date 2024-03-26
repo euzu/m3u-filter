@@ -8,11 +8,10 @@ use crate::api::download_api::{download_file_info, queue_download_file};
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
 use crate::processing::playlist_processor::exec_processing;
-use crate::util::config_reader::{read_config, save_api_proxy, save_main_config};
-use crate::utils::download;
+use crate::utils::{config_reader, download};
 
 fn _save_config_api_proxy(backup_dir: &str, api_proxy: &mut ApiProxyConfig) -> Option<M3uFilterError> {
-    match save_api_proxy(api_proxy._file_path.as_str(), backup_dir, api_proxy) {
+    match config_reader::save_api_proxy(api_proxy._file_path.as_str(), backup_dir, api_proxy) {
         Ok(_) => {}
         Err(err) => {
             error!("Failed to save api_proxy.yml {}", err.to_string());
@@ -23,7 +22,7 @@ fn _save_config_api_proxy(backup_dir: &str, api_proxy: &mut ApiProxyConfig) -> O
 }
 
 fn _save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Option<M3uFilterError> {
-    match save_main_config(file_path, backup_dir, cfg) {
+    match config_reader::save_main_config(file_path, backup_dir, cfg) {
         Ok(_) => {}
         Err(err) => {
             error!("Failed to save config.yml {}", err.to_string());
@@ -200,7 +199,7 @@ pub(crate) async fn config(
         api_proxy: config._api_proxy.read().unwrap().clone(),
     };
 
-    let mut result = match read_config(_app_state.config._config_path.as_str(),
+    let mut result = match config_reader::read_config(_app_state.config._config_path.as_str(),
                                        _app_state.config._config_file_path.as_str(),
                                        _app_state.config._sources_file_path.as_str()) {
         Ok(mut cfg) => {
