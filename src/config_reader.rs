@@ -6,12 +6,13 @@ use serde::Serialize;
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::{Config, ConfigDto};
 use crate::model::mapping::Mappings;
-use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, utils};
+use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::multi_file_reader::MultiFileReader;
+use crate::utils::file_utils;
 
 pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
-    let mappings_file: String = args_mapping.unwrap_or(utils::get_default_mappings_path(cfg._config_path.as_str()));
+    let mappings_file: String = args_mapping.unwrap_or(file_utils::get_default_mappings_path(cfg._config_path.as_str()));
 
     match read_mapping(mappings_file.as_str()) {
         Ok(mappings) => {
@@ -25,7 +26,7 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
 }
 
 pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
-    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(utils::get_default_api_proxy_config_path(cfg._config_path.as_str()));
+    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(file_utils::get_default_api_proxy_config_path(cfg._config_path.as_str()));
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str());
     match api_proxy_config {
         None => {
@@ -64,7 +65,7 @@ pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &s
 
 pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterError> {
     let mapping_file = std::path::PathBuf::from(mapping_file);
-    match utils::open_file(&mapping_file) {
+    match file_utils::open_file(&mapping_file) {
         Ok(file) => {
             let mapping: Result<Mappings, _> = serde_yaml::from_reader(file);
             match mapping {
@@ -86,7 +87,7 @@ pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFi
 }
 
 pub(crate) fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
-    match utils::open_file(&std::path::PathBuf::from(api_proxy_file)) {
+    match file_utils::open_file(&std::path::PathBuf::from(api_proxy_file)) {
         Ok(file) => {
             let mapping: Result<ApiProxyConfig, _> = serde_yaml::from_reader(file);
             match mapping {

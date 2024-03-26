@@ -4,11 +4,11 @@ use std::io::Write;
 use chrono::Datelike;
 use log::error;
 
-use crate::{create_m3u_filter_error_result, utils};
+use crate::{create_m3u_filter_error_result};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::model_playlist::{PlaylistGroup, PlaylistItemType};
-use crate::utils::add_prefix_to_filename;
+use crate::utils::file_utils;
 
 fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error> {
     match res {
@@ -83,12 +83,12 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
 }
 
 pub(crate) fn get_m3u_file_path(cfg: &Config, filename: &Option<String>) -> Option<std::path::PathBuf> {
-    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
+    file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
 }
 
 pub(crate) fn get_m3u_epg_file_path(cfg: &Config, filename: &Option<String>) -> Option<std::path::PathBuf> {
-    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
-        .map(|path| add_prefix_to_filename(&path, "epg_", Some("xml")))
+    file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
+        .map(|path| file_utils::add_prefix_to_filename(&path, "epg_", Some("xml")))
 }
 
 
@@ -145,7 +145,7 @@ pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playl
         let cleanup = target.options.as_ref().map_or(false, |o| o.cleanup);
         let kodi_style = target.options.as_ref().map_or(false, |o| o.kodi_style);
 
-        if let Some(path) = utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) {
+        if let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) {
             if cleanup {
                 let _ = std::fs::remove_dir_all(&path);
             }
