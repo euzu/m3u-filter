@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use enum_iterator::all;
 use std::collections::{HashMap};
 use std::rc::Rc;
-use log::{debug, error};
+use log::{debug, error, Level, log_enabled};
 use pest::iterators::Pair;
 use pest::Parser;
 use petgraph::algo::toposort;
@@ -129,7 +129,9 @@ impl Filter {
                 let value = provider.call(field);
                 let is_match = rewc.re.is_match(value.as_str());
                 if is_match {
-                    debug!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);
+                    if log_enabled!(Level::Debug) {
+                        debug!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);
+                    }
                     processor.process(field, &value, rewc);
                 }
                 is_match
@@ -204,7 +206,9 @@ fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Resu
         let regexp = re.unwrap();
         let captures = regexp.capture_names()
             .flatten().map(String::from).filter(|x| !x.is_empty()).collect::<Vec<String>>();
-        debug!("Created regex: {} with captures: [{}]", regstr, captures.join(", "));
+        if log_enabled!(Level::Debug) {
+            debug!("Created regex: {} with captures: [{}]", regstr, captures.join(", "));
+        }
         return Ok(RegexWithCaptures {
             restr: regstr,
             re: regexp,
@@ -430,7 +434,9 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<
             if graph.edges_directed(*node, petgraph::Incoming).count() > 0 {
                 let node_name = node_map.get(&node.index()).unwrap();
                 if let Some(deps) = node_deps.get(node_name) {
-                    debug!("template {}  depends on [{}]", node_name, deps.join(", "));
+                    if log_enabled!(Level::Debug) {
+                        debug!("template {}  depends on [{}]", node_name, deps.join(", "));
+                    }
                     let mut node_template = dep_value_map.get(node_name).unwrap().clone();
                     for dep_name in deps {
                         let dep_template = dep_value_map.get(dep_name).unwrap().clone();
@@ -445,6 +451,8 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<
             }
         }
     }
-    debug!("{:#?}", result);
+    if log_enabled!(Level::Debug) {
+        debug!("{:#?}", result);
+    }
     Ok(result)
 }

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read};
 use std::path::{PathBuf};
-use log::{debug, error, Level};
+use log::{debug, error, Level, log_enabled};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
@@ -14,7 +14,9 @@ pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
 }
 
 pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
-    debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
+    if log_enabled!(Level::Debug) {
+        debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
+    }
     match url_str.parse::<url::Url>() {
         Ok(url) => match download_text_content(input, url, persist_filepath).await {
             Ok(content) => Ok(content),
@@ -95,12 +97,12 @@ pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, cus
                 headers.insert(
                     HeaderName::from_bytes(key.as_bytes()).unwrap(),
                     HeaderValue::from_bytes(value).unwrap());
-            } else {
+            } else if log_enabled!(Level::Debug) {
                 debug!("Ignoring request header {}={}", key_lc, String::from_utf8_lossy(value));
             }
         }
     }
-    if log::max_level() == Level::Debug {
+    if log_enabled!(Level::Debug) {
         let he: HashMap<String, String> = headers.iter().map(|(k, v)| (k.to_string(), String::from_utf8_lossy(v.as_bytes()).to_string())).collect();
         debug!("Request headers {:?}", he);
     }
@@ -108,9 +110,15 @@ pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, cus
 }
 
 async fn download_json_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, String> {
+    if log_enabled!(Level::Debug) {
+        debug!("downloading json content from {}", url.to_string());
+    }
     let request = get_client_request(input, url, None);
     match request.send().await {
         Ok(response) => {
+            if log_enabled!(Level::Debug) {
+                debug!("downloading json content response code: {}", response.status().as_str());
+            }
             if response.status().is_success() {
                 match response.json::<serde_json::Value>().await {
                     Ok(content) => {

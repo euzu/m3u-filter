@@ -78,12 +78,13 @@ fn main() {
 
     let mut cfg = config_reader::read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
 
-    if args.log_level.is_none() {
-         if let Some(log_level) =  &cfg.log_level {
-             info!("Setting log level to: {}", get_log_level(log_level.as_str()));
-             log::set_max_level(get_log_level(log_level.as_str()));
-         }
-    }
+    // this does not work
+    // if args.log_level.is_none() {
+    //      if let Some(log_level) =  &cfg.log_level {
+    //          info!("Setting log level to: {}", log_level.as_str());
+    //          log::set_max_level(get_log_level(log_level.as_str()));
+    //      }
+    // }
 
     let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 

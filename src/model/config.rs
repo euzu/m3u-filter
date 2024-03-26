@@ -569,7 +569,6 @@ pub(crate) struct Config {
     pub video: Option<VideoConfig>,
     pub schedule: Option<String>,
     pub messaging: Option<MessagingConfig>,
-    pub log_level: Option<String>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
     #[serde(skip_serializing, skip_deserializing)]
