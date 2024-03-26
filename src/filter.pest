@@ -1,8 +1,8 @@
 WHITESPACE = _{ " " | "\t" }
-field = { "Group" | "Title" | "Name" | "Url" }
-and = {"AND" | "and"}
-or = {"OR" | "or"}
-not = { "NOT" | "not" }
+field = { ^"group" | ^"title" | ^"name" | ^"url" }
+and = { ^"and" }
+or = { ^"or" }
+not = { ^"not" }
 regexp = @{ "\"" ~ ( "\\\"" | (!"\"" ~ ANY) )* ~ "\"" }
 comparison_value = _{ regexp }
 comparison = { field ~ "~" ~ comparison_value }

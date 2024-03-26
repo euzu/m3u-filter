@@ -334,12 +334,12 @@ fn write_index(path: &PathBuf, index: &IndexTree) -> std::io::Result<()> {
 
 fn seek_read(
     reader: &mut (impl Read + Seek),
-    offset: u32,
+    offset: u64,
     amount_to_read: u16,
 ) -> Result<Vec<u8>, Error> {
     // A buffer filled with as many zeros as we'll read with read_exact
-    let mut buf = vec![0; amount_to_read as usize];
-    reader.seek(SeekFrom::Start(offset as u64))?;
+    let mut buf = vec![0u8; amount_to_read as usize];
+    reader.seek(SeekFrom::Start(offset))?;
     reader.read_exact(&mut buf)?;
     Ok(buf)
 }
@@ -360,7 +360,7 @@ pub(crate) async fn xtream_get_stored_stream_info(
                 if let Some(idx_map) = &index_tree {
                     if let Some((offset, size)) = idx_map.get(&stream_id) {
                         let mut reader = BufReader::new(File::open(&col_path).unwrap());
-                        if let Ok(bytes) = seek_read(&mut reader, *offset, *size) {
+                        if let Ok(bytes) = seek_read(&mut reader, *offset as u64, *size) {
                             let mut decomp: Vec<u8> = Vec::new();
                             let _ = lzma_rs::lzma_decompress(&mut bytes.as_slice(), &mut decomp);
                             drop(shared_lock);

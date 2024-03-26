@@ -10,13 +10,11 @@ use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
 
-use crate::config_reader::{read_api_proxy_config, read_config, read_mappings};
 use crate::model::config::{Config, ProcessTargets, validate_targets};
-use crate::processing::playlist_processor::exec_processing;
-use crate::utils::file_utils;
+use crate::processing::playlist_processor;
+use crate::utils::{config_reader, file_utils};
 
 mod m3u_filter_error;
-mod config_reader;
 mod model;
 mod filter;
 mod repository;
@@ -24,7 +22,6 @@ mod messaging;
 mod test;
 mod api;
 mod processing;
-mod multi_file_reader;
 mod utils;
 
 #[derive(Parser)]
@@ -79,7 +76,7 @@ fn main() {
     let sources_file: String = args.source_file.unwrap_or(file_utils::get_default_sources_file_path(&config_path));
 
 
-    let mut cfg = read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
+    let mut cfg = config_reader::read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
 
     if args.log_level.is_none() {
          if let Some(log_level) =  &cfg.log_level {
@@ -97,12 +94,12 @@ fn main() {
     info!("Config file: {}", &config_file);
     info!("Source file: {}", &sources_file);
 
-    if let Err(err) = read_mappings(args.mapping_file, &mut cfg) {
+    if let Err(err) = config_reader::read_mappings(args.mapping_file, &mut cfg) {
         exit!("{}", err);
     }
 
     if args.server {
-        read_api_proxy_config(args.api_proxy, &mut cfg);
+        config_reader::read_api_proxy_config(args.api_proxy, &mut cfg);
         start_in_server_mode(Arc::new(cfg), Arc::new(targets));
     } else {
         start_in_cli_mode(Arc::new(cfg), Arc::new(targets))
@@ -110,7 +107,7 @@ fn main() {
 }
 
 fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    System::new().block_on(async { exec_processing(cfg, targets).await });
+    System::new().block_on(async { playlist_processor::exec_processing(cfg, targets).await });
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
