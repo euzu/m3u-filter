@@ -16,6 +16,9 @@ use crate::model::model_config::{TargetType};
 use crate::model::model_playlist::XtreamCluster;
 use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD, read_xtream_mapping, xtream_get_all, xtream_get_stored_stream_info, xtream_persist_stream_info};
 use crate::utils::{get_client_request};
+use crate::repository::xtream_repository::{COL_CAT_LIVE, COL_CAT_SERIES, COL_CAT_VOD, COL_LIVE, COL_SERIES, COL_VOD,
+                                           xtream_get_all, xtream_get_stored_stream_info, xtream_persist_stream_info};
+use crate::utils::request_utils;
 
 fn get_xtream_player_api_action_url(input: &ConfigInput, action: &str) -> Option<String> {
     match input.input_type {
@@ -144,7 +147,7 @@ async fn xtream_player_api_stream(
                     let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
                     debug!("Try to open stream {}", &stream_url);
                     if let Ok(url) = Url::parse(&stream_url) {
-                        let client = get_client_request(target_input, url, Some(&req_headers));
+                        let client = request_utils::get_client_request(target_input, url, Some(&req_headers));
                         match client.send().await {
                             Ok(response) => {
                                 if response.status().is_success() {
@@ -255,7 +258,7 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
 
         if let Some(info_url) = get_xtream_player_api_info_url(target_input, cluster, xtream_id) {
             if let Ok(url) = Url::parse(&info_url) {
-                let client = get_client_request(target_input, url, None);
+                let client = request_utils::get_client_request(target_input, url, None);
                 if let Ok(response) = client.send().await {
                     debug!("{}", response.status());
                     if response.status().is_success() {
@@ -317,16 +320,16 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &UserCredentials, targ
                     return HttpResponse::Found().insert_header(("Location", info_url)).finish();
                 }
 
-                let client = get_client_request(target_input, url, None);
+                let client = request_utils::get_client_request(target_input, url, None);
                 if let Ok(response) = client.send().await {
                     if response.status().is_success() {
-                        match response.text().await {
+                        return match response.text().await {
                             Ok(content) => {
-                                return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content);
+                                HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content)
                             }
                             Err(err) => {
                                 error!("Failed to download epg {}", err.to_string());
-                                return HttpResponse::NoContent().finish();
+                                HttpResponse::NoContent().finish()
                             }
                         }
                     }

@@ -15,8 +15,7 @@ use crate::model::api_proxy::{ApiProxyConfig, UserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
 use crate::model::model_config::{default_as_false, default_as_true, default_as_zero, ItemField, ProcessingOrder, SortOrder, TargetType};
-use crate::utils;
-use crate::utils::get_working_path;
+use crate::utils::file_utils;
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 
@@ -25,7 +24,6 @@ pub(crate) fn default_as_default() -> String { String::from("default") }
 fn default_as_empty_map<K, V>() -> HashMap<K, V> { HashMap::new() }
 
 fn default_as_empty_list<T>() -> Vec<T> { vec![] }
-
 
 #[macro_export]
 macro_rules! create_m3u_filter_error_result {
@@ -575,6 +573,7 @@ pub(crate) struct Config {
     pub video: Option<VideoConfig>,
     pub schedule: Option<String>,
     pub messaging: Option<MessagingConfig>,
+    pub log_level: Option<String>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -665,7 +664,7 @@ impl Config {
     }
 
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
-        self.working_dir = get_working_path(&self.working_dir);
+        self.working_dir = file_utils::get_working_path(&self.working_dir);
         if self.backup_dir.is_none() {
             self.backup_dir = Some(PathBuf::from(&self.working_dir).join(".backup").into_os_string().to_string_lossy().to_string());
         }
@@ -739,7 +738,7 @@ impl Config {
             if wrpb.is_relative() {
                 let mut wrpb2 = std::path::PathBuf::from(&self.working_dir).join(&self.api.web_root);
                 if !wrpb2.exists() {
-                    wrpb2 = utils::get_exe_path().join(&self.api.web_root);
+                    wrpb2 = file_utils::get_exe_path().join(&self.api.web_root);
                 }
                 if !wrpb2.exists() {
                     let cwd = std::env::current_dir();

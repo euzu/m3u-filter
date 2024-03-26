@@ -5,7 +5,7 @@ use regex::Regex;
 use crate::messaging::{MsgKind, send_message};
 use crate::model::config::Config;
 use crate::model::model_playlist::PlaylistGroup;
-use crate::utils;
+use crate::utils::file_utils;
 
 pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) {
     let mut new_tree = BTreeSet::new();
@@ -18,7 +18,7 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
     let filename_re = Regex::new(r"[^A-Za-z0-9_-]").unwrap();
     let file_name = format!("watch_{}_{}", target_name, &pl.title);
     let watch_filename = format!("{}.bin", filename_re.replace_all(&file_name, "_")).to_string();
-    match utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&watch_filename))) {
+    match file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&watch_filename))) {
         Some(path) => {
             let save_path = path.clone();
             let mut changed = false;

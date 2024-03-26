@@ -10,15 +10,14 @@ use crate::model::config::{Config, ConfigTarget, InputType};
 use crate::model::model_config::TargetType;
 use crate::repository::m3u_repository::get_m3u_epg_file_path;
 use crate::repository::xtream_repository::{get_xtream_epg_file_path, get_xtream_storage_path};
-use crate::utils::{get_client_request, path_exists};
-
+use crate::utils::{file_utils, request_utils};
 
 fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<PathBuf> {
     for output in &target.output {
         match output.target {
             TargetType::M3u => {
                 if let Some(epg_path) = get_m3u_epg_file_path(config, &target.get_m3u_filename()) {
-                    if path_exists(&epg_path) {
+                    if file_utils::path_exists(&epg_path) {
                         return Some(epg_path);
                     } else {
                         info!("Cant find epg file for m3u target: {}", epg_path.to_str().unwrap_or("?"))
@@ -28,7 +27,7 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
             TargetType::Xtream => {
                 if let Some(storage_path) = get_xtream_storage_path(config, &target.name) {
                     let epg_path = get_xtream_epg_file_path(&storage_path);
-                    if path_exists(&epg_path) {
+                    if file_utils::path_exists(&epg_path) {
                         return Some(epg_path);
                     } else {
                         info!("Cant find epg file for xtream target: {}", epg_path.to_str().unwrap_or("?"))
@@ -54,7 +53,6 @@ async fn xmltv_api(
                 // If you want to use xmltv then provide the url in the config to filter unnecessary content.
                 // If you have multiple xtream sources, the first one will be used for epg
                 let target_name = &target.name;
-
                 if let Some(inputs) = _app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
                     if let Some(&input) = inputs.first() {
                         let epg_url = input.epg_url.as_ref().map_or("".to_string(), |s| s.to_owned());
@@ -70,7 +68,7 @@ async fn xmltv_api(
                                 debug!("Redirecting epg request to {}", api_url);
                                 return HttpResponse::Found().insert_header(("Location", api_url)).finish();
                             }
-                            let client = get_client_request(input, url, None);
+                            let client = request_utils::get_client_request(input, url, None);
                             if let Ok(response) = client.send().await {
                                 if response.status().is_success() {
                                     if let Ok(content) = response.text().await {

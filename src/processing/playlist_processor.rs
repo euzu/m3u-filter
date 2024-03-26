@@ -11,7 +11,6 @@ use log::{debug, error, info};
 use unidecode::unidecode;
 
 use crate::{Config, get_errors_notify_message, model::config, valid_property};
-use crate::download::{get_m3u_playlist, get_xmltv, get_xtream_playlist, get_xtream_playlist_series};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{MsgKind, send_message};
@@ -27,6 +26,7 @@ use crate::processing::xmltv_parser::flatten_tvguide;
 use crate::repository::epg_repository::write_epg;
 use crate::repository::m3u_repository::{write_m3u_playlist, write_strm_playlist};
 use crate::repository::xtream_repository::{write_xtream_mapping, write_xtream_playlist};
+use crate::utils::download;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
     debug!("Filtering {} groups", playlist.len());
@@ -282,11 +282,11 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         let input_id = input.id;
         if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
             let (playlist, mut error_list) = match input.input_type {
-                InputType::M3u => get_m3u_playlist(&cfg, input, &cfg.working_dir).await,
-                InputType::Xtream => get_xtream_playlist(input, &cfg.working_dir).await,
+                InputType::M3u => download::get_m3u_playlist(&cfg, input, &cfg.working_dir).await,
+                InputType::Xtream => download::get_xtream_playlist(input, &cfg.working_dir).await,
             };
             let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
-                get_xmltv(&cfg, input, &cfg.working_dir).await
+                download::get_xmltv(&cfg, input, &cfg.working_dir).await
             } else {
                 (None, vec![])
             };
@@ -425,7 +425,6 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
             }
         }
         playlist_resolve_series(target, errors, &pipe, fpl, &mut new_fpl).await;
-
         // stats
         let input_stats = stats.get_mut(&new_fpl.input.id);
         if let Some(stat) = input_stats {
@@ -528,7 +527,7 @@ async fn playlist_resolve_series<'a>(target: &ConfigTarget, errors: &mut Vec<M3u
             (false, 0)
         };
     if resolve_series {
-        let mut series_playlist = get_xtream_playlist_series(fpl, errors, resolve_series_delay).await;
+        let mut series_playlist = download::get_xtream_playlist_series(fpl, errors, resolve_series_delay).await;
         // original content saved into original list
         for plg in &series_playlist {
             fpl.update_playlist(plg);

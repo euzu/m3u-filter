@@ -7,9 +7,9 @@ use actix_web::{HttpResponse, web};
 use serde_json::{json, Value};
 use crate::api::api_model::{AppState, DownloadQueue, FileDownload, FileDownloadRequest};
 use crate::model::config::{VideoDownloadConfig};
-use crate::utils::{bytes_to_megabytes, get_request_headers};
 use futures::stream::TryStreamExt;
 use log::{info};
+use crate::utils::{request_utils};
 
 async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwest::Client) -> Result<(), String> {
     let file_download = { active.read().unwrap().as_ref().unwrap().clone() };
@@ -37,7 +37,7 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
                                                     }
                                                 }
                                                 None => {
-                                                    let megabytes = bytes_to_megabytes(downloaded);
+                                                    let megabytes = request_utils::bytes_to_megabytes(downloaded);
                                                     info!("Downloaded {}, filesize: {}MB", file_path_str, megabytes);
                                                     active.write().unwrap().as_mut().unwrap().size = downloaded;
                                                     return Ok(());
@@ -67,7 +67,7 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<Do
     };
     if next_download.is_some() {
         { *download_queue.as_ref().active.write().unwrap() = next_download; }
-        let headers = get_request_headers(&download_cfg.headers, None);
+        let headers = request_utils::get_request_headers(&download_cfg.headers, None);
         let dq = Arc::clone(&download_queue);
         match reqwest::Client::builder().default_headers(headers).build() {
             Ok(client) => {

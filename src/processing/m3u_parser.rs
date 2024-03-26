@@ -4,6 +4,7 @@ use std::rc::Rc;
 use crate::model::config::Config;
 use crate::model::model_config::default_as_empty_rc_str;
 use crate::model::model_playlist::{default_playlist_item_type, default_stream_cluster, PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::utils::string_utils;
 
 fn token_value(it: &mut std::str::Chars) -> String {
     if let Some(oc) = it.next() {
@@ -117,8 +118,10 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
             }
             c = it.next();
         }
-        if plih.group.is_empty() {
-            plih.group = Rc::new(String::from("Unknown"));
+        if plih.id.is_empty() {
+            if let Some(chanid) = extract_id_from_url(url.as_str()) {
+                plih.id = Rc::new(chanid);
+            }
         }
         plih.stream_id = Rc::clone(&plih.id);
         plih.epg_channel_id = Some(Rc::clone(&plih.id));
@@ -145,6 +148,12 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
     plih
 }
 
+fn extract_id_from_url(url: &str) -> Option<String> {
+    if let Some(filename) = url.split('/').last() {
+        return filename.rsplit('.').next().map(|stem| stem.to_string());
+    }
+    None
+}
 
 pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup> {
     let mut groups: std::collections::HashMap<Rc<String>, Vec<PlaylistItem>> = std::collections::HashMap::new();
@@ -152,6 +161,7 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
+    let mut playlist = Vec::new();
     let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(|ext| ext.as_str()).collect();
     for line in lines {
         if line.starts_with("#EXTINF") {
@@ -172,19 +182,30 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
                     item.header.borrow_mut().group = Rc::new(group_value);
                 }
             }
-            let key = Rc::clone(&item.header.borrow().group);
-            // let key2 = String::from(&item.header.group);
-            match groups.entry(Rc::clone(&key)) {
-                std::collections::hash_map::Entry::Vacant(e) => {
-                    e.insert(vec![item]);
-                    sort_order.push(Rc::clone(&key));
-                }
-                std::collections::hash_map::Entry::Occupied(mut e) => { e.get_mut().push(item); }
-            }
+            playlist.push(item);
         }
         header = None;
         group = None;
     }
+
+    for item in &playlist {
+        if item.header.borrow().group.is_empty() {
+            let current_title = item.header.borrow().title.to_owned();
+            item.header.borrow_mut().group = Rc::new(string_utils::get_title_group(current_title.as_str()));
+        }
+    }
+
+    playlist.drain(..).for_each(|item| {
+        let key = Rc::clone(&item.header.borrow().group);
+        // let key2 = String::from(&item.header.group);
+        match groups.entry(Rc::clone(&key)) {
+            std::collections::hash_map::Entry::Vacant(e) => {
+                e.insert(vec![item]);
+                sort_order.push(Rc::clone(&key));
+            }
+            std::collections::hash_map::Entry::Occupied(mut e) => { e.get_mut().push(item); }
+        }
+    });
 
     let mut result: Vec<PlaylistGroup> = vec![];
     for (grp_id, (key, channels)) in (1_u32..).zip(groups.into_iter()) {

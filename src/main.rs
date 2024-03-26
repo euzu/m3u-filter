@@ -14,6 +14,7 @@ use crate::model::config::{Config, ProcessTargets, validate_targets};
 use crate::processing::playlist_processor::exec_processing;
 use crate::util::config_reader::{read_api_proxy_config, read_config, read_mappings};
 use crate::util::utils;
+use crate::utils::file_utils;
 
 mod m3u_filter_error;
 mod model;
@@ -25,6 +26,8 @@ mod test;
 mod api;
 mod processing;
 mod util;
+mod multi_file_reader;
+mod utils;
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
@@ -71,14 +74,22 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let args = Args::parse();
-    init_logger(&args.log_level.unwrap_or("info".to_string()));
+    init_logger(args.log_level.as_ref().unwrap_or(&"info".to_string()));
 
-    let config_path: String = args.config_path.unwrap_or(utils::get_default_config_path());
-    let config_file: String = args.config_file.unwrap_or(utils::get_default_config_file_path(&config_path));
-    let sources_file: String = args.source_file.unwrap_or(utils::get_default_sources_file_path(&config_path));
+    let config_path: String = args.config_path.unwrap_or(file_utils::get_default_config_path());
+    let config_file: String = args.config_file.unwrap_or(file_utils::get_default_config_file_path(&config_path));
+    let sources_file: String = args.source_file.unwrap_or(file_utils::get_default_sources_file_path(&config_path));
 
 
     let mut cfg = read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
+
+    if args.log_level.is_none() {
+         if let Some(log_level) =  &cfg.log_level {
+             info!("Setting log level to: {}", get_log_level(log_level.as_str()));
+             log::set_max_level(get_log_level(log_level.as_str()));
+         }
+    }
+
     let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
     info!("Version: {}", VERSION);
@@ -115,16 +126,20 @@ fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     };
 }
 
+fn get_log_level(log_level: &str) -> LevelFilter {
+    match log_level.to_lowercase().as_str() {
+        "trace" => LevelFilter::Trace,
+        "debug" => LevelFilter::Debug,
+        "info" => LevelFilter::Info,
+        "warn" => LevelFilter::Warn,
+        "error" => LevelFilter::Error,
+        _ => LevelFilter::Info,
+    }
+}
+
 fn init_logger(log_level: &str) {
     let mut log_builder = Builder::from_default_env();
     // Set the log level based on the parsed value
-    match log_level.to_lowercase().as_str() {
-        "trace" => log_builder.filter_level(LevelFilter::Trace),
-        "debug" => log_builder.filter_level(LevelFilter::Debug),
-        "info" => log_builder.filter_level(LevelFilter::Info),
-        "warn" => log_builder.filter_level(LevelFilter::Warn),
-        "error" => log_builder.filter_level(LevelFilter::Error),
-        _ => log_builder.filter_level(LevelFilter::Info),
-    };
+    log_builder.filter_level(get_log_level(log_level));
     log_builder.init();
 }

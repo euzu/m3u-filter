@@ -10,10 +10,11 @@ use serde::Serialize;
 use serde_json::{json, Map, Value};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::model_playlist::{PlaylistGroup, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
-use crate::{create_m3u_filter_error_result, utils};
+use crate::{create_m3u_filter_error_result};
 use crate::api::api_model::AppState;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::model_xtream::MultiXtreamMapping;
+use crate::utils::file_utils;
 
 type IndexTree = BTreeMap<i32, (u32, u16)>;
 
@@ -42,7 +43,7 @@ const SERIES_STREAM_FIELDS: &[&str] = &[
 
 
 pub(crate) fn get_xtream_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
-    utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(' ', "_"))))
+    file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(' ', "_"))))
 }
 
 pub(crate) fn get_xtream_epg_file_path(path: &Path) -> PathBuf {
@@ -134,6 +135,7 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
         let mut series_map = HashMap::<i32, String>::new();
 
         let mut channel_num: i32 = 0;
+        let mut errors = Vec::new();
         for plg in playlist {
             if !&plg.channels.is_empty() {
                 match &plg.xtream_cluster {
@@ -149,91 +151,93 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
 
                 for pli in &plg.channels {
                     let header = &pli.header.borrow();
-                    if header.item_type == PlaylistItemType::Series {
-                        // we skip resolved series, because this is only necessary when writing m3u files
-                        continue;
-                    }
-                    channel_num += 1;
-                    let mut document = serde_json::Map::from_iter([
-                        ("category_id".to_string(), Value::String(format!("{}", &plg.id))),
-                        ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(plg.id.to_owned()))]))),
-                        ("name".to_string(), Value::String(header.name.as_ref().clone())),
-                        ("num".to_string(), Value::Number(serde_json::Number::from(channel_num))),
-                        ("title".to_string(), Value::String(header.title.as_ref().clone())),
-                        ("stream_icon".to_string(), Value::String(header.logo.as_ref().clone())),
-                    ]);
+                    if let Ok(stream_id) = header.id.parse::<i32>() {
+                        if header.item_type == PlaylistItemType::Series {
+                            // we skip resolved series, because this is only necessary when writing m3u files
+                            continue;
+                        }
+                        channel_num += 1;
+                        let mut document = serde_json::Map::from_iter([
+                            ("category_id".to_string(), Value::String(format!("{}", &plg.id))),
+                            ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(plg.id.to_owned()))]))),
+                            ("name".to_string(), Value::String(header.name.as_ref().clone())),
+                            ("num".to_string(), Value::Number(serde_json::Number::from(channel_num))),
+                            ("title".to_string(), Value::String(header.title.as_ref().clone())),
+                            ("stream_icon".to_string(), Value::String(header.logo.as_ref().clone())),
+                        ]);
 
-                    let stream_id = header.id.parse::<i32>().unwrap();
-                    let stream_id_value = Value::Number(serde_json::Number::from(stream_id));
-                    match header.xtream_cluster {
-                        XtreamCluster::Live => {
-                            document.insert("stream_id".to_string(), stream_id_value);
-                            if skip_live_direct_source {
-                                document.insert("direct_source".to_string(), Value::String("".to_string()));
-                            } else {
-                                document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                        let stream_id_value = Value::Number(serde_json::Number::from(stream_id));
+                        match header.xtream_cluster {
+                            XtreamCluster::Live => {
+                                document.insert("stream_id".to_string(), stream_id_value);
+                                if skip_live_direct_source {
+                                    document.insert("direct_source".to_string(), Value::String("".to_string()));
+                                } else {
+                                    document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                                }
+                                document.insert("thumbnail".to_string(), Value::String(header.logo_small.as_ref().clone()));
+                                document.insert("custom_sid".to_string(), Value::String("".to_string()));
+                                document.insert("epg_channel_id".to_string(), match &header.epg_channel_id {
+                                    None => Value::Null,
+                                    Some(epg_id) => Value::String(epg_id.as_ref().clone())
+                                });
                             }
-                            document.insert("thumbnail".to_string(), Value::String(header.logo_small.as_ref().clone()));
-                            document.insert("custom_sid".to_string(), Value::String("".to_string()));
-                            document.insert("epg_channel_id".to_string(), match &header.epg_channel_id {
-                                None => Value::Null,
-                                Some(epg_id) => Value::String(epg_id.as_ref().clone())
-                            });
-                        }
-                        XtreamCluster::Video => {
-                            document.insert("stream_id".to_string(), stream_id_value);
-                            if skip_video_direct_source {
-                                document.insert("direct_source".to_string(), Value::String("".to_string()));
-                            } else {
-                                document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                            XtreamCluster::Video => {
+                                document.insert("stream_id".to_string(), stream_id_value);
+                                if skip_video_direct_source {
+                                    document.insert("direct_source".to_string(), Value::String("".to_string()));
+                                } else {
+                                    document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                                }
+                                document.insert("custom_sid".to_string(), Value::String("".to_string()));
                             }
-                            document.insert("custom_sid".to_string(), Value::String("".to_string()));
-                        }
-                        XtreamCluster::Series => {
-                            document.insert("series_id".to_string(), stream_id_value);
-                        }
-                    };
+                            XtreamCluster::Series => {
+                                document.insert("series_id".to_string(), stream_id_value);
+                            }
+                        };
 
-                    if let Some(add_props) = &header.additional_properties {
-                        for (field_name, field_value) in add_props {
-                            document.insert(field_name.to_string(), field_value.to_owned());
+                        if let Some(add_props) = &header.additional_properties {
+                            for (field_name, field_value) in add_props {
+                                document.insert(field_name.to_string(), field_value.to_owned());
+                            }
                         }
+
+                        match header.xtream_cluster {
+                            XtreamCluster::Live => {
+                                append_mandatory_fields(&mut document, LIVE_STREAM_FIELDS);
+                            }
+                            XtreamCluster::Video => {
+                                append_mandatory_fields(&mut document, VIDEO_STREAM_FIELDS);
+                            }
+                            XtreamCluster::Series => {
+                                append_prepared_series_properties(header, &mut document);
+                                append_mandatory_fields(&mut document, SERIES_STREAM_FIELDS);
+                                append_release_date(&mut document);
+                            }
+                        };
+
+                        match header.xtream_cluster {
+                            XtreamCluster::Live => {}
+                            XtreamCluster::Series => {
+                                series_map.insert(stream_id, serde_json::to_string(&document).unwrap());
+                            }
+                            XtreamCluster::Video => {
+                                vod_map.insert(stream_id, serde_json::to_string(&document).unwrap());
+                            }
+                        }
+
+                        match header.xtream_cluster {
+                            XtreamCluster::Live => &mut live_col,
+                            XtreamCluster::Series => &mut series_col,
+                            XtreamCluster::Video => &mut vod_col,
+                        }.push(Value::Object(document));
+                    } else {
+                        errors.push(format!("Channel does not have an id: {}", &header.title));
                     }
-
-                    match header.xtream_cluster {
-                        XtreamCluster::Live => {
-                            append_mandatory_fields(&mut document, LIVE_STREAM_FIELDS);
-                        }
-                        XtreamCluster::Video => {
-                            append_mandatory_fields(&mut document, VIDEO_STREAM_FIELDS);
-                        }
-                        XtreamCluster::Series => {
-                            append_prepared_series_properties(header, &mut document);
-                            append_mandatory_fields(&mut document, SERIES_STREAM_FIELDS);
-                            append_release_date(&mut document);
-                        }
-                    };
-
-                    match header.xtream_cluster {
-                        XtreamCluster::Live => {}
-                        XtreamCluster::Series => {
-                            series_map.insert(stream_id, serde_json::to_string(&document).unwrap());
-                        }
-                        XtreamCluster::Video => {
-                            vod_map.insert(stream_id, serde_json::to_string(&document).unwrap());
-                        }
-                    }
-
-                    match header.xtream_cluster {
-                        XtreamCluster::Live => &mut live_col,
-                        XtreamCluster::Series => &mut series_col,
-                        XtreamCluster::Video => &mut vod_col,
-                    }.push(Value::Object(document));
                 }
             }
         }
 
-        let mut errors = Vec::new();
         for (col_path, data) in [
             (get_collection_path(&path, COL_CAT_LIVE), &cat_live_col),
             (get_collection_path(&path, COL_CAT_VOD), &cat_vod_col),
