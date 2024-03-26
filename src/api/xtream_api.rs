@@ -1,8 +1,7 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufReader, Error};
+use std::io::{Error};
 use std::path::Path;
 use std::str::FromStr;
 use actix_web::{HttpRequest, HttpResponse, web, Resource};
@@ -17,41 +16,10 @@ use crate::model::config::{Config, ConfigInput, InputType};
 use crate::model::model_config::{TargetType};
 use crate::model::model_playlist::XtreamCluster;
 use crate::repository::xtream_repository;
-use crate::utils::{request_utils};
-use crate::utils::json_utils::iter_json_array;
+use crate::utils::{json_utils, request_utils};
 
 pub(crate) async fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
-    let mut filtered: Vec<serde_json::Value> = Vec::new();
-    if file_path.exists() {
-        if let Ok(file) = File::open(file_path) {
-            let reader = BufReader::new(file);
-            for xtream_entry in iter_json_array::<serde_json::Value, BufReader<File>>(reader) {
-                if let Ok(entry) = xtream_entry {
-                    if let Some(item) = entry.as_object() {
-                        for (&key, &value) in filter {
-                            if let Some(field_value) = item.get(key) {
-                                if field_value.is_string() && field_value.eq(value) {
-                                    filtered.push(entry.clone());
-                                } else if let Some(num_val) = field_value.as_i64() {
-                                    if let Ok(filter_num_val) = value.parse::<i64>() {
-                                        if num_val == filter_num_val {
-                                            filtered.push(entry.clone());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // let stream = serde_json::Deserializer::from_reader(reader).into_iter::<serde_json::Value>();
-            // // Iterate over the stream of JSON elements
-            // for entry in stream.flatten() {
-            // }
-        }
-    }
-
+    let filtered = json_utils::filter_json_file(file_path, filter);
     HttpResponse::Ok().json(filtered)
 }
 
