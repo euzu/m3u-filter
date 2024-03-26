@@ -175,22 +175,18 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
         }
         if let Some(header_value) = header {
             let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value, String::from(line))) };
-            if let Some(group_value) = group {
-                if item.header.borrow().group.is_empty() {
+            if item.header.borrow().group.is_empty() {
+                if let Some(group_value) = group {
                     item.header.borrow_mut().group = Rc::new(group_value);
+                } else {
+                    let current_title = item.header.borrow().title.to_owned();
+                    item.header.borrow_mut().group = Rc::new(string_utils::get_title_group(current_title.as_str()));
                 }
             }
             playlist.push(item);
         }
         header = None;
         group = None;
-    }
-
-    for item in &playlist {
-        if item.header.borrow().group.is_empty() {
-            let current_title = item.header.borrow().title.to_owned();
-            item.header.borrow_mut().group = Rc::new(string_utils::get_title_group(current_title.as_str()));
-        }
     }
 
     playlist.drain(..).for_each(|item| {
