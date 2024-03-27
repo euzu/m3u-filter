@@ -859,4 +859,210 @@ rust install cross
 env  RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target armv7-unknown-linux-musleabihf
 ```
 
+# Different Scenarios
+## Using `m3u-filter` with a m3u provider.
+ todo.
+
+## Using `m3u-filter` with a xtream provider.
+
+You have a provider who supports the xtream api.
+
+The provider gives you:
+- the url: `http://fantastic.provider.xyz:8080`
+- username: `tvjunkie`
+- password: `junkie.secret`
+- epg_url: `http://fantastic.provider.xyz:8080/xmltv.php?username=tvjunkie&password=junkie.secret`
+
+
+To use `m3u-filter` you need to create the configuration.
+The configuration consist of 4 files.
+- config.yml
+- source.yml
+- mapping.yml
+- api-proxy.yml
+
+The file `mapping.yml`is optional and only needed if you want to do something linke renaming titles or changing attributes.
+
+Lets start with `config.yml`. An example basic configuration is:
+
+```yaml
+api: {host: 0.0.0.0, port: 8901, web_root: ./web}
+working_dir: ./data
+update_on_boot: true
+```
+
+This configuration starts `m3u-filter`and listens on the 8901 port. The downloaded playlists are stored inside the `data`-folder in the current working directory.
+The property `update_on_boot` is optional and can be helpful in the beginning until you have found a working configuration. I prefer to set it to false.
+
+Now we have to define the sources we want to import. We do this inside `source.yml`
+
+```yaml
+templates:
+- name: ALL_CHAN
+  value: 'Group ~ ".*"'
+sources:
+- inputs:
+    - type: xtream
+      url: 'http://fantastic.provider.xyz:8080'
+      epg_url: 'http://fantastic.provider.xyz:8080/xmltv.php?username=tvjunkie&password=junkie.secret'
+      username: tvjunkie
+      password: junkie.secret
+      options: {xtream_info_cache: true}
+  targets:
+    - name: all_channels
+      output:
+        - type: xtream
+      filter: "!ALL_CHAN!"
+      options: {ignore_logo: false, xtream_skip_live_direct_source: true, xtream_skip_video_direct_source: true}
+      sort:
+        match_as_ascii: true
+        groups:
+          order: asc
+```
+
+What did we do? First, we defined the input source based on the information we received from our provider.
+Then we defined a target that we will create from our source.
+This configuration creates a 1:1 copy (this is probably not what we want, but we discuss the filtering later).
+
+Now we need to define the user access to the created target. We need to define `api-proxy.yml`.
+
+```yaml
+server:
+- name: default
+  protocol: http
+  host: 192.168.1.41
+  http_port: '8901'
+  timezone: Europe/Berlin
+  message: Welcome to m3u-filter
+- name: external
+  protocol: https
+  host: tvjunkie.dyndns.org
+  http_port: '80'
+  https_port: '443'
+  rtmp_port: '1953'
+  timezone: Europe/Berlin
+  message: Welcome to m3u-filter
+user:
+- target: all_channels
+  credentials:
+  - username: xt
+    password: xt.secret
+    proxy: redirect
+    server: default
+  - username: xtext
+    password: xtext.secret
+    proxy: redirect
+    server: external
+```
+We have defined 2 server configurations. The `default` configuration is intended for use in the local network, the IP address is that of the computer on which `m3u-filter` is running. The `external` configuration is optional and is only required for access from outside your local network. External access requires port forwarding on your router and an SSL terminator proxy such as nginx and a dyndns provider configured from your router if you do not have a static IP address (this is outside the scope of this manual).
+
+The next section of the `api-proxy.yml` contains the user definition. We can define users for each `target` from the `source.yml`.
+This means that each `user` can only access one `target` from `source.yml`.  We have named our target `all_channels` in `source.yml` and used this name for the user definition.  We have defined 2 users, one for local access and one for external access.
+We have set the proxy type to `redirect`, which means that the client will be redirected to the original provider URL when opening a stream. If you set the proxy type to `reverse`, the stream will be streamed from the provider through `m3u-filter`. Based on the hardware you are running `m3u-filter` on, you can opt for the proxy type `reverse`. But you should start with `redirect` first until everything works well.
+
+
+To access a xtream api from our IPTV-application we need at least 3 information  the `url`, `username` and `password`.
+All this information are now defined in `api-proxy.yml`.
+- url: `http://192.168.1.41:8901`
+- username: `xt`
+- password: `xt.secret`
+
+Start `m3u-filter`,  fire up your IPTV-Application, enter credentials and watch.
+
+# It works well, but I don't need all the channels, how can I filter?
+
+You need to understand regular expressions to define filters. A good site for learning and testing regular expressions is [regex101.com](https://regex101.com). Don't forget to set FLAVOR on the left side to Rust.
+
+To adjust the filter, you must change the `source.yml` file.
+What we have currently is: (for a better overview I have removed some parts and marked them with ...)
+
+```yaml
+templates:
+- name: ALL_CHAN
+  value: 'Group ~ ".*"'
+sources:
+- inputs:
+    - type: xtream
+      ...
+  targets:
+    - name: all_channels
+      output:
+        - type: xtream
+      filter: "!ALL_CHAN!"
+      ...
+```
+
+We use templates to make the filters easier to maintain and read.
+
+Ok now let's start.
+
+First: We have a lot of channel groups we dont need.
+
+`m3u-filter` excludes or includes groups or channels based on filter. Usable fields for filter are `Group`, `Name` and `Title`.
+The simplest filter is:
+
+`<Field> ~ <Regular Expression>`.  For example  `Group ~ ".*"`. This means include all categories.
+
+Ok, if you only want the Shopping categories, here it is: `Group ~ ".*Shopping.*"`. This includes all categories whose name contains shopping.
+
+Wait, we are missing categories that contain 'shopping'. Regular expressions are case-sensitive. You must explicitly define a case-insensitive regexp. `Group ~ "(?i).*Shopping.*"` will match everything containing Shopping, sHopping, ShOppInG,....
+
+But what if i want to reverse the filter? I dont want a shoppping category. How can I achieve this? Quite simply with `NOT`.
+`NOT(Group ~ "(?i).*Shopping.*")`. Thats it.
+
+
+You can combine Filter with `AND` and `OR` to create more complex filter.
+
+For example:
+'(Group ~ "^FR.*" AND NOT(Group ~ "^FR.*SERIES.*" OR Group ~ "^DE.*EINKAUFEN.*" OR Group ~ "^EN.*RADIO.*" OR Group ~ "^EN.*ANIME.*"))'
+
+As you can see, this can become very complex and unmaintainable. This is where the templates come into play.
+
+We can disassemble the filter into smaller parts and combine them into a more powerfull filter.
+
+```yaml
+templates:
+- name: NO_SHOPPING
+  value: 'NOT(Group ~ "(?i).*Shopping.*" OR Group ~ "(?i).*Einkaufen.*") OR Group ~ "(?i).*téléachat.*"'
+- name: GERMAN_CHANNELS
+  value: 'Group ~ "^DE: .*"'
+- name: FRENCH_CHANNELS
+  value: 'Group ~ "^FR: .*"'
+- name: MY_CHANNELS
+  value: '!NO_SHOOPING! AND (!GERMAN_CHANNELS! OR !FRENCH_CHANNELS!)'
+
+sources:
+- inputs:
+    - type: xtream
+      ...
+  targets:
+    - name: all_channels
+      output:
+        - type: xtream
+      filter: "!MY_CHANNELS!"
+      ...
+```
+
+The resulting playlist contains all French and German channels except Shopping.
+
+Wait, we've only filtered categories, but what if I want to exclude a specific channel?
+No Problem. You can write a filter for your channel using the `Name` or `Title` property.
+`NOT(Title ~ "FR: TV5Monde")`. If you have this channel in different categories, you can alter your filter like:
+`NOT(Group ~ "FR: TF1" AND Title ~ "FR: TV5Monde")`.
+
+```yaml
+templates:
+- name: NO_SHOPPING
+  value: 'NOT(Group ~ "(?i).*Shopping.*" OR Group ~ "(?i).*Einkaufen.*") OR Group ~ "(?i).*téléachat.*"'
+- name: GERMAN_CHANNELS
+  value: 'Group ~ "^DE: .*"'
+- name: FRENCH_CHANNELS
+  value: 'Group ~ "^FR: .*"'
+- name: NO_TV5MONDE_IN_TF1
+  value: 'NOT(Group ~ "FR: TF1" AND Title ~ "FR: TV5Monde")'
+- name: EXCLUDED_CHANNELS
+  value: '!NO_TV5MONDE_IN_TF1! AND !NO_SHOOPING!'
+- name: MY_CHANNELS
+  value: '!EXCLUDED_CHANNELS! AND (!GERMAN_CHANNELS! OR !FRENCH_CHANNELS!)'
+```
 
