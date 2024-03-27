@@ -65,6 +65,9 @@ Top level entries in the config files are:
 * `threads` _optional_
 * `messaging`  _optional_
 * `video` _optional_
+* `schedule` _optional_
+* `backup_dir` _optional_
+* `update_on_boot` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -153,6 +156,11 @@ schedule: "0  0  8,20  *  *  *  *"
 At the given times the complete processing is started. Do not start it every second or minute.
 You could be banned from your server. Twice a day should be enough.
 
+### 1.6 `backup_dir`
+is the directory where the backup configuration files written, when saved from the ui.
+
+### 1.7 `update_on_boot`
+if set to true, an update is started when the application starts.
 
 ## Example config file
 ```yaml

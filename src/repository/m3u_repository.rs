@@ -7,7 +7,7 @@ use log::error;
 use crate::{create_m3u_filter_error_result};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::model_playlist::{PlaylistGroup, PlaylistItemType};
+use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
 use crate::utils::file_utils;
 
 fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error> {

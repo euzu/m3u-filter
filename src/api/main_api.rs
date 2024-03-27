@@ -14,7 +14,8 @@ use crate::api::scheduler::start_scheduler;
 use crate::api::v1_api::{v1_api_register};
 use crate::api::xmltv_api::{xmltv_api_register};
 use crate::api::xtream_api::{xtream_api_register};
-use crate::model::config::{Config,ProcessTargets};
+use crate::model::config::{Config, ProcessTargets};
+use crate::processing::playlist_processor;
 
 #[get("/")]
 async fn index(
@@ -40,8 +41,8 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
     let schedule = cfg.schedule.clone();
 
     let shared_data = web::Data::new(AppState {
-        config: cfg,
-        targets,
+        config: Arc::clone(&cfg),
+        targets: Arc::clone(&targets),
         downloads: Arc::from(DownloadQueue {
             queue: Arc::from(Mutex::new(VecDeque::new())),
             active: Arc::from(RwLock::new(None)),
@@ -56,6 +57,14 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
         actix_rt::spawn(async move {
             start_scheduler(&expression, cloned_data).await
         });
+    }
+
+    if cfg.update_on_boot {
+        let cfg_clone = Arc::clone(&cfg);
+        let targets_clone = Arc::clone(&targets);
+        actix_rt::spawn(
+            async move { playlist_processor::exec_processing(cfg_clone, targets_clone).await }
+        );
     }
 
     // Web Server

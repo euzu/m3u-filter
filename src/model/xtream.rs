@@ -5,8 +5,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::model::model_config::{default_as_empty_rc_str};
-use crate::model::model_playlist::{PlaylistItem};
+use crate::model::config::{default_as_empty_rc_str};
+use crate::model::playlist::{PlaylistItem};
 
 fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
 
@@ -330,4 +330,10 @@ impl XtreamSeriesInfoEpisode {
         add_str_property_if_exists!(result, series_info.info.youtube_trailer, "youtube_trailer");
         if result.is_empty() { None } else { Some(result) }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct MultiXtreamMapping {
+    pub stream_id: u32,
+    pub input_id: u16,
 }

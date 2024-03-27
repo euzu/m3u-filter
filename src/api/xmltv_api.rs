@@ -7,7 +7,7 @@ use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::api_proxy::ProxyType;
 use crate::model::config::{Config, ConfigTarget, InputType};
-use crate::model::model_config::TargetType;
+use crate::model::config::TargetType;
 use crate::repository::m3u_repository::get_m3u_epg_file_path;
 use crate::repository::xtream_repository::{get_xtream_epg_file_path, get_xtream_storage_path};
 use crate::utils::{file_utils, request_utils};

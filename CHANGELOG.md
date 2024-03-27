@@ -1,4 +1,11 @@
 # Changelog
+# v1.1.9(2024-03-xx)
+* `update_on_boot` for config, default is false, if true an update is run on start
+* `category_id` filter added to xtream api
+* Handling for m3u files without id and group information
+* Added `panel_api.php`  endpoint for xtream
+* Case insensitive filter syntax
+* Added docker files
 
 # v1.1.8(2024-03-06)
 * Fixed WebUI Option-Select  

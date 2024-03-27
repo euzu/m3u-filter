@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use unidecode::unidecode;
 use crate::model::api_proxy::{ApiProxyConfig};
 use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig, ConfigApi, MessagingConfig};
-use crate::model::model_config::{default_as_empty_str, ProcessingOrder};
+use crate::model::config::{default_as_empty_str, ProcessingOrder};
 
 /// File-Download information.
 #[derive(Clone)]

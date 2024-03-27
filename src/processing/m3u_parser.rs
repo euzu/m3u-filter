@@ -2,8 +2,8 @@ use std::borrow::{BorrowMut};
 use std::cell::RefCell;
 use std::rc::Rc;
 use crate::model::config::Config;
-use crate::model::model_config::default_as_empty_rc_str;
-use crate::model::model_playlist::{default_playlist_item_type, default_stream_cluster, PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::model::config::default_as_empty_rc_str;
+use crate::model::playlist::{default_playlist_item_type, default_stream_cluster, PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::utils::string_utils;
 
 fn token_value(it: &mut std::str::Chars) -> String {

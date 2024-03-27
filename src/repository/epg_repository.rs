@@ -5,7 +5,7 @@ use log::{debug, log_enabled, Level};
 use quick_xml::{Writer};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
-use crate::model::model_config::TargetType;
+use crate::model::config::TargetType;
 use crate::model::xmltv::{Epg};
 use crate::repository::m3u_repository::{get_m3u_epg_file_path};
 use crate::repository::xtream_repository::{get_xtream_epg_file_path, get_xtream_storage_path};

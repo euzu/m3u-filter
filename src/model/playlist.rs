@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
-use crate::model::model_config::{default_as_false};
+use crate::model::config::{default_as_false};
 use crate::model::xmltv::TVGuide;
 
 // https://de.wikipedia.org/wiki/M3U

@@ -4,7 +4,7 @@ use std::thread::sleep;
 use log::debug;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput};
-use crate::model::model_playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
+use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::model::xmltv::TVGuide;
 use crate::processing::{m3u_parser, xmltv_parser, xtream_parser};
 use crate::processing::xtream_parser::parse_xtream_series_info;

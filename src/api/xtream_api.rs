@@ -13,8 +13,8 @@ use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, ser
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::model::api_proxy::{ProxyType, UserCredentials};
 use crate::model::config::{Config, ConfigInput, InputType};
-use crate::model::model_config::{TargetType};
-use crate::model::model_playlist::XtreamCluster;
+use crate::model::config::{TargetType};
+use crate::model::playlist::XtreamCluster;
 use crate::repository::xtream_repository;
 use crate::utils::{json_utils, request_utils};
 

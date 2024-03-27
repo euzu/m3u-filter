@@ -9,7 +9,7 @@ use log::{error};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
-use crate::model::model_playlist::{PlaylistGroup, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::model::playlist::{PlaylistGroup, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::{create_m3u_filter_error_result};
 use crate::api::api_model::AppState;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};

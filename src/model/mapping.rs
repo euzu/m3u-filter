@@ -8,9 +8,9 @@ use regex::Regex;
 use crate::{handle_m3u_filter_error_result, valid_property};
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::model_config::{AFFIX_FIELDS, default_as_empty_map, default_as_empty_str,
-                                 default_as_false, ItemField, MAPPER_ATTRIBUTE_FIELDS, };
-use crate::model::model_playlist::{FieldAccessor, PlaylistItem};
+use crate::model::config::{AFFIX_FIELDS, default_as_empty_map, default_as_empty_str,
+                           default_as_false, ItemField, MAPPER_ATTRIBUTE_FIELDS, };
+use crate::model::playlist::{FieldAccessor, PlaylistItem};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MappingTag {

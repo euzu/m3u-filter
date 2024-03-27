@@ -8,9 +8,9 @@ use crate::{create_m3u_filter_error_result};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
 
-use crate::model::model_config::{default_as_empty_rc_str};
-use crate::model::model_playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
-use crate::model::model_xtream::{XtreamCategory, XtreamSeriesInfo, XtreamStream};
+use crate::model::config::{default_as_empty_rc_str};
+use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::model::xtream::{XtreamCategory, XtreamSeriesInfo, XtreamStream};
 
 fn process_category(category: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(category.to_owned()) {
