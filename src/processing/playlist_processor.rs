@@ -255,10 +255,12 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
                     _ => {
                         let new_group_id = if group_id_used {
                             0
+                        } else if *title == playlist_group.title {
+                                group_id_used = true;
+                                max_group_id = max_group_id.max(playlist_group.id);
+                                playlist_group.id
                         } else {
-                            group_id_used = true;
-                            max_group_id = max_group_id.max(playlist_group.id);
-                            playlist_group.id
+                            0
                         };
                         new_groups.push(PlaylistGroup {
                             id: new_group_id,
