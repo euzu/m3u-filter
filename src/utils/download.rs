@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::thread::sleep;
-use log::debug;
+use log::{debug, info};
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
@@ -97,6 +97,9 @@ fn get_skip_cluster(input: &&ConfigInput) -> Vec<XtreamCluster> {
         if input_options.xtream_skip_series {
             skip_cluster.push(XtreamCluster::Series)
         }
+    }
+    if skip_cluster.len() == 3 {
+        info!("You have skipped all sections from xtream input {}", input.name.as_ref().unwrap_or(&input.id.to_string()));
     }
     skip_cluster
 }
