@@ -214,6 +214,10 @@ Each input has the following attributes:
 - `suffix` is optional, it is applied to the given field with the given value
 - `options` is optional,
     + `xtream_info_cache` true or false, vod_info and series_info can be cached to disc to reduce network traffic to provider.
+    + `xtream_skip_live` true or false, live section can be skipped.
+    + `xtream_skip_vod` true or false, vod section can be skipped. 
+    + `xtream_skip_series` true or false, series section can be skipped.
+
 
 `persist` should be different for `m3u` and `xtream` types. For `m3u` use full filename like `./playlist_{}.m3u`.
 For `xtream` use a prefix like `./playlist_`
@@ -687,7 +691,8 @@ The configuration contains the server info for xtream accounts and user definiti
 You can define multiple server with unique names, one should be named `default`.
 
 Iptv player can act differently and use the direct-source attribute or can compose the url based on the server info.
-You should set `xtream_skip_live_direct_source` and `xtream_skip_video_direct_source` to `true` to avoid this problem.
+The two options `xtream_skip_live_direct_source` and `xtream_skip_video_direct_source` are default `true` to avoid this problem. 
+You can set them fo `false`to keep the direct-source attribute.
 
 `username` and `password`are mandatory for credentials. `username` is unique.
 The `token` is _optional_. If defined it should be unique. The `token`can be used
@@ -1014,7 +1019,7 @@ But what if i want to reverse the filter? I dont want a shoppping category. How 
 You can combine Filter with `AND` and `OR` to create more complex filter.
 
 For example:
-'(Group ~ "^FR.*" AND NOT(Group ~ "^FR.*SERIES.*" OR Group ~ "^DE.*EINKAUFEN.*" OR Group ~ "^EN.*RADIO.*" OR Group ~ "^EN.*ANIME.*"))'
+`(Group ~ "^FR.*" AND NOT(Group ~ "^FR.*SERIES.*" OR Group ~ "^DE.*EINKAUFEN.*" OR Group ~ "^EN.*RADIO.*" OR Group ~ "^EN.*ANIME.*"))`
 
 As you can see, this can become very complex and unmaintainable. This is where the templates come into play.
 

@@ -7,6 +7,9 @@
 * Case insensitive filter syntax
 * Updated docker files
 * Xtream category_id fixes, to avoid category_id change when title not changes.
+* `xtream_skip_live_direct_source` and `xtream_skip_video_direct_source` are now default true
+* Added new options to input configuration. `xtream_skip_live`, `xtream_skip_vod`, `xtream_skip_series`
+
 
 # v1.1.8(2024-03-06)
 * Fixed WebUI Option-Select  

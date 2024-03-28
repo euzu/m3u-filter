@@ -21,6 +21,8 @@ sources:
         url: 'http://localhost:8080'
         username: test
         password: test
+        select:
+          -
     targets:
       - name: pl1
         filename: playlist_1.m3u

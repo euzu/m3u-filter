@@ -85,6 +85,22 @@ pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>
     result
 }
 
+fn get_skip_cluster(input: &&ConfigInput) -> Vec<XtreamCluster> {
+    let mut skip_cluster = vec![];
+    if let Some(input_options) = &input.options {
+        if input_options.xtream_skip_live {
+            skip_cluster.push(XtreamCluster::Live)
+        }
+        if input_options.xtream_skip_vod {
+            skip_cluster.push(XtreamCluster::Video)
+        }
+        if input_options.xtream_skip_series {
+            skip_cluster.push(XtreamCluster::Series)
+        }
+    }
+    skip_cluster
+}
+
 const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Live, "get_live_categories", "get_live_streams"),
     (XtreamCluster::Video, "get_vod_categories", "get_vod_streams"),
@@ -96,33 +112,37 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
     let password = input.password.as_ref().map_or("", |v| v);
     let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);
 
+    let skip_cluster = get_skip_cluster(&input);
+
     let mut errors = vec![];
     for (xtream_cluster, category, stream) in &ACTIONS {
-        let category_url = format!("{}&action={}", base_url, category);
-        let stream_url = format!("{}&action={}", base_url, stream);
-        let category_file_path = prepare_file_path(input, working_dir, format!("{}_", category).as_str());
-        let stream_file_path = prepare_file_path(input, working_dir, format!("{}_", stream).as_str());
+        if !skip_cluster.contains(xtream_cluster) {
+            let category_url = format!("{}&action={}", base_url, category);
+            let stream_url = format!("{}&action={}", base_url, stream);
+            let category_file_path = prepare_file_path(input, working_dir, format!("{}_", category).as_str());
+            let stream_file_path = prepare_file_path(input, working_dir, format!("{}_", stream).as_str());
 
-        match request_utils::get_input_json_content(input, category_url.as_str(), category_file_path).await {
-            Ok(category_content) => {
-                match request_utils::get_input_json_content(input, stream_url.as_str(), stream_file_path).await {
-                    Ok(stream_content) => {
-                        match xtream_parser::parse_xtream(input,
-                                                          xtream_cluster,
-                                                          &category_content,
-                                                          &stream_content) {
-                            Ok(sub_playlist_opt) => {
-                                if let Some(mut sub_playlist) = sub_playlist_opt {
-                                    sub_playlist.drain(..).for_each(|group| playlist.push(group));
+            match request_utils::get_input_json_content(input, category_url.as_str(), category_file_path).await {
+                Ok(category_content) => {
+                    match request_utils::get_input_json_content(input, stream_url.as_str(), stream_file_path).await {
+                        Ok(stream_content) => {
+                            match xtream_parser::parse_xtream(input,
+                                                              xtream_cluster,
+                                                              &category_content,
+                                                              &stream_content) {
+                                Ok(sub_playlist_opt) => {
+                                    if let Some(mut sub_playlist) = sub_playlist_opt {
+                                        sub_playlist.drain(..).for_each(|group| playlist.push(group));
+                                    }
                                 }
+                                Err(err) => errors.push(err)
                             }
-                            Err(err) => errors.push(err)
                         }
+                        Err(err) => errors.push(err)
                     }
-                    Err(err) => errors.push(err)
                 }
+                Err(err) => errors.push(err)
             }
-            Err(err) => errors.push(err)
         }
     }
     (playlist, errors)

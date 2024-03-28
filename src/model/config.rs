@@ -272,9 +272,9 @@ pub(crate) struct ConfigTargetOptions {
     pub cleanup: bool,
     #[serde(default = "default_as_false")]
     pub kodi_style: bool,
-    #[serde(default = "default_as_false")]
+    #[serde(default = "default_as_true")]
     pub xtream_skip_live_direct_source: bool,
-    #[serde(default = "default_as_false")]
+    #[serde(default = "default_as_true")]
     pub xtream_skip_video_direct_source: bool,
     #[serde(default = "default_as_false")]
     pub xtream_resolve_series: bool,
@@ -481,6 +481,12 @@ impl FromStr for InputType {
 pub(crate) struct ConfigInputOptions {
     #[serde(default = "default_as_false")]
     pub xtream_info_cache: bool,
+    #[serde(default = "default_as_false")]
+    pub xtream_skip_live: bool,
+    #[serde(default = "default_as_false")]
+    pub xtream_skip_vod: bool,
+    #[serde(default = "default_as_false")]
+    pub xtream_skip_series: bool,
 }
 
 
