@@ -35,7 +35,6 @@ macro_rules! valid_property {
     }};
 }
 
-
 pub(crate) fn default_as_true() -> bool { true }
 
 pub(crate) fn default_as_false() -> bool { false }
@@ -425,6 +424,7 @@ pub(crate) struct ConfigSource {
 impl ConfigSource {
     pub(crate) fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
+        self._multi_xtream_input = self.inputs.iter().filter(|i| i.input_type == InputType::Xtream).count() > 1;
         Ok(index + (self.inputs.len() as u16))
     }
 
@@ -740,7 +740,7 @@ impl Config {
         None
     }
 
-    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {
+    pub(crate) fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {
         match self._api_proxy.read().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name(username, password))
@@ -749,7 +749,7 @@ impl Config {
         }
     }
 
-    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(UserCredentials, &ConfigTarget)> {
+    pub(crate) fn get_target_for_user_by_token(&self, token: &str) -> Option<(UserCredentials, &ConfigTarget)> {
         match self._api_proxy.read().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name_by_token(token))
@@ -758,7 +758,7 @@ impl Config {
         }
     }
 
-    pub fn get_input_by_id(&self, input_id: &u16) -> Option<ConfigInput> {
+    pub(crate) fn get_input_by_id(&self, input_id: &u16) -> Option<ConfigInput> {
         for source in &self.sources {
             for input in &source.inputs {
                 if input.id == *input_id {
@@ -769,7 +769,18 @@ impl Config {
         None
     }
 
-    pub fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError> {
+    pub(crate) fn is_multi_xtream_input(&self, target_name: &str) -> bool {
+        for source in &self.sources {
+            for target in &source.targets {
+                if target_name.eq_ignore_ascii_case(&target.name) {
+                    return source._multi_xtream_input;
+                }
+            }
+        }
+        false
+    }
+
+    pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError> {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
                 for target in &mut source.targets {
@@ -789,7 +800,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub(crate) fn prepare(&mut self) -> Result<(), M3uFilterError> {
         self.working_dir = file_utils::get_working_path(&self.working_dir);
         if self.backup_dir.is_none() {
             self.backup_dir = Some(PathBuf::from(&self.working_dir).join(".backup").into_os_string().to_string_lossy().to_string());

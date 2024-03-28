@@ -143,7 +143,7 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                     Ok(Some(group_map.values().map(|category| {
                         let cat = category.borrow();
                         PlaylistGroup {
-                            id: 0,
+                            id: cat.category_id.parse::<u32>().unwrap_or(0),
                             xtream_cluster: xtream_cluster.clone(),
                             title: Rc::clone(&cat.category_name),
                             channels: cat.channels.clone()

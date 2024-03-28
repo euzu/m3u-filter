@@ -13,7 +13,7 @@ use crate::model::playlist::{PlaylistGroup, PlaylistItemHeader, PlaylistItemType
 use crate::{create_m3u_filter_error_result};
 use crate::api::api_model::AppState;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::model_xtream::MultiXtreamMapping;
+use crate::model::xtream::MultiXtreamMapping;
 use crate::utils::file_utils;
 use crate::utils::json_utils::iter_json_array;
 
@@ -450,19 +450,25 @@ fn get_id_mapping_path(path: &Path) -> PathBuf {
     path.join("id_mapping.db")
 }
 
-pub(crate) fn write_xtream_mapping(mappings: &[MultiXtreamMapping], config: &Config, target_name: &str) -> io::Result<()> {
+pub(crate) fn write_xtream_mapping(mappings: &[MultiXtreamMapping], config: &Config, target_name: &str) -> Result<(), M3uFilterError>  {
     if let Some(path) = get_xtream_storage_path(config, target_name) {
-        let mut file = File::create(get_id_mapping_path(&path))?;
+        if fs::create_dir_all(&path).is_err() {
+            let msg = format!("Failed to save, can't create directory {}", &path.to_str().unwrap());
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg));
+        }
+
+        let err_map = |e: Error| M3uFilterError::new(M3uFilterErrorKind::Notify, e.to_string());
+        let mut file = File::create(get_id_mapping_path(&path)).map_err(err_map)?;
         // We assume the mappings list is created with a counter as id
         // and id 1 means the 0 index. We write all the data and can calculate the offset inside the
         // file by  (u32 size + u16 size) * index.
         for mapping in mappings {
-            file.write_all(&mapping.stream_id.to_le_bytes())?;
-            file.write_all(&mapping.input_id.to_le_bytes())?;
+            file.write_all(&mapping.stream_id.to_le_bytes()).map_err(err_map)?;
+            file.write_all(&mapping.input_id.to_le_bytes()).map_err(err_map)?;
         };
         return Ok(());
     }
-    Err(io::Error::new(ErrorKind::Other, format!("Failed to find the xtream storage path for {}", target_name)))
+    Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to find the xtream storage path for {}", target_name)))
 }
 
 pub(crate) fn read_xtream_mapping(id: u32, config: &Config, target_name: &str) -> io::Result<Option<MultiXtreamMapping>> {

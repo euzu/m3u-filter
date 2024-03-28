@@ -4,6 +4,36 @@ use actix_web::{HttpRequest, HttpResponse, web};
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::api_proxy::{UserCredentials};
 use crate::model::config::{ConfigTarget};
+use url::Url;
+
+pub (crate) struct M3uUrlInfo {
+    pub base_url: String,
+    pub username: String,
+    pub password: String,
+}
+
+pub (crate) fn parse_m3u_url(url: &str) -> Option<M3uUrlInfo> {
+    if let Ok(url) = Url::parse(url) {
+        let base_url = url.origin().ascii_serialization();
+        let mut username = None;
+        let mut password = None;
+        for (key, value) in url.query_pairs() {
+            if key.eq("username") {
+                username = Some(value.into_owned());
+            } else if key.eq("password") {
+                password = Some(value.into_owned());
+            }
+        }
+        if username.is_some() || password.is_some() {
+            return Some(M3uUrlInfo {
+                base_url,
+                username: username.as_ref().unwrap().to_owned(),
+                password: username.as_ref().unwrap().to_owned(),
+            });
+        }
+    }
+    None
+}
 
 pub(crate) async fn serve_file(file_path: &Path, req: &HttpRequest) -> HttpResponse {
     if file_path.exists() {

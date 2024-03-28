@@ -11,41 +11,13 @@ use url::Url;
 
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
+use crate::api::api_utils;
 use crate::model::api_proxy::{ProxyType, UserCredentials};
 use crate::model::config::{Config, ConfigInput, InputType};
 use crate::model::config::{TargetType};
 use crate::model::playlist::XtreamCluster;
 use crate::repository::xtream_repository;
 use crate::utils::{json_utils, request_utils};
-
-struct M3uUrlInfo {
-    pub base_url: String,
-    pub username: String,
-    pub password: String,
-}
-
-fn parse_m3u_url(url: &str) -> Option<M3uUrlInfo> {
-    if let Ok(url) = Url::parse(url) {
-        let base_url = url.origin().ascii_serialization();
-        let mut username = None;
-        let mut password = None;
-        for (key, value) in url.query_pairs() {
-            if key.eq("username") {
-                username = Some(value.into_owned());
-            } else if key.eq("password") {
-                password = Some(value.into_owned());
-            }
-        }
-        if username.is_some() || password.is_some() {
-            return Some(M3uUrlInfo {
-                base_url,
-                username: username.as_ref().unwrap().to_owned(),
-                password: username.as_ref().unwrap().to_owned(),
-            });
-        }
-    }
-    None
-}
 
 pub(crate) async fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
     let filtered = json_utils::filter_json_file(file_path, filter);
@@ -55,7 +27,7 @@ pub(crate) async fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) 
 fn get_xtream_player_api_action_url(input: &ConfigInput, action: &str) -> Option<String> {
     match input.input_type {
         InputType::M3u => {
-            match parse_m3u_url(input.url.as_str()) {
+            match api_utils::parse_m3u_url(input.url.as_str()) {
                 None => None,
                 Some(m3u_url_info) => Some(
                     format!("{}/player_api.php?username={}&password={}&action={}",
@@ -89,7 +61,7 @@ fn get_xtream_player_api_info_url(input: &ConfigInput, cluster: &XtreamCluster, 
 fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_path: &str) -> Option<String> {
     let ctx_path = if context.is_empty() { "".to_string() } else { format!("{}/", context) };
     match input.input_type {
-        InputType::M3u => match parse_m3u_url(input.url.as_str()) {
+        InputType::M3u => match api_utils::parse_m3u_url(input.url.as_str()) {
             None => None,
             Some(m3u_url_info) => Some(
                 format!("{}/{}{}/{}/{}",
@@ -174,7 +146,6 @@ async fn xtream_player_api_stream(
         if target.has_output(&TargetType::Xtream) {
             let mut stream_id = action_path.to_owned();
             let mut input: Option<&ConfigInput> = None;
-
             let (action_stream_id, action_ext) = separate_number_and_rest(action_path);
             if let Ok(num) = action_stream_id.trim().parse() {
                 let (xtream_id, cfg_input) = get_xtream_mapped_id_and_input_for_stream_id(_app_state, target_name, num);
@@ -300,13 +271,11 @@ fn get_xtream_mapped_id_and_input_for_stream_id<'a>(app_state: &'a AppState, tar
     (stream_id, None)
 }
 
-// TODO use u32 or i32 ??
 async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_id: i32,
                                 cluster: &XtreamCluster) -> Result<String, Error> {
-
     let (xtream_id, input) = get_xtream_mapped_id_and_input_for_stream_id(app_state, target_name, stream_id);
     if let Some(target_input) = input {
-        if let Ok(content) = xtream_repository::xtream_get_stored_stream_info(app_state, target_name, xtream_id, cluster, target_input).await {
+        if let Ok(content) = xtream_repository::xtream_get_stored_stream_info(app_state, target_name, stream_id, cluster, target_input).await {
             return Ok(content);
         }
 
@@ -341,7 +310,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCreden
         Err(_) => return HttpResponse::BadRequest().finish()
     };
 
-    if user.proxy == ProxyType::Redirect {
+    if user.proxy == ProxyType::Redirect  && !app_state.config.is_multi_xtream_input(target_name) {
         let (xtream_id, input) = get_xtream_mapped_id_and_input_for_stream_id(app_state, target_name, xtream_stream_id);
         if let Some(target_input) = input {
             if let Some(info_url) = get_xtream_player_api_info_url(target_input, cluster, xtream_id) {

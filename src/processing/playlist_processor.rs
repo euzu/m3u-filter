@@ -244,39 +244,26 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
 
         // if the group names are changed, restructure channels to the right groups
         // we use
-        let mut max_group_id = 0;
         let mut new_groups: Vec<PlaylistGroup> = Vec::new();
+        let mut grp_id: u32 = 0;
         for playlist_group in new_playlist {
-            let mut group_id_used = false;
             for channel in &playlist_group.channels {
                 let cluster = &channel.header.borrow().xtream_cluster;
                 let title = &channel.header.borrow().group;
                 match new_groups.iter_mut().find(|x| *x.title == **title) {
                     Some(grp) => grp.channels.push(channel.clone()),
                     _ => {
-                        let new_group_id = if group_id_used {
-                            0
-                        } else if *title == playlist_group.title {
-                                group_id_used = true;
-                                max_group_id = max_group_id.max(playlist_group.id);
-                                playlist_group.id
-                        } else {
-                            0
-                        };
+                        grp_id += 1;
                         new_groups.push(PlaylistGroup {
-                            id: new_group_id,
+                            id: grp_id,
                             title: Rc::clone(title),
                             channels: vec![channel.clone()],
-                            xtream_cluster: cluster.clone(),
+                            xtream_cluster: cluster.clone()
                         })
                     }
                 }
             }
         }
-        new_groups.iter_mut().filter(|g| g.id == 0).for_each(|grp| {
-            max_group_id += 1;
-            grp.id = max_group_id;
-        });
         Some(new_groups)
     } else {
         None
