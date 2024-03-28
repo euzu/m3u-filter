@@ -1,3 +1,5 @@
 target/
 bin/
 docker/
+frontend/node_modules/
+frontend/build/
