@@ -7,7 +7,7 @@ use std::str::FromStr;
 use actix_web::{HttpRequest, HttpResponse, web, Resource};
 use chrono::{Duration, Local};
 use log::{debug, error};
-use url::{Url};
+use url::Url;
 
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
@@ -18,6 +18,35 @@ use crate::model::playlist::XtreamCluster;
 use crate::repository::xtream_repository;
 use crate::utils::{json_utils, request_utils};
 
+struct M3uUrlInfo {
+    pub base_url: String,
+    pub username: String,
+    pub password: String,
+}
+
+fn parse_m3u_url(url: &str) -> Option<M3uUrlInfo> {
+    if let Ok(url) = Url::parse(url) {
+        let base_url = url.origin().ascii_serialization();
+        let mut username = None;
+        let mut password = None;
+        for (key, value) in url.query_pairs() {
+            if key.eq("username") {
+                username = Some(value.into_owned());
+            } else if key.eq("password") {
+                password = Some(value.into_owned());
+            }
+        }
+        if username.is_some() || password.is_some() {
+            return Some(M3uUrlInfo {
+                base_url,
+                username: username.as_ref().unwrap().to_owned(),
+                password: username.as_ref().unwrap().to_owned(),
+            });
+        }
+    }
+    None
+}
+
 pub(crate) async fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
     let filtered = json_utils::filter_json_file(file_path, filter);
     HttpResponse::Ok().json(filtered)
@@ -25,7 +54,18 @@ pub(crate) async fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) 
 
 fn get_xtream_player_api_action_url(input: &ConfigInput, action: &str) -> Option<String> {
     match input.input_type {
-        InputType::M3u => None,
+        InputType::M3u => {
+            match parse_m3u_url(input.url.as_str()) {
+                None => None,
+                Some(m3u_url_info) => Some(
+                    format!("{}/player_api.php?username={}&password={}&action={}",
+                            m3u_url_info.base_url,
+                            m3u_url_info.username,
+                            m3u_url_info.password,
+                            action
+                    ))
+            }
+        }
         InputType::Xtream => Some(
             format!("{}/player_api.php?username={}&password={}&action={}",
                     input.url.as_str(),
@@ -49,7 +89,17 @@ fn get_xtream_player_api_info_url(input: &ConfigInput, cluster: &XtreamCluster, 
 fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_path: &str) -> Option<String> {
     let ctx_path = if context.is_empty() { "".to_string() } else { format!("{}/", context) };
     match input.input_type {
-        InputType::M3u => None,
+        InputType::M3u => match parse_m3u_url(input.url.as_str()) {
+            None => None,
+            Some(m3u_url_info) => Some(
+                format!("{}/{}{}/{}/{}",
+                        m3u_url_info.base_url,
+                        ctx_path,
+                        m3u_url_info.username,
+                        m3u_url_info.password,
+                        action_path
+                ))
+        }
         InputType::Xtream => Some(format!("{}/{}{}/{}/{}",
                                           input.url.as_str(),
                                           ctx_path,
