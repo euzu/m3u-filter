@@ -14,6 +14,7 @@ use crate::{create_m3u_filter_error_result};
 use crate::api::api_model::AppState;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::utils::file_utils;
+use crate::utils::json_utils::iter_json_array;
 
 type IndexTree = BTreeMap<i32, (u32, u16)>;
 
@@ -113,7 +114,7 @@ fn write_xtream_info(app_state: &AppState, target_name: &str, stream_id: i32, cl
     Ok(())
 }
 
-pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
     if let Some(path) = get_xtream_storage_path(cfg, &target.name) {
         if fs::create_dir_all(&path).is_err() {
             let msg = format!("Failed to save, can't create directory {}", &path.to_str().unwrap());
@@ -135,15 +136,25 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
 
         let mut channel_num: i32 = 0;
         let mut errors = Vec::new();
-        for plg in playlist {
+
+        // preserve category_ids
+        let (max_cat_id, existing_cat_ids) = load_old_category_ids(&path);
+        let mut cat_id_counter = max_cat_id;
+        for plg in playlist.iter_mut() {
             if !&plg.channels.is_empty() {
+                let cat_id = existing_cat_ids.get(plg.title.as_ref()).unwrap_or_else(|| {
+                    cat_id_counter += 1;
+                    &cat_id_counter
+                });
+                plg.id = *cat_id;
+
                 match &plg.xtream_cluster {
                     XtreamCluster::Live => &mut cat_live_col,
                     XtreamCluster::Series => &mut cat_series_col,
                     XtreamCluster::Video => &mut cat_vod_col,
                 }.push(
                     json!({
-                    "category_id": format!("{}", &plg.id),
+                    "category_id": format!("{}", &cat_id),
                     "category_name": plg.title.clone(),
                     "parent_id": 0
                 }));
@@ -157,8 +168,8 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                         }
                         channel_num += 1;
                         let mut document = serde_json::Map::from_iter([
-                            ("category_id".to_string(), Value::String(format!("{}", &plg.id))),
-                            ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(plg.id.to_owned()))]))),
+                            ("category_id".to_string(), Value::String(format!("{}", &cat_id))),
+                            ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(cat_id.to_owned()))]))),
                             ("name".to_string(), Value::String(header.name.as_ref().clone())),
                             ("num".to_string(), Value::Number(serde_json::Number::from(channel_num))),
                             ("title".to_string(), Value::String(header.title.as_ref().clone())),
@@ -259,6 +270,38 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
     }
 
     Ok(())
+}
+
+fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
+    let mut result: HashMap<String, u32> = HashMap::new();
+    let mut max_id: u32 = 0;
+    for col_path in [
+        get_collection_path(path, COL_CAT_LIVE),
+        get_collection_path(path, COL_CAT_VOD),
+        get_collection_path(path, COL_CAT_SERIES)] {
+        if col_path.exists() {
+            if let Ok(file) = File::open(col_path) {
+                let reader = BufReader::new(file);
+                for entry in iter_json_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
+                    if let Some(item) = entry.as_object() {
+                        if let Some(category_id_value) = item.get("category_id") {
+                            if let Some(category_id) = category_id_value.as_str() {
+                                if let Some(category_name_value) = item.get("category_name") {
+                                    if let Some(category_name) = category_name_value.as_str() {
+                                        if let Ok(cat_id) = category_id.to_string().parse::<u32>() {
+                                            result.insert(category_name.to_string(), cat_id);
+                                            max_id = max_id.max(cat_id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    (max_id, result)
 }
 
 fn append_prepared_series_properties(header: &Ref<PlaylistItemHeader>, document: &mut Map<String, Value>) {

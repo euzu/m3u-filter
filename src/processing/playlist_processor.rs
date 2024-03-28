@@ -530,14 +530,14 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
             }
         }
 
-        persist_playlist(&new_playlist, flatten_tvguide(&new_epg), target, cfg)
+        persist_playlist(&mut new_playlist, flatten_tvguide(&new_epg), target, cfg)
     } else {
         info!("Playlist is empty: {}", &target.name);
         Ok(())
     }
 }
 
-fn persist_playlist(playlist: &[PlaylistGroup], epg: Option<Epg>,
+fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<Epg>,
                     target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
     for output in &target.output {

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::path::PathBuf;
 use std::thread::sleep;
 use log::{debug, info};
@@ -148,9 +149,14 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
             }
         }
     }
+    playlist.sort_by(|a, b| a.title.partial_cmp(&b.title).unwrap_or(Ordering::Greater));
+    let mut counter = 1;
+    playlist.iter_mut().for_each(|plg| {
+        plg.id = counter;
+        counter += 1;
+    });
     (playlist, errors)
 }
-
 
 pub(crate) async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Option<TVGuide>, Vec<M3uFilterError>) {
     match &input.epg_url {
