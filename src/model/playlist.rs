@@ -68,6 +68,7 @@ pub(crate) trait FieldAccessor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistItemHeader {
     pub id: Rc<String>,
+    pub stream_id: Rc<String>,
     pub name: Rc<String>,
     pub logo: Rc<String>,
     pub logo_small: Rc<String>,
@@ -86,7 +87,7 @@ pub(crate) struct PlaylistItemHeader {
     #[serde(skip_serializing, skip_deserializing)]
     pub additional_properties: Option<Vec<(String, Value)>>,
     #[serde(default = "default_playlist_item_type", skip_serializing, skip_deserializing)]
-    pub item_type:  PlaylistItemType,
+    pub item_type: PlaylistItemType,
     #[serde(default = "default_as_false", skip_serializing, skip_deserializing)]
     pub series_fetched: bool, // only used for series_info
 }
@@ -118,12 +119,12 @@ macro_rules! get_fields {
 
 impl FieldAccessor for PlaylistItemHeader {
     fn get_field(&self, field: &str) -> Option<Rc<String>> {
-        get_fields!(self, field, id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url;)
+        get_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url;)
     }
 
     fn set_field(&mut self, field: &str, value: &str) -> bool {
         let val = String::from(value);
-        update_fields!(self, field, id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url; val)
+        update_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url; val)
     }
 }
 

@@ -418,6 +418,8 @@ impl ConfigTarget {
 pub(crate) struct ConfigSource {
     pub inputs: Vec<ConfigInput>,
     pub targets: Vec<ConfigTarget>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _multi_xtream_input: bool,
 }
 
 impl ConfigSource {
@@ -426,14 +428,16 @@ impl ConfigSource {
         Ok(index + (self.inputs.len() as u16))
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
+    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<Vec<&ConfigInput>> {
+        let mut result = Vec::new();
         for target in &self.targets {
             if target.name.eq(target_name) {
                 for input in &self.inputs {
-                    if input.input_type.eq(input_type) {
-                        return Some(input);
+                    if input.enabled && input.input_type.eq(input_type) {
+                        result.push(input);
                     }
                 }
+                return Some(result);
             }
         }
         None
@@ -627,7 +631,7 @@ impl VideoConfig {
             Some(downl) => {
                 if downl.headers.is_empty() {
                     downl.headers.borrow_mut().insert("Accept".to_string(), "video/*".to_string());
-                    downl.headers.borrow_mut().insert("User-Agent".to_string(), "AppleTV/tvOS/9.1.1.".to_string());
+                    downl.headers.borrow_mut().insert("User-Agent".to_string(), "Apple TV; tvOS 13.3.1".to_string());
                 }
 
                 if let Some(episode_pattern) = &downl.episode_pattern {
@@ -727,9 +731,11 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
+    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<Vec<&ConfigInput>> {
         for source in &self.sources {
-            if let Some(cfg) = source.get_input_for_target(target_name, input_type) { return Some(cfg); }
+            if let Some(cfg) = source.get_input_for_target(target_name, input_type) {
+                return Some(cfg);
+            }
         }
         None
     }

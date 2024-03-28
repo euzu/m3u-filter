@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::filter::get_filter;
+    use crate::model::model_xtream::MultiXtreamMapping;
+    use crate::repository::xtream_repository::{read_xtream_mapping, write_xtream_mapping};
 
     #[test]
     fn test_filter() {

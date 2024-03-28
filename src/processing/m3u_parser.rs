@@ -56,6 +56,7 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
 fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistItemHeader {
     PlaylistItemHeader {
         id: default_as_empty_rc_str(),
+        stream_id: default_as_empty_rc_str(),
         name: default_as_empty_rc_str(),
         logo: default_as_empty_rc_str(),
         logo_small: default_as_empty_rc_str(),
@@ -122,6 +123,7 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
                 plih.id = Rc::new(chanid);
             }
         }
+        plih.stream_id = Rc::clone(&plih.id);
         plih.epg_channel_id = Some(Rc::clone(&plih.id));
     }
 

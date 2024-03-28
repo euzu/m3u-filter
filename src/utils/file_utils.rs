@@ -73,6 +73,7 @@ pub(crate) fn get_working_path(wd: &String) -> String {
         String::from(current_dir.to_str().unwrap_or("."))
     } else {
         let work_path = std::path::PathBuf::from(wd);
+        let _ = fs::create_dir_all(&work_path);
         let wdpath = match fs::metadata(&work_path) {
             Ok(md) => {
                 if md.is_dir() && !md.permissions().readonly() {

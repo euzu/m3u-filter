@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{thread};
 use actix_rt::System;
 
 use log::{debug, error, info, Level, log_enabled};
@@ -14,17 +14,18 @@ use crate::{Config, get_errors_notify_message, model::config, valid_property};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{MsgKind, send_message};
-use crate::model::config::{ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
+use crate::model::config::{ConfigSource, ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::model::config::{AFFIX_FIELDS, ItemField, ProcessingOrder, SortOrder::{Asc, Desc}, TargetType};
 use crate::model::playlist::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
 use crate::model::stats::{InputStats, PlaylistStats};
 use crate::model::xmltv::{Epg};
+use crate::model::xtream::MultiXtreamMapping;
 use crate::processing::playlist_watch::process_group_watch;
 use crate::processing::xmltv_parser::flatten_tvguide;
 use crate::repository::epg_repository::write_epg;
 use crate::repository::m3u_repository::{write_m3u_playlist, write_strm_playlist};
-use crate::repository::xtream_repository::write_xtream_playlist;
+use crate::repository::xtream_repository::{write_xtream_mapping, write_xtream_playlist};
 use crate::utils::download;
 
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
@@ -48,7 +49,7 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                 id: pg.id,
                 title: pg.title.clone(),
                 channels,
-                xtream_cluster: pg.xtream_cluster.clone()
+                xtream_cluster: pg.xtream_cluster.clone(),
             });
         }
     });
@@ -266,7 +267,7 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
                             id: new_group_id,
                             title: Rc::clone(title),
                             channels: vec![channel.clone()],
-                            xtream_cluster: cluster.clone()
+                            xtream_cluster: cluster.clone(),
                         })
                     }
                 }
@@ -362,7 +363,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         }
         for target in &source.targets {
             if is_target_enabled(target, &user_targets) {
-                match process_playlist(&mut all_playlist, target, &cfg, &mut stats, &mut errors).await {
+                match process_playlist(&mut all_playlist, source, target, &cfg, &mut stats, &mut errors).await {
                     Ok(_) => {}
                     Err(mut err) => err.drain(..).for_each(|e| errors.push(e))
                 }
@@ -430,6 +431,7 @@ fn get_processing_pipe(target: &ConfigTarget) -> ProcessingPipe {
 }
 
 pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
+                                         source: &ConfigSource,
                                          target: &ConfigTarget, cfg: &Config,
                                          stats: &mut HashMap<u16, InputStats>,
                                          errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
@@ -452,32 +454,7 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
                 new_fpl.playlist = v;
             }
         }
-        let (resolve_series, resolve_series_delay) =
-            if let Some(options) = &target.options {
-                (options.xtream_resolve_series && fpl.input.input_type == InputType::Xtream && target.has_output(&TargetType::M3u),
-                 options.xtream_resolve_series_delay)
-            } else {
-                (false, 0)
-            };
-        if resolve_series {
-            let mut series_playlist = download::get_xtream_playlist_series(fpl, errors, resolve_series_delay).await;
-            // original content saved into original list
-            for plg in &series_playlist {
-                fpl.update_playlist(plg);
-            }
-            // run processing pipe over new items
-            for f in &pipe {
-                let r = f(&mut series_playlist, target);
-                if let Some(v) = r {
-                    series_playlist = v;
-                }
-            }
-            // assign new items to the new playlist
-            for plg in &series_playlist {
-                new_fpl.update_playlist(plg);
-            }
-        }
-
+        playlist_resolve_series(target, errors, &pipe, fpl, &mut new_fpl).await;
         // stats
         let input_stats = stats.get_mut(&new_fpl.input.id);
         if let Some(stat) = input_stats {
@@ -491,6 +468,39 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
     }
 
     apply_affixes(&mut new_fetched_playlists);
+
+    if source._multi_xtream_input {
+        let mut stream_id_mappings: Vec<MultiXtreamMapping> = Vec::new();
+        let mut counter: u32 = 0;
+        new_fetched_playlists.iter()
+            .flat_map(|pl| {
+                let input_id = &pl.input.id;
+                pl.playlist.iter().map(move |plg| (input_id, &plg.channels))
+            })
+            .flat_map(|(input_id, channels)| channels.iter().map(move |chan| (input_id, chan)))
+            .for_each(|(input_id, chan)| {
+                counter += 1;
+                let mut header = chan.header.borrow_mut();
+                header.id = Rc::new(counter.to_string());
+                let xtream_mapping = MultiXtreamMapping {
+                    stream_id: header.stream_id.parse::<u32>().unwrap(),
+                    input_id: *input_id,
+                };
+                stream_id_mappings.push(xtream_mapping);
+            });
+
+        match write_xtream_mapping(&stream_id_mappings, cfg, &target.name) {
+            Ok(_) => {
+                debug!("wrote multi xtream input mapping for {}", &target.name);
+            }
+            Err(err) => {
+                return Err(vec![M3uFilterError::new(
+                    M3uFilterErrorKind::Notify,
+                    format!("Write multi xtream input mapping {} failed: {}", target.name, err))]);
+            }
+        }
+    }
+
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
     let mut tv_guides = vec![];
@@ -524,7 +534,7 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
                 let watch_re = target._watch_re.as_ref().unwrap();
                 new_playlist.iter().for_each(|pl| {
                     if watch_re.iter().any(|r| r.is_match(&pl.title)) {
-                         process_group_watch(cfg, &target.name, pl)
+                        process_group_watch(cfg, &target.name, pl)
                     }
                 });
             }
@@ -534,6 +544,37 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
     } else {
         info!("Playlist is empty: {}", &target.name);
         Ok(())
+    }
+}
+
+async fn playlist_resolve_series<'a>(target: &ConfigTarget, errors: &mut Vec<M3uFilterError>,
+                                     pipe: &ProcessingPipe,
+                                     fpl: &mut FetchedPlaylist<'_>,
+                                     new_fpl: &mut FetchedPlaylist<'_>) {
+    let (resolve_series, resolve_series_delay) =
+        if let Some(options) = &target.options {
+            (options.xtream_resolve_series && fpl.input.input_type == InputType::Xtream && target.has_output(&TargetType::M3u),
+             options.xtream_resolve_series_delay)
+        } else {
+            (false, 0)
+        };
+    if resolve_series {
+        let mut series_playlist = download::get_xtream_playlist_series(fpl, errors, resolve_series_delay).await;
+        // original content saved into original list
+        for plg in &series_playlist {
+            fpl.update_playlist(plg);
+        }
+        // run processing pipe over new items
+        for f in pipe {
+            let r = f(&mut series_playlist, target);
+            if let Some(v) = r {
+                series_playlist = v;
+            }
+        }
+        // assign new items to the new playlist
+        for plg in &series_playlist {
+            new_fpl.update_playlist(plg);
+        }
     }
 }
 
@@ -572,7 +613,7 @@ pub(crate) async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTarget
     errors.iter().for_each(|err| error!("{}", err.message));
     // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
-        let error_msg = format!("{{\"errors\": \"{}\"}}",message.as_str());
+        let error_msg = format!("{{\"errors\": \"{}\"}}", message.as_str());
         send_message(&MsgKind::Error, &cfg.messaging, error_msg.as_str());
     }
 }
