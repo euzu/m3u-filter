@@ -766,7 +766,20 @@ Use the `-l` or `-log-level` cli-argument to specify the log-level.
 
 ## 6. Compilation
 
-### Static binary for docker
+### Docker build
+Change into the root directory and run:
+
+```shell
+docker build --rm -f docker/Dockerfile -t m3u-filter .  
+```
+
+This will build the complete project and create a docker image.
+
+To start the container, you can use the `docker-compose.yml`
+But you need to change `image: ghcr.io/euzu/m3u-filter:latest` to `image: m3u-filter`
+
+
+### Manual build static binary for docker
 
 #### `cross`compile
 
