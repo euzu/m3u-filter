@@ -1,5 +1,7 @@
 # m3u-filter
 
+[Wiki](https://github.com/euzu/m3u-filter/wiki)
+
 m3u-filter is a simple application which can:
   - filter, rename, map and sort entries out of a playlist and persist in EXTM3U, XTREAM or Kodi format.
   - can process multiple inputs and can create multiple outputs from this input files trough target definitions.
