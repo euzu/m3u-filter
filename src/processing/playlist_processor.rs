@@ -14,7 +14,7 @@ use crate::{Config, get_errors_notify_message, model::config, valid_property};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{MsgKind, send_message};
-use crate::model::config::{ConfigSource, ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
+use crate::model::config::{ConfigTarget, default_as_default, InputAffix, InputType, ProcessTargets};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::model::config::{AFFIX_FIELDS, ItemField, ProcessingOrder, SortOrder::{Asc, Desc}, TargetType};
 use crate::model::playlist::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemHeader};
@@ -258,7 +258,7 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
                             id: grp_id,
                             title: Rc::clone(title),
                             channels: vec![channel.clone()],
-                            xtream_cluster: cluster.clone()
+                            xtream_cluster: cluster.clone(),
                         })
                     }
                 }
@@ -350,7 +350,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         }
         for target in &source.targets {
             if is_target_enabled(target, &user_targets) {
-                match process_playlist(&mut all_playlist, source, target, &cfg, &mut stats, &mut errors).await {
+                match process_playlist(&mut all_playlist, target, &cfg, &mut stats, &mut errors).await {
                     Ok(_) => {}
                     Err(mut err) => err.drain(..).for_each(|e| errors.push(e))
                 }
@@ -418,7 +418,6 @@ fn get_processing_pipe(target: &ConfigTarget) -> ProcessingPipe {
 }
 
 pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
-                                         source: &ConfigSource,
                                          target: &ConfigTarget, cfg: &Config,
                                          stats: &mut HashMap<u16, InputStats>,
                                          errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
@@ -456,7 +455,7 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
 
     apply_affixes(&mut new_fetched_playlists);
 
-    if source._multi_xtream_input {
+    if target.is_multi_input() {
         let mut stream_id_mappings: Vec<MultiXtreamMapping> = Vec::new();
         let mut counter: u32 = 0;
         new_fetched_playlists.iter()

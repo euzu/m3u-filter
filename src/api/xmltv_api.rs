@@ -6,7 +6,7 @@ use url::Url;
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::api_proxy::ProxyType;
-use crate::model::config::{Config, ConfigTarget, InputType};
+use crate::model::config::{Config, ConfigTarget};
 use crate::model::config::TargetType;
 use crate::repository::m3u_repository::get_m3u_epg_file_path;
 use crate::repository::xtream_repository::{get_xtream_epg_file_path, get_xtream_storage_path};
@@ -54,7 +54,7 @@ async fn xmltv_api(
                 // If you have multiple xtream sources, no response because of mapped ids
                 // if you want epg for multi xtream input, then provide  epg_url.
                 let target_name = &target.name;
-                if let Some(inputs) = _app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
+                if let Some(inputs) = _app_state.config.get_inputs_for_target(target_name) {
                     if inputs.len() == 1 {
                         if let Some(&input) = inputs.first() {
                             let epg_url = input.epg_url.as_ref().map_or("".to_string(), |s| s.to_owned());

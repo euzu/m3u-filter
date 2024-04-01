@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+use url::Url;
 
 use log::{debug, error, warn};
 use path_absolutize::*;
@@ -275,6 +276,8 @@ pub(crate) struct ConfigTargetOptions {
     pub xtream_skip_live_direct_source: bool,
     #[serde(default = "default_as_true")]
     pub xtream_skip_video_direct_source: bool,
+    #[serde(default = "default_as_true")]
+    pub xtream_skip_series_direct_source: bool,
     #[serde(default = "default_as_false")]
     pub xtream_resolve_series: bool,
     #[serde(default = "default_as_two")]
@@ -318,6 +321,8 @@ pub(crate) struct ConfigTarget {
     pub _filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _mapping: Option<Vec<Mapping>>,
+    #[serde(skip_serializing, skip_deserializing)]
+    _multi_input: bool,
 }
 
 
@@ -387,6 +392,11 @@ impl ConfigTarget {
             Err(err) => Err(err),
         }
     }
+
+    pub(crate) fn is_multi_input(&self) -> bool {
+        self._multi_input
+    }
+
     pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
         return self._filter.as_ref().unwrap().filter(provider, &mut processor);
@@ -417,23 +427,23 @@ impl ConfigTarget {
 pub(crate) struct ConfigSource {
     pub inputs: Vec<ConfigInput>,
     pub targets: Vec<ConfigTarget>,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub _multi_xtream_input: bool,
 }
 
 impl ConfigSource {
     pub(crate) fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
-        self._multi_xtream_input = self.inputs.iter().filter(|i| i.input_type == InputType::Xtream).count() > 1;
+        if self.inputs.len() > 1 {
+            self.targets.iter_mut().for_each(|t| t._multi_input = true);
+        }
         Ok(index + (self.inputs.len() as u16))
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<Vec<&ConfigInput>> {
+    pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
         let mut result = Vec::new();
         for target in &self.targets {
             if target.name.eq(target_name) {
                 for input in &self.inputs {
-                    if input.enabled && input.input_type.eq(input_type) {
+                    if input.enabled {
                         result.push(input);
                     }
                 }
@@ -493,6 +503,12 @@ pub(crate) struct ConfigInputOptions {
     pub xtream_skip_series: bool,
 }
 
+
+pub(crate) struct InputUserInfo {
+    pub base_url: String,
+    pub username: String,
+    pub password: String,
+}
 
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
@@ -560,6 +576,37 @@ impl ConfigInput {
             }
         }
         Ok(())
+    }
+
+    pub(crate) fn get_user_info(&self) -> Option<InputUserInfo> {
+        if self.input_type == InputType::Xtream {
+            if self.username.is_some() || self.password.is_some() {
+                return Some(InputUserInfo {
+                    base_url: self.url.to_owned(),
+                    username: self.username.as_ref().unwrap().to_owned(),
+                    password: self.password.as_ref().unwrap().to_owned(),
+                });
+            }
+        } else if let Ok(url) = Url::parse(&self.url) {
+            let base_url = url.origin().ascii_serialization();
+            let mut username = None;
+            let mut password = None;
+            for (key, value) in url.query_pairs() {
+                if key.eq("username") {
+                    username = Some(value.into_owned());
+                } else if key.eq("password") {
+                    password = Some(value.into_owned());
+                }
+            }
+            if username.is_some() || password.is_some() {
+                return Some(InputUserInfo {
+                    base_url,
+                    username: username.as_ref().unwrap().to_owned(),
+                    password: password.as_ref().unwrap().to_owned(),
+                });
+            }
+        }
+        None
     }
 }
 
@@ -731,9 +778,9 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<Vec<&ConfigInput>> {
+    pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
         for source in &self.sources {
-            if let Some(cfg) = source.get_input_for_target(target_name, input_type) {
+            if let Some(cfg) = source.get_inputs_for_target(target_name) {
                 return Some(cfg);
             }
         }
@@ -769,16 +816,16 @@ impl Config {
         None
     }
 
-    pub(crate) fn is_multi_xtream_input(&self, target_name: &str) -> bool {
-        for source in &self.sources {
-            for target in &source.targets {
-                if target_name.eq_ignore_ascii_case(&target.name) {
-                    return source._multi_xtream_input;
-                }
-            }
-        }
-        false
-    }
+    // pub(crate) fn is_multi_input_target(&self, target_name: &str) -> bool {
+    //     for source in &self.sources {
+    //         for target in &source.targets {
+    //             if target_name.eq_ignore_ascii_case(&target.name) {
+    //                 return target.is_multi_input();
+    //             }
+    //         }
+    //     }
+    //     false
+    // }
 
     pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError> {
         if let Some(mapping_list) = mappings {
