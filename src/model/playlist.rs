@@ -5,7 +5,7 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::model::config::{ConfigInput, ConfigTargetOptions};
+use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::config::{default_as_false};
 use crate::model::xmltv::TVGuide;
 
@@ -67,6 +67,8 @@ pub(crate) trait FieldAccessor {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistItemHeader {
+    // stream_id is a custom field for processing
+    pub stream_id: u32,
     pub id: Rc<String>,
     pub name: Rc<String>,
     pub logo: Rc<String>,
@@ -77,8 +79,8 @@ pub(crate) struct PlaylistItemHeader {
     pub audio_track: Rc<String>,
     pub time_shift: Rc<String>,
     pub rec: Rc<String>,
-    pub source: Rc<String>,
     // this is the source content not the url
+    pub source: Rc<String>,
     pub url: Rc<String>,
     pub epg_channel_id: Option<Rc<String>>,
     #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
@@ -86,7 +88,7 @@ pub(crate) struct PlaylistItemHeader {
     #[serde(skip_serializing, skip_deserializing)]
     pub additional_properties: Option<Vec<(String, Value)>>,
     #[serde(default = "default_playlist_item_type", skip_serializing, skip_deserializing)]
-    pub item_type:  PlaylistItemType,
+    pub item_type: PlaylistItemType,
     #[serde(default = "default_as_false", skip_serializing, skip_deserializing)]
     pub series_fetched: bool, // only used for series_info
 }
@@ -144,10 +146,12 @@ macro_rules! to_m3u_non_empty_fields {
 
 
 impl PlaylistItem {
-    pub fn to_m3u(&self, options: &Option<ConfigTargetOptions>) -> String {
+    pub fn to_m3u(&self, target: &ConfigTarget) -> String {
+        let options = target.options.as_ref();
         let header = self.header.borrow();
-        let ignore_logo = options.as_ref().map_or(false, |o| o.ignore_logo);
-        let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",
+        let ignore_logo = options.map_or(false, |o| o.ignore_logo);
+        let mut line = format!("#EXTINF:-1 str-id=\"{}\" tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",
+                               header.stream_id,
                                header.epg_channel_id.as_ref().map_or("", |o| o.as_ref()),
                                header.name, header.group);
 

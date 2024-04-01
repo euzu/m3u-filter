@@ -9,7 +9,7 @@ use chrono::{Duration, Local};
 use log::{debug, error};
 use url::Url;
 
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, serve_file};
+use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::model::api_proxy::{ProxyType, UserCredentials};
 use crate::model::config::{Config, ConfigInput, InputType};
@@ -112,15 +112,7 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_p
 
 
 fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
-    let server_info_list = cfg._api_proxy.read().unwrap().as_ref().unwrap().server.clone();
-    let server_info_name = match &user.server {
-        Some(server_name) => server_name.as_str(),
-        None => "default"
-    };
-    let server_info = match server_info_list.iter().find(|c| c.name.eq(server_info_name)) {
-        Some(info) => info,
-        None => server_info_list.first().unwrap(),
-    };
+    let server_info = get_user_server_info(cfg, user);
 
     let now = Local::now();
     XtreamAuthorizationResponse {
@@ -181,7 +173,7 @@ async fn xtream_player_api_stream(
                                 if response.status().is_success() {
                                     let mut response_builder = HttpResponse::Ok();
                                     response.headers().iter().for_each(|(k, v)| {
-                                        response_builder.insert_header((k, v));
+                                        response_builder.insert_header((k.as_str(), v.as_ref()));
                                     });
                                     return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
                                 } else {
@@ -394,7 +386,7 @@ async fn xtream_player_api(
                                     if !category_id.is_empty() {
                                         serve_query(&file_path, &HashMap::from([("category_id", category_id)])).await
                                     } else {
-                                        serve_file(&file_path, req).await
+                                        serve_file(&file_path, req, mime::APPLICATION_JSON).await
                                     }
                                 } else if let Some(payload) = content {
                                     HttpResponse::Ok().body(payload)

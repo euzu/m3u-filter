@@ -79,7 +79,7 @@ async fn xmltv_api(
                     }
                 }
             }
-            Some(epg_path) => return serve_file(&epg_path, &req).await
+            Some(epg_path) => return serve_file(&epg_path, &req, mime::TEXT_XML).await
         }
     }
     HttpResponse::Ok().content_type(mime::TEXT_XML).body(

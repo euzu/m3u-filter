@@ -39,6 +39,7 @@ pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &
             let result: Vec<PlaylistItem> = series_info.episodes.values().flatten().map(|episode|
                 PlaylistItem {
                     header: RefCell::new(PlaylistItemHeader {
+                        stream_id: 0,
                         id: Rc::new(episode.id.to_owned()),
                         name: Rc::new(episode.title.to_owned()),
                         logo: Rc::new(episode.info.movie_image.to_owned()),
@@ -96,6 +97,7 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                             let title = &grp.category_name;
                             let item = PlaylistItem {
                                 header: RefCell::new(PlaylistItemHeader {
+                                    stream_id: stream.stream_id.unwrap_or(0) as u32,
                                     id: Rc::new(stream.get_stream_id()),
                                     name: Rc::clone(&stream.name),
                                     logo: Rc::clone(&stream.stream_icon),
