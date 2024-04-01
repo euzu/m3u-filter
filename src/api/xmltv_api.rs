@@ -68,7 +68,7 @@ async fn xmltv_api(
                             debug!("Redirecting epg request to {}", api_url);
                             return HttpResponse::Found().insert_header(("Location", api_url)).finish();
                         }
-                        let client = request_utils::get_client_request(input, url, None);
+                        let client = request_utils::get_client_request(Some(input), url, None);
                         if let Ok(response) = client.send().await {
                             if response.status().is_success() {
                                 if let Ok(content) = response.text().await {

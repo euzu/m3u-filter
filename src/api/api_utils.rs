@@ -1,9 +1,13 @@
+use std::collections::HashMap;
 use std::path::{Path};
 use actix_web::http::header::{CACHE_CONTROL, HeaderValue};
 use actix_web::{HttpRequest, HttpResponse, web};
+use log::{debug, error};
+use url::Url;
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::api_proxy::{ApiProxyServerInfo, UserCredentials};
-use crate::model::config::{Config, ConfigTarget};
+use crate::model::config::{Config, ConfigTarget, ConfigInput};
+use crate::utils::request_utils;
 
 pub(crate) async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
@@ -48,4 +52,31 @@ pub(crate) fn get_user_server_info(cfg: &Config, user: &UserCredentials) -> ApiP
         Some(info) => info.clone(),
         None => server_info_list.first().unwrap().clone(),
     }
+}
+
+pub(crate) async fn stream_response(stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
+    let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
+    debug!("Try to open stream {}", stream_url);
+    if let Ok(url) = Url::parse(stream_url) {
+        let client = request_utils::get_client_request(input, url, Some(&req_headers));
+        match client.send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    let mut response_builder = HttpResponse::Ok();
+                    response.headers().iter().for_each(|(k, v)| {
+                        response_builder.insert_header((k.as_str(), v.as_ref()));
+                    });
+                    return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
+                } else {
+                    debug!("Failed to open stream got status {} for {}", response.status(), stream_url)
+                }
+            }
+            Err(err) => {
+                error!("Received failure from server {}:  {}", stream_url, err)
+            }
+        }
+    } else {
+        error!("Url is malformed {}", &stream_url)
+    }
+    HttpResponse::BadRequest().finish()
 }

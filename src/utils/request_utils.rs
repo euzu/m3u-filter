@@ -75,9 +75,9 @@ pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &St
     }
 }
 
-pub(crate) fn get_client_request(input: &ConfigInput, url: url::Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
+pub(crate) fn get_client_request(input: Option<&ConfigInput>, url: url::Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
     let mut request = reqwest::Client::new().get(url);
-    let headers = get_request_headers(&input.headers, custom_headers);
+    let headers = get_request_headers(input.map_or(&HashMap::new(), |i| &i.headers), custom_headers);
     request = request.headers(headers);
     request
 }
@@ -113,7 +113,7 @@ async fn download_json_content(input: &ConfigInput, url: url::Url, persist_filep
     if log_enabled!(Level::Debug) {
         debug!("downloading json content from {}", url.to_string());
     }
-    let request = get_client_request(input, url, None);
+    let request = get_client_request(Some(input), url, None);
     match request.send().await {
         Ok(response) => {
             if log_enabled!(Level::Debug) {
@@ -148,7 +148,7 @@ pub(crate) async fn get_input_json_content(input: &ConfigInput, url_str: &str, p
 }
 
 async fn download_text_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<String, String> {
-    let request = get_client_request(input, url, None);
+    let request = get_client_request(Some(input), url, None);
     match request.send().await {
         Ok(response) => {
             if response.status().is_success() {

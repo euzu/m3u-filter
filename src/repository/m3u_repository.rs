@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{Error, BufRead, BufReader, ErrorKind, Write, SeekFrom, Seek, Read};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -95,7 +95,7 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
 
 pub(crate) fn get_m3u_file_paths(cfg: &Config, filename: &Option<String>) -> Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
     match file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) {
-        Some(m3u_path ) => {
+        Some(m3u_path) => {
             let extension = m3u_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or(""))).unwrap_or("".to_owned());
             let url_path = m3u_path.with_extension(format!("{}url", &extension));
             let index_path = m3u_path.with_extension(format!("{}idx_url", &extension));
@@ -160,7 +160,7 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
                                         Err(e) => return cant_write_result!(&m3u_path, e),
                                     }
                                     idx_offset += bytes_to_write;
-                                },
+                                }
                                 Err(e) => return cant_write_result!(&m3u_path, e),
                             }
 
@@ -268,4 +268,37 @@ pub(crate) fn rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &U
         }
     }
     None
+}
+
+pub(crate) fn get_m3u_url_for_stream_id(stream_id: u32, url_path: &Path, idx_path: &Path) -> Result<String, Error> {
+    if stream_id < 1 {
+        return Err(Error::new(ErrorKind::Other, "id should start with 1"));
+    }
+    if url_path.exists() && idx_path.exists() {
+        let index = (stream_id - 1) as u64;
+        let mapping_size = 4; // u32
+        let offset = mapping_size * index;
+        let mut idx_file = File::open(idx_path)?;
+        idx_file.seek(SeekFrom::Start(offset))?;
+        let mut url_offset_bytes = [0u8; 4];
+        idx_file.read_exact(&mut url_offset_bytes)?;
+        let url_offset = u32::from_le_bytes(url_offset_bytes);
+        let url_end_offset = match idx_file.read_exact(&mut url_offset_bytes) {
+            Ok(_) => u32::from_le_bytes(url_offset_bytes),
+            Err(_) => 0
+        };
+
+        let mut url_file = File::open(url_path)?;
+        url_file.seek(SeekFrom::Start(url_offset as u64))?;
+        let mut buf = String::new();
+
+        if (if url_end_offset > 0 {
+                url_file.take((url_end_offset - url_offset) as u64).read_to_string(&mut buf)
+            } else {
+                url_file.read_to_string(&mut buf)
+        }).is_ok() {
+            return Ok(buf);
+        };
+    }
+    Err(Error::new(ErrorKind::Other, format!("Failed to read m3u url form stream-id {}", stream_id)))
 }
