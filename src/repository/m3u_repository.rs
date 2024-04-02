@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{Error, BufRead, BufReader, ErrorKind, Write, SeekFrom, Seek, Read};
+use std::io::{Error, ErrorKind, Write, SeekFrom, Seek, Read};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -13,6 +13,7 @@ use crate::model::api_proxy::UserCredentials;
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
 use crate::processing::m3u_parser::consume_m3u;
+use crate::utils::file_reader::FileReader;
 use crate::utils::file_utils;
 
 macro_rules! cant_write_result {
@@ -251,8 +252,8 @@ pub(crate) fn rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &U
                 result.push("#EXTM3U".to_string());
                 match File::open(&m3u_path) {
                     Ok(m3u_file) => {
-                        let lines: Vec<String> = BufReader::new(m3u_file).lines().map_while(Result::ok).collect();
-                        consume_m3u(cfg, &lines, |item| {
+                        let reader = FileReader::new(m3u_file);
+                        consume_m3u(cfg, reader, |item| {
                             let stream_id = item.header.borrow().stream_id;
                             item.header.borrow_mut().url = Rc::new(format!("{}/{}", url, stream_id));
                             result.push(item.to_m3u(target))

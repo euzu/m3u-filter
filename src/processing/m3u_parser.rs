@@ -160,14 +160,14 @@ fn extract_id_from_url(url: &str) -> Option<String> {
     None
 }
 
-pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, lines: &Vec<String>, mut visit: F) {
+pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, lines: impl Iterator<Item=String>, mut visit: F) {
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
     let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(|ext| ext.as_str()).collect();
     for line in lines {
         if line.starts_with("#EXTINF") {
-            header = Some(String::from(line));
+            header = Some(line);
             continue;
         }
         if line.starts_with("#EXTGRP") {
@@ -178,7 +178,7 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, lines: &Vec<Stri
             continue;
         }
         if let Some(header_value) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value, String::from(line))) };
+            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value,line)) };
             if item.header.borrow().group.is_empty() {
                 if let Some(group_value) = group {
                     item.header.borrow_mut().group = Rc::new(group_value);
@@ -194,11 +194,11 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, lines: &Vec<Stri
     }
 }
 
-pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup> {
+pub(crate) fn parse_m3u(cfg: &Config, lines: &[String]) -> Vec<PlaylistGroup> {
     let mut groups: std::collections::HashMap<Rc<String>, Vec<PlaylistItem>> = std::collections::HashMap::new();
     let mut sort_order: Vec<Rc<String>> = vec![];
     let mut playlist = Vec::new();
-    consume_m3u(cfg, lines, |item| playlist.push(item));
+    consume_m3u(cfg, lines.iter().cloned(), |item| playlist.push(item));
     playlist.drain(..).for_each(|item| {
         let key = Rc::clone(&item.header.borrow().group);
         // let key2 = String::from(&item.header.group);

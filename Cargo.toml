@@ -43,3 +43,4 @@ rustelebot = "0.3"
 bincode = "1.3"
 uuid = { version = "1.7", features = ["v4", "fast-rng", "macro-diagnostics"] }
 lzma-rs = "0.3"
+linereader = "0"
