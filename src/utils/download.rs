@@ -33,7 +33,7 @@ pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_
     let persist_file_path = prepare_file_path(input, working_dir, "");
     match request_utils::get_input_text_content(input, working_dir, &url, persist_file_path).await {
         Ok(text) => {
-            let lines = text.lines().map(String::from).collect();
+            let lines = text.lines().map(String::from).collect::<Vec<String>>();
             (m3u_parser::parse_m3u(cfg, &lines), vec![])
         }
         Err(err) => (vec![], vec![err])

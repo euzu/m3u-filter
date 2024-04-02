@@ -5,7 +5,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use url::Url;
 
 use log::{debug, error, warn};
 use path_absolutize::*;
@@ -503,7 +502,6 @@ pub(crate) struct ConfigInputOptions {
     pub xtream_skip_series: bool,
 }
 
-
 pub(crate) struct InputUserInfo {
     pub base_url: String,
     pub username: String,
@@ -587,7 +585,7 @@ impl ConfigInput {
                     password: self.password.as_ref().unwrap().to_owned(),
                 });
             }
-        } else if let Ok(url) = Url::parse(&self.url) {
+        } else if let Ok(url) = url::Url::parse(&self.url) {
             let base_url = url.origin().ascii_serialization();
             let mut username = None;
             let mut password = None;
@@ -847,7 +845,7 @@ impl Config {
         Ok(())
     }
 
-    pub(crate) fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         self.working_dir = file_utils::get_working_path(&self.working_dir);
         if self.backup_dir.is_none() {
             self.backup_dir = Some(PathBuf::from(&self.working_dir).join(".backup").into_os_string().to_string_lossy().to_string());

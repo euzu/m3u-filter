@@ -103,16 +103,20 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
                     let token = token_till(&mut it, '=');
                     if let Some(t) = token {
                         let value = token_value(&mut it);
-                        process_header_fields!(plih, t.as_str(),
-                        (id, "tvg-id"),
-                        (group, "group-title"),
-                        (name, "tvg-name"),
-                        (parent_code, "parent-code"),
-                        (audio_track, "audio-track"),
-                        (logo, "tvg-logo"),
-                        (logo_small, "tvg-logo-small"),
-                        (time_shift, "timeshift"),
-                        (rec, "tvg-rec"); value)
+                        if t.as_str().eq("str-id") {
+                           plih.stream_id = Rc::new(value.to_string());
+                        } else {
+                            process_header_fields!(plih, t.as_str(),
+                            (id, "tvg-id"),
+                            (group, "group-title"),
+                            (name, "tvg-name"),
+                            (parent_code, "parent-code"),
+                            (audio_track, "audio-track"),
+                            (logo, "tvg-logo"),
+                            (logo_small, "tvg-logo-small"),
+                            (time_shift, "timeshift"),
+                            (rec, "tvg-rec"); value)
+                        }
                     }
                 }
             }
@@ -123,7 +127,6 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
                 plih.id = Rc::new(chanid);
             }
         }
-        plih.stream_id = Rc::clone(&plih.id);
         plih.epg_channel_id = Some(Rc::clone(&plih.id));
     }
 
@@ -155,17 +158,14 @@ fn extract_id_from_url(url: &str) -> Option<String> {
     None
 }
 
-pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup> {
-    let mut groups: std::collections::HashMap<Rc<String>, Vec<PlaylistItem>> = std::collections::HashMap::new();
-    let mut sort_order: Vec<Rc<String>> = vec![];
+pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, lines: impl Iterator<Item=String>, mut visit: F) {
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
-    let mut playlist = Vec::new();
     let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(|ext| ext.as_str()).collect();
     for line in lines {
         if line.starts_with("#EXTINF") {
-            header = Some(String::from(line));
+            header = Some(line);
             continue;
         }
         if line.starts_with("#EXTGRP") {
@@ -176,7 +176,7 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
             continue;
         }
         if let Some(header_value) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value, String::from(line))) };
+            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value,line)) };
             if item.header.borrow().group.is_empty() {
                 if let Some(group_value) = group {
                     item.header.borrow_mut().group = Rc::new(group_value);
@@ -185,12 +185,18 @@ pub(crate) fn parse_m3u(cfg: &Config, lines: &Vec<String>) -> Vec<PlaylistGroup>
                     item.header.borrow_mut().group = Rc::new(string_utils::get_title_group(current_title.as_str()));
                 }
             }
-            playlist.push(item);
+            visit(item);
         }
         header = None;
         group = None;
     }
+}
 
+pub(crate) fn parse_m3u(cfg: &Config, lines: &[String]) -> Vec<PlaylistGroup> {
+    let mut groups: std::collections::HashMap<Rc<String>, Vec<PlaylistItem>> = std::collections::HashMap::new();
+    let mut sort_order: Vec<Rc<String>> = vec![];
+    let mut playlist = Vec::new();
+    consume_m3u(cfg, lines.iter().cloned(), |item| playlist.push(item));
     playlist.drain(..).for_each(|item| {
         let key = Rc::clone(&item.header.borrow().group);
         // let key2 = String::from(&item.header.group);

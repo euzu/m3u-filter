@@ -10,6 +10,7 @@
 * Added new options to input configuration. `xtream_skip_live`, `xtream_skip_vod`, `xtream_skip_series`
 * Updated docker files, New Dockerfile with builder to build an image without installing rust or node environments.
 * Generating xtream stream urls from m3u input.
+* Reverse proxy implementation for m3u playlist.
 
 # v1.1.8(2024-03-06)
 * Fixed WebUI Option-Select  

@@ -9,7 +9,7 @@ use chrono::{Duration, Local};
 use log::{debug, error};
 use url::Url;
 
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, serve_file};
+use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, serve_file, stream_response};
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::model::api_proxy::{ProxyType, UserCredentials};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
@@ -63,15 +63,7 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_p
 
 
 fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
-    let server_info_list = cfg._api_proxy.read().unwrap().as_ref().unwrap().server.clone();
-    let server_info_name = match &user.server {
-        Some(server_name) => server_name.as_str(),
-        None => "default"
-    };
-    let server_info = match server_info_list.iter().find(|c| c.name.eq(server_info_name)) {
-        Some(info) => info,
-        None => server_info_list.first().unwrap(),
-    };
+    let server_info = get_user_server_info(cfg, user);
 
     let now = Local::now();
     XtreamAuthorizationResponse {
@@ -144,30 +136,7 @@ async fn xtream_player_api_stream(
                         debug!("Redirecting stream request to {}", stream_url);
                         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
                     }
-
-                    let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
-                    debug!("Try to open stream {}", &stream_url);
-                    if let Ok(url) = Url::parse(&stream_url) {
-                        let client = request_utils::get_client_request(target_input, url, Some(&req_headers));
-                        match client.send().await {
-                            Ok(response) => {
-                                if response.status().is_success() {
-                                    let mut response_builder = HttpResponse::Ok();
-                                    response.headers().iter().for_each(|(k, v)| {
-                                        response_builder.insert_header((k, v));
-                                    });
-                                    return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
-                                } else {
-                                    debug!("Failed to open stream got status {} for {}", response.status(), &stream_url)
-                                }
-                            }
-                            Err(err) => {
-                                error!("Received failure from server {}:  {}", &stream_url, err)
-                            }
-                        }
-                    } else {
-                        error!("Url is malformed {}", &stream_url)
-                    }
+                    return stream_response(&stream_url, req, Some(target_input)).await
                 } else {
                     debug!("Cant figure out stream url for target {}, context {}, action {}",
                         target_name, context, action_path);
@@ -256,7 +225,7 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
 
         if let Some(info_url) = get_xtream_player_api_info_url(target_input, cluster, xtream_id) {
             if let Ok(url) = Url::parse(&info_url) {
-                let client = request_utils::get_client_request(target_input, url, None);
+                let client = request_utils::get_client_request(Some(target_input), url, None);
                 if let Ok(response) = client.send().await {
                     debug!("{}", response.status());
                     if response.status().is_success() {
@@ -320,7 +289,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &UserCredentials, targ
                     return HttpResponse::Found().insert_header(("Location", info_url)).finish();
                 }
 
-                let client = request_utils::get_client_request(target_input, url, None);
+                let client = request_utils::get_client_request(Some(target_input), url, None);
                 if let Ok(response) = client.send().await {
                     if response.status().is_success() {
                         return match response.text().await {
@@ -388,7 +357,7 @@ async fn xtream_player_api(
                                     if !category_id.is_empty() {
                                         serve_query(&file_path, &HashMap::from([("category_id", category_id)])).await
                                     } else {
-                                        serve_file(&file_path, req).await
+                                        serve_file(&file_path, req, mime::APPLICATION_JSON).await
                                     }
                                 } else if let Some(payload) = content {
                                     HttpResponse::Ok().body(payload)

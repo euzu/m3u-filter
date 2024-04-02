@@ -97,7 +97,7 @@ fn write_xtream_info(app_state: &AppState, target_name: &str, stream_id: i32, cl
         let size = comp.len();
         match OpenOptions::new()
             .create(true)
-            .write(true)
+            //.write(true)
             .append(true)
             .open(col_path) {
             Ok(mut file) => {

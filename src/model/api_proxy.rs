@@ -151,6 +151,14 @@ impl ApiProxyServerInfo {
 
         true
     }
+
+    pub(crate) fn get_base_url(&self) -> String {
+        if self.protocol.eq("http") {
+            format!("http://{}:{}", self.host, self.http_port)
+        } else {
+            format!("https://{}:{}", self.host, self.https_port)
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

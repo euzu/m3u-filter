@@ -455,7 +455,7 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
 
     apply_affixes(&mut new_fetched_playlists);
 
-    if target.is_multi_input() {
+    if target.is_multi_input() && target.has_output(&TargetType::Xtream) {
         let mut stream_id_mappings: Vec<MultiXtreamMapping> = Vec::new();
         let mut counter: u32 = 0;
         new_fetched_playlists.iter()
@@ -465,14 +465,24 @@ pub(crate) async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
             })
             .flat_map(|(input_id, channels)| channels.iter().map(move |chan| (input_id, chan)))
             .for_each(|(input_id, chan)| {
-                counter += 1;
                 let mut header = chan.header.borrow_mut();
+                if header.stream_id.is_empty() {
+                    header.stream_id = Rc::clone(&header.id);
+                }
+                match header.stream_id.parse::<u32>() {
+                        Ok(stream_id) => {
+                            let xtream_mapping = MultiXtreamMapping {
+                                stream_id,
+                                input_id: *input_id,
+                            };
+                            stream_id_mappings.push(xtream_mapping);
+                        },
+                        Err(_) =>  {
+                            error!("Failed to parse stream_id: {}", &header.id)
+                        }
+                }
+                counter += 1;
                 header.id = Rc::new(counter.to_string());
-                let xtream_mapping = MultiXtreamMapping {
-                    stream_id: header.stream_id.parse::<u32>().unwrap(),
-                    input_id: *input_id,
-                };
-                stream_id_mappings.push(xtream_mapping);
             });
 
         match write_xtream_mapping(&stream_id_mappings, cfg, &target.name) {
