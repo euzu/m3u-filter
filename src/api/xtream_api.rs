@@ -284,36 +284,42 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCreden
 }
 
 async fn xtream_get_short_epg(app_state: &AppState, user: &UserCredentials, target_name: &str, stream_id: &str, limit: &str) -> HttpResponse {
-    if let Some(target_input) = app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
-        if let Some(action_url) = get_xtream_player_api_action_url(target_input, "get_short_epg") {
-            let mut info_url = format!("{}&stream_id={}", action_url, stream_id);
-            if !(limit.is_empty() || limit.eq("0")) {
-                info_url = format!("{}&limit={}", info_url, limit);
-            }
-            if let Ok(url) = Url::parse(&info_url) {
-                if user.proxy == ProxyType::Redirect {
-                    return HttpResponse::Found().insert_header(("Location", info_url)).finish();
+    if stream_id.is_empty() {
+        if let Some(target_input) = app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
+            if let Some(action_url) = get_xtream_player_api_action_url(target_input, "get_short_epg") {
+                let mut info_url = format!("{}&stream_id={}", action_url, stream_id);
+                if !(limit.is_empty() || limit.eq("0")) {
+                    info_url = format!("{}&limit={}", info_url, limit);
                 }
+                if let Ok(url) = Url::parse(&info_url) {
+                    if user.proxy == ProxyType::Redirect {
+                        return HttpResponse::Found().insert_header(("Location", info_url)).finish();
+                    }
 
-                let client = request_utils::get_client_request(Some(target_input), url, None);
-                if let Ok(response) = client.send().await {
-                    if response.status().is_success() {
-                        return match response.text().await {
-                            Ok(content) => {
-                                HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content)
-                            }
-                            Err(err) => {
-                                error!("Failed to download epg {}", err.to_string());
-                                HttpResponse::NoContent().finish()
-                            }
-                        };
+                    let client = request_utils::get_client_request(Some(target_input), url, None);
+                    if let Ok(response) = client.send().await {
+                        if response.status().is_success() {
+                            return match response.text().await {
+                                Ok(content) => {
+                                    HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content)
+                                }
+                                Err(err) => {
+                                    error!("Failed to download epg {}", err.to_string());
+                                    HttpResponse::NoContent().finish()
+                                }
+                            };
+                        }
                     }
                 }
             }
         }
+        error!("Cant find short epg with id: {}/{}", target_name, stream_id);
+        HttpResponse::NoContent().finish()
+    } else {
+        error!("No epg_id given, short epg needs id: {}", target_name);
+        HttpResponse::BadRequest().finish()
     }
-    error!("Cant find short epg with id: {}/{}", target_name, stream_id);
-    HttpResponse::NoContent().finish()
+
 }
 
 async fn xtream_player_api(
