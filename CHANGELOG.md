@@ -11,6 +11,7 @@
 * Updated docker files, New Dockerfile with builder to build an image without installing rust or node environments.
 * Generating xtream stream urls from m3u input.
 * Reverse proxy implementation for m3u playlist.
+* Mapper can now set `epg_channel_id`.
 
 # v1.1.8(2024-03-06)
 * Fixed WebUI Option-Select  

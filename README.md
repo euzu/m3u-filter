@@ -542,6 +542,7 @@ but lacks a few features like look around and backreferences.
 #### 2.3.4.3 `attributes`
 Attributes is a map of key value pairs. Valid keys are:
 - `id`
+- `epg_channel_id` or `epg_id`
 - `chno`
 - `name`
 - `group`
@@ -665,8 +666,8 @@ mappings:
           - pattern: 'Name ~ "^TF1$"'
             attributes:
               name: TF1
-              id: TF1.fr,
-              chno: '1',
+              id: TF1.fr
+              chno: '1'
               logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png
             suffix:
               title: '<tag:quality>'
@@ -675,9 +676,9 @@ mappings:
               title: name
           - pattern: 'Name ~ "^TF1!delimiter!!quality!*Series[_ ]*Films$"'
             attributes:
-              name: TF1 Series Films,
-              id: TF1SeriesFilms.fr,
-              chno: '20',
+              name: TF1 Series Films
+              id: TF1SeriesFilms.fr
+              chno: '20'
               logo: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/TF1_logo_2013.svg/320px-TF1_logo_2013.svg.png,
             suffix:
               group: '|FR|TNT'
