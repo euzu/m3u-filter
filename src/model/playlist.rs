@@ -120,12 +120,29 @@ macro_rules! get_fields {
 
 impl FieldAccessor for PlaylistItemHeader {
     fn get_field(&self, field: &str) -> Option<Rc<String>> {
-        get_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url;)
+        let val = get_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url;);
+        if val.is_some() {
+            return val;
+        }
+        match field {
+            "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
+            _ => None
+        }
     }
 
     fn set_field(&mut self, field: &str, value: &str) -> bool {
         let val = String::from(value);
-        update_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url; val)
+        let updated = update_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url; val);
+        if updated {
+            return updated;
+        }
+        match field {
+            "epg_channel_id" | "epg_id" => {
+                self.epg_channel_id = Some(Rc::new(value.to_owned()));
+                true
+            },
+            _ => false,
+        }
     }
 }
 
