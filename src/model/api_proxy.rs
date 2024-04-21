@@ -1,10 +1,14 @@
 use std::collections::HashSet;
+use std::env;
+use std::fmt::Display;
 use std::str::FromStr;
+
 use enum_iterator::Sequence;
+use log::info;
+use regex::Regex;
+
 use crate::create_m3u_filter_error_result;
-
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
 pub(crate) enum ProxyType {
@@ -20,12 +24,13 @@ impl ProxyType {
     }
 }
 
-impl ToString for ProxyType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for ProxyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
             ProxyType::Reverse => "reverse".to_string(),
             ProxyType::Redirect => "redirect".to_string()
-        }
+        };
+        write!(f, "{}", str)
     }
 }
 
@@ -43,12 +48,11 @@ impl FromStr for ProxyType {
     }
 }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UserCredentials {
-    pub username: String,
-    pub password: String,
-    pub token: Option<String>,
+    username: String,
+    password: String,
+    token: Option<String>,
     #[serde(default = "ProxyType::default")]
     pub proxy: ProxyType,
     pub server: Option<String>,
@@ -56,14 +60,14 @@ pub(crate) struct UserCredentials {
 
 impl UserCredentials {
     pub fn matches_token(&self, token: &str) -> bool {
-        if let Some(tkn) = &self.token {
+        if let Some(tkn) = self.get_token() {
             return tkn.eq(token);
         }
         false
     }
 
     pub fn matches(&self, username: &str, password: &str) -> bool {
-        self.username.eq(username) && self.password.eq(password)
+        self.get_username().eq(username) && self.get_password().eq(password)
     }
 
     pub fn trim(&mut self) {
@@ -74,6 +78,35 @@ impl UserCredentials {
             Some(tkn) => {
                 self.token = Some(tkn.trim().to_string());
             }
+        }
+    }
+
+    fn resolve_env_var(content: &str) -> String {
+        let pattern = Regex::new(r#"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}"#).unwrap();
+        if let Some(caps) = pattern.captures(content) {
+            if let Some(var) = caps.name("var") {
+                let var_name = var.as_str();
+                return match env::var(var_name) {
+                    Ok(val) =>  val, // If environment variable found, replace with its value
+                    Err(_) => content.to_string()                }
+            }
+        }
+        content.to_string()
+    }
+
+    pub fn get_username(&self) -> String {
+        UserCredentials::resolve_env_var(&self.username)
+    }
+
+    pub fn get_password(&self) -> String {
+        UserCredentials::resolve_env_var(&self.password)
+    }
+
+    pub fn get_token(&self) -> Option<String> {
+        if let Some(tkn) = &self.token {
+            Some(UserCredentials::resolve_env_var(tkn))
+        } else {
+            None
         }
     }
 }
@@ -206,7 +239,7 @@ impl ApiProxyConfig {
                 }
 
                 if let Some(server_info_name) = &user.server {
-                    if ! &self.server.iter().any(|server_info| server_info.name.eq(server_info_name)) {
+                    if !&self.server.iter().any(|server_info| server_info.name.eq(server_info_name)) {
                         errors.push(format!("No server info with name {} found for user {}", server_info_name, &user.username));
                     }
                 }

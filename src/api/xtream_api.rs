@@ -125,8 +125,8 @@ fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationRes
             is_trial: "0".to_string(),
             max_connections: "1".to_string(),
             message: server_info.message.to_string(),
-            password: user.password.to_string(),
-            username: user.username.to_string(),
+            password: user.get_password().to_string(),
+            username: user.get_username().to_string(),
             status: "Active".to_string(),
         },
         server_info: XtreamServerInfo {
@@ -284,7 +284,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCreden
 }
 
 async fn xtream_get_short_epg(app_state: &AppState, user: &UserCredentials, target_name: &str, stream_id: &str, limit: &str) -> HttpResponse {
-    if stream_id.is_empty() {
+    if !stream_id.is_empty() {
         if let Some(target_input) = app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
             if let Some(action_url) = get_xtream_player_api_action_url(target_input, "get_short_epg") {
                 let mut info_url = format!("{}&stream_id={}", action_url, stream_id);

@@ -1,5 +1,5 @@
 # Changelog
-# v1.1.9(2024-03-xx)
+# v1.1.9(2024-04-xx)
 * `update_on_boot` for config, default is false, if true an update is run on start
 * `category_id` filter added to xtream api
 * Handling for m3u files without id and group information
@@ -12,6 +12,7 @@
 * Generating xtream stream urls from m3u input.
 * Reverse proxy implementation for m3u playlist.
 * Mapper can now set `epg_channel_id`.
+* Added environment variables for User Credentials `username`, `password` and `token` in format `${env:<EnvVarName>}` where `<EnvVarName>` should be replaced. 
 
 # v1.1.8(2024-03-06)
 * Fixed WebUI Option-Select  
