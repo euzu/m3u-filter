@@ -750,6 +750,9 @@ pub(crate) struct Config {
     pub _config_file_path: String,
     #[serde(skip_serializing, skip_deserializing)]
     pub _sources_file_path: String,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub _api_proxy_file_path: String,
+
 }
 
 impl Config {

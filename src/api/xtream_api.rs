@@ -125,8 +125,8 @@ fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationRes
             is_trial: "0".to_string(),
             max_connections: "1".to_string(),
             message: server_info.message.to_string(),
-            password: user.get_password().to_string(),
-            username: user.get_username().to_string(),
+            password: user.password.to_string(),
+            username: user.username.to_string(),
             status: "Active".to_string(),
         },
         server_info: XtreamServerInfo {

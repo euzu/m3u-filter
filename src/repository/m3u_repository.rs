@@ -247,7 +247,7 @@ pub(crate) fn rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &U
         if let Some((m3u_path, url_path, idx_path)) = get_m3u_file_paths(cfg, &filename) {
             if m3u_path.exists() && url_path.exists() && idx_path.exists() {
                 let server_info = get_user_server_info(cfg, user);
-                let url = format!("{}/m3u-stream/{}/{}", server_info.get_base_url(), user.get_username(), user.get_password());
+                let url = format!("{}/m3u-stream/{}/{}", server_info.get_base_url(), user.username, user.password);
                 let mut result = vec![];
                 result.push("#EXTM3U".to_string());
                 match File::open(&m3u_path) {

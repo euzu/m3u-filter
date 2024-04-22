@@ -1,14 +1,12 @@
 use std::collections::HashSet;
-use std::env;
 use std::fmt::Display;
 use std::str::FromStr;
 
 use enum_iterator::Sequence;
-use log::info;
-use regex::Regex;
 
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::utils::config_reader;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
 pub(crate) enum ProxyType {
@@ -50,24 +48,36 @@ impl FromStr for ProxyType {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UserCredentials {
-    username: String,
-    password: String,
-    token: Option<String>,
+    pub username: String,
+    pub password: String,
+    pub token: Option<String>,
     #[serde(default = "ProxyType::default")]
     pub proxy: ProxyType,
     pub server: Option<String>,
 }
 
 impl UserCredentials {
+
+    pub fn prepare(&mut self, resolve_var: bool) {
+        if resolve_var {
+            self.username =  config_reader::resolve_env_var(&self.username);
+            self.password =  config_reader::resolve_env_var(&self.password);
+            if let Some(tkn) = &self.token {
+                self.token = Some(config_reader::resolve_env_var(tkn))
+            }
+            self.trim();
+        }
+    }
+
     pub fn matches_token(&self, token: &str) -> bool {
-        if let Some(tkn) = self.get_token() {
+        if let Some(tkn) = &self.token {
             return tkn.eq(token);
         }
         false
     }
 
     pub fn matches(&self, username: &str, password: &str) -> bool {
-        self.get_username().eq(username) && self.get_password().eq(password)
+        self.username.eq(username) && self.password.eq(password)
     }
 
     pub fn trim(&mut self) {
@@ -78,35 +88,6 @@ impl UserCredentials {
             Some(tkn) => {
                 self.token = Some(tkn.trim().to_string());
             }
-        }
-    }
-
-    fn resolve_env_var(content: &str) -> String {
-        let pattern = Regex::new(r#"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}"#).unwrap();
-        if let Some(caps) = pattern.captures(content) {
-            if let Some(var) = caps.name("var") {
-                let var_name = var.as_str();
-                return match env::var(var_name) {
-                    Ok(val) =>  val, // If environment variable found, replace with its value
-                    Err(_) => content.to_string()                }
-            }
-        }
-        content.to_string()
-    }
-
-    pub fn get_username(&self) -> String {
-        UserCredentials::resolve_env_var(&self.username)
-    }
-
-    pub fn get_password(&self) -> String {
-        UserCredentials::resolve_env_var(&self.password)
-    }
-
-    pub fn get_token(&self) -> Option<String> {
-        if let Some(tkn) = &self.token {
-            Some(UserCredentials::resolve_env_var(tkn))
-        } else {
-            None
         }
     }
 }
@@ -198,12 +179,10 @@ impl ApiProxyServerInfo {
 pub(crate) struct ApiProxyConfig {
     pub server: Vec<ApiProxyServerInfo>,
     pub user: Vec<TargetUser>,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub _file_path: String,
 }
 
 impl ApiProxyConfig {
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
         let mut usernames = HashSet::new();
         let mut tokens = HashSet::new();
         let mut errors = Vec::new();
@@ -223,6 +202,7 @@ impl ApiProxyConfig {
         }
         for target_user in &mut self.user {
             for user in &mut target_user.credentials {
+                user.prepare(resolve_var);
                 if usernames.contains(&user.username) {
                     errors.push(format!("Non unique username found {}", &user.username));
                 } else {
