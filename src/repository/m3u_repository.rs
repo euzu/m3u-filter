@@ -240,7 +240,6 @@ pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playl
     Ok(())
 }
 
-
 pub(crate) fn rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &UserCredentials) -> Option<String> {
     let filename = target.get_m3u_filename();
     if filename.is_some() {
@@ -265,7 +264,15 @@ pub(crate) fn rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &U
                     }
                 }
                 return Some(result.join("\n"));
-            };
+            } else if m3u_path.exists() {
+                match std::fs::read_to_string(&m3u_path) {
+                    Ok(result) => return Some(result),
+                    Err(err) => {
+                        error!("Could not open file {}: {}", &m3u_path.to_str().unwrap(), err);
+                        return None;
+                    }
+                }
+            }
         }
     }
     None

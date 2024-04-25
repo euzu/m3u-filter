@@ -35,7 +35,7 @@ fn _save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Opti
 }
 
 pub(crate) async fn save_config_api_proxy_user(
-    mut req: web::Json<Vec<TargetUser>>,
+    req: web::Json<Vec<TargetUser>>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let mut users = req.0;

@@ -9,9 +9,11 @@ use crate::repository::m3u_repository::{get_m3u_file_paths, get_m3u_url_for_stre
 
 async fn m3u_api(
     api_req: web::Query<UserApiRequest>,
+    //_api_req: web::Query<HashMap<String, String>>,
     req: HttpRequest,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
+    //let api_req = UserApiRequest::from_map(&_api_req);
     match get_user_target(&api_req, &app_state) {
         Some((user, target)) => {
             let filename = target.get_m3u_filename();
