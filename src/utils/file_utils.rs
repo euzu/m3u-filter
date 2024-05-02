@@ -37,7 +37,7 @@ fn get_default_path(file: &str) -> String {
     })
 }
 
-fn get_default_file_path(config_path: &str, file: &str) -> String {
+pub(crate) fn get_default_file_path(config_path: &str, file: &str) -> String {
     let path: PathBuf = PathBuf::from(config_path);
     let default_path = path.join(file);
     String::from(if default_path.exists() {

@@ -12,7 +12,7 @@ use url::Url;
 
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, serve_file, stream_response};
-use crate::model::api_proxy::{ProxyType, UserCredentials};
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigInput, InputType};
 use crate::model::config::TargetType;
 use crate::model::playlist::XtreamCluster;
@@ -112,7 +112,7 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_p
 }
 
 
-fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
+fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
     let server_info = get_user_server_info(cfg, user);
 
     let now = Local::now();
@@ -262,7 +262,7 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
     Err(Error::new(std::io::ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}", target_name, &cluster, stream_id)))
 }
 
-async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCredentials,
+async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserCredentials,
                                          target_name: &str, stream_id: &str,
                                          cluster: &XtreamCluster) -> HttpResponse {
     match FromStr::from_str(stream_id) {
@@ -284,7 +284,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCreden
     }
 }
 
-async fn xtream_get_short_epg(app_state: &AppState, user: &UserCredentials, target_name: &str, stream_id: &str, limit: &str) -> HttpResponse {
+async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials, target_name: &str, stream_id: &str, limit: &str) -> HttpResponse {
     if !stream_id.is_empty() {
         if let Some(target_input) = app_state.config.get_input_for_target(target_name, &InputType::Xtream) {
             if let Some(action_url) = get_xtream_player_api_action_url(target_input, "get_short_epg") {

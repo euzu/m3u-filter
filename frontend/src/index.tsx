@@ -1,15 +1,16 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.scss';
-import App from './app/app';
 import {SnackbarProvider} from 'notistack';
 import {ServiceProvider} from "./provider/service-provider";
+import Authentication from "./component/authentication/authentication";
 
 const container = document.getElementById('root');
 const root = createRoot(container);
-root.render(    <SnackbarProvider maxSnack={3} autoHideDuration={1500} anchorOrigin={ ({vertical: 'top', horizontal: 'center'}) }>
+root.render(
+    <SnackbarProvider maxSnack={3} autoHideDuration={1500} anchorOrigin={ ({vertical: 'top', horizontal: 'center'}) }>
         <ServiceProvider>
-            <App/>
+            <Authentication/>
         </ServiceProvider>
     </SnackbarProvider>
 );

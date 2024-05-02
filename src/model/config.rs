@@ -2,20 +2,23 @@ use std::rc::Rc;
 use enum_iterator::Sequence;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use log::{debug, error, warn};
 use path_absolutize::*;
+use crate::auth::user::UserCredential;
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::MsgKind;
-use crate::model::api_proxy::{ApiProxyConfig, UserCredentials};
+use crate::model::api_proxy::{ApiProxyConfig, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::utils::file_utils;
+use crate::utils::{config_reader, file_utils};
 
 pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "logo",
@@ -729,6 +732,67 @@ impl ConfigDto {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct WebAuthConfig {
+    #[serde(default = "default_as_true")]
+    pub enabled: bool,
+    pub issuer: String,
+    pub secret: String,
+    pub userfile: String,
+    pub _users: Option<Vec<UserCredential>>,
+}
+
+impl WebAuthConfig {
+    pub fn prepare(&mut self, config_path: &str, resolve_var: bool) -> Result<(), M3uFilterError> {
+        if resolve_var {
+            self.issuer = config_reader::resolve_env_var(&self.issuer);
+            self.secret = config_reader::resolve_env_var(&self.secret);
+            self.userfile = config_reader::resolve_env_var(&self.userfile);
+        }
+
+        let userfile_path = PathBuf::from(file_utils::get_default_file_path(config_path, &self.userfile));
+        if !file_utils::path_exists(&userfile_path) {
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not find userfile {:?}", &userfile_path);
+        }
+
+        if let Ok(file) = File::open(&userfile_path) {
+            let mut users = vec![];
+            let reader = std::io::BufReader::new(file);
+            for line in reader.lines() {
+                match line {
+                    Ok(credential) => {
+                        let mut parts = credential.split(':');
+                        if let (Some(username), Some(password)) = (parts.next(), parts.next()) {
+                            users.push(UserCredential {
+                                username: username.trim().to_string(),
+                                password: password.trim().to_string(),
+                            });
+                            debug!("Read ui user {}", username);
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+
+            self._users = Some(users);
+        } else {
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not read userfile {:?}", &userfile_path);
+        }
+        Ok(())
+    }
+
+    pub fn get_user_password(&self, username: &str) -> Option<&str> {
+        if let Some(users) = &self._users {
+            for credential in users {
+                if credential.username.eq_ignore_ascii_case(username) {
+                    return Some(credential.password.as_str());
+                }
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Config {
     #[serde(default = "default_as_zero")]
     pub threads: u8,
@@ -743,8 +807,7 @@ pub(crate) struct Config {
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]
     pub web_ui_enabled: bool,
-    #[serde(default = "default_as_false")]
-    pub web_auth_enabled: bool,
+    pub web_auth: Option<WebAuthConfig>,
     pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
@@ -764,7 +827,7 @@ impl Config {
         self._api_proxy = Arc::new(RwLock::new(api_proxy));
     }
 
-    fn _get_target_for_user(&self, user_target: Option<(UserCredentials, String)>) -> Option<(UserCredentials, &ConfigTarget)> {
+    fn _get_target_for_user(&self, user_target: Option<(ProxyUserCredentials, String)>) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
         match user_target {
             Some((user, target_name)) => {
                 for source in &self.sources {
@@ -787,7 +850,7 @@ impl Config {
         None
     }
 
-    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(UserCredentials, &ConfigTarget)> {
+    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
         match self._api_proxy.read().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name(username, password))
@@ -796,7 +859,7 @@ impl Config {
         }
     }
 
-    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(UserCredentials, &ConfigTarget)> {
+    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
         match self._api_proxy.read().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name_by_token(token))
@@ -836,7 +899,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
         self.working_dir = file_utils::get_working_path(&self.working_dir);
         if self.backup_dir.is_none() {
             self.backup_dir = Some(PathBuf::from(&self.working_dir).join(".backup").into_os_string().to_string_lossy().to_string());
@@ -902,6 +965,13 @@ impl Config {
                 }
             }
         };
+
+        if let Some(web_auth) = &mut self.web_auth {
+            if let Err(err) = web_auth.prepare(&self._config_path, resolve_var) {
+                return Err(err);
+            }
+        }
+
         Ok(())
     }
 

@@ -9,7 +9,7 @@ use log::error;
 use crate::{create_m3u_filter_error_result};
 use crate::api::api_utils::get_user_server_info;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::UserCredentials;
+use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
 use crate::processing::m3u_parser::consume_m3u;
@@ -240,7 +240,7 @@ pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playl
     Ok(())
 }
 
-pub(crate) fn rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &UserCredentials) -> Option<String> {
+pub(crate) fn rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &ProxyUserCredentials) -> Option<String> {
     let filename = target.get_m3u_filename();
     if filename.is_some() {
         if let Some((m3u_path, url_path, idx_path)) = get_m3u_file_paths(cfg, &filename) {

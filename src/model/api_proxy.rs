@@ -47,7 +47,7 @@ impl FromStr for ProxyType {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct UserCredentials {
+pub(crate) struct ProxyUserCredentials {
     pub username: String,
     pub password: String,
     pub token: Option<String>,
@@ -56,7 +56,7 @@ pub(crate) struct UserCredentials {
     pub server: Option<String>,
 }
 
-impl UserCredentials {
+impl ProxyUserCredentials {
 
     pub fn prepare(&mut self, resolve_var: bool) {
         if resolve_var {
@@ -95,15 +95,15 @@ impl UserCredentials {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct TargetUser {
     pub target: String,
-    pub credentials: Vec<UserCredentials>,
+    pub credentials: Vec<ProxyUserCredentials>,
 }
 
 impl TargetUser {
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(&UserCredentials, &str)> {
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(&ProxyUserCredentials, &str)> {
         self.credentials.iter().find(|c| c.matches(username, password))
             .map(|credentials| (credentials, self.target.as_str()))
     }
-    pub fn get_target_name_by_token(&self, token: &str) -> Option<(&UserCredentials, &str)> {
+    pub fn get_target_name_by_token(&self, token: &str) -> Option<(&ProxyUserCredentials, &str)> {
         self.credentials.iter().find(|c| c.matches_token(token))
             .map(|credentials| (credentials, self.target.as_str()))
     }
@@ -232,7 +232,7 @@ impl ApiProxyConfig {
         }
     }
 
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(UserCredentials, String)> {
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, String)> {
         for target_user in &self.user {
             if let Some((credentials, target_name)) = target_user.get_target_name(username, password) {
                 return Some((credentials.clone(), target_name.to_string()));
@@ -241,7 +241,7 @@ impl ApiProxyConfig {
         None
     }
 
-    pub fn get_target_name_by_token(&self, token: &str) -> Option<(UserCredentials, String)> {
+    pub fn get_target_name_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, String)> {
         for target_user in &self.user {
             if let Some((credentials, target_name)) = target_user.get_target_name_by_token(token) {
                 return Some((credentials.clone(), target_name.to_string()));

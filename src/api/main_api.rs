@@ -5,8 +5,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, web};
-use actix_web::http::StatusCode;
-use actix_web::middleware::{ErrorHandlers, Logger};
+use actix_web::middleware::{Logger};
 use log::info;
 
 use crate::api::api_model::{AppState, DownloadQueue, SharedLocks};
@@ -16,7 +15,6 @@ use crate::api::v1_api::v1_api_register;
 use crate::api::web_index::index_register;
 use crate::api::xmltv_api::xmltv_api_register;
 use crate::api::xtream_api::xtream_api_register;
-use crate::auth::authenticator::handle_unauthorized;
 use crate::model::config::{Config, ProcessTargets};
 use crate::processing::playlist_processor;
 
@@ -74,7 +72,6 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
     if web_ui_enabled {
         info!("Web root: {:?}", &web_dir_path);
     }
-    let web_auth_enabled = cfg.web_auth_enabled;
 
     // Web Server
     HttpServer::new(move || {
@@ -87,19 +84,19 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
                 .allow_any_header()
                 .max_age(3600))
             .app_data(shared_data.clone())
-            .wrap(ErrorHandlers::new().handler(StatusCode::UNAUTHORIZED, handle_unauthorized))
-            .configure(|cfg| {
+            // .wrap(Condition::new(web_auth_enabled, ErrorHandlers::new().handler(StatusCode::UNAUTHORIZED, handle_unauthorized)))
+            .configure(|srvcfg| {
                 if web_ui_enabled {
-                    cfg.service(actix_files::Files::new("/static", web_dir_path.join("static")));
-                    cfg.configure(v1_api_register(web_auth_enabled));
+                    srvcfg.service(actix_files::Files::new("/static", web_dir_path.join("static")));
+                    srvcfg.configure(v1_api_register(cfg.web_auth.as_ref().unwrap().clone()));
                 }
             })
             .configure(xtream_api_register)
             .configure(m3u_api_register)
             .configure(xmltv_api_register)
-            .configure(|cfg| {
+            .configure(|srvcfg| {
                 if web_ui_enabled {
-                    cfg.configure(index_register(&web_dir_path, web_auth_enabled));
+                    srvcfg.configure(index_register(&web_dir_path, cfg.web_auth.as_ref().unwrap().clone()));
                 }
             })
     }).bind(format!("{}:{}", host, port))?.run().await

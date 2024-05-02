@@ -2,6 +2,7 @@ extern crate env_logger;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
+extern crate core;
 
 use std::sync::Arc;
 use actix_rt::System;
@@ -9,6 +10,7 @@ use actix_rt::System;
 use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
+use crate::auth::password::generate_password;
 
 use crate::model::config::{Config, ProcessTargets, validate_targets};
 use crate::processing::playlist_processor;
@@ -31,7 +33,6 @@ mod auth;
 #[command(version)]
 #[command(about = "Extended M3U playlist filter", long_about = None)]
 struct Args {
-
     /// The config directory
     #[arg(short = 'p', long = "config-path")]
     config_path: Option<String>,
@@ -48,7 +49,6 @@ struct Args {
     #[arg(short = 'm', long = "mapping")]
     mapping_file: Option<String>,
 
-
     /// The target to process
     #[arg(short = 't', long)]
     target: Option<Vec<String>>,
@@ -64,6 +64,11 @@ struct Args {
     /// log level
     #[arg(short = 'l', long = "log-level", default_missing_value = "info")]
     log_level: Option<String>,
+
+    /// log level
+    #[arg(short = None, long = "genpwd", default_value_t = false, default_missing_value = "true")]
+    genpwd: bool,
+
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -76,8 +81,19 @@ fn main() {
     let config_file: String = args.config_file.unwrap_or(file_utils::get_default_config_file_path(&config_path));
     let sources_file: String = args.source_file.unwrap_or(file_utils::get_default_sources_file_path(&config_path));
 
-
     let mut cfg = config_reader::read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
+
+    if args.genpwd  {
+        match generate_password() {
+            Ok(pwd) => {
+                println!("{}", pwd);
+            }
+            Err(err) => {
+                error!("{}", err);
+            }
+        }
+        return;
+    }
 
     // this does not work
     // if args.log_level.is_none() {
@@ -115,8 +131,7 @@ fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     info!("Server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
     match api::main_api::start_server(cfg, targets) {
-        Ok(_) => {
-        }
+        Ok(_) => {}
         Err(e) => {
             exit!("Can't start server: {}", e);
         }

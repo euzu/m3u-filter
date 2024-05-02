@@ -1,2 +1,3 @@
 pub(crate) mod authenticator;
-mod password;
+pub(crate) mod password;
+pub(crate) mod user;

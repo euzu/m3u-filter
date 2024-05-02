@@ -52,7 +52,7 @@ pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &s
                     result._config_path = config_path.to_string();
                     result._config_file_path = config_file.to_string();
                     result._sources_file_path = sources_file.to_string();
-                    match result.prepare() {
+                    match result.prepare(true) {
                         Ok(_) => Ok(result),
                         Err(err) => Err(err)
                     }
