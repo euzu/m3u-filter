@@ -391,9 +391,9 @@ impl ConfigTarget {
         }
     }
 
-    pub(crate) fn is_multi_input(&self) -> bool {
-        self._multi_input
-    }
+    // pub(crate) fn is_multi_input(&self) -> bool {
+    //     self._multi_input
+    // }
 
     pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
@@ -499,11 +499,11 @@ pub(crate) struct ConfigInputOptions {
     pub xtream_skip_series: bool,
 }
 
-pub(crate) struct InputUserInfo {
-    pub base_url: String,
-    pub username: String,
-    pub password: String,
-}
+// pub(crate) struct InputUserInfo {
+//     pub base_url: String,
+//     pub username: String,
+//     pub password: String,
+// }
 
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
@@ -573,36 +573,36 @@ impl ConfigInput {
         Ok(())
     }
 
-    pub(crate) fn get_user_info(&self) -> Option<InputUserInfo> {
-        if self.input_type == InputType::Xtream {
-            if self.username.is_some() || self.password.is_some() {
-                return Some(InputUserInfo {
-                    base_url: self.url.to_owned(),
-                    username: self.username.as_ref().unwrap().to_owned(),
-                    password: self.password.as_ref().unwrap().to_owned(),
-                });
-            }
-        } else if let Ok(url) = url::Url::parse(&self.url) {
-            let base_url = url.origin().ascii_serialization();
-            let mut username = None;
-            let mut password = None;
-            for (key, value) in url.query_pairs() {
-                if key.eq("username") {
-                    username = Some(value.into_owned());
-                } else if key.eq("password") {
-                    password = Some(value.into_owned());
-                }
-            }
-            if username.is_some() || password.is_some() {
-                return Some(InputUserInfo {
-                    base_url,
-                    username: username.as_ref().unwrap().to_owned(),
-                    password: password.as_ref().unwrap().to_owned(),
-                });
-            }
-        }
-        None
-    }
+    // pub(crate) fn get_user_info(&self) -> Option<InputUserInfo> {
+    //     if self.input_type == InputType::Xtream {
+    //         if self.username.is_some() || self.password.is_some() {
+    //             return Some(InputUserInfo {
+    //                 base_url: self.url.to_owned(),
+    //                 username: self.username.as_ref().unwrap().to_owned(),
+    //                 password: self.password.as_ref().unwrap().to_owned(),
+    //             });
+    //         }
+    //     } else if let Ok(url) = url::Url::parse(&self.url) {
+    //         let base_url = url.origin().ascii_serialization();
+    //         let mut username = None;
+    //         let mut password = None;
+    //         for (key, value) in url.query_pairs() {
+    //             if key.eq("username") {
+    //                 username = Some(value.into_owned());
+    //             } else if key.eq("password") {
+    //                 password = Some(value.into_owned());
+    //             }
+    //         }
+    //         if username.is_some() || password.is_some() {
+    //             return Some(InputUserInfo {
+    //                 base_url,
+    //                 username: username.as_ref().unwrap().to_owned(),
+    //                 password: password.as_ref().unwrap().to_owned(),
+    //             });
+    //         }
+    //     }
+    //     None
+    // }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -741,6 +741,10 @@ pub(crate) struct Config {
     pub schedule: Option<String>,
     #[serde(default = "default_as_false")]
     pub update_on_boot: bool,
+    #[serde(default = "default_as_true")]
+    pub web_ui_enabled: bool,
+    #[serde(default = "default_as_false")]
+    pub web_auth_enabled: bool,
     pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,

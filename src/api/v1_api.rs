@@ -1,11 +1,14 @@
-use std::sync::{Arc};
+use std::sync::Arc;
 
-use actix_web::{HttpResponse, Scope, web};
+use actix_web::{HttpResponse, web};
+use actix_web::middleware::Condition;
+use actix_web_httpauth::middleware::HttpAuthentication;
 use log::error;
 use serde_json::json;
 
 use crate::api::api_model::{AppState, PlaylistRequest, ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::api::download_api;
+use crate::auth::authenticator::validator;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
 use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, validate_targets};
@@ -223,8 +226,10 @@ pub(crate) async fn config(
     HttpResponse::Ok().json(result)
 }
 
-pub(crate) fn v1_api_register() -> Scope {
-    web::scope("/api/v1")
+pub(crate) fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) -> () {
+    return move |cfg: &mut web::ServiceConfig| {
+        cfg.service(web::scope("/api/v1")
+        .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))
         .route("/config", web::get().to(config))
         .route("/config/main", web::post().to(save_config_main))
         .route("/config/user", web::post().to(save_config_api_proxy_user))
@@ -232,5 +237,6 @@ pub(crate) fn v1_api_register() -> Scope {
         .route("/playlist", web::post().to(playlist))
         .route("/playlist/update", web::post().to(playlist_update))
         .route("/file/download", web::post().to(download_api::queue_download_file))
-        .route("/file/download/info", web::get().to(download_api::download_file_info))
+        .route("/file/download/info", web::get().to(download_api::download_file_info)));
+    };
 }

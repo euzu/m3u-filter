@@ -1,17 +1,17 @@
-use std::path::{PathBuf};
-use actix_web::{HttpRequest, HttpResponse, Resource, web};
+use std::path::PathBuf;
+
+use actix_web::{HttpRequest, HttpResponse, web};
 use log::{debug, info};
 use url::Url;
 
-use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::api_model::{AppState, UserApiRequest};
+use crate::api::api_utils::{get_user_target, serve_file};
 use crate::model::api_proxy::ProxyType;
 use crate::model::config::{Config, ConfigTarget, InputType};
 use crate::model::config::TargetType;
 use crate::repository::m3u_repository::get_m3u_epg_file_path;
 use crate::repository::xtream_repository::{get_xtream_epg_file_path, get_xtream_storage_path};
 use crate::utils::{file_utils, request_utils};
-
 
 fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<PathBuf> {
     for output in &target.output {
@@ -86,9 +86,7 @@ async fn xmltv_api(
         r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)
 }
 
-pub(crate) fn xmltv_api_register() -> Vec<Resource> {
-    vec![
-        web::resource("/xmltv.php").route(web::get().to(xmltv_api)),
-        web::resource("/epg").route(web::get().to(xmltv_api)),
-    ]
+pub(crate) fn xmltv_api_register(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::resource("/xmltv.php").route(web::get().to(xmltv_api)));
+    cfg.service(web::resource("/epg").route(web::get().to(xmltv_api)));
 }

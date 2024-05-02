@@ -23,6 +23,7 @@ mod test;
 mod api;
 mod processing;
 mod utils;
+mod auth;
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
@@ -112,10 +113,10 @@ fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    info!("Web root: {}", &cfg.api.web_root);
     info!("Server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
     match api::main_api::start_server(cfg, targets) {
-        Ok(_) => {}
+        Ok(_) => {
+        }
         Err(e) => {
             exit!("Can't start server: {}", e);
         }

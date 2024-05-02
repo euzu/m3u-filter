@@ -70,6 +70,7 @@ Top level entries in the config files are:
 * `schedule` _optional_
 * `backup_dir` _optional_
 * `update_on_boot` _optional_
+* `web_ui_enabled` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -162,6 +163,9 @@ You could be banned from your server. Twice a day should be enough.
 is the directory where the backup configuration files written, when saved from the ui.
 
 ### 1.7 `update_on_boot`
+if set to true, an update is started when the application starts.
+
+### 1.8 `web_ui_enabled`
 if set to true, an update is started when the application starts.
 
 ## Example config file
