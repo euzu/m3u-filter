@@ -184,8 +184,9 @@ web_auth:
 
 - `web_auth` can be deactivated if `enabled` is set to `false`. If not set default is `true`.
 - `secret` is used for jwt token generation.
-- `userfile` is the file where the ui users are stored. if the filename is not absolute
-- `m3u-filter` will look into the `config_dir`. if `userfile`is not given the default value is `user.txt`
+- `userfile` is the file where the ui users are stored. if the filename is not absolute `m3u-filter` will look into the `config_dir`. if `userfile`is not given the default value is `user.txt`
+
+You can generate a secret for jwt token for example with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
 The userfile has the format  `username: password` per line.
 Example:
