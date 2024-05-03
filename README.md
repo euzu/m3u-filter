@@ -182,10 +182,10 @@ web_auth:
   userfile: user.txt
 ```
 
-`web_auth` can be deactivated if `enabled` is set to `false`. If not set default is `true`.
-`secret` is used for jwt token generation.
-`userfile` is the file where the ui users are stored. if the filename is not absolute
-`m3u-filter` will look into the `config_dir`. if `userfile`is not given the default value is `user.txt`
+- `web_auth` can be deactivated if `enabled` is set to `false`. If not set default is `true`.
+- `secret` is used for jwt token generation.
+- `userfile` is the file where the ui users are stored. if the filename is not absolute
+- `m3u-filter` will look into the `config_dir`. if `userfile`is not given the default value is `user.txt`
 
 The userfile has the format  `username: password` per line.
 Example:

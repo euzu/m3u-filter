@@ -69,34 +69,34 @@ pub(crate) struct TVGuide {
 impl TVGuide {
     pub(crate) fn filter(&self, channel_ids: &HashSet<Rc<String>>) -> Option<Epg> {
         if !channel_ids.is_empty() {
-            let children: Vec<Rc<XmlTag>> = self.epg.children.as_ref().unwrap().iter().filter(|c| {
-                match c.name.as_str() {
-                    "channel" => {
-                        match c.get_attribute_value("id") {
-                            None => false,
-                            Some(val) => channel_ids.contains(val)
+            if let Some(epg_children) = &self.epg.children {
+                let children: Vec<Rc<XmlTag>> = epg_children.iter().filter(|c| {
+                    match c.name.as_str() {
+                        "channel" => {
+                            match c.get_attribute_value("id") {
+                                None => false,
+                                Some(val) => channel_ids.contains(val)
+                            }
                         }
-                    }
-                    "programme" => {
-                        match c.get_attribute_value("channel") {
-                            None => false,
-                            Some(val) => channel_ids.contains(val)
+                        "programme" => {
+                            match c.get_attribute_value("channel") {
+                                None => false,
+                                Some(val) => channel_ids.contains(val)
+                            }
                         }
+                        _ => false,
                     }
-                    _ => false,
+                }).cloned().collect();
+
+                if !children.is_empty() {
+                    return Some(Epg {
+                        attributes: self.epg.attributes.clone(),
+                        children,
+                    });
                 }
-            }).cloned().collect();
-            if children.is_empty() {
-                None
-            } else {
-                Some(Epg {
-                    attributes: self.epg.attributes.clone(),
-                    children,
-                })
             }
-        } else {
-            None
         }
+        None
     }
 }
 
