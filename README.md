@@ -168,9 +168,9 @@ is the directory where the backup configuration files written, when saved from t
 if set to true, an update is started when the application starts.
 
 ### 1.8 `web_ui_enabled`
-if set to true, an update is started when the application starts.
+default is true, if set to false the web_ui is disabled
 
-### 1.8 `web_auth`
+### 1.9 `web_auth`
 Web UI Authentication can be enabled if `web_ui_enabled` is `true`.
 
 ```yaml
