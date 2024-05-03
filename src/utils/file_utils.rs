@@ -47,6 +47,10 @@ pub(crate) fn get_default_file_path(config_path: &str, file: &str) -> String {
     })
 }
 
+pub(crate) fn get_default_user_file_path(config_path: &str) -> String {
+    get_default_file_path(config_path, "user.txt")
+}
+
 pub(crate) fn get_default_config_path() -> String {
     get_default_path("config")
 }

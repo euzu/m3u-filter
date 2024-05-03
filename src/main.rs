@@ -85,12 +85,8 @@ fn main() {
 
     if args.genpwd  {
         match generate_password() {
-            Ok(pwd) => {
-                println!("{}", pwd);
-            }
-            Err(err) => {
-                error!("{}", err);
-            }
+            Ok(pwd) => println!("{}", pwd),
+            Err(err) => error!("{}", err)
         }
         return;
     }

@@ -32,11 +32,23 @@ pub(crate) fn verify_password(hash: &str, password: &[u8]) -> bool {
 
 pub(crate) fn generate_password() -> std::io::Result<String> {
     match rpassword::prompt_password("password> ") {
-        Ok(pwd) => {
-          match hash(pwd.as_bytes()) {
-              None => Err(std::io::Error::new(ErrorKind::Other, "Failed to generate hash")),
-              Some(hash) => Ok(hash),
-          }
+        Ok(pwd1) => {
+            if pwd1.len() < 8 {
+                return Err(std::io::Error::new(ErrorKind::Other, "Password too short min length 8"))
+            }
+            match rpassword::prompt_password("retype password> ") {
+                Ok(pwd2) => {
+                    if pwd1.eq(&pwd2) {
+                        match hash(pwd1.as_bytes()) {
+                            None => Err(std::io::Error::new(ErrorKind::Other, "Failed to generate hash")),
+                            Some(hash) => Ok(hash),
+                        }
+                    } else {
+                        Err(std::io::Error::new(ErrorKind::Other, "Passwords don't match"))
+                    }
+                }
+                Err(err) => Err(err)
+            }
         },
         Err(err) => Err(err)
     }

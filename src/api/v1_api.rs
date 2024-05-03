@@ -11,7 +11,7 @@ use crate::api::download_api;
 use crate::auth::authenticator::validator;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
-use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, validate_targets, WebAuthConfig};
+use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, validate_targets};
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, download};
 
@@ -226,8 +226,7 @@ pub(crate) async fn config(
     HttpResponse::Ok().json(result)
 }
 
-pub(crate) fn v1_api_register(web_auth_config: WebAuthConfig) -> impl Fn(&mut web::ServiceConfig) -> () {
-    let web_auth_enabled = web_auth_config.enabled;
+pub(crate) fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) -> () {
     return move |cfg: &mut web::ServiceConfig| {
         cfg.service(web::scope("/api/v1")
         .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))

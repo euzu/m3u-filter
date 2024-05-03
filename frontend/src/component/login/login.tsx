@@ -10,18 +10,14 @@ export default function Login(): JSX.Element {
     const usernameRef = useRef<HTMLInputElement>();
     const passwordRef = useRef<HTMLInputElement>();
     const services = useServices();
-    const [authorized, setAuthorized] = useState(false);
+    const [authorized, setAuthorized] = useState(true);
 
     const handleLogin = useCallback(() => {
         const username = usernameRef.current.value;
         const password = passwordRef.current.value;
         services.auth().authenticate(username, password).pipe(first()).subscribe({
-            next: (auth) => {
-                setAuthorized(auth);
-            },
-            error: () => {
-                setAuthorized(false);
-            }
+            next: (auth) => setAuthorized(auth),
+            error: () => setAuthorized(false)
         });
     }, [services]);
 
@@ -34,15 +30,15 @@ export default function Login(): JSX.Element {
     }, [handleLogin]);
 
 
-    return <div className={'login'}>
-        <div className={'title'}>Login to m3u-filter</div>
+    return <div className={'login-view'}>
+        <div className={'login-view__title'}>Login to m3u-filter</div>
         <form>
-            <div className="login__form">
+            <div className="login-view__form">
                 <input ref={usernameRef} type="text" name="username" placeholder="username"/>
                 <input ref={passwordRef} type="password" name="password" placeholder="password"
                        onKeyDown={handleKeyDown}/>
                 <button type="button" className="btn" onClick={handleLogin}>Login</button>
-                <span className={authorized ? '' : 'hidden'}>Failed to login</span>
+                <span className={authorized ? 'hidden' : 'error-text'}>Failed to login</span>
             </div>
         </form>
     </div>

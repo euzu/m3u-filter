@@ -18,7 +18,7 @@
    - `enabled`: default true
    - `issuer` issuer for jwt token
    - `secret` secret for jwt token
-   - `userfile` userfile with generated userfile in format "username: password" per file
+   - `userfile` optional userfile with generated userfile in format "username: password" per file, default name is user.txt in config path
 * Password generation argument --genpwd  to generate passwords for userfile. 
 
 # v1.1.8(2024-03-06)

@@ -737,7 +737,7 @@ pub(crate) struct WebAuthConfig {
     pub enabled: bool,
     pub issuer: String,
     pub secret: String,
-    pub userfile: String,
+    pub userfile: Option<String>,
     pub _users: Option<Vec<UserCredential>>,
 }
 
@@ -746,12 +746,22 @@ impl WebAuthConfig {
         if resolve_var {
             self.issuer = config_reader::resolve_env_var(&self.issuer);
             self.secret = config_reader::resolve_env_var(&self.secret);
-            self.userfile = config_reader::resolve_env_var(&self.userfile);
+            if let Some(file) = &self.userfile {
+                self.userfile = Some(config_reader::resolve_env_var(file));
+            }
         }
+        let userfile_name = match &self.userfile {
+            None => file_utils::get_default_user_file_path(config_path),
+            Some(file) => file.to_owned()
+        };
+        self.userfile = Some(userfile_name.to_owned());
 
-        let userfile_path = PathBuf::from(file_utils::get_default_file_path(config_path, &self.userfile));
+        let mut userfile_path = PathBuf::from(&userfile_name);
         if !file_utils::path_exists(&userfile_path) {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not find userfile {:?}", &userfile_path);
+            userfile_path = PathBuf::from(config_path).join(&userfile_name);
+            if !file_utils::path_exists(&userfile_path) {
+                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not find userfile {}", &userfile_name);
+            }
         }
 
         if let Ok(file) = File::open(&userfile_path) {
@@ -966,9 +976,17 @@ impl Config {
             }
         };
 
+        if !self.web_ui_enabled {
+            self.web_auth = None;
+        }
+
         if let Some(web_auth) = &mut self.web_auth {
-            if let Err(err) = web_auth.prepare(&self._config_path, resolve_var) {
-                return Err(err);
+            if !web_auth.enabled {
+                self.web_auth = None
+            } else {
+                if let Err(err) = web_auth.prepare(&self._config_path, resolve_var) {
+                    return Err(err);
+                }
             }
         }
 

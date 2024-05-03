@@ -1,16 +1,16 @@
 @use '../../scss/theme';
 
-.login {
+.login-view {
   display: flex;
   flex-flow: column;
   gap: 8px;
-  margin: 20% auto auto auto;
+  margin: 10% auto auto auto;
   border: 1px solid var(--border-color);
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
   overflow: hidden;
 
-  .title {
+  &__title {
     background-color: var(--app-header-color);
     padding: 8px;
   }
@@ -38,6 +38,11 @@
       color: var(--text-button-color);
       padding: 4px 8px;
       border-radius: 6px;
+    }
+
+    .error-text {
+      color: red;
+      font-size: 0.8rem;
     }
   }
 }

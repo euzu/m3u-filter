@@ -69,8 +69,12 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
         );
     }
 
+    let mut web_auth_enabled = false;
     if web_ui_enabled {
         info!("Web root: {:?}", &web_dir_path);
+        if let Some(web_auth) = &cfg.web_auth {
+            web_auth_enabled = web_auth.enabled;
+        }
     }
 
     // Web Server
@@ -88,7 +92,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
             .configure(|srvcfg| {
                 if web_ui_enabled {
                     srvcfg.service(actix_files::Files::new("/static", web_dir_path.join("static")));
-                    srvcfg.configure(v1_api_register(cfg.web_auth.as_ref().unwrap().clone()));
+                    srvcfg.configure(v1_api_register(web_auth_enabled));
                 }
             })
             .configure(xtream_api_register)
@@ -96,7 +100,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
             .configure(xmltv_api_register)
             .configure(|srvcfg| {
                 if web_ui_enabled {
-                    srvcfg.configure(index_register(&web_dir_path, cfg.web_auth.as_ref().unwrap().clone()));
+                    srvcfg.configure(index_register(&web_dir_path));
                 }
             })
     }).bind(format!("{}:{}", host, port))?.run().await
