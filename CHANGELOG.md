@@ -1,5 +1,5 @@
 # Changelog
-# v1.1.9(2024-03-xx)
+# v1.1.9(2024-04-xx)
 * `update_on_boot` for config, default is false, if true an update is run on start
 * `category_id` filter added to xtream api
 * Handling for m3u files without id and group information
@@ -12,6 +12,14 @@
 * Generating xtream stream urls from m3u input.
 * Reverse proxy implementation for m3u playlist.
 * Mapper can now set `epg_channel_id`.
+* Added environment variables for User Credentials `username`, `password` and `token` in format `${env:<EnvVarName>}` where `<EnvVarName>` should be replaced.
+* Added `web_ui_enabled` to `config.yml`. Default is `true`. Set to `false` to disable webui.
+* Added `web_auth` to `config.yml` struct for web-ui-authentication is optional.
+   - `enabled`: default true
+   - `issuer` issuer for jwt token
+   - `secret` secret for jwt token
+   - `userfile` optional userfile with generated userfile in format "username: password" per file, default name is user.txt in config path
+* Password generation argument --genpwd  to generate passwords for userfile. 
 
 # v1.1.8(2024-03-06)
 * Fixed WebUI Option-Select  

@@ -96,7 +96,7 @@ export default function App(props: AppProps) {
         } else {
             enqueueSnackbar("Invalid filetype!", {variant: 'error'})
         }
-    }, [clipboardChannel, serverConfig]);
+    }, [serverConfig, enqueueSnackbar, services]);
 
     const handleOnWebSearch = useCallback((playlistItem: PlaylistItem): void => {
         if (playlistItem) {

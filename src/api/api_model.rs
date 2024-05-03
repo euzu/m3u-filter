@@ -133,7 +133,7 @@ impl SharedLocks {
             }
         }
         let mut lock = self.shared_locks.write().unwrap();
-        let file = Arc::new(RwLock::new(key.to_string() ));
+        let file = Arc::new(RwLock::new(key.to_string()));
         lock.insert(key.to_string(), file.clone());
         file
     }
@@ -191,6 +191,47 @@ pub(crate) struct XtreamAuthorizationResponse {
     pub user_info: XtreamUserInfo,
     pub server_info: XtreamServerInfo,
 }
+
+// macro_rules! create_user_api {
+// ($name:ident { $($field:ident : $field_type:ty),* $(,)? }) => {
+//         #[derive(Debug, serde::Serialize, serde::Deserialize)]
+//         pub(crate) struct $name {
+//             $(
+//             #[serde(default = "default_as_empty_str")]
+//             pub $field : $field_type
+//             ),*
+//         }
+//
+//         impl $name {
+//             pub fn from_map(map: &HashMap<String, String>) -> Self {
+//                 let mut fields = HashMap::new();
+//                 $(
+//                     if let Some(value) = map.get(stringify!($field)) {
+//                         fields.insert(stringify!($field).to_string(), value.clone());
+//                     }
+//                 )*
+//                 Self {
+//                     $(
+//                         $field: fields.remove(stringify!($field)).unwrap_or_default(),
+//                     )*
+//                 }
+//             }
+//         }
+//     };
+// }
+//
+// create_user_api!(
+// UserApiRequest {
+//     username: String,
+//     password: String,
+//     token: String,
+//     action: String,
+//     series_id: String,
+//     vod_id: String,
+//     stream_id: String,
+//     category_id: String,
+//     limit: String,
+// });
 
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

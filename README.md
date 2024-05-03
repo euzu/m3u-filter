@@ -50,6 +50,7 @@ Options:
   -l, --log-level <LOG_LEVEL>      log level
   -h, --help                       Print help
   -V, --version                    Print version
+  --genpwd                         Generate UI Password
 ```
 
 ## 1. `config.yml`
@@ -70,6 +71,8 @@ Top level entries in the config files are:
 * `schedule` _optional_
 * `backup_dir` _optional_
 * `update_on_boot` _optional_
+* `web_ui_enabled` _optional_
+* `web_auth` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -163,6 +166,39 @@ is the directory where the backup configuration files written, when saved from t
 
 ### 1.7 `update_on_boot`
 if set to true, an update is started when the application starts.
+
+### 1.8 `web_ui_enabled`
+default is true, if set to false the web_ui is disabled
+
+### 1.9 `web_auth`
+Web UI Authentication can be enabled if `web_ui_enabled` is `true`.
+
+```yaml
+web_ui_enabled: true
+web_auth:
+  enabled: true
+  secret: very.secret.secret
+  issuer: m3u_filter
+  userfile: user.txt
+```
+
+- `web_auth` can be deactivated if `enabled` is set to `false`. If not set default is `true`.
+- `secret` is used for jwt token generation.
+- `userfile` is the file where the ui users are stored. if the filename is not absolute `m3u-filter` will look into the `config_dir`. if `userfile`is not given the default value is `user.txt`
+
+You can generate a secret for jwt token for example with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+The userfile has the format  `username: password` per line.
+Example:
+```
+test: $argon2id$v=19$m=19456,t=2,p=1$QUpBWW5uellicTFRUU1tR0RVYVVEUTN5UEJDaWNWQnI3Rm1aNU1xZ3VUSWc3djZJNjk5cGlkOWlZTGFHajllSw$3HHEnLmHW07pjE97Inh85RTi6VN6wbV27sT2hHzGgXk
+nobody: $argon2id$v=$argon2id$v=19$m=19456,t=2,p=1$Y2FROE83ZDQ1c2VaYmJ4VU9YdHpuZ2c2ZUwzVkhlRWFpQk80YVhNMEJCSlhmYk8wRE16UEtWemV2dk81cmNaNw$BB81wmEm/faku/dXenC9wE7z0/pt40l4YGh8jl9G2ko
+```
+
+The password can be generated with
+`./m3u-filter  -p /op/m3u-filter/config --genpwd`
+
+The encrypted pasword needs to be added manually into the users file.
 
 ## Example config file
 ```yaml

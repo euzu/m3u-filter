@@ -5,7 +5,7 @@ use actix_web::{HttpRequest, HttpResponse, web};
 use log::{debug, error};
 use url::Url;
 use crate::api::api_model::{AppState, UserApiRequest};
-use crate::model::api_proxy::{ApiProxyServerInfo, UserCredentials};
+use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, ConfigInput};
 use crate::utils::request_utils;
 
@@ -23,7 +23,7 @@ pub(crate) async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: m
 }
 
 pub(crate) fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a UserApiRequest,
-                                                 app_state: &'a web::Data<AppState>) -> Option<(UserCredentials, &'a ConfigTarget)> {
+                                                 app_state: &'a web::Data<AppState>) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() && !password.is_empty() {
         app_state.config.get_target_for_user(username, password)
     } else {
@@ -36,13 +36,13 @@ pub(crate) fn get_user_target_by_credentials<'a>(username: &str, password: &str,
     }
 }
 
-pub(crate) fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a web::Data<AppState>) -> Option<(UserCredentials, &'a ConfigTarget)> {
+pub(crate) fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a web::Data<AppState>) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     let username = api_req.username.as_str().trim();
     let password = api_req.password.as_str().trim();
     get_user_target_by_credentials(username, password, api_req, app_state)
 }
 
-pub(crate) fn get_user_server_info(cfg: &Config, user: &UserCredentials) -> ApiProxyServerInfo {
+pub(crate) fn get_user_server_info(cfg: &Config, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
     let server_info_list = cfg._api_proxy.read().unwrap().as_ref().unwrap().server.clone();
     let server_info_name = match &user.server {
         Some(server_name) => server_name.as_str(),

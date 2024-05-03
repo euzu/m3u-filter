@@ -1,17 +1,22 @@
-use std::sync::{Arc};
-use actix_web::{HttpResponse, Scope, web};
-use serde_json::{json};
+use std::sync::Arc;
+
+use actix_web::{HttpResponse, web};
+use actix_web::middleware::Condition;
+use actix_web_httpauth::middleware::HttpAuthentication;
+use log::error;
+use serde_json::json;
+
 use crate::api::api_model::{AppState, PlaylistRequest, ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
-use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, validate_targets};
-use log::{error};
 use crate::api::download_api;
+use crate::auth::authenticator::validator;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
+use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, validate_targets};
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, download};
 
-fn _save_config_api_proxy(backup_dir: &str, api_proxy: &mut ApiProxyConfig) -> Option<M3uFilterError> {
-    match config_reader::save_api_proxy(api_proxy._file_path.as_str(), backup_dir, api_proxy) {
+fn _save_config_api_proxy(backup_dir: &str, api_proxy: &mut ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
+    match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
         Ok(_) => {}
         Err(err) => {
             error!("Failed to save api_proxy.yml {}", err.to_string());
@@ -33,16 +38,18 @@ fn _save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Opti
 }
 
 pub(crate) async fn save_config_api_proxy_user(
-    mut req: web::Json<Vec<TargetUser>>,
-    mut _app_state: web::Data<AppState>,
+    req: web::Json<Vec<TargetUser>>,
+    app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    req.0.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.trim());
-    if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
-        api_proxy.user = req.0;
-        let backup_dir = _app_state.config.backup_dir.as_ref().unwrap().as_str();
-        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy) {
+    let mut users = req.0;
+    users.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.trim());
+    if let Some(api_proxy) = app_state.config._api_proxy.write().unwrap().as_mut() {
+        let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
+        api_proxy.user = users;
+        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy, app_state.config._api_proxy_file_path.as_str()) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
+        api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.prepare(true));
     }
     HttpResponse::Ok().finish()
 }
@@ -64,10 +71,9 @@ pub(crate) async fn save_config_main(
     }
 }
 
-
 pub(crate) async fn save_config_api_proxy_config(
     req: web::Json<Vec<ApiProxyServerInfo>>,
-    mut _app_state: web::Data<AppState>,
+    app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let mut req_api_proxy = req.0;
     for server_info in &mut req_api_proxy {
@@ -75,10 +81,10 @@ pub(crate) async fn save_config_api_proxy_config(
             return HttpResponse::BadRequest().json(json!({"error": "Invalid content"}));
         }
     }
-    if let Some(api_proxy) = _app_state.config._api_proxy.write().unwrap().as_mut() {
+    if let Some(api_proxy) = app_state.config._api_proxy.write().unwrap().as_mut() {
         api_proxy.server = req_api_proxy;
-        let backup_dir = _app_state.config.backup_dir.as_ref().unwrap().as_str();
-        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy) {
+        let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
+        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy, app_state.config._api_proxy_file_path.as_str()) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
     }
@@ -158,7 +164,7 @@ pub(crate) async fn playlist(
 }
 
 pub(crate) async fn config(
-    _app_state: web::Data<AppState>,
+    app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let map_input = |i: &ConfigInput| ServerInputConfig {
         id: i.id,
@@ -199,29 +205,31 @@ pub(crate) async fn config(
         messaging: config.messaging.clone(),
         video: config.video.clone(),
         sources: config.sources.iter().map(map_source).collect(),
-        api_proxy: config._api_proxy.read().unwrap().clone(),
+        api_proxy: config_reader::read_api_proxy(app_state.config._api_proxy_file_path.as_str(), false),
     };
 
-    let mut result = match config_reader::read_config(_app_state.config._config_path.as_str(),
-                                       _app_state.config._config_file_path.as_str(),
-                                       _app_state.config._sources_file_path.as_str()) {
+    let mut result = match config_reader::read_config(app_state.config._config_path.as_str(),
+                                                      app_state.config._config_file_path.as_str(),
+                                                      app_state.config._sources_file_path.as_str()) {
         Ok(mut cfg) => {
-            let _ = cfg.prepare();
+            let _ = cfg.prepare(true);
             map_config(&cfg)
         }
-        Err(_) => map_config(&_app_state.config)
+        Err(_) => map_config(&app_state.config)
     };
 
     // if we didn't read it from file then we should use it from app_state
     if result.api_proxy.is_none() {
-        result.api_proxy = _app_state.config._api_proxy.read().unwrap().clone();
+        result.api_proxy = app_state.config._api_proxy.read().unwrap().clone();
     }
 
     HttpResponse::Ok().json(result)
 }
 
-pub(crate) fn v1_api_register() -> Scope {
-    web::scope("/api/v1")
+pub(crate) fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) -> () {
+    return move |cfg: &mut web::ServiceConfig| {
+        cfg.service(web::scope("/api/v1")
+        .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))
         .route("/config", web::get().to(config))
         .route("/config/main", web::post().to(save_config_main))
         .route("/config/user", web::post().to(save_config_api_proxy_user))
@@ -229,5 +237,6 @@ pub(crate) fn v1_api_register() -> Scope {
         .route("/playlist", web::post().to(playlist))
         .route("/playlist/update", web::post().to(playlist_update))
         .route("/file/download", web::post().to(download_api::queue_download_file))
-        .route("/file/download/info", web::get().to(download_api::download_file_info))
+        .route("/file/download/info", web::get().to(download_api::download_file_info)));
+    };
 }

@@ -1,10 +1,12 @@
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::str::FromStr;
+
 use enum_iterator::Sequence;
+
 use crate::create_m3u_filter_error_result;
-
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-
+use crate::utils::config_reader;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
 pub(crate) enum ProxyType {
@@ -20,12 +22,13 @@ impl ProxyType {
     }
 }
 
-impl ToString for ProxyType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for ProxyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
             ProxyType::Reverse => "reverse".to_string(),
             ProxyType::Redirect => "redirect".to_string()
-        }
+        };
+        write!(f, "{}", str)
     }
 }
 
@@ -43,9 +46,8 @@ impl FromStr for ProxyType {
     }
 }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct UserCredentials {
+pub(crate) struct ProxyUserCredentials {
     pub username: String,
     pub password: String,
     pub token: Option<String>,
@@ -54,7 +56,19 @@ pub(crate) struct UserCredentials {
     pub server: Option<String>,
 }
 
-impl UserCredentials {
+impl ProxyUserCredentials {
+
+    pub fn prepare(&mut self, resolve_var: bool) {
+        if resolve_var {
+            self.username =  config_reader::resolve_env_var(&self.username);
+            self.password =  config_reader::resolve_env_var(&self.password);
+            if let Some(tkn) = &self.token {
+                self.token = Some(config_reader::resolve_env_var(tkn))
+            }
+            self.trim();
+        }
+    }
+
     pub fn matches_token(&self, token: &str) -> bool {
         if let Some(tkn) = &self.token {
             return tkn.eq(token);
@@ -81,15 +95,15 @@ impl UserCredentials {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct TargetUser {
     pub target: String,
-    pub credentials: Vec<UserCredentials>,
+    pub credentials: Vec<ProxyUserCredentials>,
 }
 
 impl TargetUser {
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(&UserCredentials, &str)> {
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(&ProxyUserCredentials, &str)> {
         self.credentials.iter().find(|c| c.matches(username, password))
             .map(|credentials| (credentials, self.target.as_str()))
     }
-    pub fn get_target_name_by_token(&self, token: &str) -> Option<(&UserCredentials, &str)> {
+    pub fn get_target_name_by_token(&self, token: &str) -> Option<(&ProxyUserCredentials, &str)> {
         self.credentials.iter().find(|c| c.matches_token(token))
             .map(|credentials| (credentials, self.target.as_str()))
     }
@@ -165,12 +179,10 @@ impl ApiProxyServerInfo {
 pub(crate) struct ApiProxyConfig {
     pub server: Vec<ApiProxyServerInfo>,
     pub user: Vec<TargetUser>,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub _file_path: String,
 }
 
 impl ApiProxyConfig {
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
         let mut usernames = HashSet::new();
         let mut tokens = HashSet::new();
         let mut errors = Vec::new();
@@ -190,6 +202,7 @@ impl ApiProxyConfig {
         }
         for target_user in &mut self.user {
             for user in &mut target_user.credentials {
+                user.prepare(resolve_var);
                 if usernames.contains(&user.username) {
                     errors.push(format!("Non unique username found {}", &user.username));
                 } else {
@@ -206,7 +219,7 @@ impl ApiProxyConfig {
                 }
 
                 if let Some(server_info_name) = &user.server {
-                    if ! &self.server.iter().any(|server_info| server_info.name.eq(server_info_name)) {
+                    if !&self.server.iter().any(|server_info| server_info.name.eq(server_info_name)) {
                         errors.push(format!("No server info with name {} found for user {}", server_info_name, &user.username));
                     }
                 }
@@ -219,7 +232,7 @@ impl ApiProxyConfig {
         }
     }
 
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(UserCredentials, String)> {
+    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, String)> {
         for target_user in &self.user {
             if let Some((credentials, target_name)) = target_user.get_target_name(username, password) {
                 return Some((credentials.clone(), target_name.to_string()));
@@ -228,7 +241,7 @@ impl ApiProxyConfig {
         None
     }
 
-    pub fn get_target_name_by_token(&self, token: &str) -> Option<(UserCredentials, String)> {
+    pub fn get_target_name_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, String)> {
         for target_user in &self.user {
             if let Some((credentials, target_name)) = target_user.get_target_name_by_token(token) {
                 return Some((credentials.clone(), target_name.to_string()));

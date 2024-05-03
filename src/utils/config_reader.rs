@@ -1,13 +1,17 @@
-use std::fs::{File};
-use std::path::{PathBuf};
+use std::env;
+use std::fs::File;
+use std::path::PathBuf;
+
 use chrono::Local;
 use log::{debug, error, info, warn};
+use regex::Regex;
 use serde::Serialize;
+
+use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result};
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::{Config, ConfigDto};
 use crate::model::mapping::Mappings;
-use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::utils::{file_utils, multi_file_reader};
 
 pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
@@ -26,14 +30,14 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
 
 pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
     let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(file_utils::get_default_api_proxy_config_path(cfg._config_path.as_str()));
-    let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str());
+    cfg._api_proxy_file_path = api_proxy_config_file.to_owned();
+    let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str(), true);
     match api_proxy_config {
         None => {
             warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
         }
-        Some(mut config) => {
+        Some(config) => {
             info!("Api Proxy File: {}", &api_proxy_config_file);
-            config._file_path = api_proxy_config_file;
             cfg.set_api_proxy(Some(config));
         }
     }
@@ -48,7 +52,7 @@ pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &s
                     result._config_path = config_path.to_string();
                     result._config_file_path = config_file.to_string();
                     result._sources_file_path = sources_file.to_string();
-                    match result.prepare() {
+                    match result.prepare(true) {
                         Ok(_) => Ok(result),
                         Err(err) => Err(err)
                     }
@@ -85,14 +89,16 @@ pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFi
     }
 }
 
-pub(crate) fn read_api_proxy(api_proxy_file: &str) -> Option<ApiProxyConfig> {
+pub(crate) fn read_api_proxy(api_proxy_file: &str, resolve_var: bool) -> Option<ApiProxyConfig> {
     match file_utils::open_file(&std::path::PathBuf::from(api_proxy_file)) {
         Ok(file) => {
             let mapping: Result<ApiProxyConfig, _> = serde_yaml::from_reader(file);
             match mapping {
                 Ok(mut result) => {
-                    match result.prepare() {
-                        Ok(_) => Some(result),
+                    match result.prepare(resolve_var) {
+                        Ok(_) => {
+                            Some(result)
+                        }
                         Err(err) => {
                             error!("cant read api-proxy-config file: {}", err);
                             None
@@ -137,4 +143,20 @@ pub(crate) fn save_api_proxy(file_path: &str, backup_dir: &str, config: &ApiProx
 
 pub(crate) fn save_main_config(file_path: &str, backup_dir: &str, config: &ConfigDto) -> Result<(), M3uFilterError> {
     write_config_file(file_path, backup_dir, config, "config.yml")
+}
+
+pub(crate) fn resolve_env_var(value: &str) -> String {
+    if !value.trim().is_empty() {
+        let pattern = Regex::new(r#"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}"#).unwrap();
+        if let Some(caps) = pattern.captures(value) {
+            if let Some(var) = caps.name("var") {
+                let var_name = var.as_str();
+                return match env::var(var_name) {
+                    Ok(resolved_val) => resolved_val, // If environment variable found, replace with its value
+                    Err(_) => value.to_string()
+                };
+            }
+        }
+    }
+    value.to_string()
 }

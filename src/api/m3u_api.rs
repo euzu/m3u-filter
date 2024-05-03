@@ -1,4 +1,4 @@
-use actix_web::{HttpRequest, HttpResponse, Resource, web};
+use actix_web::{HttpRequest, HttpResponse, web};
 use log::error;
 
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, serve_file, stream_response};
@@ -9,9 +9,11 @@ use crate::repository::m3u_repository::{get_m3u_file_paths, get_m3u_url_for_stre
 
 async fn m3u_api(
     api_req: web::Query<UserApiRequest>,
+    //_api_req: web::Query<HashMap<String, String>>,
     req: HttpRequest,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
+    //let api_req = UserApiRequest::from_map(&_api_req);
     match get_user_target(&api_req, &app_state) {
         Some((user, target)) => {
             let filename = target.get_m3u_filename();
@@ -64,12 +66,10 @@ async fn m3u_api_stream(
     HttpResponse::BadRequest().finish()
 }
 
-pub(crate) fn m3u_api_register() -> Vec<Resource> {
-    vec![
-        web::resource("/get.php").route(web::get().to(m3u_api)),
-        web::resource("/get.php").route(web::post().to(m3u_api)),
-        web::resource("/apiget").route(web::get().to(m3u_api)),
-        web::resource("/m3u").route(web::get().to(m3u_api)),
-        web::resource("/m3u-stream/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream))
-    ]
+pub(crate) fn m3u_api_register(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::resource("/get.php").route(web::get().to(m3u_api)));
+    cfg.service(web::resource("/get.php").route(web::post().to(m3u_api)));
+    cfg.service(web::resource("/apiget").route(web::get().to(m3u_api)));
+    cfg.service(web::resource("/m3u").route(web::get().to(m3u_api)));
+    cfg.service(web::resource("/m3u-stream/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream)));
 }

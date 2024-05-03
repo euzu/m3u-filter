@@ -7,3 +7,4 @@ mod xtream_api;
 mod m3u_api;
 mod xmltv_api;
 mod scheduler;
+mod web_index;

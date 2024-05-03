@@ -1,10 +1,12 @@
 import {Observable} from "rxjs";
 import axios from "axios";
 import config from "../config";
+import ServiceContext from "../service/service-context";
 
 const HEADER_CONTENT_TYPE = 'Content-Type';
 const HEADER_LANGUAGE = 'X-Language';
 const HEADER_ACCEPT = 'Accept';
+const HEADER_AUTHORIZATION = 'Authorization';
 
 export default interface ApiService {
     get<T>(query: string, url?: string): Observable<T>;
@@ -53,6 +55,10 @@ export class DefaultApiService implements ApiService {
             headers[HEADER_CONTENT_TYPE] = value;
         }
         headers[HEADER_ACCEPT] = 'application/json';
+        const token = ServiceContext.auth().getToken();
+        if (token) {
+            headers[HEADER_AUTHORIZATION] = 'Bearer ' + token;
+        }
         return headers;
     }
 

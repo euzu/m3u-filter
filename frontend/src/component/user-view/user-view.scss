@@ -98,16 +98,15 @@
         background-color: var(--background-color);
       }
 
-
       &-col {
         display: table-cell;
         width: auto;
         vertical-align: bottom;
+        padding-left: 4px;
+        padding-right: 4px;
         input {
           border: none !important;
-          @media (min-width: 981px) {
-            width: 100%;
-          }
+          height: 2rem;
         }
 
         &-toolbar {
@@ -154,6 +153,8 @@
         &-col {
           display: flex;
           flex-flow: column;
+          padding-top: 4px;
+          padding-bottom: 4px;
           gap: 4px;
 
           input {

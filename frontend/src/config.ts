@@ -5,7 +5,7 @@ const dev = {
         version: process.env.REACT_APP_VERSION,
     },
     api: {
-        serverUrl: 'http://10.41.41.41:8901/api/v1/',
+        serverUrl: 'http://localhost:8901/api/v1/',
     }
 };
 

@@ -4,14 +4,14 @@ use std::collections::HashMap;
 use std::io::{Error};
 use std::path::Path;
 use std::str::FromStr;
-use actix_web::{HttpRequest, HttpResponse, web, Resource};
+use actix_web::{HttpRequest, HttpResponse, web};
 use chrono::{Duration, Local};
 use log::{debug, error};
 use url::Url;
 
 use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, serve_file, stream_response};
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
-use crate::model::api_proxy::{ProxyType, UserCredentials};
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::config::{TargetType};
 use crate::model::playlist::XtreamCluster;
@@ -62,7 +62,7 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_p
 }
 
 
-fn get_user_info(user: &UserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
+fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
     let server_info = get_user_server_info(cfg, user);
 
     let now = Local::now();
@@ -246,7 +246,7 @@ async fn xtream_get_stream_info(app_state: &AppState, target_name: &str, stream_
     Err(Error::new(std::io::ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}", target_name, &cluster, stream_id)))
 }
 
-async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCredentials,
+async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserCredentials,
                                          target: &ConfigTarget, stream_id: &str,
                                          cluster: &XtreamCluster) -> HttpResponse {
     let req_stream_id: i32 = match FromStr::from_str(stream_id) {
@@ -271,7 +271,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &UserCreden
     }
 }
 
-async fn xtream_get_short_epg(app_state: &AppState, user: &UserCredentials, target_name: &str, stream_id: &str, limit: &str) -> HttpResponse {
+async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials, target_name: &str, stream_id: &str, limit: &str) -> HttpResponse {
     let xtream_stream_id: i32 = match FromStr::from_str(stream_id) {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().finish()
@@ -403,20 +403,18 @@ async fn xtream_player_api_post(req: HttpRequest,
     xtream_player_api(&req, api_req.into_inner(), &_app_state).await
 }
 
-pub(crate) fn xtream_api_register() -> Vec<Resource> {
-    vec![
-        web::resource("/player_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)),
-        web::resource("/panel_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)),
-        web::resource("/xtream").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)),
-        web::resource("/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream_alt)),
-        web::resource("/live/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream)),
-        web::resource("/movie/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_movie_stream)),
-        web::resource("/series/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_series_stream)),
-        web::resource("/timeshift/{username}/{password}/{duration}/{start}{stream_id}").route(web::get().to(xtream_player_api_timeshift_stream)),
-        /* TODO
-        web::resource("/hlsr/{token}/{username}/{password}/{channel}/{hash}/{chunk}").route(web::get().to(xtream_player_api_hlsr_stream))
-        web::resource("/hls/{token}/{chunk}").route(web::get().to(xtream_player_api_hls_stream))
-        web::resource("/play/{token}/{type}").route(web::get().to(xtream_player_api_play_stream))
-         */
-    ]
+pub(crate) fn xtream_api_register(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::resource("/player_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)));
+    cfg.service(web::resource("/panel_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)));
+    cfg.service(web::resource("/xtream").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)));
+    cfg.service(web::resource("/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream_alt)));
+    cfg.service(web::resource("/live/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream)));
+    cfg.service(web::resource("/movie/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_movie_stream)));
+    cfg.service(web::resource("/series/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_series_stream)));
+    cfg.service(web::resource("/timeshift/{username}/{password}/{duration}/{start}{stream_id}").route(web::get().to(xtream_player_api_timeshift_stream)));
+    /* TODO
+    cfg.service(web::resource("/hlsr/{token}/{username}/{password}/{channel}/{hash}/{chunk}").route(web::get().to(xtream_player_api_hlsr_stream)));
+    cfg.service(web::resource("/hls/{token}/{chunk}").route(web::get().to(xtream_player_api_hls_stream)));
+    cfg.service(web::resource("/play/{token}/{type}").route(web::get().to(xtream_player_api_play_stream)));
+     */
 }

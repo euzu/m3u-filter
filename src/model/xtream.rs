@@ -177,6 +177,7 @@ macro_rules! add_rc_str_property_if_exists {
        $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::String(v.to_string()))));
     }
 }
+
 macro_rules! add_opt_i64_property_if_exists {
     ($vec:expr, $prop:expr, $prop_name:expr) => {
        $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from(i64::from(*v))))));
@@ -230,7 +231,7 @@ impl XtreamStream {
         add_rc_str_property_if_exists!(result, self.title, "title");
         add_rc_str_property_if_exists!(result, self.year, "year");
         add_rc_str_property_if_exists!(result, self.youtube_trailer, "youtube_trailer");
-        //add_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
+        add_rc_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
         add_opt_i64_property_if_exists!(result, self.tv_archive, "tv_archive");
         add_opt_i64_property_if_exists!(result, self.tv_archive_duration, "tv_archive_duration");
         if result.is_empty() { None } else { Some(result) }
