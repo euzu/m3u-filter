@@ -68,7 +68,7 @@ pub(crate) trait FieldAccessor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistItemHeader {
     // stream_id is a custom field for processing
-    pub stream_id: u32,
+    pub stream_id: Rc<String>,
     pub id: Rc<String>,
     pub name: Rc<String>,
     pub logo: Rc<String>,
@@ -100,7 +100,7 @@ macro_rules! update_fields {
                 stringify!($prop) => {
                     $self.$prop = Rc::new($val);
                     true
-                },
+                }
             )*
             _ => false,
         }
@@ -118,38 +118,6 @@ macro_rules! get_fields {
     };
 }
 
-impl FieldAccessor for PlaylistItemHeader {
-    fn get_field(&self, field: &str) -> Option<Rc<String>> {
-        let val = get_fields!(self, field, id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url;);
-        if val.is_some() {
-            return val;
-        }
-        match field {
-            "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
-            _ => None
-        }
-    }
-
-    fn set_field(&mut self, field: &str, value: &str) -> bool {
-        let val = String::from(value);
-        let updated = update_fields!(self, field, id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url; val);
-        if updated {
-            return updated;
-        }
-        match field {
-            "epg_channel_id" | "epg_id" => {
-                self.epg_channel_id = Some(Rc::new(value.to_owned()));
-                true
-            },
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PlaylistItem {
-    pub header: RefCell<PlaylistItemHeader>,
-}
 
 macro_rules! to_m3u_non_empty_fields {
     ($header:expr, $line:expr, $(($prop:ident, $field:expr)),*;) => {
@@ -161,33 +129,101 @@ macro_rules! to_m3u_non_empty_fields {
     };
 }
 
+impl FieldAccessor for PlaylistItemHeader {
+    fn get_field(&self, field: &str) -> Option<Rc<String>> {
+        let val = get_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url;);
+        if val.is_some() {
+            return val;
+        }
+        match field {
+            "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
+            _ => None
+        }
+    }
 
-impl PlaylistItem {
-    pub fn to_m3u(&self, target: &ConfigTarget) -> String {
+    fn set_field(&mut self, field: &str, value: &str) -> bool {
+        let val = String::from(value);
+        let updated = update_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url; val);
+        if updated {
+            return updated;
+        }
+        match field {
+            "epg_channel_id" | "epg_id" => {
+                self.epg_channel_id = Some(Rc::new(value.to_owned()));
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct M3uPlaylistItem {
+    pub stream_id: Rc<String>,
+    pub id: Rc<String>,
+    pub name: Rc<String>,
+    pub logo: Rc<String>,
+    pub logo_small: Rc<String>,
+    pub group: Rc<String>,
+    pub title: Rc<String>,
+    pub parent_code: Rc<String>,
+    pub audio_track: Rc<String>,
+    pub time_shift: Rc<String>,
+    pub rec: Rc<String>,
+    pub url: Rc<String>,
+    pub epg_channel_id: Option<Rc<String>>,
+}
+
+
+impl M3uPlaylistItem {
+    pub fn to_m3u(&self, target: &ConfigTarget, url: Option<&str>) -> String {
         let options = target.options.as_ref();
-        let header = self.header.borrow();
         let ignore_logo = options.map_or(false, |o| o.ignore_logo);
-        let mut line = format!("#EXTINF:-1 str-id=\"{}\" tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",
-                               header.stream_id,
-                               header.epg_channel_id.as_ref().map_or("", |o| o.as_ref()),
-                               header.name, header.group);
+        let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",
+                               self.epg_channel_id.as_ref().map_or("", |o| o.as_ref()),
+                               self.name, self.group);
 
         // line = format!("{} tvg-chno=\"{}\"", line, header.chno);
 
         if !ignore_logo {
-            to_m3u_non_empty_fields!(header, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
+            to_m3u_non_empty_fields!(self, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
         }
 
-        to_m3u_non_empty_fields!(header, line,
+        to_m3u_non_empty_fields!(self, line,
             (parent_code, "parent-code"),
             (audio_track, "audio-track"),
             (time_shift, "timeshift"),
             (rec, "tvg-rec"););
 
-        format!("{},{}\n{}", line, header.title, header.url)
+        format!("{},{}\n{}", line, self.title, if url.is_none() { self.url.as_str() } else { url.unwrap() })
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct PlaylistItem {
+    pub header: RefCell<PlaylistItemHeader>,
+}
+
+impl PlaylistItem {
+    pub fn to_m3u(&self) -> M3uPlaylistItem {
+        let header = self.header.borrow();
+        M3uPlaylistItem {
+            stream_id: Rc::clone(&header.stream_id),
+            id: Rc::clone(&header.id),
+            name: Rc::clone(&header.name),
+            logo: Rc::clone(&header.logo),
+            logo_small: Rc::clone(&header.logo_small),
+            group: Rc::clone(&header.group),
+            title: Rc::clone(&header.title),
+            parent_code: Rc::clone(&header.parent_code),
+            audio_track: Rc::clone(&header.audio_track),
+            time_shift: Rc::clone(&header.time_shift),
+            rec: Rc::clone(&header.rec),
+            url: Rc::clone(&header.url),
+            epg_channel_id: header.epg_channel_id.clone(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistGroup {

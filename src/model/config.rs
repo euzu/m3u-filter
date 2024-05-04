@@ -2,6 +2,7 @@ use std::rc::Rc;
 use enum_iterator::Sequence;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
@@ -37,7 +38,6 @@ macro_rules! valid_property {
         $array.contains(&$key)
     }};
 }
-
 
 pub(crate) fn default_as_true() -> bool { true }
 
@@ -279,6 +279,8 @@ pub(crate) struct ConfigTargetOptions {
     pub xtream_skip_live_direct_source: bool,
     #[serde(default = "default_as_true")]
     pub xtream_skip_video_direct_source: bool,
+    // #[serde(default = "default_as_true")]
+    // pub xtream_skip_series_direct_source: bool,
     #[serde(default = "default_as_false")]
     pub xtream_resolve_series: bool,
     #[serde(default = "default_as_two")]
@@ -394,9 +396,9 @@ impl ConfigTarget {
         }
     }
 
-    // pub(crate) fn is_multi_input(&self) -> bool {
-    //     self._multi_input
-    // }
+    pub(crate) fn is_multi_input(&self) -> bool {
+        self._multi_input
+    }
 
     pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
@@ -439,13 +441,12 @@ impl ConfigSource {
         Ok(index + (self.inputs.len() as u16))
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
+    pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
         for target in &self.targets {
             if target.name.eq(target_name) {
-                for input in &self.inputs {
-                    if input.input_type.eq(input_type) {
-                        return Some(input);
-                    }
+                let inputs = self.inputs.iter().filter(|&i| i.enabled).collect::<Vec<&ConfigInput>>();
+                if !inputs.is_empty() {
+                    return Some(inputs);
                 }
             }
         }
@@ -467,12 +468,13 @@ pub(crate) enum InputType {
     Xtream,
 }
 
-impl ToString for InputType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for InputType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
             InputType::M3u => "m3u".to_string(),
             InputType::Xtream => "xtream".to_string()
-        }
+        };
+        write!(f, "{}", str)
     }
 }
 
@@ -502,11 +504,11 @@ pub(crate) struct ConfigInputOptions {
     pub xtream_skip_series: bool,
 }
 
-// pub(crate) struct InputUserInfo {
-//     pub base_url: String,
-//     pub username: String,
-//     pub password: String,
-// }
+pub(crate) struct InputUserInfo {
+    pub base_url: String,
+    pub username: String,
+    pub password: String,
+}
 
 fn default_as_type_m3u() -> InputType { InputType::M3u }
 
@@ -576,36 +578,36 @@ impl ConfigInput {
         Ok(())
     }
 
-    // pub(crate) fn get_user_info(&self) -> Option<InputUserInfo> {
-    //     if self.input_type == InputType::Xtream {
-    //         if self.username.is_some() || self.password.is_some() {
-    //             return Some(InputUserInfo {
-    //                 base_url: self.url.to_owned(),
-    //                 username: self.username.as_ref().unwrap().to_owned(),
-    //                 password: self.password.as_ref().unwrap().to_owned(),
-    //             });
-    //         }
-    //     } else if let Ok(url) = url::Url::parse(&self.url) {
-    //         let base_url = url.origin().ascii_serialization();
-    //         let mut username = None;
-    //         let mut password = None;
-    //         for (key, value) in url.query_pairs() {
-    //             if key.eq("username") {
-    //                 username = Some(value.into_owned());
-    //             } else if key.eq("password") {
-    //                 password = Some(value.into_owned());
-    //             }
-    //         }
-    //         if username.is_some() || password.is_some() {
-    //             return Some(InputUserInfo {
-    //                 base_url,
-    //                 username: username.as_ref().unwrap().to_owned(),
-    //                 password: password.as_ref().unwrap().to_owned(),
-    //             });
-    //         }
-    //     }
-    //     None
-    // }
+    pub(crate) fn get_user_info(&self) -> Option<InputUserInfo> {
+        if self.input_type == InputType::Xtream {
+            if self.username.is_some() || self.password.is_some() {
+                return Some(InputUserInfo {
+                    base_url: self.url.to_owned(),
+                    username: self.username.as_ref().unwrap().to_owned(),
+                    password: self.password.as_ref().unwrap().to_owned(),
+                });
+            }
+        } else if let Ok(url) = url::Url::parse(&self.url) {
+            let base_url = url.origin().ascii_serialization();
+            let mut username = None;
+            let mut password = None;
+            for (key, value) in url.query_pairs() {
+                if key.eq("username") {
+                    username = Some(value.into_owned());
+                } else if key.eq("password") {
+                    password = Some(value.into_owned());
+                }
+            }
+            if username.is_some() || password.is_some() {
+                return Some(InputUserInfo {
+                    base_url,
+                    username: username.as_ref().unwrap().to_owned(),
+                    password: password.as_ref().unwrap().to_owned(),
+                });
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -767,19 +769,14 @@ impl WebAuthConfig {
         if let Ok(file) = File::open(&userfile_path) {
             let mut users = vec![];
             let reader = std::io::BufReader::new(file);
-            for line in reader.lines() {
-                match line {
-                    Ok(credential) => {
-                        let mut parts = credential.split(':');
-                        if let (Some(username), Some(password)) = (parts.next(), parts.next()) {
-                            users.push(UserCredential {
-                                username: username.trim().to_string(),
-                                password: password.trim().to_string(),
-                            });
-                            debug!("Read ui user {}", username);
-                        }
-                    }
-                    Err(_) => {}
+            for credentials in reader.lines().map_while(Result::ok) {
+                let mut parts = credentials.split(':');
+                if let (Some(username), Some(password)) = (parts.next(), parts.next()) {
+                    users.push(UserCredential {
+                        username: username.trim().to_string(),
+                        password: password.trim().to_string(),
+                    });
+                    debug!("Read ui user {}", username);
                 }
             }
 
@@ -853,9 +850,11 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_input_for_target(&self, target_name: &str, input_type: &InputType) -> Option<&ConfigInput> {
+    pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
         for source in &self.sources {
-            if let Some(cfg) = source.get_input_for_target(target_name, input_type) { return Some(cfg); }
+            if let Some(cfg) = source.get_inputs_for_target(target_name) {
+                return Some(cfg);
+            }
         }
         None
     }
@@ -878,7 +877,7 @@ impl Config {
         }
     }
 
-    pub fn get_input_by_id(&self, input_id: &u16) -> Option<ConfigInput> {
+    pub(crate) fn get_input_by_id(&self, input_id: &u16) -> Option<ConfigInput> {
         for source in &self.sources {
             for input in &source.inputs {
                 if input.id == *input_id {
@@ -889,7 +888,7 @@ impl Config {
         None
     }
 
-    pub fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError> {
+    pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError> {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
                 for target in &mut source.targets {
@@ -984,9 +983,7 @@ impl Config {
             if !web_auth.enabled {
                 self.web_auth = None
             } else {
-                if let Err(err) = web_auth.prepare(&self._config_path, resolve_var) {
-                    return Err(err);
-                }
+                web_auth.prepare(&self._config_path, resolve_var)?
             }
         }
 

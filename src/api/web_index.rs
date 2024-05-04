@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use actix_files::NamedFile;
 use actix_web::{HttpRequest, HttpResponse, web};
@@ -19,16 +19,14 @@ async fn token(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     match &app_state.config.web_auth {
-        None => {
-            return no_web_auth_token();
-        },
+        None => no_web_auth_token(),
         Some(web_auth) => {
             let username = req.username.as_str();
             let password = req.password.as_str();
 
-            if username.len() > 0 && password.len() > 0 {
+            if !(username.is_empty() || password.is_empty()) {
                 if let Some(hash) = web_auth.get_user_password(username) {
-                    if verify_password(hash, &password.as_bytes()) {
+                    if verify_password(hash, password.as_bytes()) {
                         req.zeroize();
                         if let Ok(token) = create_jwt(web_auth) {
                             return HttpResponse::Ok().json(HashMap::from([("token", token)]));
@@ -49,7 +47,7 @@ async fn token_refresh(
 ) -> HttpResponse {
     match &app_state.config.web_auth {
         None => {
-            return no_web_auth_token();
+            no_web_auth_token()
         },
         Some(web_auth) => {
             let secret_key = web_auth.secret.as_ref();
@@ -71,14 +69,13 @@ async fn index(
     NamedFile::open(path)
 }
 
-pub(crate) fn index_register(web_dir_path: &PathBuf) -> impl Fn(&mut web::ServiceConfig) -> () {
-    let wdp = web_dir_path.clone();
+pub(crate) fn index_register(web_dir_path: &Path) -> impl Fn(&mut web::ServiceConfig) + '_ {
     return move |cfg: &mut web::ServiceConfig| {
         cfg.service(web::scope("/auth")
             .route("/token", web::post().to(token))
             .route("/refresh", web::post().to(token_refresh)));
         cfg.service(web::scope("/")
             .route("", web::get().to(index))
-            .service(actix_files::Files::new("/", &wdp)));
+            .service(actix_files::Files::new("/", web_dir_path)));
     };
 }

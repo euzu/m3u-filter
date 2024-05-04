@@ -89,7 +89,7 @@ impl FileDownload {
                 let mut x: usize = 1;
                 while file_path.is_file() {
                     filename = format!("{}_{}.{}", file_stem, x, file_ext);
-                    file_path = file_dir.clone();
+                    file_path.clone_from(&file_dir);
                     file_path.push(&filename);
                     x += 1;
                 }

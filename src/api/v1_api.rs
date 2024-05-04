@@ -220,13 +220,13 @@ pub(crate) async fn config(
 
     // if we didn't read it from file then we should use it from app_state
     if result.api_proxy.is_none() {
-        result.api_proxy = app_state.config._api_proxy.read().unwrap().clone();
+        result.api_proxy.clone_from(&app_state.config._api_proxy.read().unwrap());
     }
 
     HttpResponse::Ok().json(result)
 }
 
-pub(crate) fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) -> () {
+pub(crate) fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) {
     return move |cfg: &mut web::ServiceConfig| {
         cfg.service(web::scope("/api/v1")
         .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))

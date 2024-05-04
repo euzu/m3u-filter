@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use crate::model::config::InputType;
 
 #[derive(Debug, Clone)]
@@ -6,9 +7,9 @@ pub(crate) struct PlaylistStats {
     pub channel_count: usize,
 }
 
-impl ToString for PlaylistStats {
-    fn to_string(&self) -> String {
-        format!("{{\"groups\": {}, \"channels\": {}}}", self.group_count, self.channel_count)
+impl Display for PlaylistStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f,  "{}", format_args!("{{\"groups\": {}, \"channels\": {}}}", self.group_count, self.channel_count))
     }
 }
 
@@ -21,10 +22,11 @@ pub(crate) struct InputStats {
     pub processed_stats: PlaylistStats,
 }
 
-impl ToString for InputStats {
-    fn to_string(&self) -> String {
-        format!("{{\"name\": {}, \"type\": {}, \"errors\": {}, \"raw\": {}, \"processed\": {}}}",
-                self.name, self.input_type.to_string(), self.error_count,
-                self.raw_stats.to_string(), self.processed_stats.to_string())
+impl Display for InputStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = format!("{{\"name\": {}, \"type\": {}, \"errors\": {}, \"raw\": {}, \"processed\": {}}}",
+                          self.name, self.input_type, self.error_count,
+                          self.raw_stats, self.processed_stats);
+        write!(f, "{}", str)
     }
 }

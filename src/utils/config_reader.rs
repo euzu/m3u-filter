@@ -30,7 +30,7 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
 
 pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
     let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(file_utils::get_default_api_proxy_config_path(cfg._config_path.as_str()));
-    cfg._api_proxy_file_path = api_proxy_config_file.to_owned();
+    api_proxy_config_file.clone_into(&mut cfg._api_proxy_file_path);
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str(), true);
     match api_proxy_config {
         None => {

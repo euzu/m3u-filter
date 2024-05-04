@@ -32,8 +32,8 @@ pub(crate) fn create_jwt(web_auth_config: &WebAuthConfig) -> Result<String, std:
 pub(crate) fn verify_token(bearer: Option<BearerAuth>, secret_key: &[u8]) -> bool {
     if let Some(auth) = bearer {
         let token = auth.token();
-        let token_message = decode::<Claims>(&token, &DecodingKey::from_secret(secret_key), &Validation::new(Algorithm::HS256));
-        if let Ok(_) = token_message {
+        let token_message = decode::<Claims>(token, &DecodingKey::from_secret(secret_key), &Validation::new(Algorithm::HS256));
+        if token_message.is_ok() {
             return true;
         }
     }

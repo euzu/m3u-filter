@@ -55,8 +55,8 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
 
 fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistItemHeader {
     PlaylistItemHeader {
-        stream_id: 0,
         id: default_as_empty_rc_str(),
+        stream_id: default_as_empty_rc_str(),
         name: default_as_empty_rc_str(),
         logo: default_as_empty_rc_str(),
         logo_small: default_as_empty_rc_str(),
@@ -103,22 +103,16 @@ fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> 
                     let token = token_till(&mut it, '=');
                     if let Some(t) = token {
                         let value = token_value(&mut it);
-                        if t.as_str().eq("str-id") {
-                            if let Ok(stream_id) = value.to_string().parse::<u32>() {
-                                plih.stream_id = stream_id;
-                            }
-                        } else {
-                            process_header_fields!(plih, t.as_str(),
-                            (id, "tvg-id"),
-                            (group, "group-title"),
-                            (name, "tvg-name"),
-                            (parent_code, "parent-code"),
-                            (audio_track, "audio-track"),
-                            (logo, "tvg-logo"),
-                            (logo_small, "tvg-logo-small"),
-                            (time_shift, "timeshift"),
-                            (rec, "tvg-rec"); value)
-                        }
+                        process_header_fields!(plih, t.as_str(),
+                        (id, "tvg-id"),
+                        (group, "group-title"),
+                        (name, "tvg-name"),
+                        (parent_code, "parent-code"),
+                        (audio_track, "audio-track"),
+                        (logo, "tvg-logo"),
+                        (logo_small, "tvg-logo-small"),
+                        (time_shift, "timeshift"),
+                        (rec, "tvg-rec"); value)
                     }
                 }
             }

@@ -21,11 +21,9 @@ use crate::processing::playlist_processor;
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
     let web_dir_path = PathBuf::from(&web_dir);
-    if web_ui_enabled {
-        if !&web_dir_path.exists() || !&web_dir_path.is_dir() {
-            return Err(std::io::Error::new(ErrorKind::NotFound,
-                                           format!("web_root does not exists or is not an directory: {:?}", &web_dir_path)));
-        }
+    if web_ui_enabled && (!&web_dir_path.exists() || !&web_dir_path.is_dir()) {
+        return Err(std::io::Error::new(ErrorKind::NotFound,
+                                       format!("web_root does not exists or is not an directory: {:?}", &web_dir_path)));
     };
     Ok(web_dir_path)
 }

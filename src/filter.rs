@@ -70,7 +70,6 @@ pub(crate) struct RegexWithCaptures {
     pub captures: Vec<String>,
 }
 
-
 #[derive(Parser)]
 //#[grammar = "filter.pest"]
 #[grammar_inline = r#"

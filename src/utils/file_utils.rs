@@ -77,6 +77,7 @@ pub(crate) fn get_working_path(wd: &String) -> String {
         String::from(current_dir.to_str().unwrap_or("."))
     } else {
         let work_path = std::path::PathBuf::from(wd);
+        let _ = fs::create_dir_all(&work_path);
         let wdpath = match fs::metadata(&work_path) {
             Ok(md) => {
                 if md.is_dir() && !md.permissions().readonly() {
@@ -163,4 +164,11 @@ pub(crate) fn path_exists(file_path: &Path) -> bool {
         return metadata.is_file();
     }
     false
+}
+
+pub(crate) fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error> {
+    match res {
+        Ok(_) => Ok(()),
+        Err(_) => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unable to write file")),
+    }
 }

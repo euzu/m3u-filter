@@ -76,7 +76,7 @@ pub(crate) fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
         let mut channel_ids: Vec<&String> = vec![];
         tv_guides.iter().for_each(|guide| {
             if epg.attributes.is_none() {
-                epg.attributes = guide.attributes.clone();
+                epg.attributes.clone_from(&guide.attributes);
             }
             guide.children.iter().for_each(|c| {
                 if c.name.as_str() == "channel" {

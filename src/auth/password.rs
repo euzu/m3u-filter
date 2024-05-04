@@ -13,7 +13,7 @@ fn generate_salt(length: usize) -> String {
 
 pub(crate) fn hash(password: &[u8]) -> Option<String> {
     let salt = generate_salt(64);
-    if password.len() > 0 {
+    if !password.is_empty() {
         let config = argon2::Config::default();
         if let Ok(hash) = argon2::hash_encoded(password, salt.as_bytes(), &config) {
             return Some(hash);
