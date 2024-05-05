@@ -56,12 +56,12 @@ pub(crate) async fn save_config_api_proxy_user(
 
 pub(crate) async fn save_config_main(
     req: web::Json<ConfigDto>,
-    mut _app_state: web::Data<AppState>,
+    app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let cfg = req.0;
     if cfg.is_valid() {
-        let file_path = _app_state.config._config_file_path.as_str();
-        let backup_dir = _app_state.config.backup_dir.as_ref().unwrap().as_str();
+        let file_path = app_state.config._config_file_path.as_str();
+        let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         if let Some(err) = _save_config_main(file_path, backup_dir, &cfg) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
@@ -93,14 +93,14 @@ pub(crate) async fn save_config_api_proxy_config(
 
 pub(crate) async fn playlist_update(
     req: web::Json<Vec<String>>,
-    _app_state: web::Data<AppState>,
+    app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let targets = req.0;
     let user_targets = if targets.is_empty() { None } else { Some(targets) };
-    let process_targets = validate_targets(&user_targets, &_app_state.config.sources);
+    let process_targets = validate_targets(&user_targets, &app_state.config.sources);
     match process_targets {
         Ok(valid_targets) => {
-            actix_rt::spawn(playlist_processor::exec_processing(Arc::clone(&_app_state.config), Arc::new(valid_targets)));
+            actix_rt::spawn(playlist_processor::exec_processing(Arc::clone(&app_state.config), Arc::new(valid_targets)));
             HttpResponse::Ok().finish()
         }
         Err(err) => {
@@ -135,11 +135,11 @@ fn create_config_input_for_url(url: &str) -> ConfigInput {
 
 pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
-    _app_state: web::Data<AppState>,
+    app_state: web::Data<AppState>,
 ) -> HttpResponse {
     match match &req.input_id {
         Some(input_id) => {
-            _app_state.config.get_input_by_id(input_id)
+            app_state.config.get_input_by_id(input_id)
         }
         None => {
             let url = req.url.as_deref().unwrap_or("");
@@ -150,8 +150,8 @@ pub(crate) async fn playlist(
         Some(input) => {
             let (result, errors) =
                 match input.input_type {
-                    InputType::M3u => download::get_m3u_playlist(&_app_state.config, &input, &_app_state.config.working_dir).await,
-                    InputType::Xtream => download::get_xtream_playlist(&input, &_app_state.config.working_dir).await,
+                    InputType::M3u => download::get_m3u_playlist(&app_state.config, &input, &app_state.config.working_dir).await,
+                    InputType::Xtream => download::get_xtream_playlist(&input, &app_state.config.working_dir).await,
                 };
             if result.is_empty() {
                 let error_strings: Vec<String> = errors.iter().map(|err| err.to_string()).collect();

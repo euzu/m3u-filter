@@ -1,5 +1,6 @@
 extern crate unidecode;
 
+use core::cmp::Ordering;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -14,20 +15,17 @@ use crate::{Config, get_errors_notify_message, model::config};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{MsgKind, send_message};
-use crate::model::config::{ConfigTarget, default_as_default, InputType, ProcessTargets};
-use crate::model::config::{ItemField, ProcessingOrder, SortOrder::{Asc, Desc}, TargetType};
+use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, default_as_default, InputType,
+                           ItemField, ProcessingOrder, ProcessTargets, SortOrder::{Asc, Desc}};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
-
 use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem};
 use crate::model::stats::{InputStats, PlaylistStats};
-use crate::model::xtream::MultiXtreamMapping;
+use crate::processing::affix_processor::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
 use crate::processing::xmltv_parser::flatten_tvguide;
 use crate::processing::xtream_processor::playlist_resolve_series;
 use crate::repository::playlist_repository::persist_playlist;
-use crate::repository::xtream_repository::write_xtream_mapping;
 use crate::utils::download;
-use crate::processing::affix_processor::apply_affixes;
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };
@@ -53,37 +51,41 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
     Some(new_playlist)
 }
 
+fn playlistgroup_comparator(a: &PlaylistGroup, b: &PlaylistGroup, group_sort: &ConfigSortGroup, match_as_ascii: bool) -> Ordering {
+    let value_a = if match_as_ascii { Rc::new(unidecode(&a.title)) } else { Rc::clone(&a.title) };
+    let value_b = if match_as_ascii { Rc::new(unidecode(&b.title)) } else { Rc::clone(&b.title) };
+    let ordering = value_a.partial_cmp(&value_b).unwrap();
+    match group_sort.order {
+        Asc => ordering,
+        Desc => ordering.reverse()
+    }
+}
+
+fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &ConfigSortChannel, match_as_ascii: bool) -> Ordering {
+    let raw_value_a = get_field_value(a, &channel_sort.field);
+    let raw_value_b = get_field_value(b, &channel_sort.field);
+    let value_a = if match_as_ascii { Rc::new(unidecode(&raw_value_a)) } else { raw_value_a };
+    let value_b = if match_as_ascii { Rc::new(unidecode(&raw_value_b)) } else { raw_value_b };
+    let ordering = value_a.partial_cmp(&value_b).unwrap();
+    match channel_sort.order {
+        Asc => ordering,
+        Desc => ordering.reverse()
+    }
+}
+
 fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
     if let Some(sort) = &target.sort {
-        let match_as_ascii = &sort.match_as_ascii;
+        let match_as_ascii = sort.match_as_ascii;
         if let Some(group_sort) = &sort.groups {
-            new_playlist.sort_by(|a, b| {
-                let value_a = if *match_as_ascii { Rc::new(unidecode(&a.title)) } else { Rc::clone(&a.title) };
-                let value_b = if *match_as_ascii { Rc::new(unidecode(&b.title)) } else { Rc::clone(&b.title) };
-                let ordering = value_a.partial_cmp(&value_b).unwrap();
-                match group_sort.order {
-                    Asc => ordering,
-                    Desc => ordering.reverse()
-                }
-            });
+            new_playlist.sort_by(|a, b| playlistgroup_comparator(a, b, group_sort, match_as_ascii));
         }
         if let Some(channel_sorts) = &sort.channels {
             channel_sorts.iter().for_each(|channel_sort| {
                 let regexp = channel_sort.re.as_ref().unwrap();
                 new_playlist.iter_mut().for_each(|group| {
-                    let group_title = if *match_as_ascii { Rc::new(unidecode(&group.title)) } else { Rc::clone(&group.title) };
+                    let group_title = if match_as_ascii { Rc::new(unidecode(&group.title)) } else { Rc::clone(&group.title) };
                     if regexp.is_match(group_title.as_str()) {
-                        group.channels.sort_by(|a, b| {
-                            let raw_value_a = get_field_value(a, &channel_sort.field);
-                            let raw_value_b = get_field_value(b, &channel_sort.field);
-                            let value_a = if *match_as_ascii { Rc::new(unidecode(&raw_value_a)) } else { raw_value_a };
-                            let value_b = if *match_as_ascii { Rc::new(unidecode(&raw_value_b)) } else { raw_value_b };
-                            let ordering = value_a.partial_cmp(&value_b).unwrap();
-                            match channel_sort.order {
-                                Asc => ordering,
-                                Desc => ordering.reverse()
-                            }
-                        });
+                        group.channels.sort_by(|chan1, chan2| playlistitem_comparator(chan1, chan2, channel_sort, match_as_ascii));
                     }
                 });
             });
@@ -392,68 +394,22 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
 
     apply_affixes(&mut new_fetched_playlists);
 
-    if target.is_multi_input() && target.has_output(&TargetType::Xtream) {
-        let mut stream_id_mappings: Vec<MultiXtreamMapping> = Vec::new();
-        let mut counter: u32 = 0;
-        new_fetched_playlists.iter()
-            .flat_map(|pl| {
-                let input_id = &pl.input.id;
-                pl.playlist.iter().map(move |plg| (input_id, &plg.channels))
-            })
-            .flat_map(|(input_id, channels)| channels.iter().map(move |chan| (input_id, chan)))
-            .for_each(|(input_id, chan)| {
-                let mut header = chan.header.borrow_mut();
-                if header.stream_id.is_empty() {
-                    header.stream_id = Rc::clone(&header.id);
-                }
-                match header.stream_id.parse::<u32>() {
-                    Ok(stream_id) => {
-                        let xtream_mapping = MultiXtreamMapping {
-                            stream_id,
-                            input_id: *input_id,
-                        };
-                        stream_id_mappings.push(xtream_mapping);
-                    }
-                    Err(_) => {
-                        error!("Failed to parse stream_id: {}", &header.id)
-                    }
-                }
-                counter += 1;
-                header.id = Rc::new(counter.to_string());
-            });
-
-        match write_xtream_mapping(&stream_id_mappings, cfg, &target.name) {
-            Ok(_) => {
-                debug!("wrote multi xtream input mapping for {}", &target.name);
-            }
-            Err(err) => {
-                return Err(vec![M3uFilterError::new(
-                    M3uFilterErrorKind::Notify,
-                    format!("Write multi xtream input mapping {} failed: {}", target.name, err))]);
-            }
-        }
-    }
-
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
-    let mut tv_guides = vec![];
+
     new_fetched_playlists.drain(..).for_each(|mut fp| {
+        let epg_channel_ids: HashSet<_> = fp.playlist.iter().flat_map(|g| &g.channels)
+            .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
         fp.playlist.drain(..).for_each(|group| new_playlist.push(group));
-        if let Some(tv_guide) = fp.epg {
-            tv_guides.push(tv_guide);
-            let guide = tv_guides.last().unwrap();
-            if log_enabled!(Level::Debug) {
+        if !epg_channel_ids.is_empty() {
+            if let Some(tv_guide) = fp.epg {
                 debug!("found epg information for {}", &target.name);
-            }
-            let channel_ids: HashSet<_> = new_playlist.iter().flat_map(|g| &g.channels)
-                .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
-            if !channel_ids.is_empty() {
-                if let Some(epg) = guide.filter(&channel_ids) {
+                if let Some(epg) = tv_guide.filter(&epg_channel_ids) {
                     new_epg.push(epg);
                 }
-            } else if log_enabled!(Level::Debug) {
-                debug!("channel ids are empty");
             }
+        } else if log_enabled!(Level::Debug) {
+            debug!("channel ids are empty");
         }
     });
 

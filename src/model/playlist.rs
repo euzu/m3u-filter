@@ -8,6 +8,7 @@ use serde_json::Value;
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::config::{default_as_false};
 use crate::model::xmltv::TVGuide;
+use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
 
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
@@ -30,7 +31,7 @@ impl FetchedPlaylist<'_> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) enum XtreamCluster {
     Live = 1,
     Video = 2,
@@ -58,7 +59,7 @@ pub(crate) enum PlaylistItemType {
 }
 
 pub(crate) fn default_playlist_item_type() -> PlaylistItemType { PlaylistItemType::Live }
-
+fn default_as_zero_u32() -> u32 { 0 }
 
 pub(crate) trait FieldAccessor {
     fn get_field(&self, field: &str) -> Option<Rc<String>>;
@@ -79,18 +80,19 @@ pub(crate) struct PlaylistItemHeader {
     pub audio_track: Rc<String>,
     pub time_shift: Rc<String>,
     pub rec: Rc<String>,
-    // this is the source content not the url
     pub source: Rc<String>,
     pub url: Rc<String>,
     pub epg_channel_id: Option<Rc<String>>,
-    #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
+    #[serde(default = "default_stream_cluster")]
     pub xtream_cluster: XtreamCluster,
-    #[serde(skip_serializing, skip_deserializing)]
     pub additional_properties: Option<Vec<(String, Value)>>,
     #[serde(default = "default_playlist_item_type", skip_serializing, skip_deserializing)]
     pub item_type: PlaylistItemType,
     #[serde(default = "default_as_false", skip_serializing, skip_deserializing)]
     pub series_fetched: bool, // only used for series_info
+    #[serde(default = "default_as_zero_u32")]
+    pub category_id: u32,
+
 }
 
 macro_rules! update_fields {
@@ -222,6 +224,10 @@ impl PlaylistItem {
             url: Rc::clone(&header.url),
             epg_channel_id: header.epg_channel_id.clone(),
         }
+    }
+
+    pub fn to_xtream(&self, options: &XtreamMappingOptions) -> Value {
+        xtream_playlistitem_to_document(&self, options)
     }
 }
 

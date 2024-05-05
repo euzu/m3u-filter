@@ -12,43 +12,43 @@ of the encoded file, and size is the size of the encoded struct.
 */
 pub struct IndexRecord {
     pub index: u32,
-    pub size: u32,
+    pub size: u16,
 }
 
 impl IndexRecord {
-    pub fn new(index: u32, size: u32) -> IndexRecord {
+    pub fn new(index: u32, size: u16) -> Self {
         IndexRecord { index, size }
     }
 
-    pub fn from_file(file: &mut File, offset: u64) -> Result<IndexRecord, Error> {
+    pub fn from_file(file: &mut File, offset: u64) -> Result<Self, Error> {
         file.seek(SeekFrom::Start(offset))?;
         let mut index_bytes = [0u8; 4];
-        let mut size_bytes = [0u8; 4];
+        let mut size_bytes = [0u8; 2];
         file.read_exact(&mut index_bytes)?;
         file.read_exact(&mut size_bytes)?;
         let index = u32::from_le_bytes(index_bytes);
-        let size = u32::from_le_bytes(size_bytes);
+        let size = u16::from_le_bytes(size_bytes);
         Ok(IndexRecord { index, size })
     }
 
-    pub fn from_bytes(bytes: &[u8], cursor: &mut usize) -> IndexRecord {
+    pub fn from_bytes(bytes: &[u8], cursor: &mut usize) -> Self {
         let index_bytes: [u8; 4] = bytes[*cursor..*cursor + 4].try_into().unwrap();
         *cursor += 4;
-        let size_bytes: [u8; 4] = bytes[*cursor..*cursor + 4].try_into().unwrap();
+        let size_bytes: [u8; 2] = bytes[*cursor..*cursor + 2].try_into().unwrap();
         *cursor += 4;
         let index = u32::from_le_bytes(index_bytes);
-        let size = u32::from_le_bytes(size_bytes);
+        let size = u16::from_le_bytes(size_bytes);
         IndexRecord { index, size }
     }
 
-    pub fn to_bytes(&self) -> [u8; 8] {
+    pub fn to_bytes(&self) -> [u8; 6] {
         let index_bytes: [u8; 4] = self.index.to_le_bytes();
-        let size_bytes: [u8; 4] = self.size.to_le_bytes();
-        let mut combined_bytes: [u8; 8] = [0; 8];
+        let size_bytes: [u8; 2] = self.size.to_le_bytes();
+        let mut combined_bytes: [u8; 6] = [0; 6];
         combined_bytes[..4].copy_from_slice(&index_bytes);
         combined_bytes[4..].copy_from_slice(&size_bytes);
         combined_bytes
     }
 
-    pub fn get_index_offset(index: u32) -> u32 { index * 8 }
+    pub fn get_index_offset(index: u32) -> u32 { index * 6 }
 }

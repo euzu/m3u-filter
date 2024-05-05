@@ -284,13 +284,11 @@ pub(crate) struct ServerTargetConfig {
     pub watch: Option<Vec<String>>,
 }
 
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct ServerSourceConfig {
     pub inputs: Vec<ServerInputConfig>,
     pub targets: Vec<ServerTargetConfig>,
 }
-
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct ServerConfig {

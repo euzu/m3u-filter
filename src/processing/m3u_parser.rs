@@ -1,7 +1,7 @@
 use std::borrow::{BorrowMut};
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::model::config::Config;
+use crate::model::config::{Config, ConfigInput};
 use crate::model::config::default_as_empty_rc_str;
 use crate::model::playlist::{default_playlist_item_type, default_stream_cluster, PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::utils::string_utils;
@@ -53,7 +53,7 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     }
 }
 
-fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistItemHeader {
+fn create_empty_playlistitem_header(input_id: u16, url: String) -> PlaylistItemHeader {
     PlaylistItemHeader {
         id: default_as_empty_rc_str(),
         stream_id: default_as_empty_rc_str(),
@@ -66,13 +66,14 @@ fn create_empty_playlistitem_header(content: &String, url: String) -> PlaylistIt
         audio_track: default_as_empty_rc_str(),
         time_shift: default_as_empty_rc_str(),
         rec: default_as_empty_rc_str(),
-        source: Rc::new(content.to_owned()),
+        source:  Rc::new(input_id.to_string()),//Rc::new(content.to_owned()),
         url: Rc::new(url),
         epg_channel_id: None,
         item_type: default_playlist_item_type(),
         xtream_cluster: default_stream_cluster(),
         additional_properties: None,
         series_fetched: false,
+        category_id: 0,
     }
 }
 
@@ -87,8 +88,8 @@ macro_rules! process_header_fields {
     };
 }
 
-fn process_header(video_suffixes: &Vec<&str>, content: &String, url: String) -> PlaylistItemHeader {
-    let mut plih = create_empty_playlistitem_header(content, url.clone());
+fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &String, url: String) -> PlaylistItemHeader {
+    let mut plih = create_empty_playlistitem_header(input.id, url.clone());
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':');
     if line_token == Some(String::from("#EXTINF")) {
@@ -154,7 +155,7 @@ fn extract_id_from_url(url: &str) -> Option<String> {
     None
 }
 
-pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, lines: impl Iterator<Item=String>, mut visit: F) {
+pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigInput, lines: impl Iterator<Item=String>, mut visit: F) {
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
@@ -172,15 +173,17 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, lines: impl Iter
             continue;
         }
         if let Some(header_value) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(&video_suffixes, &header_value,line)) };
-            if item.header.borrow().group.is_empty() {
+            let item = PlaylistItem { header: RefCell::new(process_header(&input, &video_suffixes, &header_value, line)) };
+            let mut header = item.header.borrow_mut();
+            if header.group.is_empty() {
                 if let Some(group_value) = group {
-                    item.header.borrow_mut().group = Rc::new(group_value);
+                    header.group = Rc::new(group_value);
                 } else {
-                    let current_title = item.header.borrow().title.to_owned();
-                    item.header.borrow_mut().group = Rc::new(string_utils::get_title_group(current_title.as_str()));
+                    let current_title = header.title.to_owned();
+                    header.group = Rc::new(string_utils::get_title_group(current_title.as_str()));
                 }
             }
+            drop(header);
             visit(item);
         }
         header = None;
@@ -188,11 +191,11 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, lines: impl Iter
     }
 }
 
-pub(crate) fn parse_m3u(cfg: &Config, lines: &[String]) -> Vec<PlaylistGroup> {
+pub(crate) fn parse_m3u(cfg: &Config, input: &ConfigInput, lines: &[String]) -> Vec<PlaylistGroup> {
     let mut groups: std::collections::HashMap<Rc<String>, Vec<PlaylistItem>> = std::collections::HashMap::new();
     let mut sort_order: Vec<Rc<String>> = vec![];
     let mut playlist = Vec::new();
-    consume_m3u(cfg, lines.iter().cloned(), |item| playlist.push(item));
+    consume_m3u(cfg, input, lines.iter().cloned(), |item| playlist.push(item));
     playlist.drain(..).for_each(|item| {
         let key = Rc::clone(&item.header.borrow().group);
         // let key2 = String::from(&item.header.group);

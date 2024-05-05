@@ -4,7 +4,7 @@ use crate::model::playlist::PlaylistGroup;
 use crate::model::xmltv::Epg;
 use crate::repository::epg_repository::write_epg;
 use crate::repository::kodi_repository::write_strm_playlist;
-use crate::repository::m3u_repository::{write_m3u_playlist};
+use crate::repository::m3u_repository::write_m3u_playlist;
 use crate::repository::xtream_repository::write_xtream_playlist;
 
 pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<Epg>,

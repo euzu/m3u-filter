@@ -13,6 +13,7 @@ use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItemType};
 use crate::repository::repository_utils::IndexRecord;
 use crate::utils::file_utils;
+use crate::utils::file_utils::create_file_tuple;
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
@@ -36,18 +37,6 @@ pub(crate) fn get_m3u_epg_file_path(cfg: &Config, filename: &Option<String>) -> 
         .map(|path| file_utils::add_prefix_to_filename(&path, "epg_", Some("xml")))
 }
 
-fn create_m3u_files(m3u_path: &Path, idx_path: &Path) -> Result<(File, File), M3uFilterError> {
-    match File::create(m3u_path) {
-        Ok(m3u_file) => {
-            match File::create(idx_path) {
-                Ok(idx_file) => Ok((m3u_file, idx_file)),
-                Err(e) => cant_write_result!(&idx_path, e),
-            }
-        }
-        Err(e) => cant_write_result!(&m3u_path, e),
-    }
-}
-
 pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
@@ -57,7 +46,7 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
         }
 
         if let Some((m3u_path, idx_path)) = get_m3u_file_paths(cfg, filename) {
-            match create_m3u_files(&m3u_path, &idx_path) {
+            match create_file_tuple(&m3u_path, &idx_path) {
                 Ok((mut m3u_file, mut m3u_idx_file)) => {
                     let mut idx_offset: u32 = 0;
                     let m3u_playlist = new_playlist.iter()
@@ -70,12 +59,12 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
                         if let Ok(encoded) = bincode::serialize(&m3u) {
                             match file_utils::check_write(m3u_file.write_all(&encoded)) {
                                 Ok(_) => {
-                                    let bytes_written = encoded.len() as u32;
-                                    let combined_bytes: [u8; 8] = IndexRecord::new(idx_offset, bytes_written).to_bytes();
+                                    let bytes_written = encoded.len() as u16;
+                                    let combined_bytes = IndexRecord::new(idx_offset, bytes_written).to_bytes();
                                     if let Err(err) = file_utils::check_write(m3u_idx_file.write_all(&combined_bytes)) {
-                                        return cant_write_result!(&m3u_path, err);
+                                        return cant_write_result!(&idx_path, err);
                                     }
-                                    idx_offset += bytes_written;
+                                    idx_offset += bytes_written as u32;
                                     stream_id += 1;
                                 }
                                 Err(err) => {
@@ -92,7 +81,7 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
     Ok(())
 }
 
-pub(crate) fn rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &ProxyUserCredentials) -> Option<String> {
+pub(crate) fn load_rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &ProxyUserCredentials) -> Option<String> {
     let filename = target.get_m3u_filename();
     if filename.is_some() {
         if let Some((m3u_path, idx_path)) = get_m3u_file_paths(cfg, &filename) {

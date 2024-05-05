@@ -24,11 +24,10 @@ impl ProxyType {
 
 impl Display for ProxyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            ProxyType::Reverse => "reverse".to_string(),
-            ProxyType::Redirect => "redirect".to_string()
-        };
-        write!(f, "{}", str)
+        write!(f, "{}", match self {
+            ProxyType::Reverse => "reverse",
+            ProxyType::Redirect => "redirect"
+        })
     }
 }
 

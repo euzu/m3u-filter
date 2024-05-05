@@ -47,7 +47,7 @@ pub(crate) fn default_as_empty_str() -> String { String::from("") }
 
 pub(crate) fn default_as_empty_rc_str() -> Rc<String> { Rc::new(String::from("")) }
 
-pub(crate) fn default_as_zero() -> u8 { 0 }
+fn default_as_zero_u8() -> u8 { 0 }
 
 fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
 
@@ -470,11 +470,10 @@ pub(crate) enum InputType {
 
 impl Display for InputType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            InputType::M3u => "m3u".to_string(),
-            InputType::Xtream => "xtream".to_string()
-        };
-        write!(f, "{}", str)
+        write!(f, "{}", match self {
+            InputType::M3u => "m3u",
+            InputType::Xtream => "xtream"
+        })
     }
 }
 
@@ -701,7 +700,7 @@ impl VideoConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigDto {
-    #[serde(default = "default_as_zero")]
+    #[serde(default = "default_as_zero_u8")]
     pub threads: u8,
     pub api: ConfigApi,
     pub working_dir: String,
@@ -801,7 +800,7 @@ impl WebAuthConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Config {
-    #[serde(default = "default_as_zero")]
+    #[serde(default = "default_as_zero_u8")]
     pub threads: u8,
     pub api: ConfigApi,
     pub sources: Vec<ConfigSource>,

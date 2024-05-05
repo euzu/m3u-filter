@@ -4,7 +4,7 @@ use log::error;
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, stream_response};
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::config::TargetType;
-use crate::repository::m3u_repository::{get_m3u_file_paths, get_m3u_item_for_stream_id, rewrite_m3u_playlist};
+use crate::repository::m3u_repository::{get_m3u_file_paths, get_m3u_item_for_stream_id, load_rewrite_m3u_playlist};
 
 async fn m3u_api(
     api_req: web::Query<UserApiRequest>,
@@ -16,7 +16,7 @@ async fn m3u_api(
     match get_user_target(&api_req, &app_state) {
         Some((user, target)) => {
             // let filename = target.get_m3u_filename();
-            if let Some(content) = rewrite_m3u_playlist(&app_state.config, target, &user) {
+            if let Some(content) = load_rewrite_m3u_playlist(&app_state.config, target, &user) {
                 HttpResponse::Ok().content_type(mime::TEXT_PLAIN_UTF_8).body(content)
             } else {
                 HttpResponse::NoContent().finish()

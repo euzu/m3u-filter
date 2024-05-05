@@ -1,12 +1,29 @@
+use std::cell::Ref;
 use std::collections::HashMap;
+use std::iter::{FromIterator};
 use std::rc::Rc;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::model::config::{default_as_empty_rc_str};
-use crate::model::playlist::{PlaylistItem};
+use crate::model::config::{ConfigTargetOptions, default_as_empty_rc_str};
+use crate::model::playlist::{PlaylistItem, PlaylistItemHeader, XtreamCluster};
+
+const LIVE_STREAM_FIELDS: &[&str] = &[];
+
+const VIDEO_STREAM_FIELDS: &[&str] = &[
+    "release_date", "cast",
+    "director", "episode_run_time", "genre",
+    "stream_type", "title", "year", "youtube_trailer",
+    "plot", "rating_5based", "stream_icon", "container_extension"
+];
+
+const SERIES_STREAM_FIELDS: &[&str] = &[
+    "backdrop_path", "cast", "cover", "director", "episode_run_time", "genre",
+    "last_modified", "name", "plot", "rating_5based",
+    "stream_type", "title", "year", "youtube_trailer",
+];
 
 fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
 
@@ -333,8 +350,126 @@ impl XtreamSeriesInfoEpisode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct MultiXtreamMapping {
-    pub stream_id: u32,
-    pub input_id: u16,
+pub(crate) struct XtreamMappingOptions {
+    pub skip_live_direct_source: bool,
+    pub skip_video_direct_source: bool,
+}
+
+impl XtreamMappingOptions {
+    pub fn from_target_options(options: Option<&ConfigTargetOptions>) -> Self {
+        let (skip_live_direct_source, skip_video_direct_source) = options
+            .map_or((false, false), |o| (o.xtream_skip_live_direct_source, o.xtream_skip_video_direct_source));
+        XtreamMappingOptions{
+            skip_live_direct_source, skip_video_direct_source
+        }
+    }
+}
+
+fn append_release_date(document: &mut serde_json::Map<String, Value>) {
+    // Do we really need releaseDate ?
+    let has_release_date_1 = document.contains_key("release_date");
+    let has_release_date_2 = document.contains_key("releaseDate");
+    if !(has_release_date_1 && has_release_date_2) {
+        let release_date = if has_release_date_1 {
+            document.get("release_date")
+        } else if has_release_date_2 {
+            document.get("releaseDate")
+        } else {
+            None
+        }.map_or_else(|| Value::Null, |v| v.clone());
+        if !&has_release_date_1 {
+            document.insert("release_date".to_string(), release_date.clone());
+        }
+        if !&has_release_date_2 {
+            document.insert("releaseDate".to_string(), release_date.clone());
+        }
+    }
+}
+
+fn append_mandatory_fields(document: &mut serde_json::Map<String, Value>, fields: &[&str]) {
+    for &field in fields {
+        if !document.contains_key(field) {
+            document.insert(field.to_string(), Value::Null);
+        }
+    }
+}
+
+fn append_prepared_series_properties(header: &Ref<PlaylistItemHeader>, document: &mut serde_json::Map<String, Value>) {
+    if let Some(add_props) = &header.additional_properties {
+        match add_props.iter().find(|(key, _)| key.eq("rating")) {
+            Some((_, value)) => {
+                document.insert("rating".to_string(), match value {
+                    Value::Number(val) => Value::String(format!("{:.0}", val.as_f64().unwrap())),
+                    Value::String(val) => Value::String(val.to_string()),
+                    _ => Value::String("0".to_string()),
+                });
+            }
+            None => {
+                document.insert("rating".to_string(), Value::String("0".to_string()));
+            }
+        }
+    }
+}
+
+pub(crate) fn xtream_playlistitem_to_document(pli: &PlaylistItem, options: &XtreamMappingOptions) -> serde_json::Value {
+    let header = &pli.header.borrow();
+    let stream_id_value = Value::Number(serde_json::Number::from(header.stream_id.parse::<i32>().unwrap()));
+    let mut document = serde_json::Map::from_iter([
+        ("category_id".to_string(), Value::String(format!("{}", &header.category_id))),
+        ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(header.category_id))]))),
+        ("name".to_string(), Value::String(header.name.as_ref().clone())),
+        ("num".to_string(), stream_id_value.clone()),
+        ("title".to_string(), Value::String(header.title.as_ref().clone())),
+        ("stream_icon".to_string(), Value::String(header.logo.as_ref().clone())),
+    ]);
+
+    match header.xtream_cluster {
+        XtreamCluster::Live => {
+            document.insert("stream_id".to_string(), stream_id_value);
+            if options.skip_live_direct_source {
+                document.insert("direct_source".to_string(), Value::String("".to_string()));
+            } else {
+                document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+            }
+            document.insert("thumbnail".to_string(), Value::String(header.logo_small.as_ref().clone()));
+            document.insert("custom_sid".to_string(), Value::String("".to_string()));
+            document.insert("epg_channel_id".to_string(), match &header.epg_channel_id {
+                None => Value::Null,
+                Some(epg_id) => Value::String(epg_id.as_ref().clone())
+            });
+        }
+        XtreamCluster::Video => {
+            document.insert("stream_id".to_string(), stream_id_value);
+            if options.skip_video_direct_source {
+                document.insert("direct_source".to_string(), Value::String("".to_string()));
+            } else {
+                document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+            }
+            document.insert("custom_sid".to_string(), Value::String("".to_string()));
+        }
+        XtreamCluster::Series => {
+            document.insert("series_id".to_string(), stream_id_value);
+        }
+    };
+
+    if let Some(add_props) = &header.additional_properties {
+        for (field_name, field_value) in add_props {
+            document.insert(field_name.to_string(), field_value.to_owned());
+        }
+    }
+
+    match header.xtream_cluster {
+        XtreamCluster::Live => {
+            append_mandatory_fields(&mut document, LIVE_STREAM_FIELDS);
+        }
+        XtreamCluster::Video => {
+            append_mandatory_fields(&mut document, VIDEO_STREAM_FIELDS);
+        }
+        XtreamCluster::Series => {
+            append_prepared_series_properties(header, &mut document);
+            append_mandatory_fields(&mut document, SERIES_STREAM_FIELDS);
+            append_release_date(&mut document);
+        }
+    };
+    Value::Object(document)
 }
