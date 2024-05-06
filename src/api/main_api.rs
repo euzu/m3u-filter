@@ -8,7 +8,7 @@ use actix_web::{App, HttpServer, web};
 use actix_web::middleware::{Logger};
 use log::info;
 
-use crate::api::api_model::{AppState, DownloadQueue, SharedLocks};
+use crate::api::api_model::{AppState, DownloadQueue};
 use crate::api::m3u_api::m3u_api_register;
 use crate::api::scheduler::start_scheduler;
 use crate::api::v1_api::v1_api_register;
@@ -48,7 +48,6 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
             active: Arc::from(RwLock::new(None)),
             finished: Arc::from(RwLock::new(Vec::new())),
         }),
-        shared_locks: Arc::new(SharedLocks::new()),
     });
 
     // Scheduler

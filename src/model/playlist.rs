@@ -227,7 +227,7 @@ impl PlaylistItem {
     }
 
     pub fn to_xtream(&self, options: &XtreamMappingOptions) -> Value {
-        xtream_playlistitem_to_document(&self, options)
+        xtream_playlistitem_to_document(self, options)
     }
 }
 

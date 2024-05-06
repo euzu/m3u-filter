@@ -324,8 +324,6 @@ pub(crate) struct ConfigTarget {
     pub _filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
     pub _mapping: Option<Vec<Mapping>>,
-    #[serde(skip_serializing, skip_deserializing)]
-    _multi_input: bool,
 }
 
 
@@ -396,10 +394,6 @@ impl ConfigTarget {
         }
     }
 
-    pub(crate) fn is_multi_input(&self) -> bool {
-        self._multi_input
-    }
-
     pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
         return self._filter.as_ref().unwrap().filter(provider, &mut processor);
@@ -435,9 +429,6 @@ pub(crate) struct ConfigSource {
 impl ConfigSource {
     pub(crate) fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
-        if self.inputs.len() > 1 {
-            self.targets.iter_mut().for_each(|t| t._multi_input = true);
-        }
         Ok(index + (self.inputs.len() as u16))
     }
 
@@ -876,11 +867,11 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_input_by_id(&self, input_id: &u16) -> Option<ConfigInput> {
+    pub(crate) fn get_input_by_id(&self, input_id: &u16) -> Option<&ConfigInput> {
         for source in &self.sources {
             for input in &source.inputs {
                 if input.id == *input_id {
-                    return Some(input.clone());
+                    return Some(input);
                 }
             }
         }

@@ -1,24 +1,21 @@
-use std::collections::{BTreeMap, HashMap};
-use std::{fs, io};
-use std::fs::{File, OpenOptions};
+use std::collections::{HashMap};
+use std::{fs};
+use std::fs::{File};
 use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use log::{error};
 use serde::Serialize;
 use serde_json::{json, Value};
-use crate::model::config::{Config, ConfigInput, ConfigTarget};
+use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::{create_m3u_filter_error_result};
-use crate::api::api_model::AppState;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::xtream::{XtreamMappingOptions};
 use crate::repository::repository_utils::IndexRecord;
 use crate::utils::file_utils;
 use crate::utils::file_utils::create_file_tuple;
 use crate::utils::json_utils::iter_json_array;
-
-type IndexTree = BTreeMap<i32, (u32, u16)>;
 
 pub(crate) static COL_CAT_LIVE: &str = "cat_live";
 pub(crate) static COL_CAT_SERIES: &str = "cat_series";
@@ -54,49 +51,6 @@ fn get_collection_path(path: &Path, collection: &str) -> PathBuf {
     path.join(format!("{}.json", collection))
 }
 
-fn get_info_collection_path(path: &Path, collection: &str) -> PathBuf {
-    path.join(format!("{}_info.db", collection))
-}
-
-fn get_info_idx_path(path: &Path, collection: &str) -> PathBuf {
-    path.join(format!("{}_info.idx", collection))
-}
-
-fn get_info_collection_and_idx_path(path: &Path, cluster: &XtreamCluster) -> (PathBuf, PathBuf) {
-    let collection = match cluster {
-        XtreamCluster::Live => COL_LIVE,
-        XtreamCluster::Video => COL_VOD,
-        XtreamCluster::Series => COL_SERIES,
-    };
-    (get_info_collection_path(path, collection), get_info_idx_path(path, collection))
-}
-
-fn write_xtream_info(app_state: &AppState, target_name: &str, stream_id: i32, cluster: &XtreamCluster,
-                     content: &str, index_tree: &mut IndexTree) -> Result<(), Error> {
-    if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
-        let (col_path, idx_path) = get_info_collection_and_idx_path(&path, cluster);
-        let mut comp: Vec<u8> = Vec::new();
-        lzma_rs::lzma_compress(&mut BufReader::new(content.as_bytes()), &mut comp)?;
-        let size = comp.len();
-        match OpenOptions::new()
-            .create(true)
-            //.write(true)
-            .append(true)
-            .open(col_path) {
-            Ok(mut file) => {
-                let offset = file.metadata().unwrap().len();
-                file.write_all(comp.as_slice())?;
-                file.flush()?;
-                index_tree.insert(stream_id, (offset as u32, size as u16));
-                write_index(&idx_path, index_tree)?;
-            }
-            Err(err) => {
-                return Err(err);
-            }
-        }
-    }
-    Ok(())
-}
 
 fn ensure_xtream_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, M3uFilterError> {
     if let Some(path) = get_xtream_storage_path(cfg, target_name) {
@@ -230,7 +184,7 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                         let mut header = pli.header.borrow_mut();
                         // we skip resolved series, because this is only necessary when writing m3u files
                         let col = if header.item_type != PlaylistItemType::Series {
-                            if let Ok(_) = header.id.parse::<i32>() {
+                            if header.id.parse::<i32>().is_ok() {
                                 header.category_id = *cat_id;
                                 Some(match pli.header.borrow().xtream_cluster {
                                     XtreamCluster::Live => &mut live_col,
@@ -321,91 +275,6 @@ pub(crate) fn xtream_get_collection_path(cfg: &Config, target_name: &str, collec
         }
     }
     Err(Error::new(ErrorKind::Other, format!("Cant find collection: {}/{}", target_name, collection_name)))
-}
-
-fn load_index(path: &Path) -> Option<IndexTree> {
-    match fs::read(path) {
-        Ok(encoded) => {
-            let decoded: IndexTree = bincode::deserialize(&encoded[..]).unwrap();
-            Some(decoded)
-        }
-        Err(_) => None,
-    }
-}
-
-fn write_index(path: &PathBuf, index: &IndexTree) -> io::Result<()> {
-    let encoded = bincode::serialize(index).unwrap();
-    fs::write(path, encoded)
-}
-
-fn seek_read(
-    reader: &mut (impl Read + Seek),
-    offset: u64,
-    amount_to_read: u16,
-) -> Result<Vec<u8>, Error> {
-    // A buffer filled with as many zeros as we'll read with read_exact
-    let mut buf = vec![0u8; amount_to_read as usize];
-    reader.seek(SeekFrom::Start(offset))?;
-    reader.read_exact(&mut buf)?;
-    Ok(buf)
-}
-
-
-pub(crate) async fn xtream_get_stored_stream_info(
-    app_state: &AppState, target_name: &str, stream_id: i32,
-    cluster: &XtreamCluster, target_input: &ConfigInput) -> Result<String, ()> {
-    let cache_info = target_input.options.as_ref()
-        .map(|o| o.xtream_info_cache).unwrap_or(false);
-    if cache_info {
-        if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
-            let (col_path, idx_path) = get_info_collection_and_idx_path(&path, cluster);
-            let lock = app_state.shared_locks.get_lock(target_name);
-            let shared_lock = lock.read().unwrap();
-            if idx_path.exists() && col_path.exists() {
-                let index_tree = load_index(&idx_path);
-                if let Some(idx_map) = &index_tree {
-                    if let Some((offset, size)) = idx_map.get(&stream_id) {
-                        let mut reader = BufReader::new(File::open(&col_path).unwrap());
-                        if let Ok(bytes) = seek_read(&mut reader, *offset as u64, *size) {
-                            let mut decompressed: Vec<u8> = Vec::new();
-                            let _ = lzma_rs::lzma_decompress(&mut bytes.as_slice(), &mut decompressed);
-                            drop(shared_lock);
-                            return Ok(String::from_utf8(decompressed).unwrap());
-                        }
-                    }
-                }
-            }
-            drop(shared_lock);
-        }
-    }
-    Err(())
-}
-
-pub(crate) async fn xtream_persist_stream_info(
-    app_state: &AppState, target_name: &str, stream_id: i32,
-    cluster: &XtreamCluster, target_input: &ConfigInput, content: &str) {
-    let cache_info = target_input.options.as_ref()
-        .map(|o| o.xtream_info_cache).unwrap_or(false);
-    if cache_info {
-        if let Some(path) = get_xtream_storage_path(&app_state.config, target_name) {
-            let lock = app_state.shared_locks.get_lock(target_name);
-            let shared_lock = lock.write().unwrap();
-            let mut index_tree = {
-                let (col_path, idx_path) = get_info_collection_and_idx_path(&path, cluster);
-                if idx_path.exists() && col_path.exists() {
-                    load_index(&idx_path).unwrap_or_default()
-                } else {
-                    IndexTree::new()
-                }
-            };
-            match write_xtream_info(app_state, target_name, stream_id, cluster, content,
-                                    &mut index_tree) {
-                Ok(_) => {}
-                Err(err) => { error!("{}", err.to_string()); }
-            }
-            drop(shared_lock);
-        }
-    }
 }
 
 pub(crate) fn get_xtream_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget) -> Result<PlaylistItem, Error> {

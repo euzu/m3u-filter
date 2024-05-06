@@ -133,25 +133,13 @@ fn create_config_input_for_url(url: &str) -> ConfigInput {
     }
 }
 
-pub(crate) async fn playlist(
-    req: web::Json<PlaylistRequest>,
-    app_state: web::Data<AppState>,
-) -> HttpResponse {
-    match match &req.input_id {
-        Some(input_id) => {
-            app_state.config.get_input_by_id(input_id)
-        }
-        None => {
-            let url = req.url.as_deref().unwrap_or("");
-            Some(create_config_input_for_url(url))
-        }
-    } {
-        None => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
+async fn get_playlist(inp: Option<&ConfigInput>, cfg: &Config) -> HttpResponse {
+    match inp {
         Some(input) => {
             let (result, errors) =
                 match input.input_type {
-                    InputType::M3u => download::get_m3u_playlist(&app_state.config, &input, &app_state.config.working_dir).await,
-                    InputType::Xtream => download::get_xtream_playlist(&input, &app_state.config.working_dir).await,
+                    InputType::M3u => download::get_m3u_playlist(cfg, input, &cfg.working_dir).await,
+                    InputType::Xtream => download::get_xtream_playlist(input, &cfg.working_dir).await,
                 };
             if result.is_empty() {
                 let error_strings: Vec<String> = errors.iter().map(|err| err.to_string()).collect();
@@ -160,6 +148,20 @@ pub(crate) async fn playlist(
                 HttpResponse::Ok().json(result)
             }
         }
+        None => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
+    }
+}
+
+pub(crate) async fn playlist(
+    req: web::Json<PlaylistRequest>,
+    app_state: web::Data<AppState>,
+) -> HttpResponse {
+    return if let Some(input_id) = &req.input_id {
+        get_playlist(app_state.config.get_input_by_id(input_id), &app_state.config).await
+    } else {
+        let url = req.url.as_deref().unwrap_or("");
+        let input = create_config_input_for_url(url);
+        get_playlist(Some(&input), &app_state.config).await
     }
 }
 
@@ -229,14 +231,14 @@ pub(crate) async fn config(
 pub(crate) fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) {
     return move |cfg: &mut web::ServiceConfig| {
         cfg.service(web::scope("/api/v1")
-        .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))
-        .route("/config", web::get().to(config))
-        .route("/config/main", web::post().to(save_config_main))
-        .route("/config/user", web::post().to(save_config_api_proxy_user))
-        .route("/config/apiproxy", web::post().to(save_config_api_proxy_config))
-        .route("/playlist", web::post().to(playlist))
-        .route("/playlist/update", web::post().to(playlist_update))
-        .route("/file/download", web::post().to(download_api::queue_download_file))
-        .route("/file/download/info", web::get().to(download_api::download_file_info)));
+            .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))
+            .route("/config", web::get().to(config))
+            .route("/config/main", web::post().to(save_config_main))
+            .route("/config/user", web::post().to(save_config_api_proxy_user))
+            .route("/config/apiproxy", web::post().to(save_config_api_proxy_config))
+            .route("/playlist", web::post().to(playlist))
+            .route("/playlist/update", web::post().to(playlist_update))
+            .route("/file/download", web::post().to(download_api::queue_download_file))
+            .route("/file/download/info", web::get().to(download_api::download_file_info)));
     };
 }

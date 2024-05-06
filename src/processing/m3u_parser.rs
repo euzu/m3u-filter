@@ -88,7 +88,7 @@ macro_rules! process_header_fields {
     };
 }
 
-fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &String, url: String) -> PlaylistItemHeader {
+fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str, url: String) -> PlaylistItemHeader {
     let mut plih = create_empty_playlistitem_header(input.id, url.clone());
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':');
@@ -173,7 +173,7 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigIn
             continue;
         }
         if let Some(header_value) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(&input, &video_suffixes, &header_value, line)) };
+            let item = PlaylistItem { header: RefCell::new(process_header(input, &video_suffixes, &header_value, line)) };
             let mut header = item.header.borrow_mut();
             if header.group.is_empty() {
                 if let Some(group_value) = group {

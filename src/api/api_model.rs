@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{VecDeque};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
@@ -113,33 +113,6 @@ impl FileDownload {
 }
 
 
-pub(crate) struct SharedLocks {
-    shared_locks: Arc<RwLock<HashMap<String, Arc<RwLock<String>>>>>,
-}
-
-impl SharedLocks {
-    pub(crate) fn new() -> Self {
-        SharedLocks {
-            shared_locks: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    pub(crate) fn get_lock(&self, key: &str) -> Arc<RwLock<String>> {
-        {
-            let lock = self.shared_locks.read().unwrap();
-            match lock.get(key) {
-                None => {}
-                Some(file) => return file.clone(),
-            }
-        }
-        let mut lock = self.shared_locks.write().unwrap();
-        let file = Arc::new(RwLock::new(key.to_string()));
-        lock.insert(key.to_string(), file.clone());
-        file
-    }
-}
-
-
 pub(crate) struct DownloadQueue {
     pub queue: Arc<Mutex<VecDeque<FileDownload>>>,
     pub active: Arc<RwLock<Option<FileDownload>>>,
@@ -150,7 +123,6 @@ pub(crate) struct AppState {
     pub config: Arc<Config>,
     pub targets: Arc<ProcessTargets>,
     pub downloads: Arc<DownloadQueue>,
-    pub shared_locks: Arc<SharedLocks>,
 }
 
 #[derive(Serialize)]
@@ -191,47 +163,6 @@ pub(crate) struct XtreamAuthorizationResponse {
     pub user_info: XtreamUserInfo,
     pub server_info: XtreamServerInfo,
 }
-
-// macro_rules! create_user_api {
-// ($name:ident { $($field:ident : $field_type:ty),* $(,)? }) => {
-//         #[derive(Debug, serde::Serialize, serde::Deserialize)]
-//         pub(crate) struct $name {
-//             $(
-//             #[serde(default = "default_as_empty_str")]
-//             pub $field : $field_type
-//             ),*
-//         }
-//
-//         impl $name {
-//             pub fn from_map(map: &HashMap<String, String>) -> Self {
-//                 let mut fields = HashMap::new();
-//                 $(
-//                     if let Some(value) = map.get(stringify!($field)) {
-//                         fields.insert(stringify!($field).to_string(), value.clone());
-//                     }
-//                 )*
-//                 Self {
-//                     $(
-//                         $field: fields.remove(stringify!($field)).unwrap_or_default(),
-//                     )*
-//                 }
-//             }
-//         }
-//     };
-// }
-//
-// create_user_api!(
-// UserApiRequest {
-//     username: String,
-//     password: String,
-//     token: String,
-//     action: String,
-//     series_id: String,
-//     vod_id: String,
-//     stream_id: String,
-//     category_id: String,
-//     limit: String,
-// });
 
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
