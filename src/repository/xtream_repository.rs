@@ -277,10 +277,13 @@ pub(crate) fn xtream_get_collection_path(cfg: &Config, target_name: &str, collec
     Err(Error::new(ErrorKind::Other, format!("Cant find collection: {}/{}", target_name, collection_name)))
 }
 
-pub(crate) fn get_xtream_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget) -> Result<XtreamPlaylistItem, Error> {
+pub(crate) fn get_xtream_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget, xtream_cluster: Option<&XtreamCluster>) -> Result<XtreamPlaylistItem, Error> {
     if let Some(storage_path) = get_xtream_storage_path(config, target.name.as_str()) {
         if let Some(mapping) = load_stream_id_cluster_mapping(&storage_path) {
-            if let Some((cluster, cluster_index)) = mapping.iter().find(|(_, c)| stream_id >= *c) {
+            if let Some((cluster, cluster_index)) = match xtream_cluster {
+                Some(clus) => mapping.iter().find(|(c, _)| c == clus),
+                None => mapping.iter().find(|(_, c)| stream_id >= *c),
+            } {
                 let (xtream_path, idx_path) = get_xtream_file_paths(&storage_path, cluster);
                 if xtream_path.exists() && idx_path.exists() {
                     let offset: u64 = IndexRecord::get_index_offset(stream_id - cluster_index) as u64;

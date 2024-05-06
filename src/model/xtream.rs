@@ -395,22 +395,19 @@ fn append_mandatory_fields(document: &mut serde_json::Map<String, Value>, fields
 }
 
 fn append_prepared_series_properties(add_props: Option<&Map<String, Value>>, document: &mut Map<String, Value>) {
-    match add_props {
-        Some(props) => {
-            match props.get("rating") {
-                Some(value) => {
-                    document.insert("rating".to_string(), match value {
-                        Value::Number(val) => Value::String(format!("{:.0}", val.as_f64().unwrap())),
-                        Value::String(val) => Value::String(val.to_string()),
-                        _ => Value::String("0".to_string()),
-                    });
-                }
-                None => {
-                    document.insert("rating".to_string(), Value::String("0".to_string()));
-                }
+    if let Some(props) = add_props {
+        match props.get("rating") {
+            Some(value) => {
+                document.insert("rating".to_string(), match value {
+                    Value::Number(val) => Value::String(format!("{:.0}", val.as_f64().unwrap())),
+                    Value::String(val) => Value::String(val.to_string()),
+                    _ => Value::String("0".to_string()),
+                });
+            }
+            None => {
+                document.insert("rating".to_string(), Value::String("0".to_string()));
             }
         }
-        None => {}
     }
 }
 

@@ -166,7 +166,7 @@ async fn xtream_player_api_stream(
                 Err(_) => return HttpResponse::BadRequest().finish()
             };
 
-            match get_xtream_item_for_stream_id(req_stream_id, &app_state.config, target) {
+            match get_xtream_item_for_stream_id(req_stream_id, &app_state.config, target, None) {
                 Ok(pli) => {
                     let input_id: u16 = pli.input_id;
                     if let Some(input) = app_state.config.get_input_by_id(&input_id) {
@@ -304,7 +304,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
         Err(_) => return HttpResponse::BadRequest().finish()
     };
 
-    if let Ok(pli) = get_xtream_item_for_stream_id(req_stream_id, &app_state.config, target) {
+    if let Ok(pli) = get_xtream_item_for_stream_id(req_stream_id, &app_state.config, target, Some(cluster)) {
         let input_id = pli.input_id;
         if let Some(input) = app_state.config.get_input_by_id(&input_id) {
             let stream_id = pli.id;
@@ -328,7 +328,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
             Err(_) => return HttpResponse::BadRequest().finish()
         };
 
-        if let Ok(pli) = get_xtream_item_for_stream_id(req_stream_id, &app_state.config, target) {
+        if let Ok(pli) = get_xtream_item_for_stream_id(req_stream_id, &app_state.config, target, None) {
             let input_id: u16 = pli.input_id;
             if let Some(input) = app_state.config.get_input_by_id(&input_id) {
                 if let Some(action_url) = get_xtream_player_api_action_url(input, "get_short_epg") {
