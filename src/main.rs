@@ -75,7 +75,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let args = Args::parse();
-    init_logger(args.log_level.as_ref().unwrap_or(&"info".to_string()));
+    let default_log_level = std::env::var("M3U_FILTER_LOG").unwrap_or_else(|_| "info".to_string());
+    init_logger(args.log_level.as_ref().unwrap_or(&default_log_level));
 
     let config_path: String = args.config_path.unwrap_or(file_utils::get_default_config_path());
     let config_file: String = args.config_file.unwrap_or(file_utils::get_default_config_file_path(&config_path));
