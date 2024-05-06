@@ -20,6 +20,8 @@
    - `secret` secret for jwt token
    - `userfile` optional userfile with generated userfile in format "username: password" per file, default name is user.txt in config path
 * Password generation argument --genpwd  to generate passwords for userfile. 
+* Added env var ` M3U_FILTER_LOG` for log level
+* Log Level has now module support like `m3u_filter::util=error,m3u_filter::filter=debug,m3u_filter=debug`
 
 
 # v1.1.8(2024-03-06)

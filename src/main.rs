@@ -75,7 +75,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let args = Args::parse();
-    init_logger(args.log_level.as_ref().unwrap_or(&"info".to_string()));
+    let default_log_level = std::env::var("M3U_FILTER_LOG").unwrap_or_else(|_| "info".to_string());
+    init_logger(args.log_level.as_ref().unwrap_or(&default_log_level));
 
     let config_path: String = args.config_path.unwrap_or(file_utils::get_default_config_path());
     let config_file: String = args.config_file.unwrap_or(file_utils::get_default_config_file_path(&config_path));
@@ -147,8 +148,19 @@ fn get_log_level(log_level: &str) -> LevelFilter {
 
 fn init_logger(log_level: &str) {
     let mut log_builder = Builder::from_default_env();
-    // Set the log level based on the parsed value
-    log_builder.filter_level(get_log_level(log_level));
+
+    if log_level.contains('=') {
+        let pairs: Vec<&str> = log_level.split(',').collect();
+        for pair in pairs {
+            let kv: Vec<&str> = pair.split('=').collect();
+            if kv.len() == 2 {
+                log_builder.filter_module(kv[0].trim(), get_log_level(kv[1].trim()));
+            }
+        }
+    } else {
+        // Set the log level based on the parsed value
+        log_builder.filter_level(get_log_level(log_level));
+    }
     log_builder.init();
     info!("Log Level {}", get_log_level(log_level));
 }
