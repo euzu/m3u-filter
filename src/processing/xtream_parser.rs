@@ -50,7 +50,6 @@ pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &
                         audio_track: default_as_empty_rc_str(),
                         time_shift: default_as_empty_rc_str(),
                         rec: default_as_empty_rc_str(),
-                        source: default_as_empty_rc_str(),
                         url: if episode.direct_source.is_empty() {
                             let ext = episode.container_extension.to_owned();
                             let stream_base_url = format!("{}/series/{}/{}/{}.{}", url, username, password, episode.id.as_str(), ext);
@@ -64,6 +63,7 @@ pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &
                         additional_properties: episode.get_additional_properties(&series_info),
                         series_fetched: false,
                         category_id: 0,
+                        input_id: input.id
                     })
                 }).collect();
             if result.is_empty() { Ok(None) } else { Ok(Some(result)) }
@@ -80,7 +80,7 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                            streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match map_to_xtream_category(category) {
         Ok(mut categories) => {
-            let input_id = input.id.to_string();
+            let input_id = input.id;
             let url = input.url.as_str();
             let username = input.username.as_ref().map_or("", |v| v);
             let password = input.password.as_ref().map_or("", |v| v);
@@ -109,7 +109,6 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                                     audio_track: default_as_empty_rc_str(),
                                     time_shift: default_as_empty_rc_str(),
                                     rec: default_as_empty_rc_str(),
-                                    source: Rc::new(input_id.to_owned()),
                                     url: if stream.direct_source.is_empty() {
                                         let stream_base_url = match xtream_cluster {
                                             XtreamCluster::Live => format!("{}/live/{}/{}/{}.ts", url, username, password, &stream.get_stream_id()),
@@ -135,6 +134,7 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                                     additional_properties: stream.get_additional_properties(),
                                     series_fetched: false,
                                     category_id: 0,
+                                    input_id
                                 }),
                             };
                             grp.add(item);

@@ -99,9 +99,9 @@ pub(crate) fn load_rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, use
                                 result.push("#EXTM3U".to_string());
 
                                 while cursor < size {
-                                    let tuple = IndexRecord::from_bytes(&encoded_idx, &mut cursor);
-                                    let start_offset = tuple.index as usize;
-                                    let end_offset = start_offset + tuple.size as usize;
+                                    let index_record = IndexRecord::from_bytes(&encoded_idx, &mut cursor);
+                                    let start_offset = index_record.index as usize;
+                                    let end_offset = start_offset + index_record.size as usize;
                                     if let Ok(m3u_pli) = bincode::deserialize::<M3uPlaylistItem>(&encoded_m3u[start_offset..end_offset]) {
                                         match user.proxy {
                                             ProxyType::Reverse => {

@@ -50,7 +50,7 @@ impl Display for XtreamCluster {
 
 pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::Live }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) enum PlaylistItemType {
     Live = 1,
     Movie = 2,
@@ -60,6 +60,7 @@ pub(crate) enum PlaylistItemType {
 
 pub(crate) fn default_playlist_item_type() -> PlaylistItemType { PlaylistItemType::Live }
 fn default_as_zero_u32() -> u32 { 0 }
+fn default_as_zero_u16() -> u16 { 0 }
 
 pub(crate) trait FieldAccessor {
     fn get_field(&self, field: &str) -> Option<Rc<String>>;
@@ -80,19 +81,19 @@ pub(crate) struct PlaylistItemHeader {
     pub audio_track: Rc<String>,
     pub time_shift: Rc<String>,
     pub rec: Rc<String>,
-    pub source: Rc<String>,
     pub url: Rc<String>,
     pub epg_channel_id: Option<Rc<String>>,
     #[serde(default = "default_stream_cluster")]
     pub xtream_cluster: XtreamCluster,
-    pub additional_properties: Option<Vec<(String, Value)>>,
+    pub additional_properties: Option<Value>,
     #[serde(default = "default_playlist_item_type", skip_serializing, skip_deserializing)]
     pub item_type: PlaylistItemType,
     #[serde(default = "default_as_false", skip_serializing, skip_deserializing)]
     pub series_fetched: bool, // only used for series_info
     #[serde(default = "default_as_zero_u32")]
     pub category_id: u32,
-
+    #[serde(default = "default_as_zero_u16")]
+    pub input_id: u16,
 }
 
 macro_rules! update_fields {
@@ -133,7 +134,7 @@ macro_rules! to_m3u_non_empty_fields {
 
 impl FieldAccessor for PlaylistItemHeader {
     fn get_field(&self, field: &str) -> Option<Rc<String>> {
-        let val = get_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url;);
+        let val = get_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, url;);
         if val.is_some() {
             return val;
         }
@@ -145,7 +146,7 @@ impl FieldAccessor for PlaylistItemHeader {
 
     fn set_field(&mut self, field: &str, value: &str) -> bool {
         let val = String::from(value);
-        let updated = update_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, source, url; val);
+        let updated = update_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, url; val);
         if updated {
             return updated;
         }
@@ -174,6 +175,7 @@ pub(crate) struct M3uPlaylistItem {
     pub rec: Rc<String>,
     pub url: Rc<String>,
     pub epg_channel_id: Option<Rc<String>>,
+    pub input_id: u16,
 }
 
 
@@ -202,6 +204,33 @@ impl M3uPlaylistItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct XtreamPlaylistItem {
+    pub stream_id: u32,
+    pub id: u32,
+    pub name: Rc<String>,
+    pub logo: Rc<String>,
+    pub logo_small: Rc<String>,
+    pub group: Rc<String>,
+    pub title: Rc<String>,
+    pub parent_code: Rc<String>,
+    pub rec: Rc<String>,
+    pub url: Rc<String>,
+    pub epg_channel_id: Option<Rc<String>>,
+    pub xtream_cluster: XtreamCluster,
+    pub additional_properties: Option<String>,
+    pub item_type: PlaylistItemType,
+    pub series_fetched: bool, // only used for series_info
+    pub category_id: u32,
+    pub input_id: u16,
+}
+
+impl XtreamPlaylistItem {
+    pub fn to_doc(&self, options: &XtreamMappingOptions) -> Value {
+        xtream_playlistitem_to_document(self, options)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistItem {
     pub header: RefCell<PlaylistItemHeader>,
 }
@@ -223,11 +252,37 @@ impl PlaylistItem {
             rec: Rc::clone(&header.rec),
             url: Rc::clone(&header.url),
             epg_channel_id: header.epg_channel_id.clone(),
+            input_id: header.input_id,
         }
     }
 
-    pub fn to_xtream(&self, options: &XtreamMappingOptions) -> Value {
-        xtream_playlistitem_to_document(self, options)
+    pub fn to_xtream(&self) -> XtreamPlaylistItem {
+        let header = self.header.borrow();
+        XtreamPlaylistItem {
+            stream_id: header.stream_id.parse::<u32>().unwrap(),
+            id: header.id.parse::<u32>().unwrap(),
+            name: Rc::clone(&header.name),
+            logo: Rc::clone(&header.logo),
+            logo_small: Rc::clone(&header.logo_small),
+            group: Rc::clone(&header.group),
+            title: Rc::clone(&header.title),
+            parent_code: Rc::clone(&header.parent_code),
+            rec: Rc::clone(&header.rec),
+            url: Rc::clone(&header.url),
+            epg_channel_id: header.epg_channel_id.clone(),
+            xtream_cluster: header.xtream_cluster.clone(),
+            additional_properties: match &header.additional_properties {
+                None => None,
+                Some(props) => match serde_json::to_string(props) {
+                    Ok(val) => Some(val),
+                    Err(_) => None
+                }
+            },
+            item_type: header.item_type.clone(),
+            series_fetched: header.series_fetched,
+            category_id: header.category_id,
+            input_id: header.input_id
+        }
     }
 }
 

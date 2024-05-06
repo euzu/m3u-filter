@@ -281,7 +281,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
     }
     if all_playlist.is_empty() {
         if log_enabled!(Level::Debug) {
-            debug!("Source at {} input is empty", source_idx);
+            debug!("Source at index {} input is empty", source_idx);
         }
         errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Source at {} input is empty", source_idx)));
     } else {

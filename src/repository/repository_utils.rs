@@ -35,7 +35,7 @@ impl IndexRecord {
         let index_bytes: [u8; 4] = bytes[*cursor..*cursor + 4].try_into().unwrap();
         *cursor += 4;
         let size_bytes: [u8; 2] = bytes[*cursor..*cursor + 2].try_into().unwrap();
-        *cursor += 4;
+        *cursor += 2;
         let index = u32::from_le_bytes(index_bytes);
         let size = u16::from_le_bytes(size_bytes);
         IndexRecord { index, size }

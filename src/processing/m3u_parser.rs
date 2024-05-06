@@ -66,7 +66,6 @@ fn create_empty_playlistitem_header(input_id: u16, url: String) -> PlaylistItemH
         audio_track: default_as_empty_rc_str(),
         time_shift: default_as_empty_rc_str(),
         rec: default_as_empty_rc_str(),
-        source:  Rc::new(input_id.to_string()),//Rc::new(content.to_owned()),
         url: Rc::new(url),
         epg_channel_id: None,
         item_type: default_playlist_item_type(),
@@ -74,6 +73,7 @@ fn create_empty_playlistitem_header(input_id: u16, url: String) -> PlaylistItemH
         additional_properties: None,
         series_fetched: false,
         category_id: 0,
+        input_id
     }
 }
 

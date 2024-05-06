@@ -8,7 +8,7 @@ use log::{error};
 use serde::Serialize;
 use serde_json::{json, Value};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
+use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::{create_m3u_filter_error_result};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::xtream::{XtreamMappingOptions};
@@ -94,7 +94,7 @@ fn write_playlist_to_file(storage_path: &Path, stream_id: &mut u32, cluster: &Xt
             let mut idx_offset: u32 = 0;
             for pli in playlist.iter_mut() {
                 pli.header.borrow_mut().stream_id = Rc::new(stream_id.to_string());
-                if let Ok(encoded) = bincode::serialize(&pli) {
+                if let Ok(encoded) = bincode::serialize(&pli.to_xtream()) {
                     match file_utils::check_write(main_file.write_all(&encoded)) {
                         Ok(_) => {
                             let bytes_written = encoded.len() as u16;
@@ -144,7 +144,7 @@ fn write_playlists_to_file(storage_path: &Path, collections: Vec<(XtreamCluster,
     }
     match save_stream_id_cluster_mapping(storage_path, &mut id_list) {
         Ok(_) => Ok(()),
-        Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("failed to write xtream playlist: {} - {}", storage_path.to_str().unwrap() , err)))
+        Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("failed to write xtream playlist: {} - {}", storage_path.to_str().unwrap(), err)))
     }
 }
 
@@ -186,7 +186,7 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                         let col = if header.item_type != PlaylistItemType::Series {
                             if header.id.parse::<i32>().is_ok() {
                                 header.category_id = *cat_id;
-                                Some(match pli.header.borrow().xtream_cluster {
+                                Some(match header.xtream_cluster {
                                     XtreamCluster::Live => &mut live_col,
                                     XtreamCluster::Series => &mut series_col,
                                     XtreamCluster::Video => &mut vod_col,
@@ -197,7 +197,7 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
                             }
                         } else { None };
                         drop(header);
-                        if let Some(pl) =  col {
+                        if let Some(pl) = col {
                             pl.push(pli);
                         }
                     }
@@ -277,10 +277,10 @@ pub(crate) fn xtream_get_collection_path(cfg: &Config, target_name: &str, collec
     Err(Error::new(ErrorKind::Other, format!("Cant find collection: {}/{}", target_name, collection_name)))
 }
 
-pub(crate) fn get_xtream_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget) -> Result<PlaylistItem, Error> {
+pub(crate) fn get_xtream_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget) -> Result<XtreamPlaylistItem, Error> {
     if let Some(storage_path) = get_xtream_storage_path(config, target.name.as_str()) {
         if let Some(mapping) = load_stream_id_cluster_mapping(&storage_path) {
-            if let Some((cluster, cluster_index)) = mapping.iter().find(|(_, c)| stream_id > *c) {
+            if let Some((cluster, cluster_index)) = mapping.iter().find(|(_, c)| stream_id >= *c) {
                 let (xtream_path, idx_path) = get_xtream_file_paths(&storage_path, cluster);
                 if xtream_path.exists() && idx_path.exists() {
                     let offset: u64 = IndexRecord::get_index_offset(stream_id - cluster_index) as u64;
@@ -290,7 +290,7 @@ pub(crate) fn get_xtream_item_for_stream_id(stream_id: u32, config: &Config, tar
                     xtream_file.seek(SeekFrom::Start(index_record.index as u64))?;
                     let mut buffer: Vec<u8> = vec![0; index_record.size as usize];
                     xtream_file.read_exact(&mut buffer)?;
-                    if let Ok(pli) = bincode::deserialize::<PlaylistItem>(&buffer[..]) {
+                    if let Ok(pli) = bincode::deserialize::<XtreamPlaylistItem>(&buffer[..]) {
                         return Ok(pli);
                     }
                 }
@@ -300,30 +300,37 @@ pub(crate) fn get_xtream_item_for_stream_id(stream_id: u32, config: &Config, tar
     Err(Error::new(ErrorKind::Other, format!("Failed to read xtream item for stream-id {}", stream_id)))
 }
 
-pub(crate) fn load_rewrite_xtream_playlist(cluster: &XtreamCluster, config: &Config, target: &ConfigTarget) -> Result<String, Error> {
+pub(crate) fn load_rewrite_xtream_playlist(cluster: &XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<String, Error> {
     if let Some(storage_path) = get_xtream_storage_path(config, target.name.as_str()) {
         let (xtream_path, idx_path) = get_xtream_file_paths(&storage_path, cluster);
         if xtream_path.exists() && idx_path.exists() {
             match std::fs::read(&xtream_path) {
                 Ok(encoded_xtream) => {
                     match std::fs::read(&idx_path) {
-                       Ok(encoded_idx) => {
-                           let mut cursor = 0;
-                           let size = encoded_idx.len();
-                           let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
-                           let mut result = vec![];
-                           while cursor < size {
-                               let tuple = IndexRecord::from_bytes(&encoded_idx, &mut cursor);
-                               let start_offset = tuple.index as usize;
-                               let end_offset = start_offset + tuple.size as usize;
-                               if let Ok(pli) = bincode::deserialize::<PlaylistItem>(&encoded_xtream[start_offset..end_offset]) {
-                                    result.push(pli.to_xtream(&options));
-                               } else {
-                                   error!("Could not deserialize item {}", &xtream_path.to_str().unwrap());
-                               }
-                           }
-                           return Ok(serde_json::to_string(&result).unwrap());
-                       }
+                        Ok(encoded_idx) => {
+                            let mut cursor = 0;
+                            let size = encoded_idx.len();
+                            let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+                            let mut result = vec![];
+                            let mut deserialize_error = false;
+                            while cursor < size {
+                                let index_record = IndexRecord::from_bytes(&encoded_idx, &mut cursor);
+                                let start_offset = index_record.index as usize;
+                                let end_offset = start_offset + index_record.size as usize;
+                                match bincode::deserialize::<XtreamPlaylistItem>(&encoded_xtream[start_offset..end_offset]) {
+                                    Ok(pli) => {
+                                        if category_id == 0 || pli.category_id == category_id {
+                                            result.push(pli.to_doc(&options));
+                                        }
+                                    },
+                                    Err(_) => deserialize_error = true,
+                                };
+                            }
+                            if deserialize_error {
+                                error!("Could not deserialize item {}", &xtream_path.to_str().unwrap());
+                            }
+                            return Ok(serde_json::to_string(&result).unwrap());
+                        }
                         Err(err) => error!("Could not open file {}: {}", &idx_path.to_str().unwrap(), err),
                     }
                 }

@@ -1,14 +1,13 @@
-use std::cell::Ref;
 use std::collections::HashMap;
 use std::iter::{FromIterator};
 use std::rc::Rc;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::model::config::{ConfigTargetOptions, default_as_empty_rc_str};
-use crate::model::playlist::{PlaylistItem, PlaylistItemHeader, XtreamCluster};
+use crate::model::playlist::{PlaylistItem, XtreamCluster, XtreamPlaylistItem};
 
 const LIVE_STREAM_FIELDS: &[&str] = &[];
 
@@ -186,36 +185,36 @@ pub(crate) struct XtreamStream {
 
 macro_rules! add_str_property_if_exists {
     ($vec:expr, $prop:expr, $prop_name:expr) => {
-        $vec.push((String::from($prop_name), Value::String($prop.to_string())));
+        $vec.insert(String::from($prop_name), Value::String($prop.to_string()));
     }
 }
 macro_rules! add_rc_str_property_if_exists {
     ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::String(v.to_string()))));
+       $prop.as_ref().map(|v| $vec.insert(String::from($prop_name), Value::String(v.to_string())));
     }
 }
 
 macro_rules! add_opt_i64_property_if_exists {
     ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from(i64::from(*v))))));
+       $prop.as_ref().map(|v| $vec.insert(String::from($prop_name), Value::Number(serde_json::value::Number::from(i64::from(*v)))));
     }
 }
 
 macro_rules! add_opt_f64_property_if_exists {
     ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $prop.as_ref().map(|v| $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from_f64(f64::from(*v)).unwrap()))));
+       $prop.as_ref().map(|v| $vec.insert(String::from($prop_name), Value::Number(serde_json::value::Number::from_f64(f64::from(*v)).unwrap())));
     }
 }
 
 macro_rules! add_f64_property_if_exists {
     ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from_f64(f64::from($prop)).unwrap())));
+       $vec.insert(String::from($prop_name), Value::Number(serde_json::value::Number::from_f64(f64::from($prop)).unwrap()));
     }
 }
 
 macro_rules! add_i64_property_if_exists {
     ($vec:expr, $prop:expr, $prop_name:expr) => {
-       $vec.push((String::from($prop_name), Value::Number(serde_json::value::Number::from(i64::from($prop)))));
+       $vec.insert(String::from($prop_name), Value::Number(serde_json::value::Number::from(i64::from($prop))));
     }
 }
 
@@ -225,11 +224,11 @@ impl XtreamStream {
         self.stream_id.map_or_else(|| self.series_id.map_or_else(|| String::from(""), |seid| format!("{}", seid)), |sid| format!("{}", sid))
     }
 
-    pub(crate) fn get_additional_properties(&self) -> Option<Vec<(String, Value)>> {
-        let mut result = vec![];
+    pub(crate) fn get_additional_properties(&self) -> Option<Value> {
+        let mut result = Map::new();
         if let Some(bdpath) = self.backdrop_path.as_ref() {
             if !bdpath.is_empty() {
-                result.push((String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first().unwrap()))]))));
+                result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first().unwrap()))])));
             }
         }
         add_rc_str_property_if_exists!(result, self.added, "added");
@@ -251,7 +250,7 @@ impl XtreamStream {
         add_rc_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
         add_opt_i64_property_if_exists!(result, self.tv_archive, "tv_archive");
         add_opt_i64_property_if_exists!(result, self.tv_archive_duration, "tv_archive_duration");
-        if result.is_empty() { None } else { Some(result) }
+        if result.is_empty() { None } else { Some(Value::Object(result)) }
     }
 }
 
@@ -326,11 +325,11 @@ pub(crate) struct XtreamSeriesInfo {
 
 
 impl XtreamSeriesInfoEpisode {
-    pub(crate) fn get_additional_properties(&self, series_info: &XtreamSeriesInfo) -> Option<Vec<(String, Value)>> {
-        let mut result = vec![];
+    pub(crate) fn get_additional_properties(&self, series_info: &XtreamSeriesInfo) -> Option<Value> {
+        let mut result = Map::new();
         let bdpath = &series_info.info.backdrop_path;
         if !bdpath.is_empty() {
-            result.push((String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first().unwrap()))]))));
+            result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first().unwrap()))])));
         }
         add_str_property_if_exists!(result, self.added.as_str(), "added");
         add_str_property_if_exists!(result, series_info.info.cast.as_str(), "cast");
@@ -346,7 +345,7 @@ impl XtreamSeriesInfoEpisode {
         add_str_property_if_exists!(result, self.title, "title");
         add_i64_property_if_exists!(result, self.season, "season");
         add_str_property_if_exists!(result, series_info.info.youtube_trailer, "youtube_trailer");
-        if result.is_empty() { None } else { Some(result) }
+        if result.is_empty() { None } else { Some(Value::Object(result)) }
     }
 }
 
@@ -359,8 +358,9 @@ impl XtreamMappingOptions {
     pub fn from_target_options(options: Option<&ConfigTargetOptions>) -> Self {
         let (skip_live_direct_source, skip_video_direct_source) = options
             .map_or((false, false), |o| (o.xtream_skip_live_direct_source, o.xtream_skip_video_direct_source));
-        XtreamMappingOptions{
-            skip_live_direct_source, skip_video_direct_source
+        XtreamMappingOptions {
+            skip_live_direct_source,
+            skip_video_direct_source,
         }
     }
 }
@@ -394,46 +394,48 @@ fn append_mandatory_fields(document: &mut serde_json::Map<String, Value>, fields
     }
 }
 
-fn append_prepared_series_properties(header: &Ref<PlaylistItemHeader>, document: &mut serde_json::Map<String, Value>) {
-    if let Some(add_props) = &header.additional_properties {
-        match add_props.iter().find(|(key, _)| key.eq("rating")) {
-            Some((_, value)) => {
-                document.insert("rating".to_string(), match value {
-                    Value::Number(val) => Value::String(format!("{:.0}", val.as_f64().unwrap())),
-                    Value::String(val) => Value::String(val.to_string()),
-                    _ => Value::String("0".to_string()),
-                });
-            }
-            None => {
-                document.insert("rating".to_string(), Value::String("0".to_string()));
+fn append_prepared_series_properties(add_props: Option<&Map<String, Value>>, document: &mut Map<String, Value>) {
+    match add_props {
+        Some(props) => {
+            match props.get("rating") {
+                Some(value) => {
+                    document.insert("rating".to_string(), match value {
+                        Value::Number(val) => Value::String(format!("{:.0}", val.as_f64().unwrap())),
+                        Value::String(val) => Value::String(val.to_string()),
+                        _ => Value::String("0".to_string()),
+                    });
+                }
+                None => {
+                    document.insert("rating".to_string(), Value::String("0".to_string()));
+                }
             }
         }
+        None => {}
     }
 }
 
-pub(crate) fn xtream_playlistitem_to_document(pli: &PlaylistItem, options: &XtreamMappingOptions) -> serde_json::Value {
-    let header = &pli.header.borrow();
-    let stream_id_value = Value::Number(serde_json::Number::from(header.stream_id.parse::<i32>().unwrap()));
+pub(crate) fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options: &XtreamMappingOptions) -> serde_json::Value {
+    let stream_id_value = Value::Number(serde_json::Number::from(pli.stream_id));
     let mut document = serde_json::Map::from_iter([
-        ("category_id".to_string(), Value::String(format!("{}", &header.category_id))),
-        ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(header.category_id))]))),
-        ("name".to_string(), Value::String(header.name.as_ref().clone())),
+        ("category_id".to_string(), Value::String(format!("{}", &pli.category_id))),
+        ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(pli.category_id))]))),
+        ("name".to_string(), Value::String(pli.name.as_ref().clone())),
         ("num".to_string(), stream_id_value.clone()),
-        ("title".to_string(), Value::String(header.title.as_ref().clone())),
-        ("stream_icon".to_string(), Value::String(header.logo.as_ref().clone())),
+        ("title".to_string(), Value::String(pli.title.as_ref().clone())),
+        ("stream_icon".to_string(), Value::String(pli.logo.as_ref().clone())),
     ]);
 
-    match header.xtream_cluster {
+    match pli.xtream_cluster {
         XtreamCluster::Live => {
             document.insert("stream_id".to_string(), stream_id_value);
             if options.skip_live_direct_source {
                 document.insert("direct_source".to_string(), Value::String("".to_string()));
             } else {
-                document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                document.insert("direct_source".to_string(), Value::String(pli.url.as_ref().clone()));
             }
-            document.insert("thumbnail".to_string(), Value::String(header.logo_small.as_ref().clone()));
+            document.insert("thumbnail".to_string(), Value::String(pli.logo_small.as_ref().clone()));
             document.insert("custom_sid".to_string(), Value::String("".to_string()));
-            document.insert("epg_channel_id".to_string(), match &header.epg_channel_id {
+            document.insert("epg_channel_id".to_string(), match &pli.epg_channel_id {
                 None => Value::Null,
                 Some(epg_id) => Value::String(epg_id.as_ref().clone())
             });
@@ -443,7 +445,7 @@ pub(crate) fn xtream_playlistitem_to_document(pli: &PlaylistItem, options: &Xtre
             if options.skip_video_direct_source {
                 document.insert("direct_source".to_string(), Value::String("".to_string()));
             } else {
-                document.insert("direct_source".to_string(), Value::String(header.url.as_ref().clone()));
+                document.insert("direct_source".to_string(), Value::String(pli.url.as_ref().clone()));
             }
             document.insert("custom_sid".to_string(), Value::String("".to_string()));
         }
@@ -452,13 +454,23 @@ pub(crate) fn xtream_playlistitem_to_document(pli: &PlaylistItem, options: &Xtre
         }
     };
 
-    if let Some(add_props) = &header.additional_properties {
+    let props = match &pli.additional_properties {
+        None => None,
+        Some(add_props) => {
+            match serde_json::from_str::<Map<String, Value>>(add_props) {
+                Ok(p) => Some(p),
+                Err(_) => None,
+            }
+        }
+    };
+
+    if let Some(ref add_props) = props {
         for (field_name, field_value) in add_props {
             document.insert(field_name.to_string(), field_value.to_owned());
         }
     }
 
-    match header.xtream_cluster {
+    match pli.xtream_cluster {
         XtreamCluster::Live => {
             append_mandatory_fields(&mut document, LIVE_STREAM_FIELDS);
         }
@@ -466,7 +478,7 @@ pub(crate) fn xtream_playlistitem_to_document(pli: &PlaylistItem, options: &Xtre
             append_mandatory_fields(&mut document, VIDEO_STREAM_FIELDS);
         }
         XtreamCluster::Series => {
-            append_prepared_series_properties(header, &mut document);
+            append_prepared_series_properties(props.as_ref(), &mut document);
             append_mandatory_fields(&mut document, SERIES_STREAM_FIELDS);
             append_release_date(&mut document);
         }
