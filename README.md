@@ -800,7 +800,9 @@ Use the `-l` or `--log-level` cli-argument to specify the log-level.
 
 The log level can be set through environment variable `M3U_FILTER_LOG`.
 
-Precedence has cli-argument 
+Precedence has cli-argument.
+
+Log Level has module support like `m3u_filter::util=error,m3u_filter::filter=debug,m3u_filter=debug`
 
 ## 6. Web-UI
 
