@@ -796,7 +796,11 @@ Following log levels are supported:
 - `warn`
 - `error`
  
-Use the `-l` or `-log-level` cli-argument to specify the log-level. 
+Use the `-l` or `--log-level` cli-argument to specify the log-level.
+
+The log level can be set through environment variable `M3U_FILTER_LOG`.
+
+Precedence has cli-argument 
 
 ## 6. Web-UI
 
