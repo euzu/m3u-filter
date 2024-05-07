@@ -7,10 +7,10 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
 use crate::model::config::TargetType;
 use crate::model::xmltv::{Epg};
-use crate::repository::m3u_repository::{get_m3u_epg_file_path};
-use crate::repository::xtream_repository::{get_xtream_epg_file_path, get_xtream_storage_path};
+use crate::repository::m3u_repository::{m3u_get_epg_file_path};
+use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
 
-fn write_epg_file(target: &ConfigTarget, epg: &Epg, path: &Path) -> Result<(), M3uFilterError> {
+fn epg_write_file(target: &ConfigTarget, epg: &Epg, path: &Path) -> Result<(), M3uFilterError> {
     let mut writer = Writer::new(Cursor::new(vec![]));
     match epg.write_to(&mut writer) {
         Ok(_) => {
@@ -42,7 +42,7 @@ fn write_epg_file(target: &ConfigTarget, epg: &Epg, path: &Path) -> Result<(), M
     Ok(())
 }
 
-pub(crate) fn write_epg(target: &ConfigTarget, cfg: &Config, epg: &Option<Epg>, output: &TargetOutput) -> Result<(), M3uFilterError> {
+pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, epg: &Option<Epg>, output: &TargetOutput) -> Result<(), M3uFilterError> {
     if let Some(epg_data) = epg {
         match &output.target {
             TargetType::M3u => {
@@ -51,21 +51,21 @@ pub(crate) fn write_epg(target: &ConfigTarget, cfg: &Config, epg: &Option<Epg>, 
                         M3uFilterErrorKind::Notify,
                         format!("write epg for target {} failed: No filename set", target.name)));
                 }
-                if let Some(path) = get_m3u_epg_file_path(cfg, &output.filename) {
+                if let Some(path) = m3u_get_epg_file_path(cfg, &output.filename) {
                     if log_enabled!(Level::Debug) {
                         debug!("writing m3u epg to {}", path.to_str().unwrap_or("?"));
                     }
-                    write_epg_file(target, epg_data, &path)?
+                    epg_write_file(target, epg_data, &path)?
                 }
             }
             TargetType::Xtream => {
-                match get_xtream_storage_path(cfg, &target.name) {
+                match xtream_get_storage_path(cfg, &target.name) {
                     Some(path) => {
-                        let epg_path = get_xtream_epg_file_path(&path);
+                        let epg_path = xtream_get_epg_file_path(&path);
                         if log_enabled!(Level::Debug) {
                             debug!("writing xtream epg to {}", epg_path.to_str().unwrap_or("?"));
                         }
-                        write_epg_file(target, epg_data, &epg_path)?
+                        epg_write_file(target, epg_data, &epg_path)?
                     }
                     None => return Err(M3uFilterError::new(
                         M3uFilterErrorKind::Notify,

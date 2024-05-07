@@ -9,8 +9,8 @@ use crate::api::api_utils::{get_user_target, serve_file};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::config::TargetType;
-use crate::repository::m3u_repository::get_m3u_epg_file_path;
-use crate::repository::xtream_repository::{get_xtream_epg_file_path, get_xtream_storage_path};
+use crate::repository::m3u_repository::m3u_get_epg_file_path;
+use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
 use crate::utils::{file_utils, request_utils};
 
 fn get_epg_path_for_target_of_type(target_name: &str, file_path: Option<PathBuf>) -> Option<PathBuf> {
@@ -28,11 +28,11 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
     for output in &target.output {
         match output.target {
             TargetType::M3u => {
-                return get_epg_path_for_target_of_type(&target.name, get_m3u_epg_file_path(config, &target.get_m3u_filename()));
+                return get_epg_path_for_target_of_type(&target.name, m3u_get_epg_file_path(config, &target.get_m3u_filename()));
             }
             TargetType::Xtream => {
-                if let Some(storage_path) = get_xtream_storage_path(config, &target.name) {
-                    return get_epg_path_for_target_of_type(&target.name, Some(get_xtream_epg_file_path(&storage_path)));
+                if let Some(storage_path) = xtream_get_storage_path(config, &target.name) {
+                    return get_epg_path_for_target_of_type(&target.name, Some(xtream_get_epg_file_path(&storage_path)));
                 }
             }
             TargetType::Strm => {}

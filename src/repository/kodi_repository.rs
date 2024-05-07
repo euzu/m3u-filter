@@ -74,7 +74,7 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
 }
 
 
-pub(crate) fn write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
+pub(crate) fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write strm playlist failed: ".to_string()));

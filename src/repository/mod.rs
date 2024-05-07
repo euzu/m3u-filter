@@ -4,4 +4,6 @@ pub(crate) mod xtream_repository;
 pub(crate) mod epg_repository;
 pub(crate)mod kodi_repository;
 
-mod repository_utils;
+mod index_record;
+mod indexed_document_writer;
+mod indexed_document_reader;

@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::fs::File;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Deserializer};
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufReader, BufWriter, Error, Read, Write};
 use std::path::Path;
+use serde::Serialize;
 
 fn read_skipping_ws(mut reader: impl Read) -> io::Result<u8> {
     loop {
@@ -54,19 +55,19 @@ fn yield_next_obj<T: DeserializeOwned, R: Read>(
 }
 
 // https://stackoverflow.com/questions/68641157/how-can-i-stream-elements-from-inside-a-json-array-using-serde-json
-pub(crate) fn iter_json_array<T: DeserializeOwned, R: Read>(
+pub(crate) fn json_iter_array<T: DeserializeOwned, R: Read>(
     mut reader: R,
 ) -> impl Iterator<Item=Result<T, io::Error>> {
     let mut at_start = false;
     std::iter::from_fn(move || yield_next_obj(&mut reader, &mut at_start).transpose())
 }
 
-pub(crate) fn filter_json_file(file_path: &Path, filter: &HashMap<&str, &str>) -> Vec<serde_json::Value> {
+pub(crate) fn json_filter_file(file_path: &Path, filter: &HashMap<&str, &str>) -> Vec<serde_json::Value> {
     let mut filtered: Vec<serde_json::Value> = Vec::new();
     if file_path.exists() {
         if let Ok(file) = File::open(file_path) {
             let reader = BufReader::new(file);
-            for entry in iter_json_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
+            for entry in json_iter_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
                 if let Some(item) = entry.as_object() {
                     for (&key, &value) in filter {
                         if let Some(field_value) = item.get(key) {
@@ -87,4 +88,20 @@ pub(crate) fn filter_json_file(file_path: &Path, filter: &HashMap<&str, &str>) -
     }
 
     filtered
+}
+
+pub(crate) fn json_write_documents_to_file<T>(file: &Path, value: &T) -> Result<(), Error>
+    where
+        T: ?Sized + Serialize {
+    match File::create(file) {
+        Ok(file) => {
+            let mut writer = BufWriter::new(file);
+            serde_json::to_writer(&mut writer, value)?;
+            match writer.flush() {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e)
+            }
+        }
+        Err(e) => Err(e)
+    }
 }

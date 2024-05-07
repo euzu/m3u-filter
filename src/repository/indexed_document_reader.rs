@@ -1,111 +1,9 @@
 use std::fs::File;
-use std::io::{Error, ErrorKind, Write};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::utils::file_utils;
-use crate::utils::file_utils::create_file_tuple;
-
-/**
-We write the structs with bincode::encode to a file.
-To access each entry we need a index file where we can find the
-Entries with offset and size of the encoded struct.
-This is used for the index file where first entry is the index
-of the encoded file, and size is the size of the encoded struct.
- */
-struct IndexRecord {
-    pub index: u32,
-    pub size: u16,
-}
-
-impl IndexRecord {
-    pub fn from_file(file: &mut File, offset: usize) -> Result<Self, Error> {
-        file.seek(SeekFrom::Start(offset as u64))?;
-        let mut index_bytes = [0u8; 4];
-        let mut size_bytes = [0u8; 2];
-        file.read_exact(&mut index_bytes)?;
-        file.read_exact(&mut size_bytes)?;
-        let index = u32::from_le_bytes(index_bytes);
-        let size = u16::from_le_bytes(size_bytes);
-        Ok(IndexRecord { index, size })
-    }
-
-    // pub fn from_bytes(bytes: &[u8], cursor: &mut usize) -> Result<Self, Error> {
-    //     if let Ok(index_bytes) = bytes[*cursor..*cursor + 4].try_into() {
-    //         *cursor += 4;
-    //         if let Ok(size_bytes) = bytes[*cursor..*cursor + 2].try_into() {
-    //             *cursor += 2;
-    //             let index = u32::from_le_bytes(index_bytes);
-    //             let size = u16::from_le_bytes(size_bytes);
-    //             return Ok(IndexRecord { index, size });
-    //         }
-    //     }
-    //     Err(Error::new(ErrorKind::Other, "Failed to read index"))
-    // }
-
-    // pub fn as_bytes(&self) -> [u8; 6] {
-    //     IndexRecord::to_bytes(self.index, self.size)
-    // }
-
-    pub fn to_bytes(index: u32, size: u16) -> [u8;6] {
-        let index_bytes: [u8; 4] = index.to_le_bytes();
-        let size_bytes: [u8; 2] = size.to_le_bytes();
-        let mut combined_bytes: [u8; 6] = [0; 6];
-        combined_bytes[..4].copy_from_slice(&index_bytes);
-        combined_bytes[4..].copy_from_slice(&size_bytes);
-        combined_bytes
-    }
-
-    fn get_record_size() -> u16 { 6 }
-    fn get_index_offset(index: u32) -> usize { index as usize * 6 }
-}
-
-pub(crate) struct IndexedDocumentWriter {
-    main_path: PathBuf,
-    index_path: PathBuf,
-    main_file: File,
-    index_file: File,
-    index_offset: u32,
-}
-
-impl IndexedDocumentWriter {
-    pub fn new(main_path: PathBuf, index_path: PathBuf) -> Result<Self, Error> {
-        match create_file_tuple(&main_path, &index_path) {
-            Ok((main_file, index_file)) => {
-                Ok(IndexedDocumentWriter {
-                    main_path,
-                    index_path,
-                    main_file,
-                    index_file,
-                    index_offset: 0,
-                })
-            }
-            Err(e) => Err(e)
-        }
-    }
-    pub fn write_doc<T>(&mut self, document_id: &mut u32, doc: &T) -> Result<(), Error>
-        where
-            T: ?Sized + serde::Serialize {
-        if let Ok(encoded) = bincode::serialize(doc) {
-            match file_utils::check_write(self.main_file.write_all(&encoded)) {
-                Ok(_) => {
-                    let bytes_written = encoded.len() as u16;
-                    let combined_bytes = IndexRecord::to_bytes(self.index_offset, bytes_written);
-                    if let Err(err) = file_utils::check_write(self.index_file.write_all(&combined_bytes)) {
-                        return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.index_path.to_str().unwrap(), err)));
-                    }
-                    self.index_offset += bytes_written as u32;
-                    *document_id += 1;
-                }
-                Err(err) => {
-                    return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.main_path.to_str().unwrap(), err)));
-                }
-            }
-        }
-        Ok(())
-    }
-}
+use crate::repository::index_record::IndexRecord;
 
 pub(crate) struct IndexedDocumentReader<T> {
     main_file: File,
@@ -221,4 +119,3 @@ pub(crate) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: 
     }
     Err(Error::new(ErrorKind::Other, format!("Failed to read item for offset {} - {}", offset, main_path.to_str().unwrap())))
 }
-

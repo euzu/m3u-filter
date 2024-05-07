@@ -10,7 +10,8 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItemType};
-use crate::repository::repository_utils::{IndexedDocumentReader, IndexedDocumentWriter, read_indexed_item};
+use crate::repository::indexed_document_reader::{IndexedDocumentReader, read_indexed_item};
+use crate::repository::indexed_document_writer::IndexedDocumentWriter;
 use crate::utils::file_utils;
 
 macro_rules! cant_write_result {
@@ -19,7 +20,7 @@ macro_rules! cant_write_result {
     }
 }
 
-pub(crate) fn get_m3u_file_paths(cfg: &Config, filename: &Option<String>) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+pub(crate) fn m3u_get_file_paths(cfg: &Config, filename: &Option<String>) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
     match file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) {
         Some(m3u_path) => {
             let extension = m3u_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or(""))).unwrap_or("".to_owned());
@@ -30,12 +31,12 @@ pub(crate) fn get_m3u_file_paths(cfg: &Config, filename: &Option<String>) -> Opt
     }
 }
 
-pub(crate) fn get_m3u_epg_file_path(cfg: &Config, filename: &Option<String>) -> Option<std::path::PathBuf> {
+pub(crate) fn m3u_get_epg_file_path(cfg: &Config, filename: &Option<String>) -> Option<std::path::PathBuf> {
     file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
         .map(|path| file_utils::add_prefix_to_filename(&path, "epg_", Some("xml")))
 }
 
-pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
+pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
             return Err(M3uFilterError::new(
@@ -43,7 +44,7 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
                 format!("write m3u playlist for target {} failed: No filename set", target.name)));
         }
 
-        if let Some((m3u_path, idx_path)) = get_m3u_file_paths(cfg, filename) {
+        if let Some((m3u_path, idx_path)) = m3u_get_file_paths(cfg, filename) {
             match IndexedDocumentWriter::new(m3u_path.clone(), idx_path) {
                 Ok(mut writer) => {
                     let m3u_playlist = new_playlist.iter()
@@ -65,10 +66,10 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
     Ok(())
 }
 
-pub(crate) fn load_rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, user: &ProxyUserCredentials) -> Option<String> {
+pub(crate) fn m3u_load_rewrite_playlist(cfg: &Config, target: &ConfigTarget, user: &ProxyUserCredentials) -> Option<String> {
     let filename = target.get_m3u_filename();
     if filename.is_some() {
-        if let Some((m3u_path, idx_path)) = get_m3u_file_paths(cfg, &filename) {
+        if let Some((m3u_path, idx_path)) = m3u_get_file_paths(cfg, &filename) {
             match IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path, &idx_path) {
                 Ok(mut reader) => {
                     let server_info = get_user_server_info(cfg, user);
@@ -105,9 +106,9 @@ pub(crate) fn load_rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, use
     None
 }
 
-pub(crate) fn get_m3u_item_for_stream_id(stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
+pub(crate) fn m3u_get_item_for_stream_id(stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
     if stream_id < 1 {
         return Err(Error::new(ErrorKind::Other, "id should start with 1"));
     }
-    read_indexed_item::<M3uPlaylistItem>(m3u_path, idx_path, stream_id -1)
+    read_indexed_item::<M3uPlaylistItem>(m3u_path, idx_path, stream_id - 1)
 }
