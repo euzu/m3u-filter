@@ -217,6 +217,15 @@ pub(crate) fn write_xtream_playlist(target: &ConfigTarget, cfg: &Config, playlis
     Ok(())
 }
 
+fn get_map_item_as_str(map: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
+    if let Some(value) = map.get(key) {
+        if let Some(result) = value.as_str() {
+            return Some(result.to_string());
+        }
+    }
+    None
+}
+
 fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
     let mut result: HashMap<String, u32> = HashMap::new();
     let mut max_id: u32 = 0;
@@ -229,15 +238,11 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
                 let reader = BufReader::new(file);
                 for entry in iter_json_array::<Value, BufReader<File>>(reader).flatten() {
                     if let Some(item) = entry.as_object() {
-                        if let Some(category_id_value) = item.get("category_id") {
-                            if let Some(category_id) = category_id_value.as_str() {
-                                if let Some(category_name_value) = item.get("category_name") {
-                                    if let Some(category_name) = category_name_value.as_str() {
-                                        if let Ok(cat_id) = category_id.to_string().parse::<u32>() {
-                                            result.insert(category_name.to_string(), cat_id);
-                                            max_id = max_id.max(cat_id);
-                                        }
-                                    }
+                        if let Some(category_id) = get_map_item_as_str(item, "category_id") {
+                            if let Some(category_name) = get_map_item_as_str(item, "category_name") {
+                                if let Ok(cat_id) = category_id.parse::<u32>() {
+                                    result.insert(category_name, cat_id);
+                                    max_id = max_id.max(cat_id);
                                 }
                             }
                         }
@@ -266,8 +271,8 @@ pub(crate) fn get_xtream_item_for_stream_id(stream_id: u32, config: &Config, tar
                 Some(clus) => mapping.iter().find(|(c, _)| c == clus),
                 None => mapping.iter().find(|(_, c)| stream_id >= *c),
             } {
-               let (xtream_path, idx_path) = get_xtream_file_paths(&storage_path, cluster);
-               return read_indexed_item::<XtreamPlaylistItem>(&xtream_path, &idx_path, stream_id - cluster_index);
+                let (xtream_path, idx_path) = get_xtream_file_paths(&storage_path, cluster);
+                return read_indexed_item::<XtreamPlaylistItem>(&xtream_path, &idx_path, stream_id - cluster_index);
             }
         }
     }

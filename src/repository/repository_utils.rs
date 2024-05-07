@@ -1,8 +1,9 @@
-use std::io::{Error, ErrorKind, Write};
 use std::fs::File;
-use std::io::{Read, SeekFrom, Seek};
+use std::io::{Error, ErrorKind, Write};
+use std::io::{Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+
 use crate::utils::file_utils;
 use crate::utils::file_utils::create_file_tuple;
 
@@ -13,16 +14,12 @@ Entries with offset and size of the encoded struct.
 This is used for the index file where first entry is the index
 of the encoded file, and size is the size of the encoded struct.
  */
-pub struct IndexRecord {
+struct IndexRecord {
     pub index: u32,
     pub size: u16,
 }
 
 impl IndexRecord {
-    pub fn new(index: u32, size: u16) -> Self {
-        IndexRecord { index, size }
-    }
-
     pub fn from_file(file: &mut File, offset: usize) -> Result<Self, Error> {
         file.seek(SeekFrom::Start(offset as u64))?;
         let mut index_bytes = [0u8; 4];
@@ -47,9 +44,13 @@ impl IndexRecord {
     //     Err(Error::new(ErrorKind::Other, "Failed to read index"))
     // }
 
-    pub fn to_bytes(&self) -> [u8; 6] {
-        let index_bytes: [u8; 4] = self.index.to_le_bytes();
-        let size_bytes: [u8; 2] = self.size.to_le_bytes();
+    // pub fn as_bytes(&self) -> [u8; 6] {
+    //     IndexRecord::to_bytes(self.index, self.size)
+    // }
+
+    pub fn to_bytes(index: u32, size: u16) -> [u8;6] {
+        let index_bytes: [u8; 4] = index.to_le_bytes();
+        let size_bytes: [u8; 2] = size.to_le_bytes();
         let mut combined_bytes: [u8; 6] = [0; 6];
         combined_bytes[..4].copy_from_slice(&index_bytes);
         combined_bytes[4..].copy_from_slice(&size_bytes);
@@ -90,7 +91,7 @@ impl IndexedDocumentWriter {
             match file_utils::check_write(self.main_file.write_all(&encoded)) {
                 Ok(_) => {
                     let bytes_written = encoded.len() as u16;
-                    let combined_bytes = IndexRecord::new(self.index_offset, bytes_written).to_bytes();
+                    let combined_bytes = IndexRecord::to_bytes(self.index_offset, bytes_written);
                     if let Err(err) = file_utils::check_write(self.index_file.write_all(&combined_bytes)) {
                         return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.index_path.to_str().unwrap(), err)));
                     }
@@ -113,17 +114,17 @@ pub(crate) struct IndexedDocumentReader<T> {
     size: usize,
     failed: bool,
     _buffer: Vec<u8>,
-    _type: PhantomData<T>
+    _type: PhantomData<T>,
 }
 
-impl<T : ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
+impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
     pub fn new(main_path: &Path, index_path: &Path) -> Result<IndexedDocumentReader<T>, Error> {
         if main_path.exists() && index_path.exists() {
             match File::open(main_path) {
                 Ok(main_file) => {
                     match File::open(index_path) {
                         Ok(index_file) => {
-                            let size= match index_file.metadata() {
+                            let size = match index_file.metadata() {
                                 Ok(metadata) => {
                                     metadata.len() as usize
                                 }
@@ -164,7 +165,7 @@ impl<T : ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
             self.cursor += IndexRecord::get_record_size() as usize;
             match record {
                 Ok(index_record) => {
-                    let offset= index_record.index as u64;
+                    let offset = index_record.index as u64;
                     let buf_size = index_record.size as usize;
                     if self._buffer.len() < buf_size {
                         self._buffer.resize(buf_size, 0u8);
@@ -178,7 +179,7 @@ impl<T : ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
                             Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {}", err)))
                         }
                     };
-                },
+                }
                 Err(err) => {
                     self.failed = true;
                     return Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {}", err)));
@@ -188,7 +189,8 @@ impl<T : ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
         Ok(None)
     }
 }
-impl<T : ?Sized + serde::de::DeserializeOwned> Iterator for IndexedDocumentReader<T> {
+
+impl<T: ?Sized + serde::de::DeserializeOwned> Iterator for IndexedDocumentReader<T> {
     type Item = T;
 
     // Implement the next() method
@@ -202,9 +204,8 @@ impl<T : ?Sized + serde::de::DeserializeOwned> Iterator for IndexedDocumentReade
     }
 }
 
-
-pub(crate) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: u32) ->  Result<T, Error>
-where T : ?Sized + serde::de::DeserializeOwned
+pub(crate) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: u32) -> Result<T, Error>
+    where T: ?Sized + serde::de::DeserializeOwned
 {
     if main_path.exists() && index_path.exists() {
         let offset = IndexRecord::get_index_offset(offset);
