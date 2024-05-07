@@ -352,15 +352,18 @@ impl XtreamSeriesInfoEpisode {
 pub(crate) struct XtreamMappingOptions {
     pub skip_live_direct_source: bool,
     pub skip_video_direct_source: bool,
+    pub skip_series_direct_source: bool,
 }
 
 impl XtreamMappingOptions {
     pub fn from_target_options(options: Option<&ConfigTargetOptions>) -> Self {
-        let (skip_live_direct_source, skip_video_direct_source) = options
-            .map_or((false, false), |o| (o.xtream_skip_live_direct_source, o.xtream_skip_video_direct_source));
+        let (skip_live_direct_source, skip_video_direct_source, skip_series_direct_source) = options
+            .map_or((false, false, false), |o| (o.xtream_skip_live_direct_source,
+                                         o.xtream_skip_video_direct_source, o.xtream_skip_series_direct_source));
         XtreamMappingOptions {
             skip_live_direct_source,
             skip_video_direct_source,
+            skip_series_direct_source,
         }
     }
 }

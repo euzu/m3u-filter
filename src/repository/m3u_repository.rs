@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{Error, ErrorKind, Write, SeekFrom, Seek, Read};
+use std::io::{Error, ErrorKind, SeekFrom, Seek, Read};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -11,9 +11,8 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItemType};
-use crate::repository::repository_utils::IndexRecord;
+use crate::repository::repository_utils::{IndexedDocumentReader, IndexedDocumentWriter, IndexRecord};
 use crate::utils::file_utils;
-use crate::utils::file_utils::create_file_tuple;
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
@@ -46,35 +45,21 @@ pub(crate) fn write_m3u_playlist(target: &ConfigTarget, cfg: &Config, new_playli
         }
 
         if let Some((m3u_path, idx_path)) = get_m3u_file_paths(cfg, filename) {
-            match create_file_tuple(&m3u_path, &idx_path) {
-                Ok((mut m3u_file, mut m3u_idx_file)) => {
-                    let mut idx_offset: u32 = 0;
+            match IndexedDocumentWriter::new(m3u_path.clone(), idx_path) {
+                Ok(mut writer) => {
                     let m3u_playlist = new_playlist.iter()
                         .flat_map(|pg| &pg.channels)
                         .filter(|&pli| pli.header.borrow().item_type != PlaylistItemType::SeriesInfo)
                         .map(|pli| pli.to_m3u()).collect::<Vec<M3uPlaylistItem>>();
                     let mut stream_id: u32 = 1;
-                    for mut m3u in  m3u_playlist {
+                    for mut m3u in m3u_playlist {
                         m3u.stream_id = Rc::new(stream_id.to_string());
-                        if let Ok(encoded) = bincode::serialize(&m3u) {
-                            match file_utils::check_write(m3u_file.write_all(&encoded)) {
-                                Ok(_) => {
-                                    let bytes_written = encoded.len() as u16;
-                                    let combined_bytes = IndexRecord::new(idx_offset, bytes_written).to_bytes();
-                                    if let Err(err) = file_utils::check_write(m3u_idx_file.write_all(&combined_bytes)) {
-                                        return cant_write_result!(&idx_path, err);
-                                    }
-                                    idx_offset += bytes_written as u32;
-                                    stream_id += 1;
-                                }
-                                Err(err) => {
-                                    return cant_write_result!(&m3u_path, err);
-                                }
-                            }
+                        if let Err(err) = writer.write_doc(&mut stream_id, &m3u) {
+                            return cant_write_result!(&m3u_path, err);
                         }
                     }
                 }
-                Err(err) => return cant_write_result!(&m3u_path, err),
+                Err(err) => return cant_write_result!(&m3u_path, err)
             }
         }
     }
@@ -85,48 +70,38 @@ pub(crate) fn load_rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, use
     let filename = target.get_m3u_filename();
     if filename.is_some() {
         if let Some((m3u_path, idx_path)) = get_m3u_file_paths(cfg, &filename) {
-            if m3u_path.exists() && idx_path.exists() {
-                match std::fs::read(&m3u_path) {
-                    Ok(encoded_m3u) => {
-                        match std::fs::read(&idx_path) {
-                            Ok(encoded_idx) => {
-                                let mut cursor = 0;
-                                let size = encoded_idx.len();
-
-                                let server_info = get_user_server_info(cfg, user);
-                                let url = format!("{}/m3u-stream/{}/{}", server_info.get_base_url(), user.username, user.password);
-                                let mut result = vec![];
-                                result.push("#EXTM3U".to_string());
-
-                                while cursor < size {
-                                    let index_record = IndexRecord::from_bytes(&encoded_idx, &mut cursor);
-                                    let start_offset = index_record.index as usize;
-                                    let end_offset = start_offset + index_record.size as usize;
-                                    if let Ok(m3u_pli) = bincode::deserialize::<M3uPlaylistItem>(&encoded_m3u[start_offset..end_offset]) {
-                                        match user.proxy {
-                                            ProxyType::Reverse => {
-                                                let stream_id = Rc::clone(&m3u_pli.stream_id);
-                                                result.push(m3u_pli.to_m3u(target, Some(format!("{}/{}", url, stream_id).as_str())));
-                                            }
-                                            ProxyType::Redirect => {
-                                                result.push(m3u_pli.to_m3u(target, None));
-                                            }
-                                        }
-                                    } else {
-                                        error!("Could not deserialize item {}", &m3u_path.to_str().unwrap());
-                                    }
-                                }
-                                return Some(result.join("\n"));
-                            },
-                            Err(err) => error!("Could not open file {}: {}", &idx_path.to_str().unwrap(), err),
+            match IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path, &idx_path) {
+                Ok(mut reader) => {
+                    let server_info = get_user_server_info(cfg, user);
+                    let url = format!("{}/m3u-stream/{}/{}", server_info.get_base_url(), user.username, user.password);
+                    let mut result = vec![];
+                    result.push("#EXTM3U".to_string());
+                    for m3u_pli in reader.by_ref() {
+                        match user.proxy {
+                            ProxyType::Reverse => {
+                                let stream_id = Rc::clone(&m3u_pli.stream_id);
+                                result.push(m3u_pli.to_m3u(target, Some(format!("{}/{}", url, stream_id).as_str())));
+                            }
+                            ProxyType::Redirect => {
+                                result.push(m3u_pli.to_m3u(target, None));
+                            }
                         }
-                    },
-                    Err(err) => error!("Could not open file {}: {}", &m3u_path.to_str().unwrap(), err),
+                    };
+                    if reader.by_ref().has_error() {
+                        error!("Could not deserialize item {}", &m3u_path.to_str().unwrap());
+                    } else {
+                        return Some(result.join("\n"));
+                    }
+                }
+                Err(err) => {
+                    error!("Could not deserialize file {} - {}", &m3u_path.to_str().unwrap(), err);
                 }
             }
         } else {
-            error!("Could not open file for target {}", &target.name);
+            error!("Could not open files for target {}", &target.name);
         }
+    } else {
+        error!("Target has no filename {}", &target.name);
     }
     None
 }
@@ -136,12 +111,12 @@ pub(crate) fn get_m3u_item_for_stream_id(stream_id: u32, m3u_path: &Path, idx_pa
         return Err(Error::new(ErrorKind::Other, "id should start with 1"));
     }
     if m3u_path.exists() && idx_path.exists() {
-        let offset:  u64 = IndexRecord::get_index_offset(stream_id - 1) as u64;
+        let offset: u64 = IndexRecord::get_index_offset(stream_id - 1) as u64;
         let mut idx_file = File::open(idx_path)?;
         let mut m3u_file = File::open(m3u_path)?;
         let index_record = IndexRecord::from_file(&mut idx_file, offset)?;
         m3u_file.seek(SeekFrom::Start(index_record.index as u64))?;
-        let mut buffer : Vec<u8> = vec![0; index_record.size as usize];
+        let mut buffer: Vec<u8> = vec![0; index_record.size as usize];
         m3u_file.read_exact(&mut buffer)?;
         if let Ok(m3u_pli) = bincode::deserialize::<M3uPlaylistItem>(&buffer[..]) {
             return Ok(m3u_pli);

@@ -36,7 +36,7 @@ pub(crate) struct M3uFilterError {
 }
 
 impl M3uFilterError {
-    pub fn new(kind: M3uFilterErrorKind, message: String) -> M3uFilterError {
+    pub fn new(kind: M3uFilterErrorKind, message: String) -> Self {
         M3uFilterError {
             kind,
             message,

@@ -4,8 +4,6 @@ use std::io::{Write};
 use std::path::{Path, PathBuf};
 use log::{debug, error};
 use path_absolutize::*;
-use crate::create_m3u_filter_error_result;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 #[macro_export]
 macro_rules! exit {
@@ -14,7 +12,6 @@ macro_rules! exit {
         std::process::exit(1);
     }};
 }
-
 
 pub(crate) fn get_exe_path() -> PathBuf {
     let default_path = std::path::PathBuf::from("./");
@@ -176,16 +173,16 @@ pub(crate) fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error
     }
 }
 
-pub(crate) fn create_file_tuple(path1: &Path, path2: &Path) -> Result<(File, File), M3uFilterError> {
+pub(crate) fn create_file_tuple(path1: &Path, path2: &Path) -> Result<(File, File), std::io::Error> {
     match File::create(path1) {
         Ok(file1) => {
             match File::create(path2) {
                 Ok(file2) => Ok((file1, file2)),
                 Err(err) =>
-                    create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to create file: {} - {}", path2.to_str().unwrap(), err)
+                    Err(std::io::Error::new(err.kind(), format!("failed to create file {} - {}", path2.to_str().unwrap(), err)))
             }
         }
         Err(err) =>
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to create file: {} - {}", path1.to_str().unwrap(), err)
+            Err(std::io::Error::new(err.kind(), format!("failed to create file {} - {}", path1.to_str().unwrap(), err)))
     }
 }

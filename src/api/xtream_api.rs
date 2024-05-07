@@ -20,7 +20,7 @@ use crate::model::config::TargetType;
 use crate::model::playlist::{XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
 use crate::repository::xtream_repository;
-use crate::repository::xtream_repository::get_xtream_item_for_stream_id;
+use crate::repository::xtream_repository::{get_xtream_item_for_stream_id};
 use crate::utils::{json_utils, request_utils};
 
 pub(crate) async fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
@@ -247,6 +247,63 @@ async fn xtream_player_api_timeshift_stream(
     xtream_player_api_stream(&req, &api_req, &app_state,  XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, &username, &password, &stream_id, &action_path)).await
 }
 
+fn get_xtream_vod_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
+    if let Ok(mut doc) = serde_json::from_str::<Map<String, Value>>(content) {
+        if let Some(Value::Object(movie_data)) = doc.get_mut("movie_data") {
+            let stream_id = pli.id;
+            let category_id = pli.category_id;
+            movie_data.insert("stream_id".to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
+            movie_data.insert("category_id".to_string(), Value::Number(serde_json::value::Number::from(category_id)));
+            let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+            if options.skip_video_direct_source {
+                movie_data.insert("direct_source".to_string(), Value::String("".to_string()));
+            } else {
+                movie_data.insert("direct_source".to_string(), Value::String(pli.url.to_string()));
+            }
+            if let Ok(result) = serde_json::to_string(&doc) {
+                return Ok(result);
+            }
+        }
+    }
+    Err(Error::new(ErrorKind::Other, format!("Failed to get vod info for id {}", pli.id)))
+}
+
+fn get_xtream_series_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
+    if let Ok(mut doc) = serde_json::from_str::<Value>(content) {
+        let mut new_id_to_provider_id_mapping = HashMap::new();
+        let mut new_id: u32 = 234;
+        if let Some(episodes) = doc.get_mut("episodes") {
+            if let Some(episodes_map) = episodes.as_object_mut() {
+                let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+                for (_season, episode_list) in episodes_map {
+                    // Iterate over items in the episode
+                    if let Some(entries) = episode_list.as_array_mut() {
+                        for entry in entries {
+                            if let Some(episode) = entry.as_object_mut() {
+                                if let Some(episode_id) = episode.get("id") {
+                                    if let Ok(provider_id) = episode_id.to_string().parse::<u32>() {
+                                        new_id += 1;
+                                        new_id_to_provider_id_mapping.insert(new_id, provider_id);
+                                        episode.insert("id".to_string(), Value::String(new_id.to_string()));
+                                    }
+                                }
+                                if options.skip_series_direct_source {
+                                    episode.insert("direct_source".to_string(), Value::String("".to_string()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let Ok(result) = serde_json::to_string(&doc) {
+                // write_xtream_series_info_mapping(pli.id, &new_id_to_provider_id_mapping, &result);
+                return Ok(result);
+            }
+        }
+    }
+    Err(Error::new(ErrorKind::Other, format!("Failed to get vod info for id {}", pli.id)))
+}
+
 async fn xtream_get_stream_info(input: &ConfigInput, target: &ConfigTarget, pli: &XtreamPlaylistItem,
                                 info_url: &str, cluster: &XtreamCluster) -> Result<String, Error> {
     if let Ok(url) = Url::parse(info_url) {
@@ -259,31 +316,10 @@ async fn xtream_get_stream_info(input: &ConfigInput, target: &ConfigTarget, pli:
                         return match cluster {
                             XtreamCluster::Live => Ok(content),
                             XtreamCluster::Video => {
-                                if let Ok(mut doc) = serde_json::from_str::<Map<String, Value>>(content.as_str()) {
-                                    if let Some(Value::Object(movie_data) ) = doc.get_mut("movie_data") {
-                                        let stream_id = pli.id;
-                                        let category_id = pli.category_id;
-                                        movie_data.insert("stream_id".to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
-                                        movie_data.insert("category_id".to_string(), Value::Number(serde_json::value::Number::from(category_id)));
-                                        let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
-                                        if options.skip_video_direct_source {
-                                            movie_data.insert("direct_source".to_string(), Value::String("".to_string()));
-                                        } else {
-                                            movie_data.insert("direct_source".to_string(), Value::String(pli.url.to_string()));
-                                        }
-                                        if let Ok(result) = serde_json::to_string(&doc) {
-                                            return Ok(result);
-                                        }
-                                    }
-                                }
-                                return Ok(content);
+                                return get_xtream_vod_info(target, pli, &content);
                             }
                             XtreamCluster::Series => {
-                                // With series we have a problem.
-                                // it could be that the series are resolved and assigned to a new stream_id
-                                // what now ?
-
-                                return Ok(content);
+                                return get_xtream_series_info(target, pli, &content);
                             }
                         };
                     }
@@ -309,7 +345,8 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
         if let Some(input) = app_state.config.get_input_by_id(&input_id) {
             let stream_id = pli.id;
             if let Some(info_url) = get_xtream_player_api_info_url(input, cluster, stream_id) {
-                if user.proxy == ProxyType::Redirect {
+                // Redirect is only possible for live streams, vod and series info needs to be modified
+                if user.proxy == ProxyType::Redirect && cluster == &XtreamCluster::Live {
                     return HttpResponse::Found().insert_header(("Location", info_url)).finish();
                 } else if let Ok(content) = xtream_get_stream_info(input, target, &pli, info_url.as_str(), cluster).await {
                     return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content);
@@ -317,7 +354,11 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
             }
         }
     }
-    return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("{info:[]}");
+    match cluster {
+        XtreamCluster::Live => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("{}"),
+        XtreamCluster::Video => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("{info:[]}"),
+        XtreamCluster::Series => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("[]"),
+    }
 }
 
 async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials, target: &ConfigTarget, stream_id: &str, limit: &str) -> HttpResponse {
