@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::io::{Error, ErrorKind, Write};
 use std::fs::File;
 use std::io::{Read, SeekFrom, Seek};
@@ -24,8 +23,8 @@ impl IndexRecord {
         IndexRecord { index, size }
     }
 
-    pub fn from_file(file: &mut File, offset: u64) -> Result<Self, Error> {
-        file.seek(SeekFrom::Start(offset))?;
+    pub fn from_file(file: &mut File, offset: usize) -> Result<Self, Error> {
+        file.seek(SeekFrom::Start(offset as u64))?;
         let mut index_bytes = [0u8; 4];
         let mut size_bytes = [0u8; 2];
         file.read_exact(&mut index_bytes)?;
@@ -35,18 +34,18 @@ impl IndexRecord {
         Ok(IndexRecord { index, size })
     }
 
-    pub fn from_bytes(bytes: &[u8], cursor: &mut usize) -> Result<Self, Error> {
-        if let Ok(index_bytes) = bytes[*cursor..*cursor + 4].try_into() {
-            *cursor += 4;
-            if let Ok(size_bytes) = bytes[*cursor..*cursor + 2].try_into() {
-                *cursor += 2;
-                let index = u32::from_le_bytes(index_bytes);
-                let size = u16::from_le_bytes(size_bytes);
-                return Ok(IndexRecord { index, size });
-            }
-        }
-        Err(Error::new(ErrorKind::Other, "Failed to read index"))
-    }
+    // pub fn from_bytes(bytes: &[u8], cursor: &mut usize) -> Result<Self, Error> {
+    //     if let Ok(index_bytes) = bytes[*cursor..*cursor + 4].try_into() {
+    //         *cursor += 4;
+    //         if let Ok(size_bytes) = bytes[*cursor..*cursor + 2].try_into() {
+    //             *cursor += 2;
+    //             let index = u32::from_le_bytes(index_bytes);
+    //             let size = u16::from_le_bytes(size_bytes);
+    //             return Ok(IndexRecord { index, size });
+    //         }
+    //     }
+    //     Err(Error::new(ErrorKind::Other, "Failed to read index"))
+    // }
 
     pub fn to_bytes(&self) -> [u8; 6] {
         let index_bytes: [u8; 4] = self.index.to_le_bytes();
@@ -57,7 +56,8 @@ impl IndexRecord {
         combined_bytes
     }
 
-    pub fn get_index_offset(index: u32) -> u32 { index * 6 }
+    fn get_record_size() -> u16 { 6 }
+    fn get_index_offset(index: u32) -> usize { index as usize * 6 }
 }
 
 pub(crate) struct IndexedDocumentWriter {
@@ -107,28 +107,35 @@ impl IndexedDocumentWriter {
 }
 
 pub(crate) struct IndexedDocumentReader<T> {
-    encoded_main: Vec<u8>,
-    encoded_index: Vec<u8>,
+    main_file: File,
+    index_file: File,
     cursor: usize,
     size: usize,
     failed: bool,
+    _buffer: Vec<u8>,
     _type: PhantomData<T>
 }
 
 impl<T : ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
     pub fn new(main_path: &Path, index_path: &Path) -> Result<IndexedDocumentReader<T>, Error> {
         if main_path.exists() && index_path.exists() {
-            match std::fs::read(main_path) {
-                Ok(encoded_main) => {
-                    match std::fs::read(index_path) {
-                        Ok(encoded_index) => {
-                            let size = encoded_index.len();
+            match File::open(main_path) {
+                Ok(main_file) => {
+                    match File::open(index_path) {
+                        Ok(index_file) => {
+                            let size= match index_file.metadata() {
+                                Ok(metadata) => {
+                                    metadata.len() as usize
+                                }
+                                Err(_e) => 0,
+                            };
                             Ok(IndexedDocumentReader {
-                                encoded_main,
-                                encoded_index,
+                                main_file,
+                                index_file,
                                 cursor: 0,
                                 size,
                                 failed: false,
+                                _buffer: Vec::new(),
                                 _type: Default::default(),
                             })
                         }
@@ -152,19 +159,26 @@ impl<T : ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
         !self.failed && self.cursor < self.size
     }
     pub fn read_next(&mut self) -> Result<Option<T>, Error> {
-        if self.cursor < self.size {
-            match IndexRecord::from_bytes(&self.encoded_index, &mut self.cursor) {
+        if self.has_next() {
+            let record = IndexRecord::from_file(&mut self.index_file, self.cursor);
+            self.cursor += IndexRecord::get_record_size() as usize;
+            match record {
                 Ok(index_record) => {
-                    let start_offset = index_record.index as usize;
-                    let end_offset = start_offset + index_record.size as usize;
-                    return match bincode::deserialize::<T>(&self.encoded_main[start_offset..end_offset]) {
+                    let offset= index_record.index as u64;
+                    let buf_size = index_record.size as usize;
+                    if self._buffer.len() < buf_size {
+                        self._buffer.resize(buf_size, 0u8);
+                    }
+                    self.main_file.seek(SeekFrom::Start(offset))?;
+                    self.main_file.read_exact(&mut self._buffer[0..buf_size])?;
+                    return match bincode::deserialize::<T>(&self._buffer[0..buf_size]) {
                         Ok(value) => Ok(Some(value)),
                         Err(err) => {
                             self.failed = true;
                             Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {}", err)))
                         }
                     };
-                }
+                },
                 Err(err) => {
                     self.failed = true;
                     return Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {}", err)));
@@ -193,7 +207,7 @@ pub(crate) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: 
 where T : ?Sized + serde::de::DeserializeOwned
 {
     if main_path.exists() && index_path.exists() {
-        let offset: u64 = IndexRecord::get_index_offset(offset) as u64;
+        let offset = IndexRecord::get_index_offset(offset);
         let mut index_file = File::open(index_path)?;
         let mut main_file = File::open(main_path)?;
         let index_record = IndexRecord::from_file(&mut index_file, offset)?;

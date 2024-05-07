@@ -473,7 +473,7 @@ async fn xtream_player_api(
                                 } {
                                     Ok(payload) => HttpResponse::Ok().body(payload),
                                     Err(err) => {
-                                        debug!("Could not create response for xtream target action: {} {} {}", target_name, action, err);
+                                        error!("Could not create response for xtream target action: {} {} {}", target_name, action, err);
                                         HttpResponse::NoContent().finish()
                                     }
                                 }

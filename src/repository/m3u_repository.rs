@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::io::{Error, ErrorKind, SeekFrom, Seek, Read};
+use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -11,7 +10,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItemType};
-use crate::repository::repository_utils::{IndexedDocumentReader, IndexedDocumentWriter, IndexRecord};
+use crate::repository::repository_utils::{IndexedDocumentReader, IndexedDocumentWriter, read_indexed_item};
 use crate::utils::file_utils;
 
 macro_rules! cant_write_result {
@@ -88,7 +87,7 @@ pub(crate) fn load_rewrite_m3u_playlist(cfg: &Config, target: &ConfigTarget, use
                         }
                     };
                     if reader.by_ref().has_error() {
-                        error!("Could not deserialize item {}", &m3u_path.to_str().unwrap());
+                        error!("Could not deserialize m3u item {}", &m3u_path.to_str().unwrap());
                     } else {
                         return Some(result.join("\n"));
                     }
@@ -110,17 +109,5 @@ pub(crate) fn get_m3u_item_for_stream_id(stream_id: u32, m3u_path: &Path, idx_pa
     if stream_id < 1 {
         return Err(Error::new(ErrorKind::Other, "id should start with 1"));
     }
-    if m3u_path.exists() && idx_path.exists() {
-        let offset: u64 = IndexRecord::get_index_offset(stream_id - 1) as u64;
-        let mut idx_file = File::open(idx_path)?;
-        let mut m3u_file = File::open(m3u_path)?;
-        let index_record = IndexRecord::from_file(&mut idx_file, offset)?;
-        m3u_file.seek(SeekFrom::Start(index_record.index as u64))?;
-        let mut buffer: Vec<u8> = vec![0; index_record.size as usize];
-        m3u_file.read_exact(&mut buffer)?;
-        if let Ok(m3u_pli) = bincode::deserialize::<M3uPlaylistItem>(&buffer[..]) {
-            return Ok(m3u_pli);
-        }
-    }
-    Err(Error::new(ErrorKind::Other, format!("Failed to read m3u for stream-id {}", stream_id)))
+    read_indexed_item::<M3uPlaylistItem>(m3u_path, idx_path, stream_id -1)
 }
