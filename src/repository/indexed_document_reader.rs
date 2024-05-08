@@ -8,8 +8,8 @@ use crate::repository::index_record::IndexRecord;
 pub(crate) struct IndexedDocumentReader<T> {
     main_file: File,
     index_file: File,
-    cursor: usize,
-    size: usize,
+    cursor: u32,
+    size: u32,
     failed: bool,
     _buffer: Vec<u8>,
     _type: PhantomData<T>,
@@ -32,7 +32,7 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
                                 main_file,
                                 index_file,
                                 cursor: 0,
-                                size,
+                                size: size as u32,
                                 failed: false,
                                 _buffer: Vec::new(),
                                 _type: Default::default(),
@@ -60,7 +60,7 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
     pub fn read_next(&mut self) -> Result<Option<T>, Error> {
         if self.has_next() {
             let record = IndexRecord::from_file(&mut self.index_file, self.cursor);
-            self.cursor += IndexRecord::get_record_size() as usize;
+            self.cursor += IndexRecord::get_record_size();
             match record {
                 Ok(index_record) => {
                     let offset = index_record.index as u64;
@@ -106,7 +106,6 @@ pub(crate) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: 
     where T: ?Sized + serde::de::DeserializeOwned
 {
     if main_path.exists() && index_path.exists() {
-        let offset = IndexRecord::get_index_offset(offset);
         let mut index_file = File::open(index_path)?;
         let mut main_file = File::open(main_path)?;
         let index_record = IndexRecord::from_file(&mut index_file, offset)?;

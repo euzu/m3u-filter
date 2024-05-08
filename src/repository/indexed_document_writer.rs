@@ -11,43 +11,64 @@ pub(crate) struct IndexedDocumentWriter {
     index_path: PathBuf,
     main_file: File,
     index_file: File,
+    main_offset: u32,
     index_offset: u32,
 }
 
 impl IndexedDocumentWriter {
-    pub fn new(main_path: PathBuf, index_path: PathBuf) -> Result<Self, Error> {
-        match create_file_tuple(&main_path, &index_path) {
+    fn new_with_mode(main_path: PathBuf, index_path: PathBuf, append: bool) -> Result<Self, Error> {
+        match create_file_tuple(&main_path, &index_path, append) {
             Ok((main_file, index_file)) => {
+                let main_offset = match &main_file.metadata() {
+                    Ok(meta) => meta.len() as u32,
+                    Err(_) => 0
+                };
+                let index_offset = match &index_file.metadata() {
+                    Ok(meta) => meta.len() as u32,
+                    Err(_) => 0
+                };
                 Ok(IndexedDocumentWriter {
                     main_path,
                     index_path,
                     main_file,
                     index_file,
-                    index_offset: 0,
+                    main_offset,
+                    index_offset,
                 })
             }
             Err(e) => Err(e)
         }
     }
-    pub fn write_doc<T>(&mut self, document_id: &mut u32, doc: &T) -> Result<(), Error>
+
+    pub fn new(main_path: PathBuf, index_path: PathBuf) -> Result<Self, Error> {
+        Self::new_with_mode(main_path, index_path, false)
+    }
+
+    pub fn new_append(main_path: PathBuf, index_path: PathBuf) -> Result<Self, Error> {
+        Self::new_with_mode(main_path, index_path, true)
+    }
+
+    pub fn write_doc<T>(&mut self, doc: &T) -> Result<(u32, u32), Error>
         where
             T: ?Sized + serde::Serialize {
+        let current_main_index = self.main_offset;
+        let current_index_index = self.index_offset;
         if let Ok(encoded) = bincode::serialize(doc) {
             match file_utils::check_write(self.main_file.write_all(&encoded)) {
                 Ok(_) => {
-                    let bytes_written = encoded.len() as u16;
-                    let combined_bytes = IndexRecord::to_bytes(self.index_offset, bytes_written);
+                    let bytes_written = encoded.len() as u32;
+                    let combined_bytes = IndexRecord::to_bytes(self.main_offset, bytes_written);
                     if let Err(err) = file_utils::check_write(self.index_file.write_all(&combined_bytes)) {
                         return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.index_path.to_str().unwrap(), err)));
                     }
-                    self.index_offset += bytes_written as u32;
-                    *document_id += 1;
+                    self.main_offset += bytes_written;
+                    self.index_offset += IndexRecord::get_record_size();
                 }
                 Err(err) => {
                     return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.main_path.to_str().unwrap(), err)));
                 }
             }
         }
-        Ok(())
+        Ok((current_main_index, current_index_index))
     }
 }

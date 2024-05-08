@@ -10,6 +10,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItemType};
+use crate::repository::index_record::IndexRecord;
 use crate::repository::indexed_document_reader::{IndexedDocumentReader, read_indexed_item};
 use crate::repository::indexed_document_writer::IndexedDocumentWriter;
 use crate::utils::file_utils;
@@ -54,8 +55,9 @@ pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, new_playli
                     let mut stream_id: u32 = 1;
                     for mut m3u in m3u_playlist {
                         m3u.stream_id = Rc::new(stream_id.to_string());
-                        if let Err(err) = writer.write_doc(&mut stream_id, &m3u) {
-                            return cant_write_result!(&m3u_path, err);
+                        match writer.write_doc(&m3u) {
+                            Ok(_) => stream_id += 1,
+                            Err(err) => return cant_write_result!(&m3u_path, err)
                         }
                     }
                 }
@@ -110,5 +112,5 @@ pub(crate) fn m3u_get_item_for_stream_id(stream_id: u32, m3u_path: &Path, idx_pa
     if stream_id < 1 {
         return Err(Error::new(ErrorKind::Other, "id should start with 1"));
     }
-    read_indexed_item::<M3uPlaylistItem>(m3u_path, idx_path, stream_id - 1)
+    read_indexed_item::<M3uPlaylistItem>(m3u_path, idx_path, IndexRecord::get_index_offset(stream_id - 1))
 }

@@ -163,7 +163,7 @@ impl FieldAccessor for PlaylistItemHeader {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct M3uPlaylistItem {
     pub stream_id: Rc<String>,
-    pub id: Rc<String>,
+    pub provider_id: Rc<String>,
     pub name: Rc<String>,
     pub logo: Rc<String>,
     pub logo_small: Rc<String>,
@@ -206,7 +206,7 @@ impl M3uPlaylistItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct XtreamPlaylistItem {
     pub stream_id: u32,
-    pub id: u32,
+    pub provider_id: u32,
     pub name: Rc<String>,
     pub logo: Rc<String>,
     pub logo_small: Rc<String>,
@@ -240,7 +240,7 @@ impl PlaylistItem {
         let header = self.header.borrow();
         M3uPlaylistItem {
             stream_id: Rc::clone(&header.stream_id),
-            id: Rc::clone(&header.id),
+            provider_id: Rc::clone(&header.id),
             name: Rc::clone(&header.name),
             logo: Rc::clone(&header.logo),
             logo_small: Rc::clone(&header.logo_small),
@@ -260,7 +260,7 @@ impl PlaylistItem {
         let header = self.header.borrow();
         XtreamPlaylistItem {
             stream_id: header.stream_id.parse::<u32>().unwrap(),
-            id: header.id.parse::<u32>().unwrap(),
+            provider_id: header.id.parse::<u32>().unwrap(),
             name: Rc::clone(&header.name),
             logo: Rc::clone(&header.logo),
             logo_small: Rc::clone(&header.logo_small),

@@ -1,5 +1,7 @@
 use std::fs::File;
-use std::io::{Error, Read, Seek, SeekFrom};
+use std::io::{Error, Read, Seek, SeekFrom, Write};
+use std::path::Path;
+use crate::utils::file_utils;
 
 /**
 We write the structs with bincode::encode to a file.
@@ -10,19 +12,29 @@ of the encoded file, and size is the size of the encoded struct.
  */
 pub(crate) struct IndexRecord {
     pub index: u32,
-    pub size: u16,
+    pub size: u32,
 }
 
 impl IndexRecord {
-    pub(crate) fn from_file(file: &mut File, offset: usize) -> Result<Self, Error> {
+    pub(crate) fn from_file(file: &mut File, offset: u32) -> Result<Self, Error> {
         file.seek(SeekFrom::Start(offset as u64))?;
         let mut index_bytes = [0u8; 4];
-        let mut size_bytes = [0u8; 2];
+        let mut size_bytes = [0u8; 4];
         file.read_exact(&mut index_bytes)?;
         file.read_exact(&mut size_bytes)?;
         let index = u32::from_le_bytes(index_bytes);
-        let size = u16::from_le_bytes(size_bytes);
+        let size = u32::from_le_bytes(size_bytes);
         Ok(IndexRecord { index, size })
+    }
+
+    pub(crate) fn to_file(path: &Path, index: u32, size: u32, append: bool) -> Result<(), Error> {
+        match file_utils::open_file_append(path, append) {
+            Ok(mut file) => {
+                let bytes = IndexRecord::to_bytes(index, size);
+                file.write_all(&bytes)
+            },
+            Err(err) => Err(err)
+        }
     }
 
     // pub fn from_bytes(bytes: &[u8], cursor: &mut usize) -> Result<Self, Error> {
@@ -42,15 +54,15 @@ impl IndexRecord {
     //     IndexRecord::to_bytes(self.index, self.size)
     // }
 
-    pub(crate) fn to_bytes(index: u32, size: u16) -> [u8; 6] {
+    pub(crate) fn to_bytes(index: u32, size: u32) -> [u8; 8] {
         let index_bytes: [u8; 4] = index.to_le_bytes();
-        let size_bytes: [u8; 2] = size.to_le_bytes();
-        let mut combined_bytes: [u8; 6] = [0; 6];
+        let size_bytes: [u8; 4] = size.to_le_bytes();
+        let mut combined_bytes: [u8; 8] = [0; 8];
         combined_bytes[..4].copy_from_slice(&index_bytes);
         combined_bytes[4..].copy_from_slice(&size_bytes);
         combined_bytes
     }
 
-    pub(crate) fn get_record_size() -> u16 { 6 }
-    pub(crate) fn get_index_offset(index: u32) -> usize { index as usize * 6 }
+    pub(crate) fn get_record_size() -> u32 { 8 }
+    pub(crate) fn get_index_offset(index: u32) -> u32 { index  * 8 }
 }

@@ -1,5 +1,5 @@
 use std::fs;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{Write};
 use std::path::{Path, PathBuf};
 use log::{debug, error};
@@ -173,10 +173,19 @@ pub(crate) fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error
     }
 }
 
-pub(crate) fn create_file_tuple(path1: &Path, path2: &Path) -> Result<(File, File), std::io::Error> {
-    match File::create(path1) {
+pub(crate) fn open_file_append(path: &Path, append: bool) -> Result<File, std::io::Error> {
+    if append  && path.exists() {
+        return OpenOptions::new()
+            .append(true) // Open in append mode
+            .open(path);
+    }
+    File::create(path)
+}
+
+pub(crate) fn create_file_tuple(path1: &Path, path2: &Path, append: bool) -> Result<(File, File), std::io::Error> {
+    match open_file_append(path1, append) {
         Ok(file1) => {
-            match File::create(path2) {
+            match open_file_append(path2, append) {
                 Ok(file2) => Ok((file1, file2)),
                 Err(err) =>
                     Err(std::io::Error::new(err.kind(), format!("failed to create file {} - {}", path2.to_str().unwrap(), err)))

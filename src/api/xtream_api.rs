@@ -20,7 +20,7 @@ use crate::model::config::TargetType;
 use crate::model::playlist::{XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
 use crate::repository::xtream_repository;
-use crate::repository::xtream_repository::{xtream_get_item_for_stream_id, xtream_write_series_info_mapping};
+use crate::repository::xtream_repository::{xtream_get_item_for_stream_id, xtream_get_max_series_info_episode_id, xtream_load_series_info, xtream_write_series_info};
 use crate::utils::{json_utils, request_utils};
 
 pub(crate) async fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
@@ -157,6 +157,9 @@ async fn xtream_player_api_stream(
     app_state: &web::Data<AppState>,
     stream_req: XtreamApiStreamRequest<'_>,
 ) -> HttpResponse {
+    // todo if id > last_series_id it is a episode
+
+
     if let Some((user, target)) = get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state) {
         let target_name = &target.name;
         if target.has_output(&TargetType::Xtream) {
@@ -171,7 +174,7 @@ async fn xtream_player_api_stream(
                     let input_id: u16 = pli.input_id;
                     if let Some(input) = app_state.config.get_input_by_id(&input_id) {
                         let mut query_path = if stream_req.action_path.is_empty() { "".to_string() } else { format!("{}/", stream_req.action_path) };
-                        query_path = format!("{}{}{}", query_path, pli.id, stream_ext);
+                        query_path = format!("{}{}{}", query_path, pli.provider_id, stream_ext);
                         if let Some(stream_url) = get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), query_path.as_str()) {
                             if user.proxy == ProxyType::Redirect {
                                 debug!("Redirecting stream request to {}", stream_url);
@@ -213,7 +216,7 @@ async fn xtream_player_api_live_stream_alt(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let (username, password, stream_id) = path.into_inner();
-    xtream_player_api_stream(&req, &api_req, &app_state,  XtreamApiStreamRequest::from(XtreamApiStreamContext::LiveAlt, &username, &password, &stream_id, "")).await
+    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::LiveAlt, &username, &password, &stream_id, "")).await
 }
 
 async fn xtream_player_api_series_stream(
@@ -223,7 +226,7 @@ async fn xtream_player_api_series_stream(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let (username, password, stream_id) = path.into_inner();
-    xtream_player_api_stream(&req, &api_req, &app_state,  XtreamApiStreamRequest::from(XtreamApiStreamContext::Series, &username, &password, &stream_id, "")).await
+    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Series, &username, &password, &stream_id, "")).await
 }
 
 async fn xtream_player_api_movie_stream(
@@ -233,7 +236,7 @@ async fn xtream_player_api_movie_stream(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let (username, password, stream_id) = path.into_inner();
-    xtream_player_api_stream(&req, &api_req, &app_state,  XtreamApiStreamRequest::from(XtreamApiStreamContext::Movie, &username, &password, &stream_id, "")).await
+    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Movie, &username, &password, &stream_id, "")).await
 }
 
 async fn xtream_player_api_timeshift_stream(
@@ -244,13 +247,13 @@ async fn xtream_player_api_timeshift_stream(
 ) -> HttpResponse {
     let (username, password, duration, start, stream_id) = path.into_inner();
     let action_path = format!("{}/{}/", duration, start);
-    xtream_player_api_stream(&req, &api_req, &app_state,  XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, &username, &password, &stream_id, &action_path)).await
+    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, &username, &password, &stream_id, &action_path)).await
 }
 
 fn get_xtream_vod_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
     if let Ok(mut doc) = serde_json::from_str::<Map<String, Value>>(content) {
         if let Some(Value::Object(movie_data)) = doc.get_mut("movie_data") {
-            let stream_id = pli.id;
+            let stream_id = pli.stream_id;
             let category_id = pli.category_id;
             movie_data.insert("stream_id".to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
             movie_data.insert("category_id".to_string(), Value::Number(serde_json::value::Number::from(category_id)));
@@ -265,51 +268,54 @@ fn get_xtream_vod_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content:
             }
         }
     }
-    Err(Error::new(ErrorKind::Other, format!("Failed to get vod info for id {}", pli.id)))
+    Err(Error::new(ErrorKind::Other, format!("Failed to get vod info for id {}", pli.stream_id)))
 }
 
-fn get_xtream_series_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
-
-    // TODO load info if exists and return
-    // ...
-
+fn get_xtream_series_info(config: &Config, target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
     if let Ok(mut doc) = serde_json::from_str::<Value>(content) {
-        let mut new_id_to_provider_id_mapping = HashMap::new();
-        let mut new_id: u32 = 234;
-        if let Some(episodes) = doc.get_mut("episodes") {
-            if let Some(episodes_map) = episodes.as_object_mut() {
-                let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
-                for (_season, episode_list) in episodes_map {
-                    // Iterate over items in the episode
-                    if let Some(entries) = episode_list.as_array_mut() {
-                        for entry in entries {
-                            if let Some(episode) = entry.as_object_mut() {
-                                if let Some(episode_id) = episode.get("id") {
-                                    if let Ok(provider_id) = episode_id.to_string().parse::<u32>() {
-                                        new_id += 1;
-                                        new_id_to_provider_id_mapping.insert(new_id, provider_id);
-                                        episode.insert("id".to_string(), Value::String(new_id.to_string()));
+        let mut new_id_to_provider_id_mapping : Vec<(u32, u32)> = Vec::new();
+        if let Some(mut new_id) = xtream_get_max_series_info_episode_id(config, target.name.as_str()) {
+            if let Some(episodes) = doc.get_mut("episodes") {
+                if let Some(episodes_map) = episodes.as_object_mut() {
+                    let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+                    for (_season, episode_list) in episodes_map {
+                        // Iterate over items in the episode
+                        if let Some(entries) = episode_list.as_array_mut() {
+                            for entry in entries {
+                                if let Some(episode) = entry.as_object_mut() {
+                                    if let Some(episode_id) = episode.get("id") {
+                                        if let Ok(provider_id) = episode_id.as_str().unwrap().parse::<u32>() {
+                                            new_id += 1;
+                                            new_id_to_provider_id_mapping.push((new_id, provider_id));
+                                            episode.insert("id".to_string(), Value::String(new_id.to_string()));
+                                        }
                                     }
-                                }
-                                if options.skip_series_direct_source {
-                                    episode.insert("direct_source".to_string(), Value::String("".to_string()));
+                                    if options.skip_series_direct_source {
+                                        episode.insert("direct_source".to_string(), Value::String("".to_string()));
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            if let Ok(result) = serde_json::to_string(&doc) {
-                xtream_write_series_info_mapping(pli.id, &new_id_to_provider_id_mapping, &result);
-                return Ok(result);
+                if let Ok(result) = serde_json::to_string(&doc) {
+                    let _ = xtream_write_series_info(config, target.name.as_str(), pli.stream_id, &new_id_to_provider_id_mapping, &result);
+                    return Ok(result);
+                }
             }
         }
     }
-    Err(Error::new(ErrorKind::Other, format!("Failed to get vod info for id {}", pli.id)))
+    Err(Error::new(ErrorKind::Other, format!("Failed to get series info for id {}", pli.stream_id)))
 }
 
-async fn xtream_get_stream_info(input: &ConfigInput, target: &ConfigTarget, pli: &XtreamPlaylistItem,
-                                info_url: &str, cluster: &XtreamCluster) -> Result<String, Error> {
+async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &ConfigTarget,
+                                pli: &XtreamPlaylistItem, info_url: &str, cluster: &XtreamCluster) -> Result<String, Error> {
+    if cluster == &XtreamCluster::Series {
+        if let Ok(content) = xtream_load_series_info(config, target.name.as_str(), pli.stream_id) {
+            return Ok(content);
+        }
+    }
+
     if let Ok(url) = Url::parse(info_url) {
         let client = request_utils::get_client_request(Some(input), url, None);
         if let Ok(response) = client.send().await {
@@ -323,7 +329,7 @@ async fn xtream_get_stream_info(input: &ConfigInput, target: &ConfigTarget, pli:
                                 return get_xtream_vod_info(target, pli, &content);
                             }
                             XtreamCluster::Series => {
-                                return get_xtream_series_info(target, pli, &content);
+                                return get_xtream_series_info(config, target, pli, &content);
                             }
                         };
                     }
@@ -347,12 +353,11 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
     if let Ok(pli) = xtream_get_item_for_stream_id(req_stream_id, &app_state.config, target, Some(cluster)) {
         let input_id = pli.input_id;
         if let Some(input) = app_state.config.get_input_by_id(&input_id) {
-            let stream_id = pli.id;
-            if let Some(info_url) = get_xtream_player_api_info_url(input, cluster, stream_id) {
+            if let Some(info_url) = get_xtream_player_api_info_url(input, cluster, pli.provider_id) {
                 // Redirect is only possible for live streams, vod and series info needs to be modified
                 if user.proxy == ProxyType::Redirect && cluster == &XtreamCluster::Live {
                     return HttpResponse::Found().insert_header(("Location", info_url)).finish();
-                } else if let Ok(content) = xtream_get_stream_info(input, target, &pli, info_url.as_str(), cluster).await {
+                } else if let Ok(content) = xtream_get_stream_info(&app_state.config, input, target, &pli, info_url.as_str(), cluster).await {
                     return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content);
                 }
             }
@@ -377,7 +382,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
             let input_id: u16 = pli.input_id;
             if let Some(input) = app_state.config.get_input_by_id(&input_id) {
                 if let Some(action_url) = get_xtream_player_api_action_url(input, "get_short_epg") {
-                    let mut info_url = format!("{}&stream_id={}", action_url, pli.id);
+                    let mut info_url = format!("{}&stream_id={}", action_url, pli.provider_id);
                     if !(limit.is_empty() || limit.eq("0")) {
                         info_url = format!("{}&limit={}", info_url, limit);
                     }
