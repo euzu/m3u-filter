@@ -63,8 +63,8 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
             self.cursor += IndexRecord::get_record_size();
             match record {
                 Ok(index_record) => {
-                    let offset = index_record.index as u64;
-                    let buf_size = index_record.size as usize;
+                    let offset = index_record.left as u64;
+                    let buf_size = index_record.right as usize;
                     if self._buffer.len() < buf_size {
                         self._buffer.resize(buf_size, 0u8);
                     }
@@ -109,8 +109,8 @@ pub(crate) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: 
         let mut index_file = File::open(index_path)?;
         let mut main_file = File::open(main_path)?;
         let index_record = IndexRecord::from_file(&mut index_file, offset)?;
-        main_file.seek(SeekFrom::Start(index_record.index as u64))?;
-        let mut buffer: Vec<u8> = vec![0; index_record.size as usize];
+        main_file.seek(SeekFrom::Start(index_record.left as u64))?;
+        let mut buffer: Vec<u8> = vec![0; index_record.right as usize];
         main_file.read_exact(&mut buffer)?;
         if let Ok(item) = bincode::deserialize::<T>(&buffer[..]) {
             return Ok(item);

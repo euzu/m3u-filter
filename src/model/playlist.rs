@@ -178,7 +178,6 @@ pub(crate) struct M3uPlaylistItem {
     pub input_id: u16,
 }
 
-
 impl M3uPlaylistItem {
     pub fn to_m3u(&self, target: &ConfigTarget, url: Option<&str>) -> String {
         let options = target.options.as_ref();

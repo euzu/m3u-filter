@@ -157,9 +157,6 @@ async fn xtream_player_api_stream(
     app_state: &web::Data<AppState>,
     stream_req: XtreamApiStreamRequest<'_>,
 ) -> HttpResponse {
-    // todo if id > last_series_id it is a episode
-
-
     if let Some((user, target)) = get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state) {
         let target_name = &target.name;
         if target.has_output(&TargetType::Xtream) {
