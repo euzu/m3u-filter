@@ -354,6 +354,7 @@ Each format has 2 properties
 `xtream` output has additional options
 - `xtream_skip_live_direct_source`  if true the direct_source property from provider for live is ignored
 - `xtream_skip_video_direct_source`  if true the direct_source property from provider for movies is ignored
+- `xtream_skip_series_direct_source`  if true the direct_source property from provider for series is ignored
 
 `m3u` output has additional options
 Because xtream api delivers only the metadata to series, we need to fetch the series and resolve them. But be aware,
@@ -730,7 +731,7 @@ The configuration contains the server info for xtream accounts and user definiti
 You can define multiple server with unique names, one should be named `default`.
 
 Iptv player can act differently and use the direct-source attribute or can compose the url based on the server info.
-The two options `xtream_skip_live_direct_source` and `xtream_skip_video_direct_source` are default `true` to avoid this problem. 
+The options `xtream_skip_live_direct_source`, `xtream_skip_video_direct_source` and `xtream_skip_series_direct_source` are default `true` to avoid this problem. 
 You can set them fo `false`to keep the direct-source attribute.
 
 `username` and `password`are mandatory for credentials. `username` is unique.
