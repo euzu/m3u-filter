@@ -328,7 +328,7 @@ is a list of sort configurations for groups. Each configuration has 3 top level 
 
 The pattern should be selected taking into account the processing sequence.
 
-```yml
+```yaml
 sort:
   groups:
     order: asc
@@ -625,7 +625,7 @@ Suffix is a map of key value pairs. Valid keys are
 
 The special text `<tag:tag_name>` is used to append the tag if not empty.
 Example:
-```
+```yaml
   suffix:
      name: '<tag:quality>'
      title: '-=[<tag:group>]=-'
@@ -643,7 +643,7 @@ Suffix is a map of key value pairs. Valid keys are
 
 The special text `<tag:tag_name>` is used to append the tag if not empty
 Example:
-```
+```yaml
   suffix:
      name: '<tag:quality>'
      title: '-=[<tag:group>]=-'
@@ -669,7 +669,7 @@ Attributes is a map of key value pairs. Valid keys and values are:
 - `source`
 
 Example configuration is:
-```
+```yaml
 assignments:
    title: name
 ```
@@ -831,24 +831,24 @@ But you need to change `image: ghcr.io/euzu/m3u-filter:latest` to `image: m3u-fi
 
 Ease way to compile is a docker toolchain `cross`
 
-```sh
+```shell
 rust install cross
 env  RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target x86_64-unknown-linux-musl
 ```
 
 #### Manual compile - install prerequisites
-```
+```shell
 rustup update
 sudo apt-get install pkg-config musl-tools libssl-dev
 rustup target add x86_64-unknown-linux-musl
 ```
 #### Build statically linked binary
-```
+```shell
 cargo build --target x86_64-unknown-linux-musl --release
 ```
 #### Dockerize
 Dockerfile
-```
+```dockerfile
 FROM gcr.io/distroless/base-debian12 as build
 
 FROM scratch
@@ -864,11 +864,11 @@ COPY ./web /web
 CMD ["/m3u-filter", "-s", "-p", "/config"]
 ```
 Image
-```
+```shell
 docker build -t m3u-filter .
 ```
 docker-compose.yml
-```
+```dockerfile
 version: '3'
 services:
   m3u-filter:
@@ -910,7 +910,7 @@ rustup toolchain install stable-x86_64-pc-windows-gnu
 ```
 
 Compile it with:
-```sh
+```shell
 cargo build --release --target x86_64-pc-windows-gnu
 ```
 
@@ -918,7 +918,7 @@ cargo build --release --target x86_64-pc-windows-gnu
 
 Ease way to compile is a docker toolchain `cross`
 
-```sh
+```shell
 rust install cross
 env  RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target armv7-unknown-linux-musleabihf
 ```
