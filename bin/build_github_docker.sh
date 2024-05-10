@@ -6,8 +6,8 @@ if [ $? -eq 0 ]; then
   VERSION=$(./m3u-filter -V | sed 's/m3u-filter *//')
   if [ -n "${VERSION}" ]; then
     echo "building docker image version ${VERSION}"
-    docker build -t ghcr.io/euzu/m3u-filter:"${VERSION}" . && \
-    docker ghcr.io/euzu/m3u-filter:"${VERSION}" ghcr.io/euzu/m3u-filter:latest  && \
+    docker build -f Dockerfile-manual -t ghcr.io/euzu/m3u-filter:"${VERSION}" . && \
+    docker tag ghcr.io/euzu/m3u-filter:"${VERSION}" ghcr.io/euzu/m3u-filter:latest  && \
     docker login ghcr.io -u euzu -p "${GHCR_IO_TOKEN}" && \
     docker push ghcr.io/euzu/m3u-filter:"${VERSION}" && \
     docker push ghcr.io/euzu/m3u-filter:latest && \
