@@ -1440,7 +1440,7 @@ dependencies = [
 
 [[package]]
 name = "m3u-filter"
-version = "1.1.8"
+version = "2.0.0"
 dependencies = [
  "actix-cors",
  "actix-files",

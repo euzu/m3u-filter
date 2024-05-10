@@ -5,6 +5,12 @@ backup_dir: /home/m3u-filter/.backup
 update_on_boot: false
 # sec  min   hour   day of month   month   day of week   year
 schedule: "0  0  8,12,16,20,22,1  *  *  *  *"
+web_ui_enabled: true
+web_auth:
+  enabled: false
+  secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
+  issuer: m3u_filter
+  userfile: user.txt
 messaging:
   notify_on:
     - error

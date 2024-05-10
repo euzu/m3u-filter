@@ -1,5 +1,6 @@
 # Changelog
-# v1.1.9(2024-04-xx)
+# v2.0.0(2024-05-10)
+* major version change due to massive changes
 * `update_on_boot` for config, default is false, if true an update is run on start
 * `category_id` filter added to xtream api
 * Handling for m3u files without id and group information

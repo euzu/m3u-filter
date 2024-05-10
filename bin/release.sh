@@ -7,7 +7,11 @@ then
 fi
 
 cd ./frontend || (echo "cant find frontend directory" && exit)
-NEW_VERSION=$(yarn version --no-git-tag-version --patch | grep "New version" | grep -Po "(\d+\.)+\d+")
+if [ "$1" = "m" ]; then
+  NEW_VERSION=$(yarn version --no-git-tag-version --major --patch | grep "New version" | grep -Po "(\d+\.)+\d+")
+else
+  NEW_VERSION=$(yarn version --no-git-tag-version --patch | grep "New version" | grep -Po "(\d+\.)+\d+")
+fi
 cd ..
 cargo set-version "$NEW_VERSION"
 
