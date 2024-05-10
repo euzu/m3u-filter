@@ -214,10 +214,10 @@ impl ValueProcessor for MappingValueProcessor<'_> {
                     }
                 );
         }
-        let () = &MappingValueProcessor::<'_>::apply_attributes(self, &captured_values);
-        let () = &MappingValueProcessor::<'_>::apply_suffix(self, &captured_values);
-        let () = &MappingValueProcessor::<'_>::apply_prefix(self, &captured_values);
-        let () = &MappingValueProcessor::<'_>::apply_assignments(self);
+        MappingValueProcessor::<'_>::apply_attributes(self, &captured_values);
+        MappingValueProcessor::<'_>::apply_suffix(self, &captured_values);
+        MappingValueProcessor::<'_>::apply_prefix(self, &captured_values);
+        MappingValueProcessor::<'_>::apply_assignments(self);
         true
     }
 }

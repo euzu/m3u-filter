@@ -11,7 +11,7 @@ use crate::api::api_model::{AppState, PlaylistRequest, ServerConfig, ServerInput
 use crate::api::download_api;
 use crate::auth::authenticator::validator;
 use crate::m3u_filter_error::M3uFilterError;
-use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
+use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, TargetUser};
 use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, validate_targets};
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, download};
@@ -43,7 +43,7 @@ pub(crate) async fn save_config_api_proxy_user(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let mut users = req.0;
-    users.iter_mut().flat_map(|t| &mut t.credentials).for_each(super::super::model::api_proxy::ProxyUserCredentials::trim);
+    users.iter_mut().flat_map(|t| &mut t.credentials).for_each(ProxyUserCredentials::trim);
     if let Some(api_proxy) = app_state.config.t_api_proxy.write().unwrap().as_mut() {
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         api_proxy.user = users;
