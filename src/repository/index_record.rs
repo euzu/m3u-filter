@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::utils::file_utils;
 
 /**
-We write the structs with bincode::encode to a file.
+We write the structs with `bincode::encode` to a file.
 To access each entry we need a index file where we can find the
 Entries with offset and size of the encoded struct.
 This is used for the index file where first entry is the index
@@ -19,7 +19,7 @@ pub(crate) struct IndexRecord {
 
 impl IndexRecord {
     pub(crate) fn from_file(file: &mut File, offset: u32) -> Result<Self, Error> {
-        file.seek(SeekFrom::Start(offset as u64))?;
+        file.seek(SeekFrom::Start(u64::from(offset)))?;
         let mut left_bytes = [0u8; 4];
         let mut right_bytes = [0u8; 4];
         file.read_exact(&mut left_bytes)?;

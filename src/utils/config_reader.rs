@@ -15,13 +15,13 @@ use crate::model::mapping::Mappings;
 use crate::utils::{file_utils, multi_file_reader};
 
 pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
-    let mappings_file: String = args_mapping.unwrap_or(file_utils::get_default_mappings_path(cfg._config_path.as_str()));
+    let mappings_file: String = args_mapping.unwrap_or(file_utils::get_default_mappings_path(cfg.t_config_path.as_str()));
 
     match read_mapping(mappings_file.as_str()) {
         Ok(mappings) => {
             info!("Mappings File: {}", &mappings_file);
             if mappings.is_none() { debug!("no mapping loaded"); }
-            handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, cfg.set_mappings(mappings));
+            cfg.set_mappings(mappings);
             Ok(())
         }
         Err(err) => Err(err),
@@ -29,8 +29,8 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
 }
 
 pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
-    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(file_utils::get_default_api_proxy_config_path(cfg._config_path.as_str()));
-    api_proxy_config_file.clone_into(&mut cfg._api_proxy_file_path);
+    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(file_utils::get_default_api_proxy_config_path(cfg.t_config_path.as_str()));
+    api_proxy_config_file.clone_into(&mut cfg.t_api_proxy_file_path);
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str(), true);
     match api_proxy_config {
         None => {
@@ -49,9 +49,9 @@ pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &s
         Ok(file) => {
             match serde_yaml::from_reader::<_, Config>(file) {
                 Ok(mut result) => {
-                    result._config_path = config_path.to_string();
-                    result._config_file_path = config_file.to_string();
-                    result._sources_file_path = sources_file.to_string();
+                    result.t_config_path = config_path.to_string();
+                    result.t_config_file_path = config_file.to_string();
+                    result.t_sources_file_path = sources_file.to_string();
                     match result.prepare(true) {
                         Err(err) => Err(err),
                         _ => Ok(result),
@@ -137,7 +137,7 @@ pub(crate) fn save_main_config(file_path: &str, backup_dir: &str, config: &Confi
 
 pub(crate) fn resolve_env_var(value: &str) -> String {
     if !value.trim().is_empty() {
-        let pattern = Regex::new(r#"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}"#).unwrap();
+        let pattern = Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap();
         if let Some(caps) = pattern.captures(value) {
             if let Some(var) = caps.name("var") {
                 let var_name = var.as_str();

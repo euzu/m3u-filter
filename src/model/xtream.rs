@@ -59,8 +59,8 @@ fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     }
 }
 
-fn value_to_string_array(value: &[Value]) -> Option<Vec<String>> {
-    Some(value.iter().filter_map(value_to_string).collect())
+fn value_to_string_array(value: &[Value]) -> Vec<String> {
+    value.iter().filter_map(value_to_string).collect()
 }
 
 fn value_to_string(v: &Value) -> Option<String> {
@@ -102,7 +102,7 @@ fn deserialize_as_string_array<'de, D>(deserializer: D) -> Result<Option<Vec<Str
         D: Deserializer<'de>,
 {
     Value::deserialize(deserializer).map(|v| match v {
-        Value::Array(value) => value_to_string_array(&value),
+        Value::Array(value) => Some(value_to_string_array(&value)),
         _ => None,
     })
 }
@@ -220,7 +220,7 @@ macro_rules! add_i64_property_if_exists {
 
 impl XtreamStream {
     pub(crate) fn get_stream_id(&self) -> String {
-        self.stream_id.map_or_else(|| self.series_id.map_or_else(|| String::from(""), |seid| format!("{}", seid)), |sid| format!("{}", sid))
+        self.stream_id.map_or_else(|| self.series_id.map_or_else(String::new, |seid| format!("{seid}")), |sid| format!("{sid}"))
     }
 
     pub(crate) fn get_additional_properties(&self) -> Option<Value> {
@@ -378,7 +378,7 @@ fn append_release_date(document: &mut serde_json::Map<String, Value>) {
             document.get("releaseDate")
         } else {
             None
-        }.map_or_else(|| Value::Null, |v| v.clone());
+        }.map_or_else(|| Value::Null, std::clone::Clone::clone);
         if !&has_release_date_1 {
             document.insert("release_date".to_string(), release_date.clone());
         }
@@ -428,12 +428,12 @@ pub(crate) fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options:
         XtreamCluster::Live => {
             document.insert("stream_id".to_string(), stream_id_value);
             if options.skip_live_direct_source {
-                document.insert("direct_source".to_string(), Value::String("".to_string()));
+                document.insert("direct_source".to_string(), Value::String(String::new()));
             } else {
                 document.insert("direct_source".to_string(), Value::String(pli.url.as_ref().clone()));
             }
             document.insert("thumbnail".to_string(), Value::String(pli.logo_small.as_ref().clone()));
-            document.insert("custom_sid".to_string(), Value::String("".to_string()));
+            document.insert("custom_sid".to_string(), Value::String(String::new()));
             document.insert("epg_channel_id".to_string(), match &pli.epg_channel_id {
                 None => Value::Null,
                 Some(epg_id) => Value::String(epg_id.as_ref().clone())
@@ -442,11 +442,11 @@ pub(crate) fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options:
         XtreamCluster::Video => {
             document.insert("stream_id".to_string(), stream_id_value);
             if options.skip_video_direct_source {
-                document.insert("direct_source".to_string(), Value::String("".to_string()));
+                document.insert("direct_source".to_string(), Value::String(String::new()));
             } else {
                 document.insert("direct_source".to_string(), Value::String(pli.url.as_ref().clone()));
             }
-            document.insert("custom_sid".to_string(), Value::String("".to_string()));
+            document.insert("custom_sid".to_string(), Value::String(String::new()));
         }
         XtreamCluster::Series => {
             document.insert("series_id".to_string(), stream_id_value);

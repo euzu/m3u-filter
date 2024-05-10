@@ -27,6 +27,6 @@ impl Display for InputStats {
         let str = format!("{{\"name\": {}, \"type\": {}, \"errors\": {}, \"raw\": {}, \"processed\": {}}}",
                           self.name, self.input_type, self.error_count,
                           self.raw_stats, self.processed_stats);
-        write!(f, "{}", str)
+        write!(f, "{str}")
     }
 }

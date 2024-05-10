@@ -13,7 +13,7 @@ fn token_value(it: &mut std::str::Chars) -> String {
             return get_value(it);
         }
     }
-    String::from("")
+    String::new()
 }
 
 fn get_value(it: &mut std::str::Chars) -> String {
@@ -34,11 +34,10 @@ fn token_till(it: &mut std::str::Chars, stop_char: char) -> Option<String> {
             break;
         } else if ch.is_whitespace() && result.is_empty() {
             continue;
-        } else {
-            result.push(ch);
         }
+        result.push(ch);
     }
-    if !result.is_empty() { Some(result.iter().collect::<String>()) } else { None }
+    if result.is_empty() { None } else { Some(result.iter().collect::<String>()) }
 }
 
 fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
@@ -54,7 +53,7 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     }
 }
 
-fn create_empty_playlistitem_header(input_id: u16, url: String) -> PlaylistItemHeader {
+fn create_empty_playlistitem_header(input_id: u16, url: &str) -> PlaylistItemHeader {
     PlaylistItemHeader {
         id: default_as_empty_rc_str(),
         stream_id: default_as_empty_rc_str(),
@@ -67,7 +66,7 @@ fn create_empty_playlistitem_header(input_id: u16, url: String) -> PlaylistItemH
         audio_track: default_as_empty_rc_str(),
         time_shift: default_as_empty_rc_str(),
         rec: default_as_empty_rc_str(),
-        url: Rc::new(url),
+        url: Rc::new(url.to_owned()),
         epg_channel_id: None,
         item_type: default_playlist_item_type(),
         xtream_cluster: default_stream_cluster(),
@@ -89,8 +88,8 @@ macro_rules! process_header_fields {
     };
 }
 
-fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str, url: String) -> PlaylistItemHeader {
-    let mut plih = create_empty_playlistitem_header(input.id, url.clone());
+fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str, url: &str) -> PlaylistItemHeader {
+    let mut plih = create_empty_playlistitem_header(input.id, url);
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':');
     if line_token == Some(String::from("#EXTINF")) {
@@ -99,13 +98,13 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
             if c.is_none() {
                 break;
             }
-            match c.unwrap() {
-                ',' => plih.title = Rc::new(get_value(&mut it)),
-                _ => {
-                    let token = token_till(&mut it, '=');
-                    if let Some(t) = token {
-                        let value = token_value(&mut it);
-                        process_header_fields!(plih, t.as_str(),
+            if let ',' = c.unwrap() {
+                plih.title = Rc::new(get_value(&mut it));
+            } else {
+                let token = token_till(&mut it, '=');
+                if let Some(t) = token {
+                    let value = token_value(&mut it);
+                    process_header_fields!(plih, t.as_str(),
                         (id, "tvg-id"),
                         (group, "group-title"),
                         (name, "tvg-name"),
@@ -114,14 +113,13 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
                         (logo, "tvg-logo"),
                         (logo_small, "tvg-logo-small"),
                         (time_shift, "timeshift"),
-                        (rec, "tvg-rec"); value)
-                    }
+                        (rec, "tvg-rec"); value);
                 }
             }
             c = it.next();
         }
         if plih.id.is_empty() {
-            if let Some(chanid) = extract_id_from_url(url.as_str()) {
+            if let Some(chanid) = extract_id_from_url(url) {
                 plih.id = Rc::new(chanid);
             }
         }
@@ -151,7 +149,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
 
 fn extract_id_from_url(url: &str) -> Option<String> {
     if let Some(filename) = url.split('/').last() {
-        return filename.rsplit('.').next().map(|stem| stem.to_string());
+        return filename.rsplit('.').next().map(std::string::ToString::to_string);
     }
     None
 }
@@ -160,7 +158,7 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigIn
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
-    let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(|ext| ext.as_str()).collect();
+    let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(std::string::String::as_str).collect();
     for line in lines {
         if line.starts_with("#EXTINF") {
             header = Some(line);
@@ -174,13 +172,13 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigIn
             continue;
         }
         if let Some(header_value) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(input, &video_suffixes, &header_value, line)) };
+            let item = PlaylistItem { header: RefCell::new(process_header(input, &video_suffixes, &header_value, &line)) };
             let mut header = item.header.borrow_mut();
             if header.group.is_empty() {
                 if let Some(group_value) = group {
                     header.group = Rc::new(group_value);
                 } else {
-                    let current_title = header.title.to_owned();
+                    let current_title = header.title.clone();
                     header.group = Rc::new(string_utils::get_title_group(current_title.as_str()));
                 }
             }

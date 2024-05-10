@@ -28,10 +28,10 @@ pub(crate) fn get_user_target_by_credentials<'a>(username: &str, password: &str,
         app_state.config.get_target_for_user(username, password)
     } else {
         let token = api_req.token.as_str().trim();
-        if !token.is_empty() {
-            app_state.config.get_target_for_user_by_token(token)
-        } else {
+        if token.is_empty() {
             None
+        } else {
+            app_state.config.get_target_for_user_by_token(token)
         }
     }
 }
@@ -43,7 +43,7 @@ pub(crate) fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a we
 }
 
 pub(crate) fn get_user_server_info(cfg: &Config, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
-    let server_info_list = cfg._api_proxy.read().unwrap().as_ref().unwrap().server.clone();
+    let server_info_list = cfg.t_api_proxy.read().unwrap().as_ref().unwrap().server.clone();
     let server_info_name = match &user.server {
         Some(server_name) => server_name.as_str(),
         None => "default"
@@ -68,14 +68,14 @@ pub(crate) async fn stream_response(stream_url: &str, req: &HttpRequest, input: 
                     });
                     return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
                 }
-                debug!("Failed to open stream got status {} for {}", response.status(), stream_url)
+                debug!("Failed to open stream got status {} for {}", response.status(), stream_url);
             }
             Err(err) => {
-                error!("Received failure from server {}:  {}", stream_url, err)
+                error!("Received failure from server {}:  {}", stream_url, err);
             }
         }
     } else {
-        error!("Url is malformed {}", &stream_url)
+        error!("Url is malformed {}", &stream_url);
     }
     HttpResponse::BadRequest().finish()
 }

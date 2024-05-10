@@ -17,60 +17,59 @@ pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &St
     if log_enabled!(Level::Debug) {
         debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
     }
-    match url_str.parse::<url::Url>() {
-        Ok(url) => match download_text_content(input, url, persist_filepath).await {
+
+    if let Ok(url) = url_str.parse::<url::Url>() {
+        match download_text_content(input, url, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", url_str, e);
                 create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
             }
         }
-        Err(_) => {
-            let result = match get_file_path(working_dir, Some(PathBuf::from(url_str))) {
-                Some(filepath) => {
-                    if filepath.exists() {
-                        if let Some(persist_file_value) = persist_filepath {
-                            let to_file = &persist_file_value;
-                            match fs::copy(&filepath, to_file) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e);
-                                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
-                                }
-                            }
-                        };
-                        match open_file(&filepath) {
-                            Ok(file) => {
-                                let mut content = String::new();
-                                match std::io::BufReader::new(file).read_to_string(&mut content) {
-                                    Ok(_) => Some(content),
-                                    Err(err) => {
-                                        let file_str = &filepath.to_str().unwrap_or("?");
-                                        error!("cant read file: {} {}", file_str,  err);
-                                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                let file_str = &filepath.to_str().unwrap_or("?");
-                                error!("cant read file: {} {}", file_str,  err);
-                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
+    } else {
+        let result = match get_file_path(working_dir, Some(PathBuf::from(url_str))) {
+            Some(filepath) => {
+                if filepath.exists() {
+                    if let Some(persist_file_value) = persist_filepath {
+                        let to_file = &persist_file_value;
+                        match fs::copy(&filepath, to_file) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e);
+                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
                             }
                         }
-                    } else {
-                        None
+                    };
+                    match open_file(&filepath) {
+                        Ok(file) => {
+                            let mut content = String::new();
+                            match std::io::BufReader::new(file).read_to_string(&mut content) {
+                                Ok(_) => Some(content),
+                                Err(err) => {
+                                    let file_str = &filepath.to_str().unwrap_or("?");
+                                    error!("cant read file: {} {}", file_str,  err);
+                                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            let file_str = &filepath.to_str().unwrap_or("?");
+                            error!("cant read file: {} {}", file_str,  err);
+                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
+                        }
                     }
-                }
-                None => None
-            };
-            match result {
-                Some(content) => Ok(content),
-                None => {
-                    let msg = format!("cant read input url: {:?}", url_str);
-                    error!("{}", msg);
-                    create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
+                } else {
+                    None
                 }
             }
+            None => None
+        };
+        if let Some(content) = result {
+            Ok(content)
+        } else {
+            let msg = format!("cant read input url: {url_str:?}");
+            error!("{}", msg);
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
         }
     }
 }

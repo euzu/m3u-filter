@@ -8,7 +8,7 @@ use regex::Regex;
 use crate::{handle_m3u_filter_error_result, valid_property};
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{AFFIX_FIELDS, ItemField, MAPPER_ATTRIBUTE_FIELDS, };
+use crate::model::config::{AFFIX_FIELDS, ItemField, MAPPER_ATTRIBUTE_FIELDS};
 use crate::model::playlist::{FieldAccessor, PlaylistItem};
 use crate::utils::default_utils::{default_as_empty_map, default_as_empty_str,
                                   default_as_false};
@@ -38,37 +38,37 @@ pub(crate) struct Mapper {
     #[serde(default = "default_as_empty_map")]
     assignments: HashMap<String, String>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub(crate) _filter: Option<Filter>,
+    pub(crate) t_filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub(crate) _pattern: Option<Filter>,
+    pub(crate) t_pattern: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _tags: Vec<MappingTag>,
+    pub t_tags: Vec<MappingTag>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _tagre: Option<Regex>,
+    pub t_tagre: Option<Regex>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _attre: Option<Regex>,
+    pub t_attre: Option<Regex>,
 }
 
 impl Mapper {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
         match get_filter(&self.pattern, templates) {
             Ok(pattern) => {
-                self._pattern = Some(pattern);
+                self.t_pattern = Some(pattern);
                 match &self.filter {
                     Some(flt) => {
                         match get_filter(flt, templates) {
-                            Ok(filter) => self._filter = Some(filter),
+                            Ok(filter) => self.t_filter = Some(filter),
                             Err(err) => return Err(err),
                         }
                     }
-                    _ => self._filter = None
+                    _ => self.t_filter = None
                 }
-                self._tags = match tags {
+                self.t_tags = match tags {
                     Some(list) => list.clone(),
                     _ => vec![]
                 };
-                self._tagre = Some(Regex::new("<tag:(.*?)>").unwrap());
-                self._attre = Some(Regex::new("<(.*?)>").unwrap());
+                self.t_tagre = Some(Regex::new("<tag:(.*?)>").unwrap());
+                self.t_attre = Some(Regex::new("<(.*?)>").unwrap());
                 Ok(())
             }
             Err(err) => Err(err)
@@ -95,14 +95,14 @@ impl MappingValueProcessor<'_> {
 
     fn apply_attributes(&mut self, captured_names: &HashMap<&str, &str>) {
         let mapper = self.mapper;
-        let attr_re = &mapper._attre.as_ref().unwrap();
+        let attr_re = &mapper.t_attre.as_ref().unwrap();
         let attributes = &mapper.attributes;
         for (key, value) in attributes {
             if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
                 if value.contains('<') { // possible replacement
                     let replaced = attr_re.replace_all(value, |captures: &regex::Captures| {
                         let capture_name = &captures[1];
-                        captured_names.get(&capture_name).unwrap_or(&&captures[0]).to_string()
+                        (*captured_names.get(&capture_name).unwrap_or(&&captures[0])).to_string()
                     });
                     self.set_property(key, &replaced);
                 } else {
@@ -114,34 +114,33 @@ impl MappingValueProcessor<'_> {
 
     fn apply_tags(&mut self, value: &String, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
-        let tag_captures = self.mapper._tagre.as_ref().unwrap().captures_iter(value)
+        let tag_captures = self.mapper.t_tagre.as_ref().unwrap().captures_iter(value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| caps.as_str())
             .collect::<Vec<&str>>();
 
         for tag_capture in tag_captures {
-            for mapping_tag in &self.mapper._tags {
+            for mapping_tag in &self.mapper.t_tags {
                 if mapping_tag.name.eq(tag_capture) {
                     // we have the right tag, now get all captured values
                     let mut captured_tag_values: Vec<&str> = Vec::new();
                     for cap in &mapping_tag.captures {
-                        match captures.get(cap.as_str()) {
-                            Some(cap_value) => captured_tag_values.push(cap_value),
-                            _ => {
-                                debug!("Cant find any tag match for {}", tag_capture);
-                                return None;
-                            }
+                        if let Some(cap_value) = captures.get(cap.as_str()) {
+                            captured_tag_values.push(cap_value);
+                        } else {
+                            debug!("Cant find any tag match for {}", tag_capture);
+                            return None;
                         }
                     }
                     if !captured_tag_values.is_empty() {
                         let captured_text = captured_tag_values.join(&mapping_tag.concat);
-                        let replacement = if !captured_text.trim().is_empty() {
-                            // Now we have all our captured values, lets create the tag
-                            format!("{}{}{}", &mapping_tag.prefix, captured_text, &mapping_tag.suffix)
-                        } else {
+                        let replacement = if captured_text.trim().is_empty() {
                             // nothing found so replace tag with empty string
-                            String::from("")
+                            String::new()
+                        } else {
+                            // Now we have all our captured values, lets create the tag
+                            format!("{}{captured_text}{}", &mapping_tag.prefix, &mapping_tag.suffix)
                         };
                         new_value = new_value.replace(format!("<tag:{}>", mapping_tag.name).as_str(), replacement.as_str());
                     }
@@ -215,10 +214,10 @@ impl ValueProcessor for MappingValueProcessor<'_> {
                     }
                 );
         }
-        let _ = &MappingValueProcessor::<'_>::apply_attributes(self, &captured_values);
-        let _ = &MappingValueProcessor::<'_>::apply_suffix(self, &captured_values);
-        let _ = &MappingValueProcessor::<'_>::apply_prefix(self, &captured_values);
-        let _ = &MappingValueProcessor::<'_>::apply_assignments(self);
+        let () = &MappingValueProcessor::<'_>::apply_attributes(self, &captured_values);
+        let () = &MappingValueProcessor::<'_>::apply_suffix(self, &captured_values);
+        let () = &MappingValueProcessor::<'_>::apply_prefix(self, &captured_values);
+        let () = &MappingValueProcessor::<'_>::apply_assignments(self);
         true
     }
 }

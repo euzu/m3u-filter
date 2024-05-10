@@ -17,9 +17,8 @@ fn get_epg_path_for_target_of_type(target_name: &str, file_path: Option<PathBuf>
     if let Some(epg_path) = file_path {
         if file_utils::path_exists(&epg_path) {
             return Some(epg_path);
-        } else {
-            info!("Cant find epg file for {target_name} target: {}", epg_path.to_str().unwrap_or("?"));
         }
+        info!("Cant find epg file for {target_name} target: {}", epg_path.to_str().unwrap_or("?"));
     }
     None
 }
@@ -61,7 +60,7 @@ async fn xmltv_api(
 }
 
 fn get_xmltv_epg_url(input: &ConfigInput) -> Result<Url, ParseError> {
-    let epg_url = input.epg_url.as_ref().map_or("".to_string(), |s| s.to_owned());
+    let epg_url = input.epg_url.as_ref().map_or(String::new(), std::borrow::ToOwned::to_owned);
     if epg_url.is_empty() {
         if let Some(user_info) = input.get_user_info() {
             let url = user_info.base_url.as_str();
@@ -99,11 +98,11 @@ async fn get_xmltv_raw_epg(config: &Config, user: &ProxyUserCredentials, target_
                         }
                     }
                 } else {
-                    debug!("Could not generate epg url for {target_name}")
+                    debug!("Could not generate epg url for {target_name}");
                 }
             }
         } else {
-            debug!("No epg_url is provided for target {target_name}, multi input requires epg_url")
+            debug!("No epg_url is provided for target {target_name}, multi input requires epg_url");
         }
     }
     None

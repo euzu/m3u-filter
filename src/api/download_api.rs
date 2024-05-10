@@ -16,7 +16,7 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
     match client.get(file_download.url.clone()).send().await {
         Ok(response) => {
             match fs::create_dir_all(&file_download.file_dir) {
-                Ok(_) => {
+                Ok(()) => {
                     if let Some(file_path_str) = file_download.file_path.to_str() {
                         info!("Downloading {}", file_path_str);
                         match File::create(&file_download.file_path) {
@@ -26,29 +26,26 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
                                 loop {
                                     match stream.try_next().await {
                                         Ok(item) => {
-                                            match item {
-                                                Some(chunk) => {
-                                                    match file.write_all(&chunk) {
-                                                        Ok(_) => {
-                                                            downloaded += chunk.len() as u64;
-                                                            active.write().unwrap().as_mut().unwrap().size = downloaded;
-                                                        }
-                                                        Err(err) => return Err(format!("Error while writing to file: {} {}", file_path_str, err))
+                                            if let Some(chunk) = item {
+                                                match file.write_all(&chunk) {
+                                                    Ok(()) => {
+                                                        downloaded += chunk.len() as u64;
+                                                        active.write().unwrap().as_mut().unwrap().size = downloaded;
                                                     }
+                                                    Err(err) => return Err(format!("Error while writing to file: {file_path_str} {err}"))
                                                 }
-                                                None => {
-                                                    let megabytes = request_utils::bytes_to_megabytes(downloaded);
-                                                    info!("Downloaded {}, filesize: {}MB", file_path_str, megabytes);
-                                                    active.write().unwrap().as_mut().unwrap().size = downloaded;
-                                                    return Ok(());
-                                                }
+                                            } else {
+                                                let megabytes = request_utils::bytes_to_megabytes(downloaded);
+                                                info!("Downloaded {}, filesize: {}MB", file_path_str, megabytes);
+                                                active.write().unwrap().as_mut().unwrap().size = downloaded;
+                                                return Ok(());
                                             }
                                         }
-                                        Err(err) => return Err(format!("Error while writing to file: {} {}", file_path_str, err))
+                                        Err(err) => return Err(format!("Error while writing to file: {file_path_str} {err}"))
                                     }
                                 }
                             }
-                            Err(err) => Err(format!("Error while writing to file: {} {}", file_path_str, err))
+                            Err(err) => Err(format!("Error while writing to file: {file_path_str} {err}"))
                         }
                     } else {
                         Err("Error file-download file-path unknown".to_string())
@@ -61,21 +58,19 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
     }
 }
 
-fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: Arc<DownloadQueue>) -> Result<(), String> {
-    let next_download = {
-        download_queue.as_ref().queue.lock().unwrap().pop_front()
-    };
+fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: &Arc<DownloadQueue>) -> Result<(), String> {
+    let next_download = download_queue.as_ref().queue.lock().unwrap().pop_front();
     if next_download.is_some() {
         { *download_queue.as_ref().active.write().unwrap() = next_download; }
         let headers = request_utils::get_request_headers(&download_cfg.headers, None);
-        let dq = Arc::clone(&download_queue);
+        let dq = Arc::clone(download_queue);
         match reqwest::Client::builder().default_headers(headers).build() {
             Ok(client) => {
                 actix_rt::spawn(async move {
                     loop {
                         if dq.active.read().unwrap().deref().is_some() {
                             match download_file(Arc::clone(&dq.active), &client).await {
-                                Ok(_) => {
+                                Ok(()) => {
                                     if let Some(fd) = &mut *dq.active.write().unwrap() {
                                         fd.finished = true;
                                         dq.finished.write().unwrap().push(fd.clone());
@@ -124,8 +119,8 @@ pub(crate) async fn queue_download_file(
                 let response = HttpResponse::Ok().json(download_info!(file_download));
                 app_state.downloads.queue.lock().unwrap().push_back(file_download);
                 if app_state.downloads.active.read().unwrap().is_none() {
-                    match run_download_queue(download_cfg, Arc::clone(&app_state.downloads)) {
-                        Ok(_) => {}
+                    match run_download_queue(download_cfg, &app_state.downloads) {
+                        Ok(()) => {}
                         Err(err) => return HttpResponse::InternalServerError().json(json!({"error": err})),
                     }
                 }

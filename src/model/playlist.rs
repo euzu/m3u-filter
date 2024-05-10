@@ -22,7 +22,7 @@ pub(crate) struct FetchedPlaylist<'a> {
 
 impl FetchedPlaylist<'_> {
     pub(crate) fn update_playlist(&mut self, plg: &PlaylistGroup) {
-        for grp in self.playlist.iter_mut() {
+        for grp in &mut self.playlist {
             if grp.id == plg.id {
                 plg.channels.iter().for_each(|item| grp.channels.push(item.clone()));
                 return;

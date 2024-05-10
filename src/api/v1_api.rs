@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix_web::{HttpResponse, web};
@@ -17,7 +18,7 @@ use crate::utils::{config_reader, download};
 
 fn _save_config_api_proxy(backup_dir: &str, api_proxy: &mut ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(err) => {
             error!("Failed to save api_proxy.yml {}", err.to_string());
             return Some(err);
@@ -28,7 +29,7 @@ fn _save_config_api_proxy(backup_dir: &str, api_proxy: &mut ApiProxyConfig, file
 
 fn _save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Option<M3uFilterError> {
     match config_reader::save_main_config(file_path, backup_dir, cfg) {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(err) => {
             error!("Failed to save config.yml {}", err.to_string());
             return Some(err);
@@ -42,11 +43,11 @@ pub(crate) async fn save_config_api_proxy_user(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let mut users = req.0;
-    users.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.trim());
-    if let Some(api_proxy) = app_state.config._api_proxy.write().unwrap().as_mut() {
+    users.iter_mut().flat_map(|t| &mut t.credentials).for_each(super::super::model::api_proxy::ProxyUserCredentials::trim);
+    if let Some(api_proxy) = app_state.config.t_api_proxy.write().unwrap().as_mut() {
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         api_proxy.user = users;
-        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy, app_state.config._api_proxy_file_path.as_str()) {
+        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
         api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.prepare(true));
@@ -60,7 +61,7 @@ pub(crate) async fn save_config_main(
 ) -> HttpResponse {
     let cfg = req.0;
     if cfg.is_valid() {
-        let file_path = app_state.config._config_file_path.as_str();
+        let file_path = app_state.config.t_config_file_path.as_str();
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         if let Some(err) = _save_config_main(file_path, backup_dir, &cfg) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
@@ -81,10 +82,10 @@ pub(crate) async fn save_config_api_proxy_config(
             return HttpResponse::BadRequest().json(json!({"error": "Invalid content"}));
         }
     }
-    if let Some(api_proxy) = app_state.config._api_proxy.write().unwrap().as_mut() {
+    if let Some(api_proxy) = app_state.config.t_api_proxy.write().unwrap().as_mut() {
         api_proxy.server = req_api_proxy;
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
-        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy, app_state.config._api_proxy_file_path.as_str()) {
+        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
     }
@@ -113,7 +114,7 @@ pub(crate) async fn playlist_update(
 fn create_config_input_for_url(url: &str) -> ConfigInput {
     ConfigInput {
         id: 0,
-        headers: Default::default(),
+        headers: HashMap::default(),
         input_type: InputType::M3u,
         url: String::from(url),
         epg_url: None,
@@ -142,7 +143,7 @@ async fn get_playlist(inp: Option<&ConfigInput>, cfg: &Config) -> HttpResponse {
                     InputType::Xtream => download::get_xtream_playlist(input, &cfg.working_dir).await,
                 };
             if result.is_empty() {
-                let error_strings: Vec<String> = errors.iter().map(|err| err.to_string()).collect();
+                let error_strings: Vec<String> = errors.iter().map(std::string::ToString::to_string).collect();
                 HttpResponse::BadRequest().json(json!({"error": error_strings.join(", ")}))
             } else {
                 HttpResponse::Ok().json(result)
@@ -156,7 +157,7 @@ pub(crate) async fn playlist(
     req: web::Json<PlaylistRequest>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    return if let Some(input_id) = &req.input_id {
+    return if let Some(input_id) = req.input_id {
         get_playlist(app_state.config.get_input_by_id(input_id), &app_state.config).await
     } else {
         let url = req.url.as_deref().unwrap_or("");
@@ -201,18 +202,18 @@ pub(crate) async fn config(
     let map_config = |config: &Config| ServerConfig {
         api: config.api.clone(),
         threads: config.threads,
-        working_dir: config.working_dir.to_owned(),
-        backup_dir: config.backup_dir.to_owned(),
+        working_dir: config.working_dir.clone(),
+        backup_dir: config.backup_dir.clone(),
         schedule: config.schedule.clone(),
         messaging: config.messaging.clone(),
         video: config.video.clone(),
         sources: config.sources.iter().map(map_source).collect(),
-        api_proxy: config_reader::read_api_proxy(app_state.config._api_proxy_file_path.as_str(), false),
+        api_proxy: config_reader::read_api_proxy(app_state.config.t_api_proxy_file_path.as_str(), false),
     };
 
-    let mut result = match config_reader::read_config(app_state.config._config_path.as_str(),
-                                                      app_state.config._config_file_path.as_str(),
-                                                      app_state.config._sources_file_path.as_str()) {
+    let mut result = match config_reader::read_config(app_state.config.t_config_path.as_str(),
+                                                      app_state.config.t_config_file_path.as_str(),
+                                                      app_state.config.t_sources_file_path.as_str()) {
         Ok(mut cfg) => {
             let _ = cfg.prepare(true);
             map_config(&cfg)
@@ -222,7 +223,7 @@ pub(crate) async fn config(
 
     // if we didn't read it from file then we should use it from app_state
     if result.api_proxy.is_none() {
-        result.api_proxy.clone_from(&app_state.config._api_proxy.read().unwrap());
+        result.api_proxy.clone_from(&app_state.config.t_api_proxy.read().unwrap());
     }
 
     HttpResponse::Ok().json(result)

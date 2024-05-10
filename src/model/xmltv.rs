@@ -26,13 +26,13 @@ impl XmlTag {
     fn write_to<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<(), Error> {
         let mut elem = BytesStart::new(self.name.as_str());
         if let Some(attribs) = self.attributes.as_ref() {
-            attribs.iter().for_each(|(k, v)| elem.push_attribute((k.as_str(), v.as_str())))
+            attribs.iter().for_each(|(k, v)| elem.push_attribute((k.as_str(), v.as_str())));
         }
         writer.write_event(Event::Start(elem))?;
         self.value.as_ref().map(|text| writer.write_event(Event::Text(BytesText::new(text.as_str()))));
         if let Some(children) = &self.children {
             for child in children {
-                child.write_to(writer)?
+                child.write_to(writer)?;
             }
         }
         writer.write_event(Event::End(BytesEnd::new(self.name.as_str())))
@@ -50,11 +50,11 @@ impl Epg {
     pub(crate) fn write_to<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<(), quick_xml::Error> {
         let mut elem = BytesStart::new("tv");
         if let Some(attribs) = self.attributes.as_ref() {
-            attribs.iter().for_each(|(k, v)| elem.push_attribute((k.as_str(), v.as_str())))
+            attribs.iter().for_each(|(k, v)| elem.push_attribute((k.as_str(), v.as_str())));
         }
         writer.write_event(Event::Start(elem))?;
         for child in &self.children {
-            child.write_to(writer)?
+            child.write_to(writer)?;
         }
         writer.write_event(Event::End(BytesEnd::new("tv")))
     }

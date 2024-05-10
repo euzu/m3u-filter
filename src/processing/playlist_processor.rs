@@ -26,17 +26,18 @@ use crate::processing::xmltv_parser::flatten_tvguide;
 use crate::processing::xtream_processor::playlist_resolve_series;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::download;
-use crate::utils::default_utils:: default_as_default;
+use crate::utils::default_utils::default_as_default;
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };
     target.filter(&provider)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
     debug!("Filtering {} groups", playlist.len());
     let mut new_playlist = Vec::new();
-    playlist.iter_mut().for_each(|pg| {
+    for pg in playlist.iter_mut() {
         let channels = pg.channels.iter()
             .filter(|&pli| is_valid(pli, target)).cloned().collect::<Vec<PlaylistItem>>();
         debug!("Filtered group {} has now {}/{} items", pg.title, channels.len(), pg.channels.len());
@@ -48,7 +49,7 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                 xtream_cluster: pg.xtream_cluster.clone(),
             });
         }
-    });
+    }
     Some(new_playlist)
 }
 
@@ -81,15 +82,15 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
             new_playlist.sort_by(|a, b| playlistgroup_comparator(a, b, group_sort, match_as_ascii));
         }
         if let Some(channel_sorts) = &sort.channels {
-            channel_sorts.iter().for_each(|channel_sort| {
+            for channel_sort in channel_sorts {
                 let regexp = channel_sort.re.as_ref().unwrap();
-                new_playlist.iter_mut().for_each(|group| {
+                for group in new_playlist.iter_mut() {
                     let group_title = if match_as_ascii { Rc::new(unidecode(&group.title)) } else { Rc::clone(&group.title) };
                     if regexp.is_match(group_title.as_str()) {
                         group.channels.sort_by(|chan1, chan2| playlistitem_comparator(chan1, chan2, channel_sort, match_as_ascii));
                     }
-                });
-            });
+                }
+            }
         }
     }
 }
@@ -158,14 +159,14 @@ fn map_channel(channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
         let mut mock_processor = MockValueProcessor {};
         for m in &mapping.mapper {
             let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: m };
-            match &m._filter {
+            match &m.t_filter {
                 Some(filter) => {
                     if filter.filter(&provider, &mut mock_processor) {
-                        apply_pattern!(&m._pattern, &provider, &mut processor);
+                        apply_pattern!(&m.t_pattern, &provider, &mut processor);
                     }
                 }
                 _ => {
-                    apply_pattern!(&m._pattern, &provider, &mut processor);
+                    apply_pattern!(&m.t_pattern, &provider, &mut processor);
                 }
             };
         }
@@ -174,10 +175,10 @@ fn map_channel(channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
 }
 
 fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
-    if target._mapping.is_some() {
+    if target.t_mapping.is_some() {
         let new_playlist: Vec<PlaylistGroup> = playlist.iter().map(|playlist_group| {
             let mut grp = playlist_group.clone();
-            let mappings = target._mapping.as_ref().unwrap();
+            let mappings = target.t_mapping.as_ref().unwrap();
             mappings.iter().filter(|&mapping| !mapping.mapper.is_empty()).for_each(|mapping|
                 grp.channels = grp.channels.drain(..).map(|chan| map_channel(chan, mapping)).collect());
             grp
@@ -191,17 +192,16 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
             for channel in &playlist_group.channels {
                 let cluster = &channel.header.borrow().xtream_cluster;
                 let title = &channel.header.borrow().group;
-                match new_groups.iter_mut().find(|x| *x.title == **title) {
-                    Some(grp) => grp.channels.push(channel.clone()),
-                    _ => {
-                        grp_id += 1;
-                        new_groups.push(PlaylistGroup {
-                            id: grp_id,
-                            title: Rc::clone(title),
-                            channels: vec![channel.clone()],
-                            xtream_cluster: cluster.clone(),
-                        })
-                    }
+                if let Some(grp) = new_groups.iter_mut().find(|x| *x.title == **title) {
+                    grp.channels.push(channel.clone());
+                } else {
+                    grp_id += 1;
+                    new_groups.push(PlaylistGroup {
+                        id: grp_id,
+                        title: Rc::clone(title),
+                        channels: vec![channel.clone()],
+                        xtream_cluster: cluster.clone(),
+                    });
                 }
             }
         }
@@ -255,7 +255,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                 .sum();
             if playlist.is_empty() {
                 info!("source is empty {}", input.url);
-                errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("source is empty {}", input_name)));
+                errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("source is empty {input_name}")));
             } else {
                 all_playlist.push(
                     FetchedPlaylist {
@@ -284,7 +284,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         if log_enabled!(Level::Debug) {
             debug!("Source at index {} input is empty", source_idx);
         }
-        errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Source at {} input is empty", source_idx)));
+        errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Source at {source_idx} input is empty")));
     } else {
         if log_enabled!(Level::Debug) {
             debug!("Input has {} groups", all_playlist.len());
@@ -292,7 +292,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         for target in &source.targets {
             if is_target_enabled(target, &user_targets) {
                 match process_playlist(&mut all_playlist, target, &cfg, &mut stats, &mut errors).await {
-                    Ok(_) => {}
+                    Ok(()) => {}
                     Err(mut err) => err.drain(..).for_each(|e| errors.push(e))
                 }
             }
@@ -327,7 +327,7 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
                     .for_each(|stat| shared_stats.lock().unwrap().push(stat));
             };
             handles.push(thread::spawn(process));
-            if handles.len() as u8 >= thread_num {
+            if handles.len() >= thread_num as usize {
                 handles.drain(..).for_each(|handle| { let _ = handle.join(); });
             }
         } else {
@@ -414,38 +414,40 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
         }
     });
 
-    if !new_playlist.is_empty() {
+    if new_playlist.is_empty() {
+        info!("Playlist is empty: {}", &target.name);
+        Ok(())
+    } else {
         sort_playlist(target, &mut new_playlist);
 
-        if target._watch_re.is_some() {
+        if target.t_watch_re.is_some() {
             if default_as_default().eq_ignore_ascii_case(&target.name) {
                 error!("cant watch a target with no unique name");
             } else {
-                let watch_re = target._watch_re.as_ref().unwrap();
-                new_playlist.iter().for_each(|pl| {
+                let watch_re = target.t_watch_re.as_ref().unwrap();
+                for pl in &new_playlist {
                     if watch_re.iter().any(|r| r.is_match(&pl.title)) {
-                        process_group_watch(cfg, &target.name, pl)
+                        process_group_watch(cfg, &target.name, pl);
                     }
-                });
+                }
             }
         }
 
-        persist_playlist(&mut new_playlist, flatten_tvguide(&new_epg), target, cfg)
-    } else {
-        info!("Playlist is empty: {}", &target.name);
-        Ok(())
+        persist_playlist(&mut new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg)
     }
 }
 
 pub(crate) async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    let (stats, errors) = process_sources(cfg.to_owned(), targets.to_owned()).await;
-    let stats_msg = format!("{{\"stats\": {}}}", stats.iter().map(|stat| stat.to_string()).collect::<Vec<String>>().join("\n"));
+    let (stats, errors) = process_sources(cfg.clone(), targets.clone()).await;
+    let stats_msg = format!("{{\"stats\": {}}}", stats.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n"));
     // print stats
     info!("{}", stats_msg);
     // send stats
     send_message(&MsgKind::Stats, &cfg.messaging, stats_msg.as_str());
     // log errors
-    errors.iter().for_each(|err| error!("{}", err.message));
+    for err in &errors {
+        error!("{}", err.message);
+    }
     // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
         let error_msg = format!("{{\"errors\": \"{}\"}}", message.as_str());

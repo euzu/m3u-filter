@@ -18,14 +18,14 @@ pub(crate) fn parse_tvguide(content: &str) -> Option<TVGuide> {
             Ok(Event::Eof) => break,
             Ok(Event::Start(e)) => {
                 let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                let attributes = e.attributes().filter_map(|a| a.ok())
+                let attributes = e.attributes().filter_map(std::result::Result::ok)
                     .filter_map(|a| {
                         let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
                         let value = String::from(a.unescape_value().unwrap().as_ref()).to_string();
-                        if !value.is_empty() {
-                            Some((key, value))
-                        } else {
+                        if value.is_empty() {
                             None
+                        } else {
+                            Some((key, value))
                         }
                     }).collect::<HashMap<String, String>>();
                 let tag = XmlTag {
@@ -78,7 +78,7 @@ pub(crate) fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
             children: vec![],
         };
         let mut channel_ids: Vec<&String> = vec![];
-        tv_guides.iter().for_each(|guide| {
+        for guide in tv_guides {
             if epg.attributes.is_none() {
                 epg.attributes.clone_from(&guide.attributes);
             }
@@ -87,7 +87,7 @@ pub(crate) fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
                     if let Some(chan_id) = c.get_attribute_value(EPG_ID) {
                         if !channel_ids.contains(&chan_id) {
                             channel_ids.push(chan_id);
-                            epg.children.push(c.clone())
+                            epg.children.push(c.clone());
                         }
                     }
                 }
@@ -101,7 +101,7 @@ pub(crate) fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
                     }
                 }
             });
-        });
+        }
         Some(epg)
     }
 }

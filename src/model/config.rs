@@ -9,7 +9,7 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use log::{debug, error, warn};
-use path_absolutize::*;
+use path_absolutize::Absolutize;
 use crate::auth::user::UserCredential;
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
@@ -216,7 +216,7 @@ pub(crate) struct ConfigSort {
 impl ConfigSort {
     pub(crate) fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if let Some(channels) = self.channels.as_mut() {
-            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, channels.iter_mut().map(|r| r.prepare()));
+            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, channels.iter_mut().map(ConfigSortChannel::prepare));
         }
         Ok(())
     }
@@ -297,11 +297,11 @@ pub(crate) struct ConfigTarget {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub watch: Option<Vec<String>>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _watch_re: Option<Vec<regex::Regex>>,
+    pub t_watch_re: Option<Vec<regex::Regex>>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _filter: Option<Filter>,
+    pub t_filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _mapping: Option<Vec<Mapping>>,
+    pub t_mapping: Option<Vec<Mapping>>,
 }
 
 
@@ -335,7 +335,7 @@ impl ConfigTarget {
                     }
                     if let Some(fname) = &format.filename {
                         if !fname.trim().is_empty() {
-                            warn!("Filename for target output xtream is ignored: {}", self.name)
+                            warn!("Filename for target output xtream is ignored: {}", self.name);
                         }
                     }
                 }
@@ -349,7 +349,7 @@ impl ConfigTarget {
         if let Some(watch) = &self.watch {
             let regexps: Result<Vec<regex::Regex>, _> = watch.iter().map(|s| regex::Regex::new(s)).collect();
             match regexps {
-                Ok(watch_re) => self._watch_re = Some(watch_re),
+                Ok(watch_re) => self.t_watch_re = Some(watch_re),
                 Err(err) => {
                     return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Invalid watch regular expression: {}", err);
                 }
@@ -359,9 +359,9 @@ impl ConfigTarget {
         match get_filter(&self.filter, templates) {
             Ok(fltr) => {
                 debug!("Filter: {}", fltr);
-                self._filter = Some(fltr);
+                self.t_filter = Some(fltr);
                 if let Some(renames) = self.rename.as_mut() {
-                    handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, renames.iter_mut().map(|r| r.prepare()));
+                    handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, renames.iter_mut().map(ConfigRename::prepare));
                 }
                 if let Some(sort) = self.sort.as_mut() {
                     handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, sort.prepare());
@@ -374,15 +374,13 @@ impl ConfigTarget {
 
     pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
-        return self._filter.as_ref().unwrap().filter(provider, &mut processor);
+        return self.t_filter.as_ref().unwrap().filter(provider, &mut processor);
     }
 
     pub(crate) fn get_m3u_filename(&self) -> Option<String> {
         for format in &self.output {
-            match format.target {
-                TargetType::M3u => return format.filename.clone(),
-                TargetType::Strm => {}
-                TargetType::Xtream => {}
+            if let TargetType::M3u = format.target {
+                return format.filename.clone();
             }
         }
         None
@@ -405,6 +403,7 @@ pub(crate) struct ConfigSource {
 }
 
 impl ConfigSource {
+    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
         Ok(index + (self.inputs.len() as u16))
@@ -529,7 +528,7 @@ impl ConfigInput {
         match self.input_type {
             InputType::M3u => {
                 if self.username.is_none() || self.password.is_none() {
-                    debug!("for input type m3u: username and password are ignored")
+                    debug!("for input type m3u: username and password are ignored");
                 }
             }
             InputType::Xtream => {
@@ -550,7 +549,7 @@ impl ConfigInput {
         if self.input_type == InputType::Xtream {
             if self.username.is_some() || self.password.is_some() {
                 return Some(InputUserInfo {
-                    base_url: self.url.to_owned(),
+                    base_url: self.url.clone(),
                     username: self.username.as_ref().unwrap().to_owned(),
                     password: self.password.as_ref().unwrap().to_owned(),
                 });
@@ -621,11 +620,11 @@ pub(crate) struct VideoDownloadConfig {
     pub organize_into_directories: bool,
     pub episode_pattern: Option<String>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _re_episode_pattern: Option<regex::Regex>,
+    pub t_re_episode_pattern: Option<regex::Regex>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _re_filename: Option<regex::Regex>,
+    pub t_re_filename: Option<regex::Regex>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _re_remove_filename_ending: Option<regex::Regex>,
+    pub t_re_remove_filename_ending: Option<regex::Regex>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -655,12 +654,12 @@ impl VideoConfig {
                         if re.is_err() {
                             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", episode_pattern);
                         }
-                        downl._re_episode_pattern = Some(re.unwrap());
+                        downl.t_re_episode_pattern = Some(re.unwrap());
                     }
                 }
 
-                downl._re_filename = Some(regex::Regex::new(r"[^A-Za-z0-9_.-]").unwrap());
-                downl._re_remove_filename_ending = Some(regex::Regex::new(r"[_.\s-]$").unwrap());
+                downl.t_re_filename = Some(regex::Regex::new(r"[^A-Za-z0-9_.-]").unwrap());
+                downl.t_re_remove_filename_ending = Some(regex::Regex::new(r"[_.\s-]$").unwrap());
             }
         }
         Ok(())
@@ -708,7 +707,8 @@ pub(crate) struct WebAuthConfig {
     pub issuer: String,
     pub secret: String,
     pub userfile: Option<String>,
-    pub _users: Option<Vec<UserCredential>>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub t_users: Option<Vec<UserCredential>>,
 }
 
 impl WebAuthConfig {
@@ -724,7 +724,7 @@ impl WebAuthConfig {
             None => file_utils::get_default_user_file_path(config_path),
             Some(file) => file.to_owned()
         };
-        self.userfile = Some(userfile_name.to_owned());
+        self.userfile = Some(userfile_name.clone());
 
         let mut userfile_path = PathBuf::from(&userfile_name);
         if !file_utils::path_exists(&userfile_path) {
@@ -748,7 +748,7 @@ impl WebAuthConfig {
                 }
             }
 
-            self._users = Some(users);
+            self.t_users = Some(users);
         } else {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not read userfile {:?}", &userfile_path);
         }
@@ -756,7 +756,7 @@ impl WebAuthConfig {
     }
 
     pub fn get_user_password(&self, username: &str) -> Option<&str> {
-        if let Some(users) = &self._users {
+        if let Some(users) = &self.t_users {
             for credential in users {
                 if credential.username.eq_ignore_ascii_case(username) {
                     return Some(credential.password.as_str());
@@ -785,21 +785,21 @@ pub(crate) struct Config {
     pub web_auth: Option<WebAuthConfig>,
     pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
+    pub t_api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _config_path: String,
+    pub t_config_path: String,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _config_file_path: String,
+    pub t_config_file_path: String,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _sources_file_path: String,
+    pub t_sources_file_path: String,
     #[serde(skip_serializing, skip_deserializing)]
-    pub _api_proxy_file_path: String,
+    pub t_api_proxy_file_path: String,
 
 }
 
 impl Config {
     pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) {
-        self._api_proxy = Arc::new(RwLock::new(api_proxy));
+        self.t_api_proxy = Arc::new(RwLock::new(api_proxy));
     }
 
     fn _get_target_for_user(&self, user_target: Option<(ProxyUserCredentials, String)>) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
@@ -828,7 +828,7 @@ impl Config {
     }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        match self._api_proxy.read().unwrap().as_ref() {
+        match self.t_api_proxy.read().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name(username, password))
             }
@@ -837,7 +837,7 @@ impl Config {
     }
 
     pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        match self._api_proxy.read().unwrap().as_ref() {
+        match self.t_api_proxy.read().unwrap().as_ref() {
             Some(api_proxy) => {
                 self._get_target_for_user(api_proxy.get_target_name_by_token(token))
             }
@@ -845,10 +845,10 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_input_by_id(&self, input_id: &u16) -> Option<&ConfigInput> {
+    pub(crate) fn get_input_by_id(&self, input_id: u16) -> Option<&ConfigInput> {
         for source in &self.sources {
             for input in &source.inputs {
-                if input.id == *input_id {
+                if input.id == input_id {
                     return Some(input);
                 }
             }
@@ -856,7 +856,7 @@ impl Config {
         None
     }
 
-    pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) -> Result<(), M3uFilterError> {
+    pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) {
         if let Some(mapping_list) = mappings {
             for source in &mut self.sources {
                 for target in &mut source.targets {
@@ -868,12 +868,11 @@ impl Config {
                                 target_mappings.push(mappings);
                             }
                         }
-                        target._mapping = if !target_mappings.is_empty() { Some(target_mappings) } else { None };
+                        target.t_mapping = if target_mappings.is_empty() { None } else { Some(target_mappings) };
                     }
                 }
             }
         }
-        Ok(())
     }
 
     pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
@@ -884,7 +883,7 @@ impl Config {
         let backupdir = PathBuf::from(self.backup_dir.as_ref().unwrap());
         if !backupdir.exists() {
             match std::fs::create_dir(backupdir) {
-                Ok(_) => {}
+                Ok(()) => {}
                 Err(err) => { error!("Could not create backup dir {} {}", self.backup_dir.as_ref().unwrap(), err) }
             }
         }
@@ -936,7 +935,7 @@ impl Config {
             }
             Some(video) => {
                 match video.prepare() {
-                    Ok(_) => {}
+                    Ok(()) => {}
                     Err(err) => return Err(err)
                 }
             }
@@ -947,10 +946,10 @@ impl Config {
         }
 
         if let Some(web_auth) = &mut self.web_auth {
-            if !web_auth.enabled {
-                self.web_auth = None
+            if web_auth.enabled {
+                web_auth.prepare(&self.t_config_path, resolve_var)?;
             } else {
-                web_auth.prepare(&self._config_path, resolve_var)?
+                self.web_auth = None;
             }
         }
 

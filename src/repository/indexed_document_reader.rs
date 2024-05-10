@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
@@ -11,8 +12,8 @@ pub(crate) struct IndexedDocumentReader<T> {
     cursor: u32,
     size: u32,
     failed: bool,
-    _buffer: Vec<u8>,
-    _type: PhantomData<T>,
+    t_buffer: Vec<u8>,
+    t_type: PhantomData<T>,
 }
 
 impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
@@ -24,7 +25,7 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
                         Ok(index_file) => {
                             let size = match index_file.metadata() {
                                 Ok(metadata) => {
-                                    metadata.len() as usize
+                                    usize::try_from(metadata.len()).map_err(|err| Error::new(ErrorKind::Other, err))?
                                 }
                                 Err(_e) => 0,
                             };
@@ -32,10 +33,10 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
                                 main_file,
                                 index_file,
                                 cursor: 0,
-                                size: size as u32,
+                                size: u32::try_from(size).map_err(|err| Error::new(ErrorKind::Other, err))?,
                                 failed: false,
-                                _buffer: Vec::new(),
-                                _type: Default::default(),
+                                t_buffer: Vec::new(),
+                                t_type: PhantomData,
                             })
                         }
                         Err(e) => Err(e)
@@ -63,24 +64,24 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
             self.cursor += IndexRecord::get_record_size();
             match record {
                 Ok(index_record) => {
-                    let offset = index_record.left as u64;
+                    let offset = u64::from(index_record.left);
                     let buf_size = index_record.right as usize;
-                    if self._buffer.len() < buf_size {
-                        self._buffer.resize(buf_size, 0u8);
+                    if self.t_buffer.len() < buf_size {
+                        self.t_buffer.resize(buf_size, 0u8);
                     }
                     self.main_file.seek(SeekFrom::Start(offset))?;
-                    self.main_file.read_exact(&mut self._buffer[0..buf_size])?;
-                    return match bincode::deserialize::<T>(&self._buffer[0..buf_size]) {
+                    self.main_file.read_exact(&mut self.t_buffer[0..buf_size])?;
+                    return match bincode::deserialize::<T>(&self.t_buffer[0..buf_size]) {
                         Ok(value) => Ok(Some(value)),
                         Err(err) => {
                             self.failed = true;
-                            Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {}", err)))
+                            Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {err}")))
                         }
                     };
                 }
                 Err(err) => {
                     self.failed = true;
-                    return Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {}", err)));
+                    return Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {err}")));
                 }
             }
         }
@@ -109,7 +110,7 @@ pub(crate) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: 
         let mut index_file = File::open(index_path)?;
         let mut main_file = File::open(main_path)?;
         let index_record = IndexRecord::from_file(&mut index_file, offset)?;
-        main_file.seek(SeekFrom::Start(index_record.left as u64))?;
+        main_file.seek(SeekFrom::Start(u64::from(index_record.left)))?;
         let mut buffer: Vec<u8> = vec![0; index_record.right as usize];
         main_file.read_exact(&mut buffer)?;
         if let Ok(item) = bincode::deserialize::<T>(&buffer[..]) {

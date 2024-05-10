@@ -105,7 +105,7 @@ fn main() {
     info!("Version: {}", VERSION);
     info!("Current time: {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
     info!("Working dir: {:?}", &cfg.working_dir);
-    info!("Config dir: {:?}", &cfg._config_path);
+    info!("Config dir: {:?}", &cfg.t_config_path);
     info!("Config file: {}", &config_file);
     info!("Source file: {}", &sources_file);
 

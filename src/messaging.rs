@@ -26,14 +26,14 @@ pub(crate) fn send_message(kind: &MsgKind, cfg: &Option<MessagingConfig>, msg: &
                     let bot = rustelebot::create_instance(&telegram.bot_token, chat_id);
                     match rustelebot::send_message(&bot, msg, None)
                     {
-                        Ok(_) => debug!("Text message sent successfully to {}", chat_id),
+                        Ok(()) => debug!("Text message sent successfully to {}", chat_id),
                         Err(e) => error!("Text message wasn't sent to {} because of: {}", chat_id, e)
                     }
                 };
             }
 
             if let Some(rest) = &messaging.rest {
-                let url = rest.url.to_owned();
+                let url = rest.url.clone();
                 let data = msg.to_owned();
                 actix_rt::spawn(async move {
                     let client = reqwest::Client::new();

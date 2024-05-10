@@ -53,14 +53,14 @@ fn get_affix_processor(input: &ConfigInput) -> Option<AffixProcessor> {
 }
 
 pub fn apply_affixes(fetched_playlists: &mut [FetchedPlaylist]) {
-    fetched_playlists.iter_mut().for_each(|fetched_playlist| {
+    for fetched_playlist in fetched_playlists.iter_mut() {
         let FetchedPlaylist { input, playlist, epg: _ } = fetched_playlist;
         if let Some(affix_processor) = get_affix_processor(input) {
-            playlist.iter_mut().for_each(|group| {
+            for group in playlist.iter_mut() {
                 group.channels.iter_mut().for_each(|channel| {
                     affix_processor(channel);
                 });
-            });
+            }
         }
-    });
+    }
 }

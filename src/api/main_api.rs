@@ -54,7 +54,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
     if let Some(expression) = schedule {
         let cloned_data = shared_data.clone();
         actix_rt::spawn(async move {
-            start_scheduler(&expression, cloned_data).await
+            start_scheduler(&expression, cloned_data).await;
         });
     }
 
@@ -100,6 +100,6 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
                     srvcfg.configure(index_register(&web_dir_path));
                 }
             })
-    }).bind(format!("{}:{}", host, port))?.run().await
+    }).bind(format!("{host}:{port}"))?.run().await
 }
 

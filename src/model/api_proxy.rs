@@ -62,7 +62,7 @@ impl ProxyUserCredentials {
             self.username =  config_reader::resolve_env_var(&self.username);
             self.password =  config_reader::resolve_env_var(&self.password);
             if let Some(tkn) = &self.token {
-                self.token = Some(config_reader::resolve_env_var(tkn))
+                self.token = Some(config_reader::resolve_env_var(tkn));
             }
             self.trim();
         }
@@ -209,7 +209,7 @@ impl ApiProxyConfig {
                 }
                 if let Some(token) = &user.token {
                     if token.is_empty() {
-                        user.token = None
+                        user.token = None;
                     } else if tokens.contains(token) {
                         errors.push(format!("Non unique token found {}", &user.username));
                     } else {

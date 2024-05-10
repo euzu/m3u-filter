@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
 use std::path::PathBuf;
@@ -20,11 +21,11 @@ impl IndexedDocumentWriter {
         match create_file_tuple(&main_path, &index_path, append) {
             Ok((main_file, index_file)) => {
                 let main_offset = match &main_file.metadata() {
-                    Ok(meta) => meta.len() as u32,
+                    Ok(meta) => u32::try_from(meta.len()).map_err(|err| Error::new(ErrorKind::Other, err))?,
                     Err(_) => 0
                 };
                 let index_offset = match &index_file.metadata() {
-                    Ok(meta) => meta.len() as u32,
+                    Ok(meta) => u32::try_from(meta.len()).map_err(|err| Error::new(ErrorKind::Other, err))?,
                     Err(_) => 0
                 };
                 Ok(Self {
@@ -54,11 +55,11 @@ impl IndexedDocumentWriter {
         let current_main_index = self.main_offset;
         let current_index_index = self.index_offset;
         if let Ok(encoded) = bincode::serialize(doc) {
-            match file_utils::check_write(self.main_file.write_all(&encoded)) {
-                Ok(_) => {
-                    let bytes_written = encoded.len() as u32;
+            match file_utils::check_write(&self.main_file.write_all(&encoded)) {
+                Ok(()) => {
+                    let bytes_written = u32::try_from(encoded.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
                     let combined_bytes = IndexRecord::to_bytes(self.main_offset, bytes_written);
-                    if let Err(err) = file_utils::check_write(self.index_file.write_all(&combined_bytes)) {
+                    if let Err(err) = file_utils::check_write(&self.index_file.write_all(&combined_bytes)) {
                         return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.index_path.to_str().unwrap(), err)));
                     }
                     self.main_offset += bytes_written;

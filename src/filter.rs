@@ -1,3 +1,4 @@
+#![allow(clippy::empty_docs)]
 use std::cell::RefCell;
 use enum_iterator::all;
 use std::collections::{HashMap};
@@ -71,7 +72,6 @@ pub(crate) struct RegexWithCaptures {
 }
 
 #[derive(Parser)]
-//#[grammar = "filter.pest"]
 #[grammar_inline = r#"
 WHITESPACE = _{ " " | "\t" }
 field = { ^"group" | ^"title" | ^"name" | ^"url" }
@@ -168,7 +168,7 @@ impl std::fmt::Display for Filter {
                 let flt = match op {
                     UnaryOperator::Not => format!("NOT {expr}"),
                 };
-                write!(f, "{}", flt)
+                write!(f, "{flt}")
             }
             Filter::BinaryExpression(left, op, right) => {
                 write!(f, "{left} {op} {right}")
@@ -177,7 +177,7 @@ impl std::fmt::Display for Filter {
     }
 }
 
-fn get_parser_item_field(expr: Pair<Rule>) -> Result<ItemField, M3uFilterError> {
+fn get_parser_item_field(expr: &Pair<Rule>) -> Result<ItemField, M3uFilterError> {
     if expr.as_rule() == Rule::field {
         let field_text = expr.as_str();
         for item in all::<ItemField>() {
@@ -189,7 +189,7 @@ fn get_parser_item_field(expr: Pair<Rule>) -> Result<ItemField, M3uFilterError> 
     create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
 }
 
-fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<RegexWithCaptures, M3uFilterError> {
+fn get_parser_regexp(expr: &Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<RegexWithCaptures, M3uFilterError> {
     if expr.as_rule() == Rule::regexp {
         let mut parsed_text = String::from(expr.as_str());
         parsed_text.pop();
@@ -219,9 +219,9 @@ fn get_parser_regexp(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Resu
 
 fn get_parser_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<Filter, M3uFilterError> {
     let mut expr_inner = expr.into_inner();
-    match get_parser_item_field(expr_inner.next().unwrap()) {
+    match get_parser_item_field(&expr_inner.next().unwrap()) {
         Ok(field) => {
-            match get_parser_regexp(expr_inner.next().unwrap(), templates) {
+            match get_parser_regexp(&expr_inner.next().unwrap(), templates) {
                 Ok(regexp) => Ok(Filter::Comparison(field, regexp)),
                 Err(err) => Err(err),
             }
@@ -277,27 +277,27 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, err
                 uop = Some(UnaryOperator::Not);
             }
             Rule::bool_op => {
-                match get_parser_binary_op(pair.into_inner().next().unwrap()) {
+                match get_parser_binary_op(&pair.into_inner().next().unwrap()) {
                     Ok(binop) => {
                         bop = Some(binop);
                     }
                     Err(err) => {
-                        errors.push(format!("{}", err));
+                        errors.push(format!("{err}"));
                     }
                 }
             }
             _ => {
-                errors.push(format!("did not expect rule: {:?}", pair))
+                errors.push(format!("did not expect rule: {pair:?}"));
             }
         }
     }
     if stmts.is_empty() || stmts.len() > 1 {
-        errors.push(format!("did not expect multiple rule: {:?}", stmts));
+        errors.push(format!("did not expect multiple rule: {stmts:?}"));
     }
     stmts.pop().unwrap()
 }
 
-fn get_parser_binary_op(expr: Pair<Rule>) -> Result<BinaryOperator, M3uFilterError> {
+fn get_parser_binary_op(expr: &Pair<Rule>) -> Result<BinaryOperator, M3uFilterError> {
     match expr.as_rule() {
         Rule::and => Ok(BinaryOperator::And),
         Rule::or => Ok(BinaryOperator::Or),
@@ -334,7 +334,7 @@ pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTempla
                                     }
                                 }
                                 Rule::bool_op => {
-                                    match get_parser_binary_op(expr.into_inner().next().unwrap()) {
+                                    match get_parser_binary_op(&expr.into_inner().next().unwrap()) {
                                         Ok(binop) => {
                                             op = Some(binop);
                                         }
@@ -344,7 +344,7 @@ pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTempla
                                     }
                                 }
                                 _ => {
-                                    errors.push(format!("unknown expression {:?}", expr));
+                                    errors.push(format!("unknown expression {expr:?}"));
                                 }
                             }
                         }
@@ -381,15 +381,14 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
     let mut node_names = HashMap::new();
     let mut node_deps = HashMap::new();
 
-    let mut add_node = |di_graph: &mut DiGraph<_, _>, node_name: &String| match node_ids.get(node_name) {
-        Some(idx) => *idx,
-        _ => {
-            let key = node_name.clone();
-            let idx = di_graph.add_node(node_name.clone());
-            node_names.insert(idx.index(), key.clone());
-            node_ids.insert(key, idx);
-            idx
-        }
+    let mut add_node = |di_graph: &mut DiGraph<_, _>, node_name: &String| if let Some(idx) =  node_ids.get(node_name) {
+        *idx
+    } else {
+        let key = node_name.clone();
+        let index = di_graph.add_node(node_name.clone());
+        node_names.insert(index.index(), key.clone());
+        node_ids.insert(key, index);
+        index
     };
 
     for template in templates {
@@ -412,14 +411,14 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
         .map(|scc| scc.iter().map(|&i| node_names.get(&i.index()).unwrap().clone()).collect())
         .collect();
     for cyclic in &cycles {
-        error!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "))
+        error!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "));
     }
 
     (graph, node_names, node_deps, !cycles.is_empty())
 }
 
 pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<PatternTemplate>, M3uFilterError> {
-    let mut result: Vec<PatternTemplate> = templates.to_vec();
+    let mut result: Vec<PatternTemplate> = templates.clone();
     let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
     if cyclic {
         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Cyclic dependencies in templates detected!");
@@ -439,7 +438,7 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<
                 let mut node_template = dep_value_map.get(node_name).unwrap().clone();
                 for dep_name in deps {
                     let dep_template = dep_value_map.get(dep_name).unwrap().clone();
-                    let new_templ = node_template.replace(format!("!{}!", dep_name).as_str(), &dep_template);
+                    let new_templ = node_template.replace(format!("!{dep_name}!").as_str(), &dep_template);
                     node_template = new_templ;
                 }
                 dep_value_map.insert(node_name, String::from(&node_template));

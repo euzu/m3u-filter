@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use log::{debug, error};
-use path_absolutize::*;
+use path_absolutize::Absolutize;
 
 #[macro_export]
 macro_rules! exit {
@@ -20,8 +20,8 @@ pub(crate) fn get_exe_path() -> PathBuf {
     match current_exe {
         Ok(exe) => {
             match fs::read_link(&exe) {
-                Ok(f) => f.parent().map_or(default_path, |p| p.to_path_buf()),
-                Err(_) => return exe.parent().map_or(default_path, |p| p.to_path_buf())
+                Ok(f) => f.parent().map_or(default_path, std::path::Path::to_path_buf),
+                Err(_) => return exe.parent().map_or(default_path, std::path::Path::to_path_buf)
             }
         }
         Err(_) => default_path
@@ -110,12 +110,11 @@ pub(crate) fn get_working_path(wd: &String) -> String {
             Some(d) => d,
             None => current_dir.join(wd)
         };
-        match rp.canonicalize() {
-            Ok(ap) => String::from(ap.to_str().unwrap_or("./")),
-            Err(_) => {
-                error!("Path not found {:?}", &rp);
-                String::from("./")
-            }
+        if let Ok(ap) = rp.canonicalize() {
+            String::from(ap.to_str().unwrap_or("./"))
+        } else {
+            error!("Path not found {:?}", &rp);
+            String::from("./")
         }
     }
 }
@@ -130,7 +129,7 @@ pub(crate) fn persist_file(persist_file: Option<PathBuf>, text: &String) {
         let filename = &path_buf.to_str().unwrap_or("?");
         match File::create(&path_buf) {
             Ok(mut file) => match file.write_all(text.as_bytes()) {
-                Ok(_) => debug!("persisted: {}", filename),
+                Ok(()) => debug!("persisted: {}", filename),
                 Err(e) => error!("failed to persist file {}, {}", filename, e)
             },
             Err(e) => error!("failed to persist file {}, {}", filename, e)
@@ -138,10 +137,10 @@ pub(crate) fn persist_file(persist_file: Option<PathBuf>, text: &String) {
     }
 }
 
-pub(crate) fn prepare_persist_path(file_name: &str, date_prefix: &str) -> Option<PathBuf> {
+pub(crate) fn prepare_persist_path(file_name: &str, date_prefix: &str) -> PathBuf {
     let now = chrono::Local::now();
     let persist_filename = file_name.replace("{}", format!("{date_prefix}{}", now.format("%Y%m%d_%H%M%S").to_string().as_str()).as_str());
-    Some(std::path::PathBuf::from(persist_filename))
+    std::path::PathBuf::from(persist_filename)
 }
 
 pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBuf> {
@@ -181,9 +180,9 @@ pub(crate) fn path_exists(file_path: &Path) -> bool {
     false
 }
 
-pub(crate) fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error> {
+pub(crate) fn check_write(res: &std::io::Result<()>) -> Result<(), std::io::Error> {
     match res {
-        Ok(_) => Ok(()),
+        Ok(()) => Ok(()),
         Err(_) => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unable to write file")),
     }
 }

@@ -32,7 +32,13 @@ fn yield_next_obj<T: DeserializeOwned, R: Read>(
     mut reader: R,
     at_start: &mut bool,
 ) -> io::Result<Option<T>> {
-    if !*at_start {
+    if *at_start {
+        match read_skipping_ws(&mut reader)? {
+            b',' => deserialize_single(reader).map(Some),
+            b']' => Ok(None),
+            _ => Err(invalid_data("`,` or `]` not found")),
+        }
+    } else {
         *at_start = true;
         if read_skipping_ws(&mut reader)? == b'[' {
             // read the next char to see if the array is empty
@@ -44,12 +50,6 @@ fn yield_next_obj<T: DeserializeOwned, R: Read>(
             }
         } else {
             Err(invalid_data("`[` not found"))
-        }
-    } else {
-        match read_skipping_ws(&mut reader)? {
-            b',' => deserialize_single(reader).map(Some),
-            b']' => Ok(None),
-            _ => Err(invalid_data("`,` or `]` not found")),
         }
     }
 }
@@ -98,7 +98,7 @@ pub(crate) fn json_write_documents_to_file<T>(file: &Path, value: &T) -> Result<
             let mut writer = BufWriter::new(file);
             serde_json::to_writer(&mut writer, value)?;
             match writer.flush() {
-                Ok(_) => Ok(()),
+                Ok(()) => Ok(()),
                 Err(e) => Err(e)
             }
         }

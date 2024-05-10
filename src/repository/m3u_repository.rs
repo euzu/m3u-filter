@@ -24,8 +24,8 @@ macro_rules! cant_write_result {
 pub(crate) fn m3u_get_file_paths(cfg: &Config, filename: &Option<String>) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
     match file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) {
         Some(m3u_path) => {
-            let extension = m3u_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or(""))).unwrap_or("".to_owned());
-            let index_path = m3u_path.with_extension(format!("{}idx", &extension));
+            let extension = m3u_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or("")));
+            let index_path = m3u_path.with_extension(format!("{}idx", &extension.unwrap_or(String::new())));
             Some((m3u_path, index_path))
         }
         None => None
@@ -51,7 +51,7 @@ pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, new_playli
                     let m3u_playlist = new_playlist.iter()
                         .flat_map(|pg| &pg.channels)
                         .filter(|&pli| pli.header.borrow().item_type != PlaylistItemType::SeriesInfo)
-                        .map(|pli| pli.to_m3u()).collect::<Vec<M3uPlaylistItem>>();
+                        .map(super::super::model::playlist::PlaylistItem::to_m3u).collect::<Vec<M3uPlaylistItem>>();
                     let mut stream_id: u32 = 1;
                     for mut m3u in m3u_playlist {
                         m3u.stream_id = Rc::new(stream_id.to_string());
@@ -82,7 +82,7 @@ pub(crate) fn m3u_load_rewrite_playlist(cfg: &Config, target: &ConfigTarget, use
                         match user.proxy {
                             ProxyType::Reverse => {
                                 let stream_id = Rc::clone(&m3u_pli.stream_id);
-                                result.push(m3u_pli.to_m3u(target, Some(format!("{}/{}", url, stream_id).as_str())));
+                                result.push(m3u_pli.to_m3u(target, Some(format!("{url}/{stream_id}").as_str())));
                             }
                             ProxyType::Redirect => {
                                 result.push(m3u_pli.to_m3u(target, None));

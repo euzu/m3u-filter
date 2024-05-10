@@ -13,19 +13,19 @@ use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_
 fn epg_write_file(target: &ConfigTarget, epg: &Epg, path: &Path) -> Result<(), M3uFilterError> {
     let mut writer = Writer::new(Cursor::new(vec![]));
     match epg.write_to(&mut writer) {
-        Ok(_) => {
+        Ok(()) => {
             let result = writer.into_inner().into_inner();
             match File::create(path) {
                 Ok(mut epg_file) => {
                     match epg_file.write_all("<?xml version=\"1.0\" encoding=\"utf-8\" ?><!DOCTYPE tv SYSTEM \"xmltv.dtd\">".as_bytes()) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => return Err(M3uFilterError::new(
                             M3uFilterErrorKind::Notify, format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
                     }
                     match epg_file.write_all(&result) {
-                        Ok(_) => {
+                        Ok(()) => {
                             if log_enabled!(Level::Debug) {
-                                debug!("Epg for target {} written to {}", target.name, path.to_str().unwrap_or("?"))
+                                debug!("Epg for target {} written to {}", target.name, path.to_str().unwrap_or("?"));
                             }
                         }
                         Err(err) => return Err(M3uFilterError::new(
@@ -42,7 +42,7 @@ fn epg_write_file(target: &ConfigTarget, epg: &Epg, path: &Path) -> Result<(), M
     Ok(())
 }
 
-pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, epg: &Option<Epg>, output: &TargetOutput) -> Result<(), M3uFilterError> {
+pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, epg: Option<&Epg>, output: &TargetOutput) -> Result<(), M3uFilterError> {
     if let Some(epg_data) = epg {
         match &output.target {
             TargetType::M3u => {
@@ -55,7 +55,7 @@ pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, epg: &Option<Epg>, 
                     if log_enabled!(Level::Debug) {
                         debug!("writing m3u epg to {}", path.to_str().unwrap_or("?"));
                     }
-                    epg_write_file(target, epg_data, &path)?
+                    epg_write_file(target, epg_data, &path)?;
                 }
             }
             TargetType::Xtream => {
@@ -65,7 +65,7 @@ pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, epg: &Option<Epg>, 
                         if log_enabled!(Level::Debug) {
                             debug!("writing xtream epg to {}", epg_path.to_str().unwrap_or("?"));
                         }
-                        epg_write_file(target, epg_data, &epg_path)?
+                        epg_write_file(target, epg_data, &epg_path)?;
                     }
                     None => return Err(M3uFilterError::new(
                         M3uFilterErrorKind::Notify,

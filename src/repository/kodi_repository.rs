@@ -109,11 +109,11 @@ pub(crate) fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_
                         };
                         kodi_file_name = kodi_style_rename(&kodi_file_name, &style);
                     }
-                    let file_path = dir_path.join(format!("{}.strm", kodi_file_name));
+                    let file_path = dir_path.join(format!("{kodi_file_name}.strm"));
                     match File::create(&file_path) {
                         Ok(mut strm_file) => {
-                            match file_utils::check_write(strm_file.write_all(header.url.as_bytes())) {
-                                Ok(_) => (),
+                            match file_utils::check_write(&strm_file.write_all(header.url.as_bytes())) {
+                                Ok(()) => (),
                                 Err(e) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e),
                             }
                         }

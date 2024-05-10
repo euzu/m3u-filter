@@ -12,15 +12,12 @@ use crate::utils::{file_utils, request_utils};
 
 fn prepare_file_path(persist: Option<&String>, working_dir: &String, action: &str) -> Option<PathBuf> {
     let persist_file: Option<PathBuf> =
-        match persist {
-            Some(persist_path) => file_utils::prepare_persist_path(persist_path.as_str(), action),
-            _ => None
-        };
+        persist.map(|persist_path| file_utils::prepare_persist_path(persist_path.as_str(), action));
     if persist_file.is_some() {
         let file_path = file_utils::get_file_path(working_dir, persist_file);
         debug!("persist to file:  {:?}", match &file_path {
             Some(fp) => fp.display().to_string(),
-            _ => "".to_string()
+            _ => String::new()
         });
         file_path
     } else {
@@ -29,7 +26,7 @@ fn prepare_file_path(persist: Option<&String>, working_dir: &String, action: &st
 }
 
 pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
-    let url = input.url.to_owned();
+    let url = input.url.clone();
     let persist_file_path = prepare_file_path(input.persist.as_ref(), working_dir, "");
     match request_utils::get_input_text_content(input, working_dir, &url, persist_file_path).await {
         Ok(text) => {
@@ -69,7 +66,7 @@ pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>
                     Err(err) => errors.push(err)
                 };
                 if resolve_delay > 0 {
-                    sleep(std::time::Duration::new(resolve_delay as u64, 0)); // 2 seconds between
+                    sleep(std::time::Duration::new(u64::from(resolve_delay), 0)); // 2 seconds between
                 }
             }
         }
@@ -86,17 +83,17 @@ pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>
     result
 }
 
-fn get_skip_cluster(input: &&ConfigInput) -> Vec<XtreamCluster> {
+fn get_skip_cluster(input: &ConfigInput) -> Vec<XtreamCluster> {
     let mut skip_cluster = vec![];
     if let Some(input_options) = &input.options {
         if input_options.xtream_skip_live {
-            skip_cluster.push(XtreamCluster::Live)
+            skip_cluster.push(XtreamCluster::Live);
         }
         if input_options.xtream_skip_vod {
-            skip_cluster.push(XtreamCluster::Video)
+            skip_cluster.push(XtreamCluster::Video);
         }
         if input_options.xtream_skip_series {
-            skip_cluster.push(XtreamCluster::Series)
+            skip_cluster.push(XtreamCluster::Series);
         }
     }
     if skip_cluster.len() == 3 {
@@ -116,15 +113,15 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
     let password = input.password.as_ref().map_or("", |v| v);
     let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);
 
-    let skip_cluster = get_skip_cluster(&input);
+    let skip_cluster = get_skip_cluster(input);
 
     let mut errors = vec![];
     for (xtream_cluster, category, stream) in &ACTIONS {
         if !skip_cluster.contains(xtream_cluster) {
-            let category_url = format!("{}&action={}", base_url, category);
-            let stream_url = format!("{}&action={}", base_url, stream);
-            let category_file_path = prepare_file_path(input.persist.as_ref(), working_dir, format!("{}_", category).as_str());
-            let stream_file_path = prepare_file_path(input.persist.as_ref(), working_dir, format!("{}_", stream).as_str());
+            let category_url = format!("{base_url}&action={category}");
+            let stream_url = format!("{base_url}&action={stream}");
+            let category_file_path = prepare_file_path(input.persist.as_ref(), working_dir, format!("{category}_").as_str());
+            let stream_file_path = prepare_file_path(input.persist.as_ref(), working_dir, format!("{stream}_").as_str());
 
             match request_utils::get_input_json_content(input, category_url.as_str(), category_file_path).await {
                 Ok(category_content) => {
@@ -151,10 +148,10 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
     }
     playlist.sort_by(|a, b| a.title.partial_cmp(&b.title).unwrap_or(Ordering::Greater));
     let mut counter = 1;
-    playlist.iter_mut().for_each(|plg| {
+    for plg in &mut playlist {
         plg.id = counter;
         counter += 1;
-    });
+    }
     (playlist, errors)
 }
 

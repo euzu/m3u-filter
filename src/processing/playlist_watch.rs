@@ -23,29 +23,26 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
             let save_path = path.clone();
             let mut changed = false;
             if path.exists() {
-                match load_watch_tree(&path) {
-                    Some(loaded_tree) => {
-                        // Find elements in set2 but not in set1
-                        let added_difference: BTreeSet<String> = new_tree.difference(&loaded_tree).cloned().collect();
-                        let removed_difference: BTreeSet<String> = loaded_tree.difference(&new_tree).cloned().collect();
-                        if !added_difference.is_empty() || !removed_difference.is_empty() {
-                            changed = true;
-                            handle_watch_notification(cfg, added_difference, removed_difference, target_name, &pl.title);
-                        }
-                    }
-                    None => {
-                        error!("failed to load watch_file {}", &path.to_str().unwrap_or_default());
+                if let Some(loaded_tree) = load_watch_tree(&path) {
+                    // Find elements in set2 but not in set1
+                    let added_difference: BTreeSet<String> = new_tree.difference(&loaded_tree).cloned().collect();
+                    let removed_difference: BTreeSet<String> = loaded_tree.difference(&new_tree).cloned().collect();
+                    if !added_difference.is_empty() || !removed_difference.is_empty() {
                         changed = true;
+                        handle_watch_notification(cfg, &added_difference, &removed_difference, target_name, &pl.title);
                     }
+                } else {
+                    error!("failed to load watch_file {}", &path.to_str().unwrap_or_default());
+                    changed = true;
                 }
             } else {
                 changed = true;
             }
             if changed {
-                match save_watch_tree(&save_path, new_tree) {
-                    Ok(_) => {}
+                match save_watch_tree(&save_path, &new_tree) {
+                    Ok(()) => {}
                     Err(err) => {
-                        error!("failed to write watch_file {}: {}", &save_path.to_str().unwrap_or_default(), err)
+                        error!("failed to write watch_file {}: {}", &save_path.to_str().unwrap_or_default(), err);
                     }
                 }
             }
@@ -56,9 +53,9 @@ pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &Playlist
     }
 }
 
-fn handle_watch_notification(cfg: &Config, added: BTreeSet<String>, removed: BTreeSet<String>, target_name: &str, group_name: &str) {
-    let added_entries = added.iter().map(|name| name.to_string()).collect::<Vec<String>>().join("\n\t");
-    let removed_entries = removed.iter().map(|name| name.to_string()).collect::<Vec<String>>().join("\n\t");
+fn handle_watch_notification(cfg: &Config, added: &BTreeSet<String>, removed: &BTreeSet<String>, target_name: &str, group_name: &str) {
+    let added_entries = added.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n\t");
+    let removed_entries = removed.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n\t");
 
     let mut message = vec![];
     if !added_entries.is_empty() {
@@ -89,7 +86,7 @@ fn load_watch_tree(path: &Path) -> Option<BTreeSet<String>> {
     }
 }
 
-fn save_watch_tree(path: &Path, tree: BTreeSet<String>) -> std::io::Result<()> {
+fn save_watch_tree(path: &Path, tree: &BTreeSet<String>) -> std::io::Result<()> {
     let encoded: Vec<u8> = bincode::serialize(&tree).unwrap();
     std::fs::write(path, encoded)
 }

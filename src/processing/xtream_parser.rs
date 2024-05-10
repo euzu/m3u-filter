@@ -39,23 +39,23 @@ pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &
             let result: Vec<PlaylistItem> = series_info.episodes.values().flatten().map(|episode|
                 PlaylistItem {
                     header: RefCell::new(PlaylistItemHeader {
-                        id: Rc::new(episode.id.to_owned()),
-                        stream_id: Rc::new(episode.id.to_owned()),
-                        name: Rc::new(episode.title.to_owned()),
-                        logo: Rc::new(episode.info.movie_image.to_owned()),
+                        id: Rc::new(episode.id.clone()),
+                        stream_id: Rc::new(episode.id.clone()),
+                        name: Rc::new(episode.title.clone()),
+                        logo: Rc::new(episode.info.movie_image.clone()),
                         logo_small: default_as_empty_rc_str(),
                         group: Rc::new(group_title.to_string()),
-                        title: Rc::new(episode.title.to_owned()),
+                        title: Rc::new(episode.title.clone()),
                         parent_code: default_as_empty_rc_str(),
                         audio_track: default_as_empty_rc_str(),
                         time_shift: default_as_empty_rc_str(),
                         rec: default_as_empty_rc_str(),
                         url: if episode.direct_source.is_empty() {
-                            let ext = episode.container_extension.to_owned();
+                            let ext = episode.container_extension.clone();
                             let stream_base_url = format!("{}/series/{}/{}/{}.{}", url, username, password, episode.id.as_str(), ext);
                             Rc::new(stream_base_url)
                         } else {
-                            Rc::new(episode.direct_source.to_owned())
+                            Rc::new(episode.direct_source.clone())
                         },
                         epg_channel_id: None,
                         item_type: PlaylistItemType::Series,

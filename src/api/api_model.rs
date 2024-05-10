@@ -15,9 +15,9 @@ use crate::utils::default_utils::default_as_empty_str;
 pub(crate) struct FileDownload {
     /// uuid of the download for identification.
     pub uuid: String,
-    /// file_dir is the directory where the download should be placed.
+    /// `file_dir` is the directory where the download should be placed.
     pub file_dir: PathBuf,
-    /// file_path is the complete path including the filename.
+    /// `file_path` is the complete path including the filename.
     pub file_path: PathBuf,
     /// filename is the filename.
     pub filename: String,
@@ -43,7 +43,7 @@ pub(crate) struct FileDownload {
 fn get_download_directory(download_cfg: &VideoDownloadConfig, filestem: &str) -> PathBuf {
     if download_cfg.organize_into_directories {
         let mut stem = filestem;
-        if let Some(re) = &download_cfg._re_episode_pattern {
+        if let Some(re) = &download_cfg.t_re_episode_pattern {
             if let Some(captures) = re.captures(stem) {
                 if let Some(episode) = captures.name("episode") {
                     if !episode.as_str().is_empty() {
@@ -52,7 +52,7 @@ fn get_download_directory(download_cfg: &VideoDownloadConfig, filestem: &str) ->
                 }
             }
         }
-        let re_ending = download_cfg._re_remove_filename_ending.as_ref().unwrap();
+        let re_ending = download_cfg.t_re_remove_filename_ending.as_ref().unwrap();
         let dir_name = re_ending.replace(stem, "");
         let file_dir: PathBuf = [download_cfg.directory.as_ref().unwrap(), dir_name.as_ref()].iter().collect();
         file_dir
@@ -74,7 +74,7 @@ impl FileDownload {
     pub fn new(req_url: &str, req_filename: &str, download_cfg: &VideoDownloadConfig) -> Option<FileDownload> {
         match reqwest::Url::parse(req_url) {
             Ok(url) => {
-                let filename_re = download_cfg._re_filename.as_ref().unwrap();
+                let filename_re = download_cfg.t_re_filename.as_ref().unwrap();
                 let tmp_filename = filename_re.replace_all(&unidecode(req_filename)
                     .replace(' ', "_"), "")
                     .replace("__", "_")
@@ -83,13 +83,13 @@ impl FileDownload {
                 let file_stem = filename_path.file_stem().and_then(OsStr::to_str).unwrap_or("").trim_matches(FILENAME_TRIM_PATTERNS);
                 let file_ext = filename_path.extension().and_then(OsStr::to_str).unwrap_or("");
 
-                let mut filename = format!("{}.{}", file_stem, file_ext);
+                let mut filename = format!("{file_stem}.{file_ext}");
                 let file_dir = get_download_directory(download_cfg, file_stem);
                 let mut file_path: PathBuf = file_dir.clone();
                 file_path.push(&filename);
                 let mut x: usize = 1;
                 while file_path.is_file() {
-                    filename = format!("{}_{}.{}", file_stem, x, file_ext);
+                    filename = format!("{file_stem}_{x}.{file_ext}");
                     file_path.clone_from(&file_dir);
                     file_path.push(&filename);
                     x += 1;
