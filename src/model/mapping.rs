@@ -222,7 +222,6 @@ impl ValueProcessor for MappingValueProcessor<'_> {
     }
 }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Mapping {
     pub id: String,

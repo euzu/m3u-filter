@@ -402,20 +402,22 @@ fn xtream_write_episode_id_mapping(storage_path: &Path, series_id: u32, episode_
 fn xtream_read_episode_id_mapping(storage_path: &Path, index: u32) -> Result<(u32, u32, u32), Error> {
     let offset = index * 12;
     let episode_file = xtream_get_series_episode_id_mapping_file_path(storage_path);
-    if let Ok(mut file) = File::open(episode_file) {
-        file.seek(SeekFrom::Start(u64::from(offset)))?;
-        let mut episode_id_bytes = [0u8; 4];
-        let mut provider_id_bytes = [0u8; 4];
-        let mut series_id_bytes = [0u8; 4];
-        file.read_exact(&mut episode_id_bytes)?;
-        file.read_exact(&mut provider_id_bytes)?;
-        file.read_exact(&mut series_id_bytes)?;
-        let episode_id = u32::from_le_bytes(episode_id_bytes);
-        let provider_id = u32::from_le_bytes(provider_id_bytes);
-        let series_id = u32::from_le_bytes(series_id_bytes);
-        Ok((episode_id, provider_id, series_id))
+    if episode_file.exists() {
+        if let Ok(mut file) = File::open(episode_file) {
+            file.seek(SeekFrom::Start(u64::from(offset)))?;
+            let mut bytes = [0u8; 4];
+            file.read_exact(&mut bytes)?;
+            let episode_id = u32::from_le_bytes(bytes);
+            file.read_exact(&mut bytes)?;
+            let provider_id = u32::from_le_bytes(bytes);
+            file.read_exact(&mut bytes)?;
+            let series_id = u32::from_le_bytes(bytes);
+            Ok((episode_id, provider_id, series_id))
+        } else {
+            Err(Error::new(ErrorKind::Other, format!("Could not find episode mapping at offset {offset}")))
+        }
     } else {
-        Err(Error::new(ErrorKind::Other, format!("Could not find episode mapping at offset {offset}")))
+        Err(Error::new(ErrorKind::Other, format!("Episode mapping not found at {}", storage_path.to_str().unwrap_or(""))))
     }
 }
 
