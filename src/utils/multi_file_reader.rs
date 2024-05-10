@@ -33,7 +33,7 @@ impl Read for MultiFileReader {
                 if self.files.is_empty() {
                     return Ok(0);
                 }
-                self.current_reader = Some(BufReader::new(self.files.pop().unwrap()))
+                self.current_reader = Some(BufReader::new(self.files.pop().unwrap()));
             }
             let reader = self.current_reader.as_mut().unwrap();
             match reader.read(buf) {

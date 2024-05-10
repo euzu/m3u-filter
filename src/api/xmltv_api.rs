@@ -18,7 +18,7 @@ fn get_epg_path_for_target_of_type(target_name: &str, file_path: Option<PathBuf>
         if file_utils::path_exists(&epg_path) {
             return Some(epg_path);
         } else {
-            info!("Cant find epg file for {target_name} target: {}", epg_path.to_str().unwrap_or("?"))
+            info!("Cant find epg file for {target_name} target: {}", epg_path.to_str().unwrap_or("?"));
         }
     }
     None

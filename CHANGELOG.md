@@ -6,7 +6,7 @@
 * Added `panel_api.php`  endpoint for xtream
 * Case insensitive filter syntax
 * Xtream category_id fixes, to avoid category_id change when title not changes.
-* `xtream_skip_live_direct_source` and `xtream_skip_video_direct_source` are now default true
+* Target options `xtream_skip_live_direct_source` and `xtream_skip_video_direct_source` are now default true
 * added new target option
   - `xtream_skip_series_direct_source` default is true
 * Added new options to input configuration. `xtream_skip_live`, `xtream_skip_vod`, `xtream_skip_series`
@@ -22,7 +22,7 @@
    - `secret` secret for jwt token
    - `userfile` optional userfile with generated userfile in format "username: password" per file, default name is user.txt in config path
 * Password generation argument --genpwd  to generate passwords for userfile. 
-* Added env var ` M3U_FILTER_LOG` for log level
+* Added env var `M3U_FILTER_LOG` for log level
 * Log Level has now module support like `m3u_filter::util=error,m3u_filter::filter=debug,m3u_filter=debug`
 * Multiple Xtream Sources merging into one target is now supported
 

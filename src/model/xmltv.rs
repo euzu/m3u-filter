@@ -5,7 +5,6 @@ use quick_xml::{Error, Writer};
 
 // https://github.com/XMLTV/xmltv/blob/master/xmltv.dtd
 
-
 #[derive(Debug, Clone)]
 pub(crate) struct XmlTag {
     pub name: String,

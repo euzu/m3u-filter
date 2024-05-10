@@ -1,9 +1,10 @@
-use std::borrow::{BorrowMut};
+use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::rc::Rc;
+
 use crate::model::config::{Config, ConfigInput};
-use crate::model::config::default_as_empty_rc_str;
-use crate::model::playlist::{default_playlist_item_type, default_stream_cluster, PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::utils::default_utils::{default_as_empty_rc_str, default_playlist_item_type, default_stream_cluster};
 use crate::utils::string_utils;
 
 fn token_value(it: &mut std::str::Chars) -> String {
@@ -73,7 +74,7 @@ fn create_empty_playlistitem_header(input_id: u16, url: String) -> PlaylistItemH
         additional_properties: None,
         series_fetched: false,
         category_id: 0,
-        input_id
+        input_id,
     }
 }
 

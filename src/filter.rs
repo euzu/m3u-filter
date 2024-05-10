@@ -30,7 +30,7 @@ pub(crate) fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: 
         ItemField::Group => header.group = value,
         ItemField::Name => header.name = value,
         ItemField::Title => header.title = value,
-        ItemField::Url =>  header.url = value,
+        ItemField::Url => header.url = value,
     };
 }
 
@@ -162,16 +162,16 @@ impl std::fmt::Display for Filter {
                 write!(f, "{} ~ \"{}\"", field, String::from(&rewc.restr))
             }
             Filter::Group(stmt) => {
-                write!(f, "({})", stmt)
+                write!(f, "({stmt})")
             }
             Filter::UnaryExpression(op, expr) => {
                 let flt = match op {
-                    UnaryOperator::Not => format!("NOT {}", expr),
+                    UnaryOperator::Not => format!("NOT {expr}"),
                 };
                 write!(f, "{}", flt)
             }
             Filter::BinaryExpression(left, op, right) => {
-                write!(f, "{} {} {}", left, op, right)
+                write!(f, "{left} {op} {right}")
             }
         }
     }
@@ -238,12 +238,12 @@ macro_rules! handle_expr {
                     let lhs = $stmts.pop().unwrap();
                     $bop = None;
                     Filter::BinaryExpression(Box::new(lhs), binop.clone(), Box::new($exp))
-                },
+                }
                 _ => match $uop {
                     Some(unop) => {
                         $uop = None;
                         Filter::UnaryExpression(unop.clone(), Box::new($exp))
-                    },
+                    }
                     _ => $exp
                 }
             };
@@ -393,7 +393,7 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
     };
 
     for template in templates {
-        let node_idx = add_node(&mut graph, &template.name);
+        let node_index = add_node(&mut graph, &template.name);
         let edges = regex.captures_iter(&template.value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
@@ -402,7 +402,7 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
         let iter = edges.iter();
         for edge in iter {
             let edge_idx = add_node(&mut graph, edge);
-            graph.add_edge(edge_idx, node_idx, ());
+            graph.add_edge(edge_idx, node_index, ());
         }
         node_deps.insert(&template.name, edges);
     }
@@ -423,33 +423,33 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<
     let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
     if cyclic {
         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Cyclic dependencies in templates detected!");
-    } else {
-        let mut dep_value_map: HashMap<&String, String> = templates.iter().map(|t| (&t.name, t.value.clone())).collect();
-        // Perform a topological sort to get a linear ordering of the nodes
-        let node_indices = toposort(&graph, None).unwrap();
-        let indices = node_indices.iter();
-        for node in indices {
-            // only nodes with dependencies
-            if graph.edges_directed(*node, petgraph::Incoming).count() > 0 {
-                let node_name = node_map.get(&node.index()).unwrap();
-                if let Some(deps) = node_deps.get(node_name) {
-                    if log_enabled!(Level::Debug) {
-                        debug!("template {}  depends on [{}]", node_name, deps.join(", "));
-                    }
-                    let mut node_template = dep_value_map.get(node_name).unwrap().clone();
-                    for dep_name in deps {
-                        let dep_template = dep_value_map.get(dep_name).unwrap().clone();
-                        let new_templ = node_template.replace(format!("!{}!", dep_name).as_str(), &dep_template);
-                        node_template = new_templ;
-                    }
-                    dep_value_map.insert(node_name, String::from(&node_template));
-                    let template = result.iter_mut().find(|t| node_name.eq(&t.name)).unwrap();
-                    //let new_value = dep_value_map.get(&template.name).unwrap();
-                    template.value = String::from(&node_template);
+    }
+    let mut dep_value_map: HashMap<&String, String> = templates.iter().map(|t| (&t.name, t.value.clone())).collect();
+    // Perform a topological sort to get a linear ordering of the nodes
+    let node_indices = toposort(&graph, None).unwrap();
+    let indices = node_indices.iter();
+    for node in indices {
+        // only nodes with dependencies
+        if graph.edges_directed(*node, petgraph::Incoming).count() > 0 {
+            let node_name = node_map.get(&node.index()).unwrap();
+            if let Some(deps) = node_deps.get(node_name) {
+                if log_enabled!(Level::Debug) {
+                    debug!("template {}  depends on [{}]", node_name, deps.join(", "));
                 }
+                let mut node_template = dep_value_map.get(node_name).unwrap().clone();
+                for dep_name in deps {
+                    let dep_template = dep_value_map.get(dep_name).unwrap().clone();
+                    let new_templ = node_template.replace(format!("!{}!", dep_name).as_str(), &dep_template);
+                    node_template = new_templ;
+                }
+                dep_value_map.insert(node_name, String::from(&node_template));
+                let template = result.iter_mut().find(|t| node_name.eq(&t.name)).unwrap();
+                //let new_value = dep_value_map.get(&template.name).unwrap();
+                template.value = String::from(&node_template);
             }
         }
     }
+
     if log_enabled!(Level::Debug) {
         debug!("{:#?}", result);
     }

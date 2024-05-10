@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use unidecode::unidecode;
 use crate::model::api_proxy::{ApiProxyConfig};
 use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig, ConfigApi, MessagingConfig};
-use crate::model::config::{default_as_empty_str, ProcessingOrder};
+use crate::model::config::{ProcessingOrder};
+use crate::utils::default_utils::default_as_empty_str;
 
 /// File-Download information.
 #[derive(Clone)]
@@ -41,18 +42,18 @@ pub(crate) struct FileDownload {
 ///
 fn get_download_directory(download_cfg: &VideoDownloadConfig, filestem: &str) -> PathBuf {
     if download_cfg.organize_into_directories {
-        let mut file_stem = filestem;
+        let mut stem = filestem;
         if let Some(re) = &download_cfg._re_episode_pattern {
-            if let Some(captures) = re.captures(file_stem) {
+            if let Some(captures) = re.captures(stem) {
                 if let Some(episode) = captures.name("episode") {
                     if !episode.as_str().is_empty() {
-                        file_stem = &file_stem[..episode.start()];
+                        stem = &stem[..episode.start()];
                     }
                 }
             }
         }
         let re_ending = download_cfg._re_remove_filename_ending.as_ref().unwrap();
-        let dir_name = re_ending.replace(file_stem, "");
+        let dir_name = re_ending.replace(stem, "");
         let file_dir: PathBuf = [download_cfg.directory.as_ref().unwrap(), dir_name.as_ref()].iter().collect();
         file_dir
     } else {

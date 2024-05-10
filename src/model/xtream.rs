@@ -1,13 +1,14 @@
 use std::collections::HashMap;
-use std::iter::{FromIterator};
+use std::iter::FromIterator;
 use std::rc::Rc;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use crate::model::config::{ConfigTargetOptions, default_as_empty_rc_str};
+use crate::model::config::ConfigTargetOptions;
 use crate::model::playlist::{PlaylistItem, XtreamCluster, XtreamPlaylistItem};
+use crate::utils::default_utils::{default_as_empty_rc_str, default_as_empty_list};
 
 const LIVE_STREAM_FIELDS: &[&str] = &[];
 
@@ -23,8 +24,6 @@ const SERIES_STREAM_FIELDS: &[&str] = &[
     "last_modified", "name", "plot", "rating_5based",
     "stream_type", "title", "year", "youtube_trailer",
 ];
-
-fn default_as_empty_list() -> Vec<PlaylistItem> { vec![] }
 
 fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     deserializer: D,
@@ -360,7 +359,7 @@ impl XtreamMappingOptions {
         let (skip_live_direct_source, skip_video_direct_source, skip_series_direct_source) = options
             .map_or((false, false, false), |o| (o.xtream_skip_live_direct_source,
                                          o.xtream_skip_video_direct_source, o.xtream_skip_series_direct_source));
-        XtreamMappingOptions {
+        Self {
             skip_live_direct_source,
             skip_video_direct_source,
             skip_series_direct_source,

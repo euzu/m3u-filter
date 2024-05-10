@@ -1,7 +1,8 @@
 use std::fs;
 use std::fs::{File, OpenOptions};
-use std::io::{Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
+
 use log::{debug, error};
 use path_absolutize::*;
 
@@ -47,28 +48,41 @@ pub(crate) fn get_default_file_path(config_path: &str, file: &str) -> String {
     })
 }
 
+static USER_FILE: &str = "user.txt";
+static CONFIG_PATH: &str = "config";
+static CONFIG_FILE: &str = "config.yml";
+static SOURCE_FILE: &str = "source.yml";
+static MAPPING_FILE: &str = "mapping.yml";
+static API_PROXY_FILE: &str = "api-proxy.yml";
+
+#[inline]
 pub(crate) fn get_default_user_file_path(config_path: &str) -> String {
-    get_default_file_path(config_path, "user.txt")
+    get_default_file_path(config_path, USER_FILE)
 }
 
+#[inline]
 pub(crate) fn get_default_config_path() -> String {
-    get_default_path("config")
+    get_default_path(CONFIG_PATH)
 }
 
+#[inline]
 pub(crate) fn get_default_config_file_path(config_path: &str) -> String {
-    get_default_file_path(config_path, "config.yml")
+    get_default_file_path(config_path, CONFIG_FILE)
 }
 
+#[inline]
 pub(crate) fn get_default_sources_file_path(config_path: &str) -> String {
-    get_default_file_path(config_path, "source.yml")
+    get_default_file_path(config_path, SOURCE_FILE)
 }
 
+#[inline]
 pub(crate) fn get_default_mappings_path(config_path: &str) -> String {
-    get_default_file_path(config_path, "mapping.yml")
+    get_default_file_path(config_path, MAPPING_FILE)
 }
 
+#[inline]
 pub(crate) fn get_default_api_proxy_config_path(config_path: &str) -> String {
-    get_default_file_path(config_path, "api-proxy.yml")
+    get_default_file_path(config_path, API_PROXY_FILE)
 }
 
 pub(crate) fn get_working_path(wd: &String) -> String {
@@ -106,14 +120,15 @@ pub(crate) fn get_working_path(wd: &String) -> String {
     }
 }
 
-pub(crate) fn open_file(file_name: &Path) -> Result<fs::File, std::io::Error> {
-    fs::File::open(file_name)
+#[inline]
+pub(crate) fn open_file(file_name: &Path) -> Result<File, std::io::Error> {
+    File::open(file_name)
 }
 
 pub(crate) fn persist_file(persist_file: Option<PathBuf>, text: &String) {
     if let Some(path_buf) = persist_file {
         let filename = &path_buf.to_str().unwrap_or("?");
-        match fs::File::create(&path_buf) {
+        match File::create(&path_buf) {
             Ok(mut file) => match file.write_all(text.as_bytes()) {
                 Ok(_) => debug!("persisted: {}", filename),
                 Err(e) => error!("failed to persist file {}, {}", filename, e)
@@ -125,8 +140,8 @@ pub(crate) fn persist_file(persist_file: Option<PathBuf>, text: &String) {
 
 pub(crate) fn prepare_persist_path(file_name: &str, date_prefix: &str) -> Option<PathBuf> {
     let now = chrono::Local::now();
-    let filename = file_name.replace("{}", format!("{}{}", date_prefix, now.format("%Y%m%d_%H%M%S").to_string().as_str()).as_str());
-    Some(std::path::PathBuf::from(filename))
+    let persist_filename = file_name.replace("{}", format!("{date_prefix}{}", now.format("%Y%m%d_%H%M%S").to_string().as_str()).as_str());
+    Some(std::path::PathBuf::from(persist_filename))
 }
 
 pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBuf> {
@@ -174,7 +189,7 @@ pub(crate) fn check_write(res: std::io::Result<()>) -> Result<(), std::io::Error
 }
 
 pub(crate) fn open_file_append(path: &Path, append: bool) -> Result<File, std::io::Error> {
-    if append  && path.exists() {
+    if append && path.exists() {
         return OpenOptions::new()
             .append(true) // Open in append mode
             .open(path);

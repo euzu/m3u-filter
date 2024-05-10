@@ -16,17 +16,17 @@ pub(crate) enum ProxyType {
     Redirect,
 }
 
-impl ProxyType {
-    fn default() -> ProxyType {
-        ProxyType::Redirect
+impl Default for ProxyType {
+    fn default() -> Self {
+        Self::Redirect
     }
 }
 
 impl Display for ProxyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            ProxyType::Reverse => "reverse",
-            ProxyType::Redirect => "redirect"
+            Self::Reverse => "reverse",
+            Self::Redirect => "redirect"
         })
     }
 }
@@ -36,9 +36,9 @@ impl FromStr for ProxyType {
 
     fn from_str(s: &str) -> Result<Self, M3uFilterError> {
         if s.eq("reverse") {
-            Ok(ProxyType::Reverse)
+            Ok(Self::Reverse)
         } else if s.eq("redirect") {
-            Ok(ProxyType::Redirect)
+            Ok(Self::Redirect)
         } else {
             create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
         }

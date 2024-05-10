@@ -99,7 +99,7 @@ pub(crate) fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_
                         error!("cant create directory: {:?}", &path);
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
                     };
-                    let mut file_name = sanitize_for_filename(&header.title, underscore_whitespace);
+                    let mut kodi_file_name = sanitize_for_filename(&header.title, underscore_whitespace);
                     if kodi_style {
                         let style = KodiStyle {
                             season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
@@ -107,9 +107,9 @@ pub(crate) fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_
                             year: regex::Regex::new(r"\d\d\d\d").unwrap(),
                             whitespace: regex::Regex::new(r"\s+").unwrap(),
                         };
-                        file_name = kodi_style_rename(&file_name, &style);
+                        kodi_file_name = kodi_style_rename(&kodi_file_name, &style);
                     }
-                    let file_path = dir_path.join(format!("{}.strm", file_name));
+                    let file_path = dir_path.join(format!("{}.strm", kodi_file_name));
                     match File::create(&file_path) {
                         Ok(mut strm_file) => {
                             match file_utils::check_write(strm_file.write_all(header.url.as_bytes())) {

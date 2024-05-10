@@ -28,7 +28,7 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
                                 }
                                 Err(_e) => 0,
                             };
-                            Ok(IndexedDocumentReader {
+                            Ok(Self {
                                 main_file,
                                 index_file,
                                 cursor: 0,

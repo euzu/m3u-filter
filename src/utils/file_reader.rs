@@ -6,8 +6,8 @@ pub(crate) struct FileReader  {
 }
 
 impl FileReader {
-    pub(crate) fn new(file: File) -> FileReader {
-        FileReader {
+    pub(crate) fn new(file: File) -> Self {
+        Self {
             reader: LineReader::new(file),
         }
     }

@@ -67,9 +67,8 @@ pub(crate) async fn stream_response(stream_url: &str, req: &HttpRequest, input: 
                         response_builder.insert_header((k.as_str(), v.as_ref()));
                     });
                     return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
-                } else {
-                    debug!("Failed to open stream got status {} for {}", response.status(), stream_url)
                 }
+                debug!("Failed to open stream got status {} for {}", response.status(), stream_url)
             }
             Err(err) => {
                 error!("Received failure from server {}:  {}", stream_url, err)

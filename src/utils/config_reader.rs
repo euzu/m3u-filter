@@ -53,8 +53,8 @@ pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &s
                     result._config_file_path = config_file.to_string();
                     result._sources_file_path = sources_file.to_string();
                     match result.prepare(true) {
-                        Ok(_) => Ok(result),
-                        Err(err) => Err(err)
+                        Err(err) => Err(err),
+                        _ => Ok(result),
                     }
                 }
                 Err(e) => {
@@ -68,25 +68,15 @@ pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &s
 
 pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterError> {
     let mapping_file = std::path::PathBuf::from(mapping_file);
-    match file_utils::open_file(&mapping_file) {
-        Ok(file) => {
-            let mapping: Result<Mappings, _> = serde_yaml::from_reader(file);
-            match mapping {
-                Ok(mut result) => {
-                    handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, result.prepare());
-                    Ok(Some(result))
-                }
-                Err(err) => {
-                    error!("cant read mapping file: {}", err);
-                    Ok(None)
-                }
-            }
-        }
-        _ => {
-            warn!("cant read mapping file: {}", mapping_file.to_str().unwrap_or("?"));
-            Ok(None)
+    if let Ok(file) = file_utils::open_file(&mapping_file) {
+        let mapping: Result<Mappings, _> = serde_yaml::from_reader(file);
+        if let Ok(mut result) = mapping {
+            handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, result.prepare());
+            return Ok(Some(result));
         }
     }
+    warn!("cant read mapping file: {}", mapping_file.to_str().unwrap_or("?"));
+    Ok(None)
 }
 
 pub(crate) fn read_api_proxy(api_proxy_file: &str, resolve_var: bool) -> Option<ApiProxyConfig> {
@@ -96,12 +86,12 @@ pub(crate) fn read_api_proxy(api_proxy_file: &str, resolve_var: bool) -> Option<
             match mapping {
                 Ok(mut result) => {
                     match result.prepare(resolve_var) {
-                        Ok(_) => {
-                            Some(result)
-                        }
                         Err(err) => {
                             error!("cant read api-proxy-config file: {}", err);
                             None
+                        }
+                        _ => {
+                            Some(result)
                         }
                     }
                 }

@@ -86,8 +86,8 @@ fn main() {
 
     if args.genpwd  {
         match generate_password() {
-            Ok(pwd) => println!("{}", pwd),
-            Err(err) => error!("{}", err)
+            Ok(pwd) => println!("{pwd}"),
+            Err(err) => error!("{err}")
         }
         return;
     }
@@ -117,7 +117,7 @@ fn main() {
         config_reader::read_api_proxy_config(args.api_proxy, &mut cfg);
         start_in_server_mode(Arc::new(cfg), Arc::new(targets));
     } else {
-        start_in_cli_mode(Arc::new(cfg), Arc::new(targets))
+        start_in_cli_mode(Arc::new(cfg), Arc::new(targets));
     }
 }
 
@@ -127,11 +127,8 @@ fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     info!("Server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
-    match api::main_api::start_server(cfg, targets) {
-        Ok(_) => {}
-        Err(e) => {
-            exit!("Can't start server: {}", e);
-        }
+    if let Err(err) = api::main_api::start_server(cfg, targets) {
+        exit!("Can't start server: {err}");
     };
 }
 
@@ -139,9 +136,9 @@ fn get_log_level(log_level: &str) -> LevelFilter {
     match log_level.to_lowercase().as_str() {
         "trace" => LevelFilter::Trace,
         "debug" => LevelFilter::Debug,
-        "info" => LevelFilter::Info,
         "warn" => LevelFilter::Warn,
         "error" => LevelFilter::Error,
+        // "info" => LevelFilter::Info,
         _ => LevelFilter::Info,
     }
 }

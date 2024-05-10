@@ -15,7 +15,7 @@ use crate::{Config, get_errors_notify_message, model::config};
 use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{MsgKind, send_message};
-use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, default_as_default, InputType,
+use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, InputType,
                            ItemField, ProcessingOrder, ProcessTargets, SortOrder::{Asc, Desc}};
 use crate::model::mapping::{Mapping, MappingValueProcessor};
 use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem};
@@ -26,6 +26,7 @@ use crate::processing::xmltv_parser::flatten_tvguide;
 use crate::processing::xtream_processor::playlist_resolve_series;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::download;
+use crate::utils::default_utils:: default_as_default;
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };

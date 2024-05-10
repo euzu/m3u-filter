@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use enum_iterator::Sequence;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
@@ -20,15 +19,14 @@ use crate::model::api_proxy::{ApiProxyConfig, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
 use crate::utils::{config_reader, file_utils};
+use crate::utils::default_utils::{default_as_default, default_as_false, default_as_true,
+                                  default_as_empty_list, default_as_frm, default_as_empty_map,
+                                  default_as_zero_u8, default_as_two_u16};
 
 pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "logo",
-    "logo_small",
-    "parent_code",
-    "audio_track",
-    "time_shift",
-    "rec",
-    "url",
+    "logo_small", "parent_code", "audio_track",
+    "time_shift", "rec", "url",
 ];
 pub(crate) const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 
@@ -38,25 +36,6 @@ macro_rules! valid_property {
         $array.contains(&$key)
     }};
 }
-
-pub(crate) fn default_as_true() -> bool { true }
-
-pub(crate) fn default_as_false() -> bool { false }
-
-pub(crate) fn default_as_empty_str() -> String { String::from("") }
-
-pub(crate) fn default_as_empty_rc_str() -> Rc<String> { Rc::new(String::from("")) }
-
-fn default_as_zero_u8() -> u8 { 0 }
-
-fn default_as_frm() -> ProcessingOrder { ProcessingOrder::Frm }
-
-pub(crate) fn default_as_default() -> String { String::from("default") }
-
-pub(crate) fn default_as_empty_map<K, V>() -> HashMap<K, V> { HashMap::new() }
-
-pub(crate) fn default_as_empty_list<T>() -> Vec<T> { vec![] }
-
 
 #[macro_export]
 macro_rules! create_m3u_filter_error_result {
@@ -103,12 +82,12 @@ pub(crate) enum TargetType {
     Xtream,
 }
 
-impl std::fmt::Display for TargetType {
+impl Display for TargetType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            TargetType::M3u => write!(f, "M3u"),
-            TargetType::Strm => write!(f, "Strm"),
-            TargetType::Xtream => write!(f, "Xtream"),
+            Self::M3u => write!(f, "M3u"),
+            Self::Strm => write!(f, "Strm"),
+            Self::Xtream => write!(f, "Xtream"),
         }
     }
 }
@@ -132,12 +111,12 @@ pub(crate) enum ProcessingOrder {
 impl std::fmt::Display for ProcessingOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ProcessingOrder::Frm => write!(f, "filter, rename, map"),
-            ProcessingOrder::Fmr => write!(f, "filter, map, rename"),
-            ProcessingOrder::Rfm => write!(f, "rename, filter, map"),
-            ProcessingOrder::Rmf => write!(f, "rename, map, filter"),
-            ProcessingOrder::Mfr => write!(f, "map, filter, rename"),
-            ProcessingOrder::Mrf => write!(f, "map, rename, filter"),
+            Self::Frm => write!(f, "filter, rename, map"),
+            Self::Fmr => write!(f, "filter, map, rename"),
+            Self::Rfm => write!(f, "rename, filter, map"),
+            Self::Rmf => write!(f, "rename, map, filter"),
+            Self::Mfr => write!(f, "map, filter, rename"),
+            Self::Mrf => write!(f, "map, rename, filter"),
         }
     }
 }
@@ -154,13 +133,13 @@ pub(crate) enum ItemField {
     Url,
 }
 
-impl std::fmt::Display for ItemField {
+impl Display for ItemField {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ItemField::Group => write!(f, "Group"),
-            ItemField::Name => write!(f, "Name"),
-            ItemField::Title => write!(f, "Title"),
-            ItemField::Url => write!(f, "Url"),
+            Self::Group => write!(f, "Group"),
+            Self::Name => write!(f, "Name"),
+            Self::Title => write!(f, "Title"),
+            Self::Url => write!(f, "Url"),
         }
     }
 }
@@ -263,7 +242,6 @@ impl ConfigRename {
     }
 }
 
-fn default_as_two() -> u16 { 2 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigTargetOptions {
@@ -283,7 +261,7 @@ pub(crate) struct ConfigTargetOptions {
     pub xtream_skip_series_direct_source: bool,
     #[serde(default = "default_as_false")]
     pub xtream_resolve_series: bool,
-    #[serde(default = "default_as_two")]
+    #[serde(default = "default_as_two_u16")]
     pub xtream_resolve_series_delay: u16,
 }
 
@@ -935,9 +913,8 @@ impl Config {
                 if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
                     if target_names_check.contains(target_name.as_str()) {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target names should be unique: {}", target_name, );
-                    } else {
-                        target_names_check.insert(target_name);
                     }
+                    target_names_check.insert(target_name);
                 }
                 // prepare templaes
                 let prepare_result = match &self.templates {

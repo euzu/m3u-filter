@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use serde_json::Value;
-use crate::{create_m3u_filter_error_result};
+
+use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
-
-use crate::model::config::{default_as_empty_rc_str};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::model::xtream::{XtreamCategory, XtreamSeriesInfo, XtreamStream};
+use crate::utils::default_utils::default_as_empty_rc_str;
 
 fn map_to_xtream_category(category: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(category.to_owned()) {
@@ -63,7 +63,7 @@ pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &
                         additional_properties: episode.get_additional_properties(&series_info),
                         series_fetched: false,
                         category_id: 0,
-                        input_id: input.id
+                        input_id: input.id,
                     })
                 }).collect();
             if result.is_empty() { Ok(None) } else { Ok(Some(result)) }
@@ -134,7 +134,7 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                                     additional_properties: stream.get_additional_properties(),
                                     series_fetched: false,
                                     category_id: 0,
-                                    input_id
+                                    input_id,
                                 }),
                             };
                             grp.add(item);

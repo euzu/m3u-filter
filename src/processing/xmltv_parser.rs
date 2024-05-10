@@ -4,6 +4,10 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 use crate::model::xmltv::{Epg, TVGuide, XmlTag};
 
+static EPG_PROGRAMME: &str = "programme";
+static EPG_CHANNEL: &str = "channel";
+static EPG_ID: &str = "id";
+
 pub(crate) fn parse_tvguide(content: &str) -> Option<TVGuide> {
     let mut stack: Vec<XmlTag> = vec![];
     let mut reader = Reader::from_str(content);
@@ -79,8 +83,8 @@ pub(crate) fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
                 epg.attributes.clone_from(&guide.attributes);
             }
             guide.children.iter().for_each(|c| {
-                if c.name.as_str() == "channel" {
-                    if let Some(chan_id) = c.get_attribute_value("id") {
+                if c.name.as_str() == EPG_CHANNEL {
+                    if let Some(chan_id) = c.get_attribute_value(EPG_ID) {
                         if !channel_ids.contains(&chan_id) {
                             channel_ids.push(chan_id);
                             epg.children.push(c.clone())
@@ -89,8 +93,8 @@ pub(crate) fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
                 }
             });
             guide.children.iter().for_each(|c| {
-                if c.name.as_str() == "programme" {
-                    if let Some(chan_id) = c.get_attribute_value("channel") {
+                if c.name.as_str() == EPG_PROGRAMME {
+                    if let Some(chan_id) = c.get_attribute_value(EPG_CHANNEL) {
                         if channel_ids.contains(&chan_id) {
                             epg.children.push(c.clone());
                         }

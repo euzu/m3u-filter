@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::model::config::{ConfigInput, ConfigTarget};
-use crate::model::config::{default_as_false};
 use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
+use crate::utils::default_utils::{default_as_false, default_as_zero_u16, default_as_zero_u32, default_playlist_item_type, default_stream_cluster};
 
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
@@ -48,8 +48,6 @@ impl Display for XtreamCluster {
     }
 }
 
-pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::Live }
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) enum PlaylistItemType {
     Live = 1,
@@ -57,10 +55,6 @@ pub(crate) enum PlaylistItemType {
     Series = 3,
     SeriesInfo = 4,
 }
-
-pub(crate) fn default_playlist_item_type() -> PlaylistItemType { PlaylistItemType::Live }
-fn default_as_zero_u32() -> u32 { 0 }
-fn default_as_zero_u16() -> u16 { 0 }
 
 pub(crate) trait FieldAccessor {
     fn get_field(&self, field: &str) -> Option<Rc<String>>;
@@ -280,7 +274,7 @@ impl PlaylistItem {
             item_type: header.item_type.clone(),
             series_fetched: header.series_fetched,
             category_id: header.category_id,
-            input_id: header.input_id
+            input_id: header.input_id,
         }
     }
 }

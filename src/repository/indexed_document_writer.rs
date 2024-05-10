@@ -27,7 +27,7 @@ impl IndexedDocumentWriter {
                     Ok(meta) => meta.len() as u32,
                     Err(_) => 0
                 };
-                Ok(IndexedDocumentWriter {
+                Ok(Self {
                     main_path,
                     index_path,
                     main_file,
