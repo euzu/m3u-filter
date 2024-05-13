@@ -344,7 +344,7 @@ Each format has 2 properties
 - `filename`
 
 `type` is _mandatory_  for `m3u`, `strm` and `xtream`.  
-`filename` is _mandatory_ if type `m3u` or `strm`, otherwise ignored
+`filename` is _mandatory_ if type is `strm`. if type is `m3u` the plain m3u file is written but it is not used by `m3u-filter`.
 
 `strm` output has additional options
 - `underscore_whitespace`

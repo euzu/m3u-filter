@@ -27,7 +27,7 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
     for output in &target.output {
         match output.target {
             TargetType::M3u => {
-                return get_epg_path_for_target_of_type(&target.name, m3u_get_epg_file_path(config, &target.get_m3u_filename()));
+                return get_epg_path_for_target_of_type(&target.name, m3u_get_epg_file_path(config, target));
             }
             TargetType::Xtream => {
                 if let Some(storage_path) = xtream_get_storage_path(config, &target.name) {

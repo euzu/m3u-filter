@@ -197,7 +197,7 @@ pub(crate) fn xtream_get_file_paths(storage_path: &Path, cluster: &XtreamCluster
 }
 
 pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
-    match ensure_xtream_storage_path(cfg, target.name.as_str()) {
+    match ensure_xtream_storage_path(cfg, target.name.replace(' ', "_").as_str()) {
         Ok(path) => {
             let mut cat_live_col = vec![];
             let mut cat_series_col = vec![];
@@ -307,7 +307,7 @@ fn _xtream_get_item_for_stream_id(stream_id: u32, storage_path: &Path, xtream_cl
 }
 
 pub(crate) fn xtream_get_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget, xtream_cluster: Option<&XtreamCluster>) -> Result<XtreamPlaylistItem, Error> {
-    if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
+    if let Some(storage_path) = xtream_get_storage_path(config, target.name.replace(' ', "_").as_str()) {
         if let Some(mapping) = load_stream_id_cluster_mapping(&storage_path) {
             if let Some(max) = mapping.iter().map(|(_cluster, _start, end)| end).max().copied() {
                 if max < stream_id {
@@ -330,7 +330,7 @@ pub(crate) fn xtream_get_item_for_stream_id(stream_id: u32, config: &Config, tar
 }
 
 pub(crate) fn xtream_load_rewrite_playlist(cluster: &XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<String, Error> {
-    if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
+    if let Some(storage_path) = xtream_get_storage_path(config, target.name.replace(' ', "_").as_str()) {
         let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
         match IndexedDocumentReader::<XtreamPlaylistItem>::new(&xtream_path, &idx_path) {
             Ok(mut reader) => {

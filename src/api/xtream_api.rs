@@ -270,7 +270,7 @@ fn get_xtream_vod_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content:
 fn get_xtream_series_info(config: &Config, target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
     if let Ok(mut doc) = serde_json::from_str::<Value>(content) {
         let mut new_id_to_provider_id_mapping: Vec<(u32, u32)> = Vec::new();
-        if let Some(mut new_id) = xtream_get_max_series_info_episode_id(config, target.name.as_str()) {
+        if let Some(mut new_id) = xtream_get_max_series_info_episode_id(config, target.name.replace(' ', "_").as_str()) {
             if let Some(episodes) = doc.get_mut("episodes") {
                 if let Some(episodes_map) = episodes.as_object_mut() {
                     let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
@@ -295,7 +295,7 @@ fn get_xtream_series_info(config: &Config, target: &ConfigTarget, pli: &XtreamPl
                     }
                 }
                 if let Ok(result) = serde_json::to_string(&doc) {
-                    let _ = xtream_write_series_info(config, target.name.as_str(), pli.stream_id, &new_id_to_provider_id_mapping, &result);
+                    let _ = xtream_write_series_info(config, target.name.replace(' ', "_").as_str(), pli.stream_id, &new_id_to_provider_id_mapping, &result);
                     return Ok(result);
                 }
             }
@@ -307,7 +307,7 @@ fn get_xtream_series_info(config: &Config, target: &ConfigTarget, pli: &XtreamPl
 async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &ConfigTarget,
                                 pli: &XtreamPlaylistItem, info_url: &str, cluster: &XtreamCluster) -> Result<String, Error> {
     if cluster == &XtreamCluster::Series {
-        if let Ok(content) = xtream_load_series_info(config, target.name.as_str(), pli.stream_id) {
+        if let Ok(content) = xtream_load_series_info(config, target.name.replace(' ', "_").as_str(), pli.stream_id) {
             return Ok(content);
         }
     }
@@ -335,7 +335,7 @@ async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &C
         }
     }
     Err(Error::new(std::io::ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}",
-                                                      target.name.as_str(), &cluster, pli.stream_id)))
+                                                      target.name.replace(' ', "_").as_str(), &cluster, pli.stream_id)))
 }
 
 async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserCredentials,

@@ -38,16 +38,13 @@ async fn m3u_api_stream(
     if let Ok(m3u_stream_id) = stream_id.parse::<u32>() {
         if let Some((_user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state) {
             if target.has_output(&TargetType::M3u) {
-                let filename = target.get_m3u_filename();
-                if filename.is_some() {
-                    if let Some((m3u_path, idx_path)) = m3u_get_file_paths(&app_state.config, &filename) {
-                        match m3u_get_item_for_stream_id(m3u_stream_id, &m3u_path, &idx_path) {
-                            Ok(m3u_item) => {
-                                return stream_response(m3u_item.url.as_str(), &req, None).await
-                            }
-                            Err(err) => {
-                                error!("Failed to get m3u url: {}", err);
-                            }
+                if let Some((m3u_path, idx_path)) = m3u_get_file_paths(&app_state.config, target) {
+                    match m3u_get_item_for_stream_id(m3u_stream_id, &m3u_path, &idx_path) {
+                        Ok(m3u_item) => {
+                            return stream_response(m3u_item.url.as_str(), &req, None).await;
+                        }
+                        Err(err) => {
+                            error!("Failed to get m3u url: {}", err);
                         }
                     }
                 }
@@ -59,8 +56,8 @@ async fn m3u_api_stream(
 
 pub(crate) fn m3u_api_register(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/get.php").route(web::get().to(m3u_api)))
-    .service(web::resource("/get.php").route(web::post().to(m3u_api)))
-    .service(web::resource("/apiget").route(web::get().to(m3u_api)))
-    .service(web::resource("/m3u").route(web::get().to(m3u_api)))
-    .service(web::resource("/m3u-stream/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream)));
+        .service(web::resource("/get.php").route(web::post().to(m3u_api)))
+        .service(web::resource("/apiget").route(web::get().to(m3u_api)))
+        .service(web::resource("/m3u").route(web::get().to(m3u_api)))
+        .service(web::resource("/m3u-stream/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream)));
 }

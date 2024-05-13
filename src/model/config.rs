@@ -318,9 +318,6 @@ impl ConfigTarget {
             match format.target {
                 TargetType::M3u => {
                     m3u_cnt += 1;
-                    if format.filename.is_none() {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for m3u type: {}", self.name);
-                    }
                 }
                 TargetType::Strm => {
                     strm_cnt += 1;
@@ -377,10 +374,10 @@ impl ConfigTarget {
         return self.t_filter.as_ref().unwrap().filter(provider, &mut processor);
     }
 
-    pub(crate) fn get_m3u_filename(&self) -> Option<String> {
+    pub(crate) fn get_m3u_filename(&self) -> Option<&String> {
         for format in &self.output {
             if let TargetType::M3u = format.target {
-                return format.filename.clone();
+                return format.filename.as_ref();
             }
         }
         None
@@ -908,10 +905,13 @@ impl Config {
             source_index = source.prepare(source_index)?;
             for target in &mut source.targets {
                 // check target name is unique
-                let target_name = target.name.clone();
+                let target_name = target.name.trim().to_string();
+                if target_name.is_empty() {
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target name required");
+                }
                 if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
                     if target_names_check.contains(target_name.as_str()) {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target names should be unique: {}", target_name, );
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target names should be unique: {}", target_name);
                     }
                     target_names_check.insert(target_name);
                 }

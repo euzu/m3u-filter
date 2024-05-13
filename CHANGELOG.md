@@ -1,4 +1,7 @@
 # Changelog
+# v2.0.1(2024-05-xx)
+* m3u playlists are not saved as plainfile, therefor m3u output filename is not mandatory, if given the plain m3u playlist is stored.
+
 # v2.0.0(2024-05-10)
 * major version change due to massive changes
 * `update_on_boot` for config, default is false, if true an update is run on start
