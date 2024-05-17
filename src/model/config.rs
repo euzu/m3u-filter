@@ -1,3 +1,4 @@
+#![allow(clippy::struct_excessive_bools)]
 use enum_iterator::Sequence;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
@@ -1032,4 +1033,10 @@ pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<
         inputs,
         targets,
     })
+}
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct HealthcheckConfig {
+    pub api: ConfigApi
 }

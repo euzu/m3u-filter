@@ -5,3 +5,4 @@ pub(crate) mod api_proxy;
 pub(crate) mod stats;
 pub(crate) mod xmltv;
 pub(crate) mod xtream;
+pub(crate) mod healthcheck;

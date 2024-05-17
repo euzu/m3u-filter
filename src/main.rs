@@ -4,6 +4,7 @@ extern crate pest;
 extern crate pest_derive;
 extern crate core;
 
+use std::fs::File;
 use std::sync::Arc;
 use actix_rt::System;
 
@@ -12,7 +13,8 @@ use env_logger::Builder;
 use log::{error, info, LevelFilter};
 use crate::auth::password::generate_password;
 
-use crate::model::config::{Config, ProcessTargets, validate_targets};
+use crate::model::config::{Config, HealthcheckConfig, ProcessTargets, validate_targets};
+use crate::model::healthcheck::Healthcheck;
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, file_utils};
 
@@ -65,9 +67,11 @@ struct Args {
     #[arg(short = 'l', long = "log-level", default_missing_value = "info")]
     log_level: Option<String>,
 
-    /// log level
     #[arg(short = None, long = "genpwd", default_value_t = false, default_missing_value = "true")]
     genpwd: bool,
+
+    #[arg(short = None, long = "healthcheck", default_value_t = false, default_missing_value = "true")]
+    healthcheck: bool,
 
 }
 
@@ -80,8 +84,12 @@ fn main() {
 
     let config_path: String = args.config_path.unwrap_or(file_utils::get_default_config_path());
     let config_file: String = args.config_file.unwrap_or(file_utils::get_default_config_file_path(&config_path));
-    let sources_file: String = args.source_file.unwrap_or(file_utils::get_default_sources_file_path(&config_path));
 
+    if args.healthcheck {
+        healthcheck(config_file.as_str());
+    }
+
+    let sources_file: String = args.source_file.unwrap_or(file_utils::get_default_sources_file_path(&config_path));
     let mut cfg = config_reader::read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
 
     if args.genpwd  {
@@ -91,14 +99,6 @@ fn main() {
         }
         return;
     }
-
-    // this does not work
-    // if args.log_level.is_none() {
-    //      if let Some(log_level) =  &cfg.log_level {
-    //          info!("Setting log level to: {}", log_level.as_str());
-    //          log::set_max_level(get_log_level(log_level.as_str()));
-    //      }
-    // }
 
     let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
@@ -160,4 +160,20 @@ fn init_logger(log_level: &str) {
     }
     log_builder.init();
     info!("Log Level {}", get_log_level(log_level));
+}
+
+fn healthcheck(config_file: &str) {
+    let path = std::path::PathBuf::from(config_file);
+    let file = File::open(path).expect("Failed to open config file");
+    let config: HealthcheckConfig = serde_yaml::from_reader(file).expect("Failed to parse config file");
+
+    if let Ok(response) = reqwest::blocking::get(format!("http://localhost:{}/healthcheck", config.api.port)) {
+        if let Ok(check) = response.json::<Healthcheck>() {
+            if check.status == "ok" {
+                std::process::exit(0);
+            }
+        }
+    }
+
+    std::process::exit(1);
 }

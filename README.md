@@ -51,6 +51,7 @@ Options:
   -h, --help                       Print help
   -V, --version                    Print version
   --genpwd                         Generate UI Password
+  --healthcheck                    Healtcheck for docker
 ```
 
 ## 1. `config.yml`
@@ -196,7 +197,14 @@ nobody: $argon2id$v=$argon2id$v=19$m=19456,t=2,p=1$Y2FROE83ZDQ1c2VaYmJ4VU9YdHpuZ
 ```
 
 The password can be generated with
-`./m3u-filter  -p /op/m3u-filter/config --genpwd`
+```shell
+./m3u-filter  -p /op/m3u-filter/config --genpwd`
+```
+
+or with docker
+```shell
+docker container exec -it m3u-filter ./m3u-filter --genpwd
+```
 
 The encrypted pasword needs to be added manually into the users file.
 
@@ -888,12 +896,16 @@ services:
     restart: unless-stopped
 ```
 
-The image should be around 15MB.
-```
-m3u-filter$ docker images
-REPOSITORY                             TAG       IMAGE ID       CREATED        SIZE
-m3u-filter                             latest    c59e1edb9e56   1 day ago     14.6MB
-```
+If you want to use m3u-filter with docker-compose, there is a `--healthcheck` argument for healthchecks
+
+```dockerfile
+    healthcheck:
+      test: ["CMD", "/m3u-filter", "-p", "/config" "--healthcheck"]  
+      interval: 30s  
+      timeout: 10s   
+      retries: 3     
+      start_period: 10s
+``` 
 
 ### Cross compile for windows on linux
 If you want to compile this project on linux for windows, you need to do the following steps.

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, web};
+use actix_web::{App, HttpResponse, HttpServer, web};
 use actix_web::middleware::{Logger};
 use log::info;
 
@@ -16,7 +16,9 @@ use crate::api::web_index::index_register;
 use crate::api::xmltv_api::xmltv_api_register;
 use crate::api::xtream_api::xtream_api_register;
 use crate::model::config::{Config, ProcessTargets};
+use crate::model::healthcheck::Healthcheck;
 use crate::processing::playlist_processor;
+use crate::VERSION;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
@@ -26,6 +28,15 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
                                        format!("web_root does not exists or is not an directory: {:?}", &web_dir_path)));
     };
     Ok(web_dir_path)
+}
+
+async fn healthcheck() -> HttpResponse {
+    let ts = chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    HttpResponse::Ok().json( Healthcheck {
+        status: "ok".to_string(),
+        version: VERSION.to_string(),
+        time: ts
+    })
 }
 
 #[actix_web::main]
@@ -91,6 +102,7 @@ pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>)
                     srvcfg.service(actix_files::Files::new("/static", web_dir_path.join("static")));
                     srvcfg.configure(v1_api_register(web_auth_enabled));
                 }
+                srvcfg.service(web::resource("/healthcheck").route(web::get().to(healthcheck)));
             })
             .configure(xtream_api_register)
             .configure(m3u_api_register)

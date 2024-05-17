@@ -38,7 +38,7 @@ fn _save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Opti
     None
 }
 
-pub(crate) async fn save_config_api_proxy_user(
+async fn save_config_api_proxy_user(
     req: web::Json<Vec<TargetUser>>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -55,7 +55,7 @@ pub(crate) async fn save_config_api_proxy_user(
     HttpResponse::Ok().finish()
 }
 
-pub(crate) async fn save_config_main(
+async fn save_config_main(
     req: web::Json<ConfigDto>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -72,7 +72,7 @@ pub(crate) async fn save_config_main(
     }
 }
 
-pub(crate) async fn save_config_api_proxy_config(
+async fn save_config_api_proxy_config(
     req: web::Json<Vec<ApiProxyServerInfo>>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -92,7 +92,7 @@ pub(crate) async fn save_config_api_proxy_config(
     HttpResponse::Ok().finish()
 }
 
-pub(crate) async fn playlist_update(
+async fn playlist_update(
     req: web::Json<Vec<String>>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -153,7 +153,7 @@ async fn get_playlist(inp: Option<&ConfigInput>, cfg: &Config) -> HttpResponse {
     }
 }
 
-pub(crate) async fn playlist(
+async fn playlist(
     req: web::Json<PlaylistRequest>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -166,7 +166,7 @@ pub(crate) async fn playlist(
     }
 }
 
-pub(crate) async fn config(
+async fn config(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let map_input = |i: &ConfigInput| ServerInputConfig {
