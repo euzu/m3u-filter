@@ -186,6 +186,10 @@ pub(crate) struct UserApiRequest {
     pub category_id: String,
     #[serde(default = "default_as_empty_str")]
     pub limit: String,
+    #[serde(default = "default_as_empty_str")]
+    pub start: String,
+    #[serde(default = "default_as_empty_str")]
+    pub end: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

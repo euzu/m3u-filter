@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::convert::{TryInto};
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -50,6 +50,13 @@ fn xtream_get_series_id_series_info_mapping_file_path(storage_path: &Path) -> Pa
     storage_path.join("mapping_series_info.db_idx")
 }
 
+// maps catchup_id to provider_id
+// direct access is not possible because the series_id is not ascending, it is random
+fn xtream_get_catchup_id_mapping_file_path(storage_path: &Path) -> PathBuf {
+    storage_path.join("mapping_catchup.db")
+}
+
+
 fn ensure_xtream_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, M3uFilterError> {
     if let Some(path) = xtream_get_storage_path(cfg, target_name) {
         if std::fs::create_dir_all(&path).is_err() {
@@ -82,6 +89,10 @@ fn xtream_clear_series_info(storage_path: &Path) {
     }
 }
 
+fn xtream_clear_catchup(storage_path: &Path) {
+    let _ = std::fs::remove_file(xtream_get_catchup_id_mapping_file_path(storage_path));
+}
+
 fn write_playlist_to_file(storage_path: &Path, stream_id: &mut u32, cluster: &XtreamCluster, playlist: &mut [PlaylistItem]) -> Result<(), M3uFilterError> {
     let (xtream_path, idx_path) = xtream_get_file_paths(storage_path, cluster);
     match IndexedDocumentWriter::new(xtream_path.clone(), idx_path) {
@@ -94,7 +105,9 @@ fn write_playlist_to_file(storage_path: &Path, stream_id: &mut u32, cluster: &Xt
                     Err(err) => return cant_write_result!(&xtream_path, err)
                 }
             }
-            if cluster == &XtreamCluster::Series {
+            if cluster == &XtreamCluster::Live {
+                xtream_clear_catchup(storage_path);
+            } else if cluster == &XtreamCluster::Series {
                 xtream_clear_series_info(storage_path);
             }
             Ok(())
@@ -471,4 +484,57 @@ pub(crate) fn xtream_load_series_info(config: &Config, target_name: &str, series
         }
     }
     Err(Error::new(ErrorKind::Other, format!("Failed to read series info for id {series_id} for {target_name}")))
+}
+
+pub(crate) fn xtream_write_catchup_id_mapping(config: &Config, target_name: &str, id_mappings: &Vec<(u32, u32)>) -> Result<(), Error> {
+    if let Some(storage_path) = xtream_get_storage_path(config, target_name) {
+        let file_path = xtream_get_catchup_id_mapping_file_path(&storage_path);
+        if let Ok(mut file) = if file_path.exists() {
+            std::fs::OpenOptions::new()
+                .append(true) // Open in append mode
+                .open(file_path)
+        } else {
+            File::create(file_path)
+        } {
+            for (provider_id, stream_id) in id_mappings {
+                let mut bytes: Vec<u8> = Vec::new();
+                bytes.extend_from_slice(&provider_id.to_le_bytes());
+                bytes.extend_from_slice(&stream_id.to_le_bytes());
+                file_utils::check_write(&file.write_all(&bytes[..]))?;
+            }
+            return Ok(());
+        }
+    }
+    Err(Error::new(ErrorKind::Other, format!("Failed to get catchup info for {target_name}")))
+}
+
+// Returns hashmap with provider_id -> new_stream_id
+pub(crate) fn xtream_load_catchup_id_mapping(config: &Config, target_name: &str) -> HashMap<u32, u32> {
+    let mut result = HashMap::new();
+    if let Some(storage_path) = xtream_get_storage_path(config, target_name) {
+        let catchup_file = xtream_get_catchup_id_mapping_file_path(&storage_path);
+        if catchup_file.exists() {
+            if let Ok(file) = File::open(catchup_file) {
+                let mut reader = BufReader::new(&file);
+                let mut bytes = [0u8; 4];
+                loop {
+                    if reader.read_exact(&mut bytes).is_ok() {
+                        let provider_id = u32::from_le_bytes(bytes);
+                        let mut bytes = [0u8; 4];
+                        if reader.read_exact(&mut bytes).is_ok() {
+                            let  stream_id = u32::from_le_bytes(bytes);
+                            result.insert(provider_id, stream_id);
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    } else {
+        error!("Failed to open catchup id-mapping file for {target_name}");
+    }
+    result
 }
