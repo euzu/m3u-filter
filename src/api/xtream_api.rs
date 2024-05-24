@@ -118,7 +118,7 @@ fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizati
     XtreamAuthorizationResponse {
         user_info: XtreamUserInfo {
             active_cons: "0".to_string(),
-            allowed_output_formats: Vec::from(["ts".to_string()]),
+            allowed_output_formats: Vec::from(["ts".to_string(), "m3u8".to_string(), "rtmp".to_string()]),
             auth: 1,
             created_at: (now - Duration::days(365)).timestamp(), // fake
             exp_date: (now + Duration::days(365)).timestamp(),// fake
@@ -242,7 +242,7 @@ async fn xtream_player_api_timeshift_stream(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let (username, password, duration, start, stream_id) = path.into_inner();
-    let action_path = format!("{duration}/{start}/");
+    let action_path = format!("{duration}/{start}");
     xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, &username, &password, &stream_id, &action_path)).await
 }
 
@@ -594,7 +594,7 @@ pub(crate) fn xtream_api_register(cfg: &mut web::ServiceConfig) {
         .service(web::resource("/live/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream)))
         .service(web::resource("/movie/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_movie_stream)))
         .service(web::resource("/series/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_series_stream)))
-        .service(web::resource("/timeshift/{username}/{password}/{duration}/{start}{stream_id}").route(web::get().to(xtream_player_api_timeshift_stream)));
+        .service(web::resource("/timeshift/{username}/{password}/{duration}/{start}/{stream_id}").route(web::get().to(xtream_player_api_timeshift_stream)));
     /* TODO
     cfg.service(web::resource("/hlsr/{token}/{username}/{password}/{channel}/{hash}/{chunk}").route(web::get().to(xtream_player_api_hlsr_stream)));
     cfg.service(web::resource("/hls/{token}/{chunk}").route(web::get().to(xtream_player_api_hls_stream)));
