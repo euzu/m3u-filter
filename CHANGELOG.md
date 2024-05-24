@@ -1,5 +1,5 @@
 # Changelog
-# v2.0.1(2024-05-xx)
+# v2.0.1(2024-05-24)
 * m3u playlists are not saved as plainfile, therefor m3u output filename is not mandatory, if given the plain m3u playlist is stored.
 * Added `--healthcheck` argument for docker 
 * Added `catch-up`/`timeshift`  api for `xtream`
