@@ -1414,6 +1414,7 @@ dependencies = [
  "cron",
  "enum-iterator",
  "env_logger",
+ "flate2",
  "futures",
  "jsonwebtoken",
  "log",

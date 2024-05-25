@@ -46,3 +46,4 @@ bincode = "1.3"
 uuid = { version = "1.8", features = ["v4", "fast-rng", "macro-diagnostics"] }
 rand = "0.8"
 rpassword = "7.3"
+flate2 = "1"

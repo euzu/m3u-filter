@@ -254,7 +254,8 @@ pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlis
                                 XtreamCluster::Video => &mut vod_col,
                             })
                         } else {
-                            errors.push(format!("Channel does not have an id: {}", pli.header.borrow().title.as_str()));
+                            let title = header.title.as_str();
+                            errors.push(format!("Channel does not have an id: {title}"));
                             None
                         };
                         drop(header);

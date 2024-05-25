@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{Read};
+use std::io::{ErrorKind, Read};
 use std::path::{PathBuf};
 use log::{debug, error, Level, log_enabled};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -8,6 +8,8 @@ use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{ConfigInput};
 use crate::utils::file_utils::{get_file_path, open_file, persist_file};
+use reqwest::header::CONTENT_ENCODING;
+use flate2::read::{GzDecoder, ZlibDecoder};
 
 pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
@@ -146,24 +148,68 @@ pub(crate) async fn get_input_json_content(input: &ConfigInput, url_str: &str, p
     }
 }
 
-async fn download_text_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<String, String> {
+async fn download_text_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<String, std::io::Error> {
     let request = get_client_request(Some(input), url, None);
-    match request.send().await {
+    let result = match request.send().await {
         Ok(response) => {
-            if response.status().is_success() {
-                match response.text_with_charset("utf8").await {
-                    Ok(content) => {
-                        if persist_filepath.is_some() {
-                            persist_file(persist_filepath, &content);
-                        }
-                        Ok(content)
+            let is_success = response.status().is_success();
+            if is_success {
+                let header_value = response.headers().get(CONTENT_ENCODING);
+                let encoding = if let Some(encoding_header) = header_value {
+                    match encoding_header.to_str() {
+                        Ok(value) => Some(value.to_string()),
+                        Err(_) => None,
                     }
-                    Err(e) => Err(e.to_string())
+                } else {
+                    None
+                };
+                match response.bytes().await {
+                    Ok(bytes) => {
+                        let mut decode_buffer = String::new();
+                        if let Some(encoding_type) = encoding {
+                            match encoding_type.as_str() {
+                                "gzip" => {
+                                    let mut decoder = GzDecoder::new(&bytes[..]);
+                                    match decoder.read_to_string(&mut decode_buffer) {
+                                        Ok(_) => {}
+                                        Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
+                                    };
+                                }
+                                "deflate" => {
+                                    let mut decoder = ZlibDecoder::new(&bytes[..]);
+                                    match decoder.read_to_string(&mut decode_buffer) {
+                                        Ok(_) => {}
+                                        Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode zlib content {err}")))
+                                    }
+                                }
+                                _ => {}
+                            };
+                        }
+
+                        if decode_buffer.is_empty() {
+                            match String::from_utf8(bytes.to_vec()) {
+                                Ok(decoded_content) => Ok(decoded_content),
+                                Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
+                            }
+                        } else {
+                            Ok(decode_buffer)
+                        }
+                    }
+                    Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to read response {err}")))
                 }
             } else {
-                Err(format!("Request failed: {}", response.status()))
+                Err(std::io::Error::new(ErrorKind::Other, format!("Request failed with status {}", response.status())))
             }
         }
-        Err(e) => Err(e.to_string())
+        Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {err}")))
+    };
+    match result {
+        Ok(content) => {
+            if persist_filepath.is_some() {
+                persist_file(persist_filepath, &content);
+            }
+            Ok(content)
+        }
+        Err(err) => Err(err)
     }
 }
