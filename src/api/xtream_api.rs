@@ -11,7 +11,6 @@ use actix_web::{HttpRequest, HttpResponse, web};
 use chrono::{Duration, Local};
 use log::{debug, error};
 use serde_json::{Map, Value};
-use url::Url;
 
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse, XtreamServerInfo, XtreamUserInfo};
 use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, serve_file, stream_response};
@@ -305,23 +304,7 @@ fn get_xtream_series_info(config: &Config, target: &ConfigTarget, pli: &XtreamPl
 }
 
 async fn xtream_get_stream_info_content(info_url: &str, input: &ConfigInput) -> Result<String, Error> {
-    if let Ok(url) = Url::parse(info_url) {
-        let client = request_utils::get_client_request(Some(input), url, None);
-        if let Ok(response) = client.send().await {
-            debug!("get stream info response status code {}", response.status());
-            if response.status().is_success() {
-                return match response.text().await {
-                    Ok(content) => Ok(content),
-                    Err(err) => {
-                        error!("Failed to download info {}", err.to_string());
-                        Err(Error::new(ErrorKind::Other, format!("Failed to download info {err}")))
-                    }
-                };
-            }
-        }
-    }
-    error!("Failed to download info {}", info_url);
-    Err(Error::new(ErrorKind::Other, format!("Failed to get stream info for {info_url}")))
+    request_utils::download_text_content(input, info_url, None).await
 }
 
 async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &ConfigTarget,
@@ -392,26 +375,17 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                     if !(limit.is_empty() || limit.eq("0")) {
                         info_url = format!("{info_url}&limit={limit}");
                     }
-                    if let Ok(url) = Url::parse(&info_url) {
-                        if user.proxy == ProxyType::Redirect {
-                            return HttpResponse::Found().insert_header(("Location", info_url)).finish();
-                        }
-
-                        let client = request_utils::get_client_request(Some(input), url, None);
-                        if let Ok(response) = client.send().await {
-                            if response.status().is_success() {
-                                return match response.text().await {
-                                    Ok(content) => {
-                                        HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content)
-                                    }
-                                    Err(err) => {
-                                        error!("Failed to download epg {}", err.to_string());
-                                        HttpResponse::NoContent().finish()
-                                    }
-                                };
-                            }
-                        }
+                    if user.proxy == ProxyType::Redirect {
+                        return HttpResponse::Found().insert_header(("Location", info_url)).finish();
                     }
+
+                    return match request_utils::download_text_content(input, info_url.as_str(), None).await {
+                        Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
+                        Err(err) => {
+                            error!("Failed to download epg {}", err.to_string());
+                            HttpResponse::NoContent().finish()
+                        }
+                    };
                 }
             }
         }

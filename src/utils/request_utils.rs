@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{ErrorKind, Read};
+use std::io::{Error, ErrorKind, Read};
 use std::path::{PathBuf};
 use log::{debug, error, Level, log_enabled};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -20,8 +20,8 @@ pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &St
         debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
     }
 
-    if let Ok(url) = url_str.parse::<url::Url>() {
-        match download_text_content(input, url, persist_filepath).await {
+    if url_str.parse::<url::Url>().is_ok() {
+        match download_text_content(input, url_str, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", url_str, e);
@@ -110,106 +110,94 @@ pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, cus
     headers
 }
 
-async fn download_json_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, String> {
-    if log_enabled!(Level::Debug) {
-        debug!("downloading json content from {}", url.to_string());
-    }
-    let request = get_client_request(Some(input), url, None);
-    match request.send().await {
-        Ok(response) => {
-            if log_enabled!(Level::Debug) {
-                debug!("downloading json content response code: {}", response.status().as_str());
-            }
-            if response.status().is_success() {
-                match response.json::<serde_json::Value>().await {
-                    Ok(content) => {
-                        if persist_filepath.is_some() {
-                            persist_file(persist_filepath, &serde_json::to_string(&content).unwrap());
+pub(crate) async fn download_text_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
+    if let Ok(url) = url_str.parse::<url::Url>() {
+        let request = get_client_request(Some(input), url, None);
+        let result = match request.send().await {
+            Ok(response) => {
+                let is_success = response.status().is_success();
+                if is_success {
+                    let header_value = response.headers().get(CONTENT_ENCODING);
+                    let encoding = if let Some(encoding_header) = header_value {
+                        match encoding_header.to_str() {
+                            Ok(value) => Some(value.to_string()),
+                            Err(_) => None,
                         }
-                        Ok(content)
-                    }
-                    Err(e) => Err(e.to_string())
-                }
-            } else {
-                Err(format!("Request failed: {}", response.status()))
-            }
-        }
-        Err(e) => Err(e.to_string())
-    }
-}
+                    } else {
+                        None
+                    };
+                    match response.bytes().await {
+                        Ok(bytes) => {
+                            let mut decode_buffer = String::new();
+                            if let Some(encoding_type) = encoding {
+                                match encoding_type.as_str() {
+                                    "gzip" => {
+                                        let mut decoder = GzDecoder::new(&bytes[..]);
+                                        match decoder.read_to_string(&mut decode_buffer) {
+                                            Ok(_) => {}
+                                            Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
+                                        };
+                                    }
+                                    "deflate" => {
+                                        let mut decoder = ZlibDecoder::new(&bytes[..]);
+                                        match decoder.read_to_string(&mut decode_buffer) {
+                                            Ok(_) => {}
+                                            Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode zlib content {err}")))
+                                        }
+                                    }
+                                    _ => {}
+                                };
+                            }
 
-pub(crate) async fn get_input_json_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
-    match url_str.parse::<url::Url>() {
-        Ok(url) => match download_json_content(input, url, persist_filepath).await {
-            Ok(content) => Ok(content),
-            Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", url_str, e)
-        },
-        Err(_) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "malformed input url: {}", url_str)
-    }
-}
-
-async fn download_text_content(input: &ConfigInput, url: url::Url, persist_filepath: Option<PathBuf>) -> Result<String, std::io::Error> {
-    let request = get_client_request(Some(input), url, None);
-    let result = match request.send().await {
-        Ok(response) => {
-            let is_success = response.status().is_success();
-            if is_success {
-                let header_value = response.headers().get(CONTENT_ENCODING);
-                let encoding = if let Some(encoding_header) = header_value {
-                    match encoding_header.to_str() {
-                        Ok(value) => Some(value.to_string()),
-                        Err(_) => None,
+                            if decode_buffer.is_empty() {
+                                match String::from_utf8(bytes.to_vec()) {
+                                    Ok(decoded_content) => Ok(decoded_content),
+                                    Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
+                                }
+                            } else {
+                                Ok(decode_buffer)
+                            }
+                        }
+                        Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to read response {err}")))
                     }
                 } else {
-                    None
-                };
-                match response.bytes().await {
-                    Ok(bytes) => {
-                        let mut decode_buffer = String::new();
-                        if let Some(encoding_type) = encoding {
-                            match encoding_type.as_str() {
-                                "gzip" => {
-                                    let mut decoder = GzDecoder::new(&bytes[..]);
-                                    match decoder.read_to_string(&mut decode_buffer) {
-                                        Ok(_) => {}
-                                        Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
-                                    };
-                                }
-                                "deflate" => {
-                                    let mut decoder = ZlibDecoder::new(&bytes[..]);
-                                    match decoder.read_to_string(&mut decode_buffer) {
-                                        Ok(_) => {}
-                                        Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode zlib content {err}")))
-                                    }
-                                }
-                                _ => {}
-                            };
-                        }
-
-                        if decode_buffer.is_empty() {
-                            match String::from_utf8(bytes.to_vec()) {
-                                Ok(decoded_content) => Ok(decoded_content),
-                                Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
-                            }
-                        } else {
-                            Ok(decode_buffer)
-                        }
-                    }
-                    Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to read response {err}")))
+                    Err(std::io::Error::new(ErrorKind::Other, format!("Request failed with status {}", response.status())))
                 }
-            } else {
-                Err(std::io::Error::new(ErrorKind::Other, format!("Request failed with status {}", response.status())))
             }
+            Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {err}")))
+        };
+        match result {
+            Ok(content) => {
+                if persist_filepath.is_some() {
+                    persist_file(persist_filepath, &content);
+                }
+                Ok(content)
+            }
+            Err(err) => Err(err)
         }
-        Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {err}")))
-    };
-    match result {
+    } else {
+        Err(std::io::Error::new(ErrorKind::Other, format!("Malformed URL {url_str}")))
+    }
+}
+
+async fn download_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, Error> {
+    if log_enabled!(Level::Debug) {
+        debug!("downloading json content from {url}");
+    }
+    match download_text_content(input, url, persist_filepath).await {
         Ok(content) => {
-            if persist_filepath.is_some() {
-                persist_file(persist_filepath, &content);
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(value) => Ok(value),
+                Err(err) => Err(Error::new(ErrorKind::Other, format!("Failed to parse json {err}")))
             }
-            Ok(content)
         }
         Err(err) => Err(err)
+    }
+}
+
+pub(crate) async fn get_input_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
+    match download_json_content(input, url, persist_filepath).await {
+        Ok(content) => Ok(content),
+        Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {url}  => {}", e)
     }
 }

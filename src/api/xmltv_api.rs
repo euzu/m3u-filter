@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use actix_web::{HttpRequest, HttpResponse, web};
 use log::{debug, info};
-use url::{ParseError, Url};
+use url::{ParseError};
 
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::api::api_utils::{get_user_target, serve_file};
@@ -59,19 +59,19 @@ async fn xmltv_api(
         r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)
 }
 
-fn get_xmltv_epg_url(input: &ConfigInput) -> Result<Url, ParseError> {
+fn get_xmltv_epg_url(input: &ConfigInput) -> Result<String, ParseError> {
     let epg_url = input.epg_url.as_ref().map_or(String::new(), std::borrow::ToOwned::to_owned);
     if epg_url.is_empty() {
         if let Some(user_info) = input.get_user_info() {
             let url = user_info.base_url.as_str();
             let username = user_info.username.as_str();
             let password = user_info.password.as_str();
-            Url::parse(format!("{url}/xmltv.php?username={username}&password={password}").as_str())
+            Ok(format!("{url}/xmltv.php?username={username}&password={password}"))
         } else {
             Err(ParseError::EmptyHost)
         }
     } else {
-        Url::parse(epg_url.as_str())
+        Ok(epg_url)
     }
 }
 
@@ -89,12 +89,10 @@ async fn get_xmltv_raw_epg(config: &Config, user: &ProxyUserCredentials, target_
                         debug!("Redirecting epg request to {}", url.as_str());
                         return Some(HttpResponse::Found().insert_header(("Location", url.as_str())).finish());
                     }
-                    let client = request_utils::get_client_request(Some(input), url, None);
-                    if let Ok(response) = client.send().await {
-                        if response.status().is_success() {
-                            if let Ok(content) = response.text().await {
-                                return Some(HttpResponse::Ok().content_type(mime::TEXT_XML).body(content));
-                            }
+                    match request_utils::download_text_content(input, url.as_str(), None).await {
+                        Ok(content) => return Some(HttpResponse::Ok().content_type(mime::TEXT_XML).body(content)),
+                        Err(err) => {
+                            debug!("Could not generate epg url for {target_name} {err}");
                         }
                     }
                 } else {
