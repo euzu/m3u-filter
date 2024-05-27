@@ -1,4 +1,8 @@
 # Changelog
+# v2.0.2(2024-05-28)
+* Added Encoding handling: gzip,deflate 
+* Fixed panic when `tvg-id` is not set.
+
 # v2.0.1(2024-05-24)
 * m3u playlists are not saved as plainfile, therefor m3u output filename is not mandatory, if given the plain m3u playlist is stored.
 * Added `--healthcheck` argument for docker 
