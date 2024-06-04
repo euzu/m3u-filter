@@ -1,9 +1,5 @@
 # TODO
 ## Bugs
-
-- xtream api, only looks for first input configuration. 
-  But if you have multiple xtream sources merged, 
-  each entry should have a pointer to his input to get the right provider url.
 - double download from web-ui possible
 
 
@@ -14,5 +10,5 @@
 - display file size from header if available
 
 ## Open topics
-- xmltv api delivers original content if no epg_url is provided for input for reverse or makes redirect.
 - web ui should fetch series info when expanded
+- Each update can change the stream id which can be confusing for players which save the state with the streamid
