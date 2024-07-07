@@ -253,7 +253,7 @@ Each input has the following attributes:
 - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
 - `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is `http://<hostname>:<port>`
 - `epg_url` _optional_ xmltv url
-- `headers` is optional, used only for type `xtream`
+- `headers` is optional
 - `username` only mandatory for type `xtream`
 - `pasword`only mandatory for type `xtream`
 - `prefix` is optional, it is applied to the given field with the given value
@@ -298,7 +298,7 @@ sources:
     - type: xtream
       persist: 'playlist_1_1{}.m3u'
       headers:
-        User-Agent: "Mozilla/5.0 (Linux; Tizen 2.3) AppleWebKit/538.1 (KHTML, like Gecko)Version/2.3 TV Safari/538.1"
+        User-Agent: "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15"
         Accept: application/json
         Accept-Encoding: gzip
       url: 'http://localhost:8080'

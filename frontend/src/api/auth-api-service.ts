@@ -1,8 +1,6 @@
 import ApiService, {DefaultApiService} from "./api-service";
 import {Observable} from "rxjs";
 
-const AUTH_API_PATH = window.location + 'auth';
-
 type TokenResponse = { token: string };
 
 export default interface AuthApiService extends ApiService {
@@ -12,11 +10,16 @@ export default interface AuthApiService extends ApiService {
 }
 
 export class DefaultAuthApiService extends DefaultApiService implements AuthApiService {
+    private readonly authBaseUrl;
+    constructor() {
+        super();
+        this.authBaseUrl = this.getBaseUrl() + '/auth';
+    }
     authenticate(username: string, password: string): Observable<{ token: string }> {
-        return this.post<TokenResponse>('/token', {username, password}, AUTH_API_PATH);
+        return this.post<TokenResponse>('/token', {username, password}, this.authBaseUrl);
     }
 
     refresh(): Observable<TokenResponse> {
-        return this.post<TokenResponse>('/refresh', {}, AUTH_API_PATH);
+        return this.post<TokenResponse>('/refresh', {}, this.authBaseUrl);
     }
 }

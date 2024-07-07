@@ -1,5 +1,5 @@
 ### playlist request
-POST http://localhost:5901/api/v1/playlist
+POST http://localhost:8901/api/v1/playlist
 Content-Type: application/json
 
 {
@@ -9,7 +9,14 @@ Content-Type: application/json
 ###
 
 ### config request
-GET http://localhost:5901/api/v1/config
+GET http://localhost:8901/api/v1/config
 Content-Type: application/json
 
 ###
+
+### auth
+POST http://localhost:8901/auth/token
+Content-Type: application/json
+
+{"username": "test", "password": "test"}
+

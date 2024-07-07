@@ -643,7 +643,8 @@ impl VideoConfig {
             Some(downl) => {
                 if downl.headers.is_empty() {
                     downl.headers.borrow_mut().insert("Accept".to_string(), "video/*".to_string());
-                    downl.headers.borrow_mut().insert("User-Agent".to_string(), "AppleTV/tvOS/9.1.1.".to_string());
+                    downl.headers.borrow_mut().insert("User-Agent".to_string(), "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15
+".to_string());
                 }
 
                 if let Some(episode_pattern) = &downl.episode_pattern {
