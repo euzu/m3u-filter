@@ -248,6 +248,7 @@ This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp
 
 Each input has the following attributes:
 
+- `name` is optional, if set it must be unique, should be set for the webui
 - `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
 - `enabled` is optional, default is true, if you disable the processing is skipped
 - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
@@ -278,6 +279,7 @@ Example input config for `m3u`
 sources:
 - inputs:
     - url: 'test-input.m3u'
+      name: test_m3u
       epg_url: 'test-epg.xml'
       enabled: false
       persist: 'playlist_1_{}.m3u'
@@ -598,7 +600,7 @@ Attributes is a map of key value pairs. Valid keys are:
 - `audio_track`
 - `time_shift`
 - `rec`
-- `source`
+- `url`
 
 If the regexps matches, the given fields will be set to the new value
 You can use `captures` in attributes.

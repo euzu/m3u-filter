@@ -67,6 +67,7 @@ pub(crate) struct PlaylistItemHeader {
     pub stream_id: Rc<String>,
     pub id: Rc<String>,
     pub name: Rc<String>,
+    pub chno: Rc<String>,
     pub logo: Rc<String>,
     pub logo_small: Rc<String>,
     pub group: Rc<String>,
@@ -90,32 +91,6 @@ pub(crate) struct PlaylistItemHeader {
     pub input_id: u16,
 }
 
-macro_rules! update_fields {
-    ($self:expr, $field:expr, $($prop:ident),*; $val:expr) => {
-        match $field {
-            $(
-                stringify!($prop) => {
-                    $self.$prop = Rc::new($val);
-                    true
-                }
-            )*
-            _ => false,
-        }
-    };
-}
-
-macro_rules! get_fields {
-    ($self:expr, $field:expr, $($prop:ident),*;) => {
-        match $field {
-            $(
-                stringify!($prop) => Some($self.$prop.clone()),
-            )*
-            _ => None,
-        }
-    };
-}
-
-
 macro_rules! to_m3u_non_empty_fields {
     ($header:expr, $line:expr, $(($prop:ident, $field:expr)),*;) => {
         $(
@@ -126,39 +101,49 @@ macro_rules! to_m3u_non_empty_fields {
     };
 }
 
-impl FieldAccessor for PlaylistItemHeader {
-    fn get_field(&self, field: &str) -> Option<Rc<String>> {
-        let val = get_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, url;);
-        if val.is_some() {
-            return val;
-        }
-        match field {
-            "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
-            _ => None
-        }
-    }
 
-    fn set_field(&mut self, field: &str, value: &str) -> bool {
-        let val = String::from(value);
-        let updated = update_fields!(self, field, id, stream_id, name, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, url; val);
-        if updated {
-            return updated;
-        }
-        match field {
-            "epg_channel_id" | "epg_id" => {
-                self.epg_channel_id = Some(Rc::new(value.to_owned()));
-                true
+macro_rules! generate_field_accessor_impl_for_playlist_item_header {
+    ($($prop:ident),*;) => {
+        impl FieldAccessor for PlaylistItemHeader {
+            fn get_field(&self, field: &str) -> Option<Rc<String>> {
+                match field {
+                    $(
+                        stringify!($prop) => Some(self.$prop.clone()),
+                    )*
+                    "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
+                    _ => None,
+                }
             }
-            _ => false,
+
+            fn set_field(&mut self, field: &str, value: &str) -> bool {
+                let val = String::from(value);
+                match field {
+                    $(
+                        stringify!($prop) => {
+                            self.$prop = Rc::new(val);
+                            true
+                        }
+                    )*
+                    "epg_channel_id" | "epg_id" => {
+                        self.epg_channel_id = Some(Rc::new(value.to_owned()));
+                        true
+                    }
+                    _ => false,
+                }
+            }
         }
     }
 }
+
+// !! should be in sync with MAPPER_ATTRIBUTES  except stream_id !!
+generate_field_accessor_impl_for_playlist_item_header!(id, stream_id, name, chno, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, url;);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct M3uPlaylistItem {
     pub stream_id: Rc<String>,
     pub provider_id: Rc<String>,
     pub name: Rc<String>,
+    pub chno: Rc<String>,
     pub logo: Rc<String>,
     pub logo_small: Rc<String>,
     pub group: Rc<String>,
@@ -180,13 +165,12 @@ impl M3uPlaylistItem {
                                self.epg_channel_id.as_ref().map_or("", |o| o.as_ref()),
                                self.name, self.group);
 
-        // line = format!("{} tvg-chno=\"{}\"", line, header.chno);
-
         if !ignore_logo {
             to_m3u_non_empty_fields!(self, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
         }
 
         to_m3u_non_empty_fields!(self, line,
+            (chno, "tvg-chno"),
             (parent_code, "parent-code"),
             (audio_track, "audio-track"),
             (time_shift, "timeshift"),
@@ -235,6 +219,7 @@ impl PlaylistItem {
             stream_id: Rc::clone(&header.stream_id),
             provider_id: Rc::clone(&header.id),
             name: Rc::clone(&header.name),
+            chno: Rc::clone(&header.chno),
             logo: Rc::clone(&header.logo),
             logo_small: Rc::clone(&header.logo_small),
             group: Rc::clone(&header.group),

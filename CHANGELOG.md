@@ -1,4 +1,9 @@
 # Changelog
+# 2.03(2024-07-x)
+*  added  `source` - `input` - `name` attribute to README
+*  added `chno`  to Playlist attributes.
+*  `epg_channel_id` mapping fixed 
+
 # v2.0.2(2024-05-28)
 * Added Encoding handling: gzip,deflate 
 * Fixed panic when `tvg-id` is not set.

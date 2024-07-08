@@ -25,10 +25,12 @@ use crate::utils::default_utils::{default_as_default, default_as_false, default_
                                   default_as_zero_u8, default_as_two_u16};
 
 pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
-    "name", "title", "group", "id", "logo",
+    "name", "title", "group", "id", "chno", "logo",
     "logo_small", "parent_code", "audio_track",
-    "time_shift", "rec", "url",
+    "time_shift", "rec", "url", "epg_channel_id", "epg_id"
 ];
+
+
 pub(crate) const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 
 #[macro_export]
