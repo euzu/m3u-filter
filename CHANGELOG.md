@@ -1,5 +1,5 @@
 # Changelog
-# 2.03(2024-07-x)
+# 2.0.3(2024-07-11)
 *  added  `source` - `input` - `name` attribute to README
 *  added `chno`  to Playlist attributes.
 *  `epg_channel_id` mapping fixed 
