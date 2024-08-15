@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::xmltv::TVGuide;
@@ -234,32 +235,39 @@ impl PlaylistItem {
         }
     }
 
-    pub fn to_xtream(&self) -> XtreamPlaylistItem {
+    pub fn to_xtream(&self) -> Result<XtreamPlaylistItem, M3uFilterError> {
         let header = self.header.borrow();
-        XtreamPlaylistItem {
-            stream_id: header.stream_id.parse::<u32>().unwrap(),
-            provider_id: header.id.parse::<u32>().unwrap(),
-            name: Rc::clone(&header.name),
-            logo: Rc::clone(&header.logo),
-            logo_small: Rc::clone(&header.logo_small),
-            group: Rc::clone(&header.group),
-            title: Rc::clone(&header.title),
-            parent_code: Rc::clone(&header.parent_code),
-            rec: Rc::clone(&header.rec),
-            url: Rc::clone(&header.url),
-            epg_channel_id: header.epg_channel_id.clone(),
-            xtream_cluster: header.xtream_cluster.clone(),
-            additional_properties: match &header.additional_properties {
-                None => None,
-                Some(props) => match serde_json::to_string(props) {
-                    Ok(val) => Some(val),
-                    Err(_) => None
-                }
-            },
-            item_type: header.item_type.clone(),
-            series_fetched: header.series_fetched,
-            category_id: header.category_id,
-            input_id: header.input_id,
+        match header.id.parse::<u32>() {
+            Ok(provider_id) => {
+                Ok(XtreamPlaylistItem {
+                    stream_id: header.stream_id.parse::<u32>().unwrap_or(0),
+                    provider_id,
+                    name: Rc::clone(&header.name),
+                    logo: Rc::clone(&header.logo),
+                    logo_small: Rc::clone(&header.logo_small),
+                    group: Rc::clone(&header.group),
+                    title: Rc::clone(&header.title),
+                    parent_code: Rc::clone(&header.parent_code),
+                    rec: Rc::clone(&header.rec),
+                    url: Rc::clone(&header.url),
+                    epg_channel_id: header.epg_channel_id.clone(),
+                    xtream_cluster: header.xtream_cluster.clone(),
+                    additional_properties: match &header.additional_properties {
+                        None => None,
+                        Some(props) => match serde_json::to_string(props) {
+                            Ok(val) => Some(val),
+                            Err(_) => None
+                        }
+                    },
+                    item_type: header.item_type.clone(),
+                    series_fetched: header.series_fetched,
+                    category_id: header.category_id,
+                    input_id: header.input_id,
+                })
+            }
+            Err(_) => {
+                Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("cant parse provider stream id: {}", header.id)))
+            }
         }
     }
 }

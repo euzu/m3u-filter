@@ -98,11 +98,12 @@ fn write_playlist_to_file(storage_path: &Path, stream_id: &mut u32, cluster: &Xt
     match IndexedDocumentWriter::new(xtream_path.clone(), idx_path) {
         Ok(mut writer) => {
             for pli in playlist.iter_mut() {
-                let mut xtream = pli.to_xtream();
-                xtream.stream_id = *stream_id;
-                match writer.write_doc(&xtream) {
-                    Ok(_) => *stream_id += 1,
-                    Err(err) => return cant_write_result!(&xtream_path, err)
+                if let Ok(mut xtream) = pli.to_xtream() {
+                    xtream.stream_id = *stream_id;
+                    match writer.write_doc(&xtream) {
+                        Ok(_) => *stream_id += 1,
+                        Err(err) => return cant_write_result!(&xtream_path, err)
+                    }
                 }
             }
             if cluster == &XtreamCluster::Live {
