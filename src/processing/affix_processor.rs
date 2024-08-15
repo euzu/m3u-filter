@@ -10,9 +10,9 @@ fn create_affix_processor(affix: &InputAffix, is_prefix: bool) -> AffixProcessor
         let header = &mut channel.header.borrow_mut();
         let value = if let Some(field_value) = header.get_field(affix.field.as_str()) {
             if is_prefix {
-                format!("{}{}", field_value.as_str(), &affix.value)
-            } else {
                 format!("{}{}", &affix.value, field_value.as_str())
+            } else {
+                format!("{}{}", field_value.as_str(), &affix.value)
             }
         } else {
             String::from(&affix.value)
