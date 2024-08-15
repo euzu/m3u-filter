@@ -11,6 +11,11 @@ use crate::utils::file_utils::{get_file_path, open_file, persist_file};
 use reqwest::header::CONTENT_ENCODING;
 use flate2::read::{GzDecoder, ZlibDecoder};
 
+fn is_gzip(bytes: &[u8]) -> bool {
+    // Gzip files start with the bytes 0x1F 0x8B
+    bytes.len() >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B
+}
+
 pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
 }
@@ -118,7 +123,7 @@ pub(crate) async fn download_text_content(input: &ConfigInput, url_str: &str, pe
                 let is_success = response.status().is_success();
                 if is_success {
                     let header_value = response.headers().get(CONTENT_ENCODING);
-                    let encoding = if let Some(encoding_header) = header_value {
+                    let mut encoding = if let Some(encoding_header) = header_value {
                         match encoding_header.to_str() {
                             Ok(value) => Some(value.to_string()),
                             Err(_) => None,
@@ -128,6 +133,9 @@ pub(crate) async fn download_text_content(input: &ConfigInput, url_str: &str, pe
                     };
                     match response.bytes().await {
                         Ok(bytes) => {
+                            if bytes.len() >= 2 && is_gzip(&bytes[0..2]) {
+                                encoding = Some("gzip".to_string());
+                            }
                             let mut decode_buffer = String::new();
                             if let Some(encoding_type) = encoding {
                                 match encoding_type.as_str() {
