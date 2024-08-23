@@ -9,7 +9,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use quick_xml::events::{BytesStart, Event};
 use std::io::{BufReader};
-use chrono::{Duration, NaiveDateTime};
+use chrono::{Duration, NaiveDateTime, TimeDelta};
 
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::api::api_utils::{get_user_target, serve_file};
@@ -20,7 +20,7 @@ use crate::repository::m3u_repository::m3u_get_epg_file_path;
 use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
 use crate::utils::{file_utils, request_utils};
 
-fn time_correct(date_time: &str, correction: i64) -> String {
+fn time_correct(date_time: &str, correction: &TimeDelta) -> String {
     // Split the dateTime string into date and time parts
     let date_time_split: Vec<&str> = date_time.split(' ').collect();
     if date_time_split.len() != 2 {
@@ -30,7 +30,7 @@ fn time_correct(date_time: &str, correction: i64) -> String {
     // Parse the datetime string
     match NaiveDateTime::parse_from_str(date_time_split[0], "%Y%m%d%H%M%S") {
         Ok(native_dt) => {
-            let corrected_dt = native_dt + Duration::minutes(correction);
+            let corrected_dt = native_dt + *correction;
             // Format the corrected datetime back to string
             let formatted_dt = corrected_dt.format("%Y%m%d%H%M%S").to_string();
             let result = format!("{} {}", formatted_dt, date_time_split[1]);
@@ -67,78 +67,121 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
     None
 }
 
-async fn serve_epg(epg_path: &Path, req: &HttpRequest, user: &ProxyUserCredentials) -> HttpResponse {
+fn parse_timeshift(time_shift: Option<&String>) -> Option<i32> {
+    match time_shift {
+        None => None,
+        Some(offset) => {
+            let sign_factor = if offset.starts_with('-') { -1 } else { 1 };
+            let offset = offset.trim_start_matches(&['-', '+'][..]); // Remove the sign for parsing
 
+            let total_minutes = if offset.contains(':') {
+                // Handle the case with hours and minutes (e.g., "-2:30", "1:45", "+0:15", ":30")
+                let parts: Vec<&str> = offset.split(':').collect();
+
+                let hours: i32 = if parts[0].is_empty() {
+                    0 // Treat empty hour part as 0 hours
+                } else {
+                    parts[0].parse().unwrap_or(0)
+                };
+
+                let minutes: i32 = if parts.len() > 1 {
+                    parts[1].parse().unwrap_or(0)
+                } else {
+                    0
+                };
+
+                // Convert hours to minutes and add the minute part
+                hours * 60 + minutes
+            } else {
+                // Handle single number case (e.g., "2" or "+2")
+                let num: i32 = offset.parse().unwrap_or(0);
+                num * 60
+            };
+
+            if total_minutes > 0 {
+                Some(sign_factor * total_minutes)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+async fn serve_epg(epg_path: &Path, req: &HttpRequest, user: &ProxyUserCredentials) -> HttpResponse {
     match File::open(epg_path) {
         Ok(epg_file) => {
-            let timeshift = user.epg_timeshift.is_some();
-            if timeshift {
-                let offset_minutes = 20;
-                let reader = BufReader::new(epg_file);
-                let encoder = GzEncoder::new(Vec::new(), Compression::default());
-                let mut xml_reader = Reader::from_reader(reader);
-                let mut xml_writer = Writer::new(encoder);
-                let mut buf = Vec::new();
-
-                loop {
-                    match xml_reader.read_event_into(&mut buf) {
-                        Ok(Event::Start(ref e)) if e.name().as_ref() == b"programme" => {
-                            // Modify the attributes
-                            let mut elem = BytesStart::from (e.name());
-                            for attr in e.attributes() {
-                                match attr {
-                                    Ok(attr) if attr.key.as_ref() == b"start" => {
-                                        let start_value = attr.decode_and_unescape_value(xml_reader.decoder())
-                                            .expect("Failed to decode start attribute");
-                                        // Modify the start attribute value as needed
-                                        elem.push_attribute(("start", time_correct(&start_value, offset_minutes).as_str()));
-                                    }
-                                    Ok(attr) if attr.key.as_ref() == b"stop" => {
-                                        let stop_value = attr.decode_and_unescape_value(xml_reader.decoder())
-                                            .expect("Failed to decode stop attribute");
-                                        // Modify the stop attribute value as needed
-                                        elem.push_attribute(("stop", time_correct(&stop_value, offset_minutes).as_str()));
-                                    }
-                                    Ok(attr) => {
-                                        // Copy any other attributes as they are
-                                        elem.push_attribute(attr);
-                                    }
-                                    Err(e) => {
-                                        println!("Error parsing attribute: {e}");
-                                    }
-                                }
-                            }
-
-                            // Write the modified start event
-                            xml_writer.write_event(Event::Start(elem)).expect("Failed to write event");
-                        }
-                        Ok(Event::Eof) => break, // End of file
-                        Ok(event) => {
-                            // Write any other event as is
-                            xml_writer.write_event(event).expect("Failed to write event");
-                        }
-                        Err(e) => {
-                            println!("Error: {e}");
-                            break;
-                        }
-                    }
-
-                    buf.clear();
+            match parse_timeshift(user.epg_timeshift.as_ref()) {
+                None => serve_file(epg_path, req, mime::TEXT_XML).await,
+                Some(duration) => {
+                    serve_epg_with_timeshift(epg_file, duration)
                 }
-
-                let compressed_data = xml_writer.into_inner().finish().unwrap();
-                HttpResponse::Ok()
-                    .content_type("application/octet-stream")
-                    .insert_header((header::CONTENT_ENCODING, "gzip")) // Set Content-Encoding header
-                    .body(compressed_data)
-            } else {
-                serve_file(epg_path, req, mime::TEXT_XML).await
             }
-        },
+        }
         Err(_) => {
             HttpResponse::NoContent().finish()
         }
     }
+}
+
+fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> HttpResponse {
+    let reader = BufReader::new(epg_file);
+    let encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let mut xml_reader = Reader::from_reader(reader);
+    let mut xml_writer = Writer::new(encoder);
+    let mut buf = Vec::new();
+    let duration = Duration::minutes(i64::from(offset_minutes));
+
+    loop {
+        match xml_reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.name().as_ref() == b"programme" => {
+                // Modify the attributes
+                let mut elem = BytesStart::from(e.name());
+                for attr in e.attributes() {
+                    match attr {
+                        Ok(attr) if attr.key.as_ref() == b"start" => {
+                            let start_value = attr.decode_and_unescape_value(xml_reader.decoder())
+                                .expect("Failed to decode start attribute");
+                            // Modify the start attribute value as needed
+                            elem.push_attribute(("start", time_correct(&start_value, &duration).as_str()));
+                        }
+                        Ok(attr) if attr.key.as_ref() == b"stop" => {
+                            let stop_value = attr.decode_and_unescape_value(xml_reader.decoder())
+                                .expect("Failed to decode stop attribute");
+                            // Modify the stop attribute value as needed
+                            elem.push_attribute(("stop", time_correct(&stop_value, &duration).as_str()));
+                        }
+                        Ok(attr) => {
+                            // Copy any other attributes as they are
+                            elem.push_attribute(attr);
+                        }
+                        Err(e) => {
+                            println!("Error parsing attribute: {e}");
+                        }
+                    }
+                }
+
+                // Write the modified start event
+                xml_writer.write_event(Event::Start(elem)).expect("Failed to write event");
+            }
+            Ok(Event::Eof) => break, // End of file
+            Ok(event) => {
+                // Write any other event as is
+                xml_writer.write_event(event).expect("Failed to write event");
+            }
+            Err(e) => {
+                println!("Error: {e}");
+                break;
+            }
+        }
+
+        buf.clear();
+    }
+
+    let compressed_data = xml_writer.into_inner().finish().unwrap();
+    HttpResponse::Ok()
+        .content_type("application/octet-stream")
+        .insert_header((header::CONTENT_ENCODING, "gzip")) // Set Content-Encoding header
+        .body(compressed_data)
 }
 
 async fn xmltv_api(
@@ -149,6 +192,8 @@ async fn xmltv_api(
     if let Some((user, target)) = get_user_target(&api_req, &app_state) {
         match get_epg_path_for_target(&app_state.config, target) {
             None => {
+                // No epg configured, we try to figure out an epg url and redirect.
+                // No processing or timeshift 
                 if let Some(value) = get_xmltv_raw_epg(&app_state.config, &user, &target.name).await {
                     return value;
                 }
@@ -175,27 +220,6 @@ fn get_xmltv_epg_url(input: &ConfigInput) -> Result<String, ParseError> {
         Ok(epg_url)
     }
 }
-
-// fn parse_custom_timeshift(timeshift: &str) -> Result<Duration, Box<dyn Error>> {
-//     let re = Regex::new(r"^([+-])?(\d{1,2}):(\d{2})$")?;
-//
-//     if let Some(caps) = re.captures(timeshift) {
-//         let sign = caps.get(1).map_or("+", |m| m.as_str());
-//         let hours: i64 = caps.get(2).ok_or("Missing hours")?.as_str().parse()?;
-//         let minutes: i64 = caps.get(3).ok_or("Missing minutes")?.as_str().parse()?;
-//
-//         let total_minutes = hours * 60 + minutes;
-//         let duration = if sign == "-" {
-//             Duration::minutes(-total_minutes)
-//         } else {
-//             Duration::minutes(total_minutes)
-//         };
-//
-//         Ok(duration)
-//     } else {
-//         Err("Invalid time shift format".into())
-//     }
-// }
 
 async fn get_xmltv_raw_epg(config: &Config, user: &ProxyUserCredentials, target_name: &str) -> Option<HttpResponse> {
     // If no epg_url is provided for input, we did not process the xmltv for our channels.

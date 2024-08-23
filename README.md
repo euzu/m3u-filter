@@ -749,6 +749,7 @@ The `token` is _optional_. If defined it should be unique. The `token`can be use
 instead of username+password
 `proxy` is _optional_. If defined it can be `reverse` or `redirect`. Default is `redirect`.
 `server` is _optional_. It should match one server definition, if not given the server with the name `default` is used or the first one.  
+`epg_timeshift` is _optional_. It is only applied when source has `epg_url` configured. `epg_timeshift: [-+]hh:mm`, example  `-2:30`, `1:45`, `+0:15`, `2`, `:30`, `:3`, `2:`
 
 To access the api for: 
 - `xtream` use url like `http://192.169.1.2/player_api.php?username={}&password={}`
@@ -795,7 +796,7 @@ server:
 user:
   - target: pl1
     credentials:
-      - {username: x3452, password: ztrhgrGZ, token: 4342sd, proxy: reverse, server: external}
+      - {username: x3452, password: ztrhgrGZ, token: 4342sd, proxy: reverse, server: external, epg_timeshift: -2:30}
       - {username: x3451, password: secret, token: abcde, proxy: redirect}
 ```
 
