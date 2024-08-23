@@ -11,7 +11,6 @@ static EPG_ID: &str = "id";
 pub(crate) fn parse_tvguide(content: &str) -> Option<TVGuide> {
     let mut stack: Vec<XmlTag> = vec![];
     let mut reader = Reader::from_str(content);
-    reader.trim_text(true);
     let mut buf = Vec::<u8>::new();
     loop {
         match reader.read_event_into(&mut buf) {

@@ -19,4 +19,4 @@ user:
   - target: pl1
     credentials:
       - {username: x3452, password: ztrhgrGZrt83hjerter, token: 4243234wer234er234, proxy: redirect, server: default}
-      - {username: x3453, password: kljlkjorn87jfkhksdh, token: 43dfgerrt345345ss4, proxy: reverse, server: extern}
+      - {username: x3453, password: kljlkjorn87jfkhksdh, token: 43dfgerrt345345ss4, proxy: reverse, server: extern, epg_timeshift: -02:30}

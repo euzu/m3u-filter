@@ -22,6 +22,8 @@ pub(crate) async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: m
     HttpResponse::NoContent().finish()
 }
 
+
+
 pub(crate) fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a UserApiRequest,
                                                  app_state: &'a web::Data<AppState>) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() && !password.is_empty() {

@@ -1,4 +1,9 @@
 # Changelog
+# 2.0.4(2024-08-xx)
+* if Content type of file download is not set in header, the gzip encoding is checked through magic header.
+* if source is m3u and stream id not a number, the entry is skipped and logged.
+* prefix and suffix was applied wrong, fixed.
+
 # 2.0.3(2024-07-11)
 *  added  `source` - `input` - `name` attribute to README
 *  added `chno`  to Playlist attributes.
