@@ -520,7 +520,7 @@ async fn xtream_player_api(
                                 "get_series" => xtream_repository::xtream_load_rewrite_playlist(&XtreamCluster::Series, &app_state.config, target, cat_id),
                                 _ => Err(Error::new(ErrorKind::Unsupported, format!("Cant find action: {action} for target: {target_name}"))),
                             } {
-                                Ok(payload) => HttpResponse::Ok().body(payload),
+                                Ok(payload) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(payload),
                                 Err(err) => {
                                     error!("Could not create response for xtream target: {} action: {} err: {}", target_name, action, err);
                                     HttpResponse::NoContent().finish()
