@@ -1,4 +1,5 @@
 #![allow(clippy::empty_docs)]
+
 use std::cell::RefCell;
 use enum_iterator::all;
 use std::collections::{HashMap};
@@ -7,7 +8,7 @@ use log::{debug, error, Level, log_enabled};
 use pest::iterators::Pair;
 use pest::Parser;
 use petgraph::algo::toposort;
-use crate::model::playlist::PlaylistItem;
+use crate::model::playlist::{PlaylistItem, PlaylistItemType};
 use crate::model::config::ItemField;
 use petgraph::graph::DiGraph;
 use crate::{create_m3u_filter_error_result};
@@ -21,6 +22,7 @@ pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<Strin
         ItemField::Name => &header.name,
         ItemField::Title => &header.title,
         ItemField::Url => &header.url,
+        ItemField::Type => &Rc::new(header.item_type.to_string()),
     };
     Rc::clone(value)
 }
@@ -32,6 +34,7 @@ pub(crate) fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: 
         ItemField::Name => header.name = value,
         ItemField::Title => header.title = value,
         ItemField::Url => header.url = value,
+        ItemField::Type => {}
     };
 }
 
@@ -79,8 +82,11 @@ and = { ^"and" }
 or = { ^"or" }
 not = { ^"not" }
 regexp = @{ "\"" ~ ( "\\\"" | (!"\"" ~ ANY) )* ~ "\"" }
-comparison_value = _{ regexp }
-comparison = { field ~ "~" ~ comparison_value }
+type_value = { ^"live" | ^"vod" | ^"series" }
+type_comparison = { ^"type" ~ "=" ~ type_value }
+field_comparison_value = _{ regexp }
+field_comparison = { field ~ "~" ~ field_comparison_value }
+comparison = { field_comparison | type_comparison }
 bool_op = { and | or}
 expr_group = { "(" ~ expr ~ ")" }
 expr = {
@@ -116,7 +122,8 @@ impl std::fmt::Display for BinaryOperator {
 #[derive(Debug, Clone)]
 pub(crate) enum Filter {
     Group(Box<Filter>),
-    Comparison(ItemField, RegexWithCaptures),
+    FieldComparison(ItemField, RegexWithCaptures),
+    TypeComparison(ItemField, PlaylistItemType),
     UnaryExpression(UnaryOperator, Box<Filter>),
     BinaryExpression(Box<Filter>, BinaryOperator, Box<Filter>),
 }
@@ -124,7 +131,7 @@ pub(crate) enum Filter {
 impl Filter {
     pub fn filter(&self, provider: &ValueProvider, processor: &mut dyn ValueProcessor) -> bool {
         match self {
-            Filter::Comparison(field, rewc) => {
+            Filter::FieldComparison(field, rewc) => {
                 let value = provider.call(field);
                 let is_match = rewc.re.is_match(value.as_str());
                 if is_match {
@@ -132,6 +139,14 @@ impl Filter {
                         debug!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);
                     }
                     processor.process(field, &value, rewc);
+                }
+                is_match
+            }
+            Filter::TypeComparison(field, item_type) => {
+                let value = provider.call(field);
+                let is_match = item_type.is_same(value.as_str());
+                if is_match && log_enabled!(Level::Debug) {
+                    debug!("Match found: {:?} {}", &field, value);
                 }
                 is_match
             }
@@ -158,8 +173,16 @@ impl Filter {
 impl std::fmt::Display for Filter {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Filter::Comparison(field, rewc) => {
+            Filter::FieldComparison(field, rewc) => {
                 write!(f, "{} ~ \"{}\"", field, String::from(&rewc.restr))
+            }
+            Filter::TypeComparison(field, item_type) => {
+                write!(f, "{} = {}", field, match item_type {
+                    PlaylistItemType::Live => "live",
+                    PlaylistItemType::Movie => "vod",
+                    PlaylistItemType::Series => "series",
+                    PlaylistItemType::SeriesInfo => "series-info"
+                })
             }
             Filter::Group(stmt) => {
                 write!(f, "({stmt})")
@@ -217,17 +240,30 @@ fn get_parser_regexp(expr: &Pair<Rule>, templates: &Vec<PatternTemplate>) -> Res
     create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
 }
 
-fn get_parser_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<Filter, M3uFilterError> {
+fn get_parser_field_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<Filter, M3uFilterError> {
     let mut expr_inner = expr.into_inner();
     match get_parser_item_field(&expr_inner.next().unwrap()) {
         Ok(field) => {
             match get_parser_regexp(&expr_inner.next().unwrap(), templates) {
-                Ok(regexp) => Ok(Filter::Comparison(field, regexp)),
+                Ok(regexp) => Ok(Filter::FieldComparison(field, regexp)),
                 Err(err) => Err(err),
             }
         }
         Err(err) => Err(err)
     }
+}
+
+fn get_parser_type_comparison(expr: Pair<Rule>) -> Result<Filter, M3uFilterError> {
+    let expr_inner = expr.into_inner();
+    let text_item_type = &expr_inner.as_str();
+    let item_type = if text_item_type.eq_ignore_ascii_case("live") {
+        PlaylistItemType::Live
+    } else if text_item_type.eq_ignore_ascii_case("vod") {
+        PlaylistItemType::Movie
+    } else {
+        PlaylistItemType::Series
+    };
+    Ok(Filter::TypeComparison(ItemField::Type, item_type))
 }
 
 macro_rules! handle_expr {
@@ -260,12 +296,22 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, err
 
     for pair in pairs {
         match pair.as_rule() {
-            Rule::comparison => {
-                let comp_res = get_parser_comparison(pair, templates);
+            Rule::field_comparison => {
+                let comp_res = get_parser_field_comparison(pair, templates);
                 match comp_res {
                     Ok(comp) => handle_expr!(bop, uop, stmts, comp),
                     Err(err) => errors.push(err.to_string()),
                 }
+            }
+            Rule::type_comparison => {
+                let comp_res = get_parser_type_comparison(pair);
+                match comp_res {
+                    Ok(comp) => handle_expr!(bop, uop, stmts, comp),
+                    Err(err) => errors.push(err.to_string()),
+                }
+            }
+            Rule::comparison => {
+                handle_expr!(bop, uop, stmts, get_parser_expression(pair, templates, errors));
             }
             Rule::expr => {
                 handle_expr!(bop, uop, stmts, get_parser_expression(pair, templates, errors));
@@ -381,7 +427,7 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
     let mut node_names = HashMap::new();
     let mut node_deps = HashMap::new();
 
-    let mut add_node = |di_graph: &mut DiGraph<_, _>, node_name: &String| if let Some(idx) =  node_ids.get(node_name) {
+    let mut add_node = |di_graph: &mut DiGraph<_, _>, node_name: &String| if let Some(idx) = node_ids.get(node_name) {
         *idx
     } else {
         let key = node_name.clone();

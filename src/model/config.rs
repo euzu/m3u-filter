@@ -134,6 +134,8 @@ pub(crate) enum ItemField {
     Title,
     #[serde(rename = "url")]
     Url,
+    #[serde(rename = "type")]
+    Type,
 }
 
 impl Display for ItemField {
@@ -143,6 +145,7 @@ impl Display for ItemField {
             Self::Name => write!(f, "Name"),
             Self::Title => write!(f, "Title"),
             Self::Url => write!(f, "Url"),
+            Self::Type => write!(f, "Type"),
         }
     }
 }

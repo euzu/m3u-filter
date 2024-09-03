@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
@@ -55,6 +56,28 @@ pub(crate) enum PlaylistItemType {
     Movie = 2,
     Series = 3,
     SeriesInfo = 4,
+}
+
+impl PlaylistItemType {
+    pub(crate) fn is_same(&self, value: &str) -> bool {
+        match self {
+            PlaylistItemType::Live => value.eq_ignore_ascii_case("live"),
+            PlaylistItemType::Movie => value.eq_ignore_ascii_case("movie"),
+            PlaylistItemType::Series => value.eq_ignore_ascii_case("series"),
+            PlaylistItemType::SeriesInfo => value.eq_ignore_ascii_case("series-info"),
+        }
+    }
+}
+
+impl Display for PlaylistItemType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            PlaylistItemType::Live => "live",
+            PlaylistItemType::Movie => "movie",
+            PlaylistItemType::Series => "series",
+            PlaylistItemType::SeriesInfo => "series-info",
+        })
+    }
 }
 
 pub(crate) trait FieldAccessor {

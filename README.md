@@ -399,8 +399,9 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 
 ### 2.2.2.5 `filter`
 The filter is a string with a filter statement.
-The filter can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
-Filter fields are `Group`, `Title`, `Name` and `Url`.
+The filter can have UnaryExpression `NOT`, BinaryExpression `AND OR`, Regexp Comparison `(Group|Title|Name|Url) ~ "regexp"`
+and Type Comparsison `Type = vod` or `Type = live` or `Type = series`.
+Filter fields are `Group`, `Title`, `Name`, `Url` and `Type`.
 Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group ~ "^AU.*")`
 
 If you use characters like `+ | [ ] ( )` in filters don't forget to escape them!!

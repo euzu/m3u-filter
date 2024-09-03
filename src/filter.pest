@@ -4,8 +4,11 @@ and = { ^"and" }
 or = { ^"or" }
 not = { ^"not" }
 regexp = @{ "\"" ~ ( "\\\"" | (!"\"" ~ ANY) )* ~ "\"" }
-comparison_value = _{ regexp }
-comparison = { field ~ "~" ~ comparison_value }
+type_value = { ^"live" | ^"vod" | ^"series" }
+type_comparison = { ^"type" ~ "=" ~ type_value }
+field_comparison_value = _{ regexp }
+field_comparison = { field ~ "~" ~ field_comparison_value }
+comparison = { field_comparison | type_comparison }
 bool_op = { and | or}
 expr_group = { "(" ~ expr ~ ")" }
 expr = {
