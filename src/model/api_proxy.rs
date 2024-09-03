@@ -53,6 +53,7 @@ pub(crate) struct ProxyUserCredentials {
     #[serde(default = "ProxyType::default")]
     pub proxy: ProxyType,
     pub server: Option<String>,
+    pub epg_timeshift: Option<String>,
 }
 
 impl ProxyUserCredentials {
