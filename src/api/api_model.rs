@@ -190,6 +190,10 @@ pub(crate) struct UserApiRequest {
     pub start: String,
     #[serde(default = "default_as_empty_str")]
     pub end: String,
+    #[serde(default = "default_as_empty_str")]
+    pub stream: String,
+    #[serde(default = "default_as_empty_str")]
+    pub duration: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
