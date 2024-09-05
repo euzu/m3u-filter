@@ -257,13 +257,18 @@ fn get_parser_type_comparison(expr: Pair<Rule>) -> Result<Filter, M3uFilterError
     let expr_inner = expr.into_inner();
     let text_item_type = &expr_inner.as_str();
     let item_type = if text_item_type.eq_ignore_ascii_case("live") {
-        PlaylistItemType::Live
+        Some(PlaylistItemType::Live)
     } else if text_item_type.eq_ignore_ascii_case("vod") {
-        PlaylistItemType::Movie
+        Some(PlaylistItemType::Movie)
+    } else if text_item_type.eq_ignore_ascii_case("series") {
+        Some(PlaylistItemType::Series)
     } else {
-        PlaylistItemType::Series
+        None
     };
-    Ok(Filter::TypeComparison(ItemField::Type, item_type))
+    match item_type {
+        None => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse item type: {text_item_type}"),
+        Some(itype) => Ok(Filter::TypeComparison(ItemField::Type, itype))
+    }
 }
 
 macro_rules! handle_expr {
@@ -310,10 +315,7 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, err
                     Err(err) => errors.push(err.to_string()),
                 }
             }
-            Rule::comparison => {
-                handle_expr!(bop, uop, stmts, get_parser_expression(pair, templates, errors));
-            }
-            Rule::expr => {
+            Rule::comparison | Rule::expr => {
                 handle_expr!(bop, uop, stmts, get_parser_expression(pair, templates, errors));
             }
             Rule::expr_group => {

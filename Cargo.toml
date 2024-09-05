@@ -16,13 +16,13 @@ strip = true
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_yaml = "0.9.33"
 serde_json = "1"
-quick-xml = { version = "0", features = ["serialize"] }
+quick-xml = { version = "0.36", features = ["serialize"] }
 regex = "1.10"
 clap = { version = "4", features = ["derive"] }
 url = "2.5"
 reqwest = { version = "0", features = ["blocking", "json", "stream", "rustls-tls"] }
 chrono = "0.4"
-cron = "0"
+cron = "0.12"
 actix-web = "4.9"
 actix-server = "2.5"
 actix-files = "0"
@@ -48,4 +48,4 @@ uuid = { version = "1.8", features = ["v4", "fast-rng", "macro-diagnostics"] }
 rand = "0.8"
 rpassword = "7.3"
 flate2 = "1"
-time = "0.3.36"
+time = "0.3"
