@@ -7,7 +7,7 @@ use crate::repository::index_record::IndexRecord;
 use crate::utils::file_utils;
 use crate::utils::file_utils::create_file_tuple;
 
-pub(crate) struct IndexedDocumentWriter {
+pub(in crate::repository) struct IndexedDocumentWriter {
     main_path: PathBuf,
     index_path: PathBuf,
     main_file: File,

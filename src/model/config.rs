@@ -11,6 +11,7 @@ use std::sync::{Arc, RwLock};
 
 use log::{debug, error, warn};
 use path_absolutize::Absolutize;
+use url::{Url};
 use crate::auth::user::UserCredential;
 
 use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
@@ -79,18 +80,18 @@ macro_rules! handle_m3u_filter_error_result {
 pub(crate) enum TargetType {
     #[serde(rename = "m3u")]
     M3u,
-    #[serde(rename = "strm")]
-    Strm,
     #[serde(rename = "xtream")]
     Xtream,
+    #[serde(rename = "strm")]
+    Strm,
 }
 
 impl Display for TargetType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             Self::M3u => write!(f, "M3u"),
-            Self::Strm => write!(f, "Strm"),
             Self::Xtream => write!(f, "Xtream"),
+            Self::Strm => write!(f, "Strm"),
         }
     }
 }
@@ -545,6 +546,7 @@ impl ConfigInput {
                 self.persist = None;
             }
         }
+        
         Ok(())
     }
 
@@ -557,7 +559,7 @@ impl ConfigInput {
                     password: self.password.as_ref().unwrap().to_owned(),
                 });
             }
-        } else if let Ok(url) = url::Url::parse(&self.url) {
+        } else if let Ok(url) = Url::parse(&self.url) {
             let base_url = url.origin().ascii_serialization();
             let mut username = None;
             let mut password = None;

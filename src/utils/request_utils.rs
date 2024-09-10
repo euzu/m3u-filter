@@ -10,6 +10,7 @@ use crate::model::config::{ConfigInput};
 use crate::utils::file_utils::{get_file_path, open_file, persist_file};
 use reqwest::header::CONTENT_ENCODING;
 use flate2::read::{GzDecoder, ZlibDecoder};
+use url::Url;
 
 fn is_gzip(bytes: &[u8]) -> bool {
     // Gzip files start with the bytes 0x1F 0x8B
@@ -207,5 +208,14 @@ pub(crate) async fn get_input_json_content(input: &ConfigInput, url: &str, persi
     match download_json_content(input, url, persist_filepath).await {
         Ok(content) => Ok(content),
         Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {url}  => {}", e)
+    }
+}
+
+
+
+pub(crate) fn get_base_url(url: &str) -> Option<String> {
+    match Url::parse(url) {
+        Ok(url) => Some(url.origin().ascii_serialization()),
+        Err(_) => None
     }
 }

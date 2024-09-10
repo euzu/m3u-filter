@@ -2,7 +2,8 @@ use std::cell::RefCell;
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
-
+use uuid::{Uuid};
+use sha1::{Sha1, Digest};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
@@ -11,20 +12,21 @@ use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
 use crate::utils::default_utils::{default_as_false, default_as_zero_u16, default_as_zero_u32, default_playlist_item_type, default_stream_cluster};
+use crate::utils::request_utils::get_base_url;
 
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
 #[derive(Debug, Clone)]
-pub(crate) struct FetchedPlaylist<'a> {
+pub(crate) struct FetchedPlaylist<'a> { // Contains playlist for one input
     pub input: &'a ConfigInput,
-    pub playlist: Vec<PlaylistGroup>,
+    pub playlistgroups: Vec<PlaylistGroup>,
     pub epg: Option<TVGuide>,
 }
 
 impl FetchedPlaylist<'_> {
     pub(crate) fn update_playlist(&mut self, plg: &PlaylistGroup) {
-        for grp in &mut self.playlist {
+        for grp in &mut self.playlistgroups {
             if grp.id == plg.id {
                 plg.channels.iter().for_each(|item| grp.channels.push(item.clone()));
                 return;
@@ -33,7 +35,8 @@ impl FetchedPlaylist<'_> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[repr(u8)]
 pub(crate) enum XtreamCluster {
     Live = 1,
     Video = 2,
@@ -87,9 +90,9 @@ pub(crate) trait FieldAccessor {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct PlaylistItemHeader {
-    // stream_id is a custom field for processing
-    pub stream_id: Rc<String>,
-    pub id: Rc<String>,
+    pub uuid: Rc<String>, // calculated
+    pub stream_id: Rc<String>, // virtual id
+    pub id: Rc<String>, // provider id
     pub name: Rc<String>,
     pub chno: Rc<String>,
     pub logo: Rc<String>,
@@ -113,6 +116,27 @@ pub(crate) struct PlaylistItemHeader {
     pub category_id: u32,
     #[serde(default = "default_as_zero_u16")]
     pub input_id: u16,
+}
+
+impl PlaylistItemHeader {
+
+    pub(crate) fn gen_uuid(&mut self) {
+        let cluster = self.xtream_cluster as u8;
+        let mut hasher = Sha1::new();
+        hasher.update(get_base_url(&self.url).unwrap_or(self.url.to_string()));
+        hasher.update(self.stream_id.as_str());
+        hasher.update(self.title.as_str());
+        hasher.update(self.name.as_str());
+        hasher.update(self.group.as_str());
+        hasher.update(vec![cluster].as_slice());
+        let hashed_bytes = hasher.finalize();
+        let namespace = Uuid::NAMESPACE_OID;
+        let uuid = Uuid::new_v5(&namespace, &hashed_bytes).to_string();
+        self.uuid = Rc::new(uuid);
+    }
+    pub(crate) fn get_uuid(&self) -> &str {
+        self.uuid.as_ref()
+    }
 }
 
 macro_rules! to_m3u_non_empty_fields {
@@ -159,7 +183,6 @@ macro_rules! generate_field_accessor_impl_for_playlist_item_header {
     }
 }
 
-// !! should be in sync with MAPPER_ATTRIBUTES  except stream_id !!
 generate_field_accessor_impl_for_playlist_item_header!(id, stream_id, name, chno, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, url;);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,7 +297,7 @@ impl PlaylistItem {
                     rec: Rc::clone(&header.rec),
                     url: Rc::clone(&header.url),
                     epg_channel_id: header.epg_channel_id.clone(),
-                    xtream_cluster: header.xtream_cluster.clone(),
+                    xtream_cluster: header.xtream_cluster,
                     additional_properties: match &header.additional_properties {
                         None => None,
                         Some(props) => match serde_json::to_string(props) {
@@ -302,5 +325,12 @@ pub(crate) struct PlaylistGroup {
     pub channels: Vec<PlaylistItem>,
     #[serde(default = "default_stream_cluster", skip_serializing, skip_deserializing)]
     pub xtream_cluster: XtreamCluster,
+}
+
+impl PlaylistGroup {
+
+    pub(crate) fn on_load(&mut self) {
+        self.channels.iter().for_each(|pl| pl.header.borrow_mut().gen_uuid());
+    }
 }
 

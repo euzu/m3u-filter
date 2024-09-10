@@ -55,6 +55,7 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
 
 fn create_empty_playlistitem_header(input_id: u16, url: &str) -> PlaylistItemHeader {
     PlaylistItemHeader {
+        uuid: default_as_empty_rc_str(),
         id: default_as_empty_rc_str(),
         stream_id: default_as_empty_rc_str(),
         name: default_as_empty_rc_str(),
@@ -125,6 +126,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
                 plih.id = Rc::new(chanid);
             }
         }
+        plih.stream_id = Rc::clone(&plih.id);
         plih.epg_channel_id = Some(Rc::clone(&plih.id));
     }
 
@@ -211,12 +213,14 @@ pub(crate) fn parse_m3u(cfg: &Config, input: &ConfigInput, lines: &[String]) -> 
 
     let mut result: Vec<PlaylistGroup> = vec![];
     for (grp_id, (key, channels)) in (1_u32..).zip(groups.into_iter()) {
-        let cluster = channels.first().map(|pli| pli.header.borrow().xtream_cluster.clone());
-        result.push(PlaylistGroup { id: grp_id, xtream_cluster: cluster.unwrap(), title: Rc::clone(&key), channels });
+        let cluster = channels.first().map(|pli| pli.header.borrow().xtream_cluster);
+        result.push(PlaylistGroup {id: grp_id, xtream_cluster: cluster.unwrap(), title: Rc::clone(&key), channels });
     }
+    // apply the sort order from the provider
+    let mut sort_iterator = sort_order.iter();
     result.sort_by(|f, s| {
-        let i1 = sort_order.iter().position(|r| **r == *f.title).unwrap();
-        let i2 = sort_order.iter().position(|r| **r == *s.title).unwrap();
+        let i1 = sort_iterator.position(|r| **r == *f.title).unwrap();
+        let i2 = sort_iterator.position(|r| **r == *s.title).unwrap();
         i1.cmp(&i2)
     });
     result

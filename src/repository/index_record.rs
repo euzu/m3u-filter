@@ -12,13 +12,13 @@ of the encoded file, and size is the size of the encoded struct.
 
 We also use it for different purposes, like storing id -> to id mapping.
  */
-pub(crate) struct IndexRecord {
+pub(in crate::repository) struct IndexRecord {
     pub left: u32,
     pub right: u32,
 }
 
 impl IndexRecord {
-    pub(crate) fn from_file(file: &mut File, offset: u32) -> Result<Self, Error> {
+    pub fn from_file(file: &mut File, offset: u32) -> Result<Self, Error> {
         file.seek(SeekFrom::Start(u64::from(offset)))?;
         let mut left_bytes = [0u8; 4];
         let mut right_bytes = [0u8; 4];
@@ -29,7 +29,7 @@ impl IndexRecord {
         Ok(IndexRecord { left, right })
     }
 
-    pub(crate) fn to_file(path: &Path, left: u32, right: u32, append: bool) -> Result<(), Error> {
+    pub fn to_file(path: &Path, left: u32, right: u32, append: bool) -> Result<(), Error> {
         match file_utils::open_file_append(path, append) {
             Ok(mut file) => {
                 let bytes = IndexRecord::to_bytes(left, right);
@@ -56,7 +56,7 @@ impl IndexRecord {
     //     IndexRecord::to_bytes(self.index, self.size)
     // }
 
-    pub(crate) fn to_bytes(left: u32, right: u32) -> [u8; 8] {
+    pub fn to_bytes(left: u32, right: u32) -> [u8; 8] {
         let left_bytes: [u8; 4] = left.to_le_bytes();
         let right_bytes: [u8; 4] = right.to_le_bytes();
         let mut combined_bytes: [u8; 8] = [0; 8];
@@ -65,6 +65,6 @@ impl IndexRecord {
         combined_bytes
     }
 
-    pub(crate) fn get_record_size() -> u32 { 8 }
-    pub(crate) fn get_index_offset(index: u32) -> u32 { index  * 8 }
+    pub fn get_record_size() -> u32 { 8 }
+    pub fn get_index_offset(index: u32) -> u32 { index  * 8 }
 }

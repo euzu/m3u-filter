@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::repository::index_record::IndexRecord;
 
-pub(crate) struct IndexedDocumentReader<T> {
+pub(in crate::repository) struct IndexedDocumentReader<T> {
     main_file: File,
     index_file: File,
     cursor: u32,
@@ -103,7 +103,7 @@ impl<T: ?Sized + serde::de::DeserializeOwned> Iterator for IndexedDocumentReader
     }
 }
 
-pub(crate) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: u32) -> Result<T, Error>
+pub(in crate::repository)  fn read_indexed_item<T>(main_path: &Path, index_path: &Path, offset: u32) -> Result<T, Error>
     where T: ?Sized + serde::de::DeserializeOwned
 {
     if main_path.exists() && index_path.exists() {

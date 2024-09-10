@@ -13,8 +13,8 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
     for output in &target.output {
         match match output.target {
             TargetType::M3u => m3u_write_playlist(target, cfg, playlist),
+            TargetType::Xtream => xtream_write_playlist(target, cfg, playlist),
             TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, &output.filename),
-            TargetType::Xtream => xtream_write_playlist(target, cfg, playlist)
         } {
             Ok(()) => {
                 if !playlist.is_empty() {

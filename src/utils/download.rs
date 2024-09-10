@@ -40,7 +40,7 @@ pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_
 pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
     let input = fpl.input;
     let mut result: Vec<PlaylistGroup> = vec![];
-    for plg in &mut fpl.playlist {
+    for plg in &mut fpl.playlistgroups {
         let mut group_series: Vec<PlaylistItem> = vec![];
         for pli in &plg.channels {
             let (fetch_series, series_info_url) = {
@@ -128,7 +128,7 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
                     match request_utils::get_input_json_content(input, stream_url.as_str(), stream_file_path).await {
                         Ok(stream_content) => {
                             match xtream_parser::parse_xtream(input,
-                                                              xtream_cluster,
+                                                              *xtream_cluster,
                                                               &category_content,
                                                               &stream_content) {
                                 Ok(sub_playlist_opt) => {
@@ -147,10 +147,9 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
         }
     }
     playlist.sort_by(|a, b| a.title.partial_cmp(&b.title).unwrap_or(Ordering::Greater));
-    let mut counter = 1;
-    for plg in &mut playlist {
-        plg.id = counter;
-        counter += 1;
+
+    for (grp_id, plg) in (1_u32..).zip(playlist.iter_mut()) {
+        plg.id = grp_id;
     }
     (playlist, errors)
 }

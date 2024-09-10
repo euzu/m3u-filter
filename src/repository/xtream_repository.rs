@@ -56,7 +56,6 @@ fn xtream_get_catchup_id_mapping_file_path(storage_path: &Path) -> PathBuf {
     storage_path.join("mapping_catchup.db")
 }
 
-
 fn ensure_xtream_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, M3uFilterError> {
     if let Some(path) = xtream_get_storage_path(cfg, target_name) {
         if std::fs::create_dir_all(&path).is_err() {
@@ -70,8 +69,8 @@ fn ensure_xtream_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf
     }
 }
 
-fn xtream_get_info_file_paths(storage_path: &Path, cluster: &XtreamCluster) -> Option<(PathBuf, PathBuf)> {
-    if cluster == &XtreamCluster::Series {
+fn xtream_get_info_file_paths(storage_path: &Path, cluster: XtreamCluster) -> Option<(PathBuf, PathBuf)> {
+    if cluster == XtreamCluster::Series {
         let xtream_path = storage_path.join("series_info.db");
         let extension = xtream_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or("")));
         let index_path = xtream_path.with_extension(format!("{}idx", &extension.unwrap_or_default()));
@@ -81,7 +80,7 @@ fn xtream_get_info_file_paths(storage_path: &Path, cluster: &XtreamCluster) -> O
 }
 
 fn xtream_clear_series_info(storage_path: &Path) {
-    if let Some((info_path, idx_path)) = xtream_get_info_file_paths(storage_path, &XtreamCluster::Series) {
+    if let Some((info_path, idx_path)) = xtream_get_info_file_paths(storage_path, XtreamCluster::Series) {
         let _ = std::fs::remove_file(info_path);
         let _ = std::fs::remove_file(idx_path);
         let _ = std::fs::remove_file(xtream_get_series_episode_id_mapping_file_path(storage_path));
@@ -93,7 +92,7 @@ fn xtream_clear_catchup(storage_path: &Path) {
     let _ = std::fs::remove_file(xtream_get_catchup_id_mapping_file_path(storage_path));
 }
 
-fn write_playlist_to_file(storage_path: &Path, stream_id: &mut u32, cluster: &XtreamCluster, playlist: &mut [PlaylistItem]) -> Result<(), M3uFilterError> {
+fn write_playlist_to_file(storage_path: &Path, stream_id: &mut u32, cluster: XtreamCluster, playlist: &mut [PlaylistItem]) -> Result<(), M3uFilterError> {
     let (xtream_path, idx_path) = xtream_get_file_paths(storage_path, cluster);
     match IndexedDocumentWriter::new(xtream_path.clone(), idx_path) {
         Ok(mut writer) => {
@@ -106,9 +105,9 @@ fn write_playlist_to_file(storage_path: &Path, stream_id: &mut u32, cluster: &Xt
                     }
                 }
             }
-            if cluster == &XtreamCluster::Live {
+            if cluster == XtreamCluster::Live {
                 xtream_clear_catchup(storage_path);
-            } else if cluster == &XtreamCluster::Series {
+            } else if cluster == XtreamCluster::Series {
                 xtream_clear_series_info(storage_path);
             }
             Ok(())
@@ -144,8 +143,8 @@ fn write_playlists_to_file(storage_path: &Path, collections: Vec<(XtreamCluster,
     let mut stream_id: u32 = 1;
     for (cluster, playlist) in collections {
         let start = stream_id;
-        write_playlist_to_file(storage_path, &mut stream_id, &cluster, playlist)?;
-        id_list.push((cluster.clone(), start, stream_id));
+        write_playlist_to_file(storage_path, &mut stream_id, cluster, playlist)?;
+        id_list.push((cluster, start, stream_id));
     }
     match save_stream_id_cluster_mapping(storage_path, &mut id_list) {
         Ok(()) => Ok(()),
@@ -199,7 +198,7 @@ pub(crate) fn xtream_get_epg_file_path(path: &Path) -> PathBuf {
     path.join("epg.xml")
 }
 
-pub(crate) fn xtream_get_file_paths(storage_path: &Path, cluster: &XtreamCluster) -> (PathBuf, PathBuf) {
+pub(crate) fn xtream_get_file_paths(storage_path: &Path, cluster: XtreamCluster) -> (PathBuf, PathBuf) {
     let xtream_path = storage_path.join(format!("{}.db", match cluster {
         XtreamCluster::Live => COL_LIVE,
         XtreamCluster::Video => COL_VOD,
@@ -308,12 +307,12 @@ pub(crate) fn xtream_get_collection_path(cfg: &Config, target_name: &str, collec
     Err(Error::new(ErrorKind::Other, format!("Cant find collection: {target_name}/{collection_name}")))
 }
 
-fn _xtream_get_item_for_stream_id(stream_id: u32, storage_path: &Path, xtream_cluster: Option<&XtreamCluster>, mapping: &[(XtreamCluster, u32, u32)]) -> Result<XtreamPlaylistItem, Error> {
+fn _xtream_get_item_for_stream_id(stream_id: u32, storage_path: &Path, xtream_cluster: Option<XtreamCluster>, mapping: &[(XtreamCluster, u32, u32)]) -> Result<XtreamPlaylistItem, Error> {
     if let Some((cluster, cluster_start, _end)) = match xtream_cluster {
-        Some(clus) => mapping.iter().find(|(c, _, _)| c == clus),
+        Some(clus) => mapping.iter().find(|(c, _, _)| *c == clus),
         None => mapping.iter().find(|(_cluster, start, _end)| stream_id >= *start),
     } {
-        let (xtream_path, idx_path) = xtream_get_file_paths(storage_path, cluster);
+        let (xtream_path, idx_path) = xtream_get_file_paths(storage_path, *cluster);
         if stream_id >= *cluster_start {
             return read_indexed_item::<XtreamPlaylistItem>(&xtream_path, &idx_path, IndexRecord::get_index_offset(stream_id - cluster_start));
         }
@@ -321,7 +320,7 @@ fn _xtream_get_item_for_stream_id(stream_id: u32, storage_path: &Path, xtream_cl
     Err(Error::new(ErrorKind::Other, format!("Failed to read xtream item for stream-id {stream_id}")))
 }
 
-pub(crate) fn xtream_get_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget, xtream_cluster: Option<&XtreamCluster>) -> Result<XtreamPlaylistItem, Error> {
+pub(crate) fn xtream_get_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget, xtream_cluster: Option<XtreamCluster>) -> Result<XtreamPlaylistItem, Error> {
     if let Some(storage_path) = xtream_get_storage_path(config, target.name.replace(' ', "_").as_str()) {
         if let Some(mapping) = load_stream_id_cluster_mapping(&storage_path) {
             if let Some(max) = mapping.iter().map(|(_cluster, _start, end)| end).max().copied() {
@@ -344,7 +343,7 @@ pub(crate) fn xtream_get_item_for_stream_id(stream_id: u32, config: &Config, tar
     Err(Error::new(ErrorKind::Other, format!("Failed to read xtream item for stream-id {stream_id}")))
 }
 
-pub(crate) fn xtream_load_rewrite_playlist(cluster: &XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<String, Error> {
+pub(crate) fn xtream_load_rewrite_playlist(cluster: XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<String, Error> {
     if let Some(storage_path) = xtream_get_storage_path(config, target.name.replace(' ', "_").as_str()) {
         let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
         match IndexedDocumentReader::<XtreamPlaylistItem>::new(&xtream_path, &idx_path) {
@@ -440,7 +439,7 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
                                        series_id: u32, episode_id_mapping: &[(u32, u32)],
                                        content: &str) -> Result<(), Error> {
     if let Some(storage_path) = xtream_get_storage_path(config, target_name) {
-        if let Some((info_path, idx_path)) = xtream_get_info_file_paths(&storage_path, &XtreamCluster::Series) {
+        if let Some((info_path, idx_path)) = xtream_get_info_file_paths(&storage_path, XtreamCluster::Series) {
             return match IndexedDocumentWriter::new_append(info_path.clone(), idx_path) {
                 Ok(mut writer) => {
                     match writer.write_doc(content) {
@@ -464,7 +463,7 @@ pub(crate) fn xtream_load_series_info(config: &Config, target_name: &str, series
         let series_id_index_mapping_path = xtream_get_series_id_series_info_mapping_file_path(&storage_path);
         if series_id_index_mapping_path.exists() {
             if let Some(storage_path) = xtream_get_storage_path(config, target_name) {
-                if let Some((info_path, idx_path)) = xtream_get_info_file_paths(&storage_path, &XtreamCluster::Series) {
+                if let Some((info_path, idx_path)) = xtream_get_info_file_paths(&storage_path, XtreamCluster::Series) {
                     if info_path.exists() && idx_path.exists() {
                         let mut file = File::open(series_id_index_mapping_path)?;
                         let mut buffer = [0u8; 8];

@@ -20,7 +20,7 @@ fn map_to_xtream_category(category: &Value) -> Result<Vec<XtreamCategory>, M3uFi
     }
 }
 
-fn map_to_xtream_streams(xtream_cluster: &XtreamCluster, streams: &Value) -> Result<Vec<XtreamStream>, M3uFilterError> {
+fn map_to_xtream_streams(xtream_cluster: XtreamCluster, streams: &Value) -> Result<Vec<XtreamStream>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamStream>>(streams.to_owned()) {
         Ok(stream_list) => Ok(stream_list),
         Err(err) => {
@@ -39,6 +39,7 @@ pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &
             let result: Vec<PlaylistItem> = series_info.episodes.values().flatten().map(|episode|
                 PlaylistItem {
                     header: RefCell::new(PlaylistItemHeader {
+                        uuid: default_as_empty_rc_str(),
                         id: Rc::new(episode.id.clone()),
                         stream_id: Rc::new(episode.id.clone()),
                         name: Rc::new(episode.title.clone()),
@@ -76,7 +77,7 @@ pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &
 }
 
 pub(crate) fn parse_xtream(input: &ConfigInput,
-                           xtream_cluster: &XtreamCluster,
+                           xtream_cluster: XtreamCluster,
                            category: &Value,
                            streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match map_to_xtream_category(category) {
@@ -96,16 +97,17 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                     for stream in streams {
                         if let Some(group) = group_map.get(&stream.category_id) {
                             let mut grp = group.borrow_mut();
-                            let title = &grp.category_name;
+                            let category_name = &grp.category_name;
                             let item = PlaylistItem {
                                 header: RefCell::new(PlaylistItemHeader {
+                                    uuid: default_as_empty_rc_str(),
                                     id: Rc::new(stream.get_stream_id()),
                                     stream_id: Rc::new(stream.get_stream_id()),
                                     name: Rc::clone(&stream.name),
                                     chno: default_as_empty_rc_str(),
                                     logo: Rc::clone(&stream.stream_icon),
                                     logo_small: default_as_empty_rc_str(),
-                                    group: Rc::clone(title),
+                                    group: Rc::clone(category_name),
                                     title: Rc::clone(&stream.name),
                                     parent_code: default_as_empty_rc_str(),
                                     audio_track: default_as_empty_rc_str(),
@@ -132,7 +134,7 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                                         XtreamCluster::Video => PlaylistItemType::Movie,
                                         XtreamCluster::Series => PlaylistItemType::SeriesInfo,
                                     },
-                                    xtream_cluster: xtream_cluster.clone(),
+                                    xtream_cluster,
                                     additional_properties: stream.get_additional_properties(),
                                     series_fetched: false,
                                     category_id: 0,
@@ -147,7 +149,7 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
                         let cat = category.borrow();
                         PlaylistGroup {
                             id: cat.category_id.parse::<u32>().unwrap_or(0),
-                            xtream_cluster: xtream_cluster.clone(),
+                            xtream_cluster,
                             title: Rc::clone(&cat.category_name),
                             channels: cat.channels.clone(),
                         }
