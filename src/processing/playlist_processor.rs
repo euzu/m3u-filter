@@ -455,9 +455,9 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
         info!("Playlist is empty: {}", &target.name);
         Ok(())
     } else {
-        sort_playlist(target, &mut new_playlist);
         process_watch(target, cfg, &new_playlist);
         let mut flat_new_playlist = flatten_groups(new_playlist);
+        sort_playlist(target, &mut flat_new_playlist);
         persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg)
     }
 }
