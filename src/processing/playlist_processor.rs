@@ -376,31 +376,23 @@ fn execute_pipe<'a>(target: &ConfigTarget, pipe: &ProcessingPipe, fpl: &mut Fetc
 // This method is needed, because of duplicate group names in different inputs.
 // We merge the same group names considering cluster together.
 fn flatten_groups(mut playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
-    let mut group_map: HashMap<(Rc<String>, XtreamCluster), PlaylistGroup> = HashMap::new();
-    let mut sort_order = vec![];
+    let mut sort_order: Vec<PlaylistGroup> = vec![];
+    let mut idx: usize = 0;
+    let mut group_map: HashMap<(Rc<String>, XtreamCluster), usize> = HashMap::new();
     playlistgroups.drain(..).for_each(|group| {
         let key = (Rc::clone(&group.title), group.xtream_cluster);
         match group_map.entry(key) {
-            std::collections::hash_map::Entry::Occupied(o) => {
-                // we loose the group id (category id) at this point, which should be available in
-                // the playlist item header.
-                o.into_mut().channels.extend(group.channels);
-            }
             std::collections::hash_map::Entry::Vacant(v) => {
-                sort_order.push(Rc::clone(&group.title));
-                v.insert(group);
-            },
+                v.insert(idx);
+                idx += 1;
+                sort_order.push(group);
+            }
+            std::collections::hash_map::Entry::Occupied(o) => {
+                sort_order.get_mut(*o.get()).unwrap().channels.extend(group.channels);
+            }
         };
     });
-    let mut flat_groups: Vec<PlaylistGroup> = group_map.into_values().collect();
-    // apply the initial sort order
-    let mut sort_iterator = sort_order.iter();
-    flat_groups.sort_by(|f, s| {
-        let i1 = sort_iterator.position(|r| **r == *f.title).unwrap();
-        let i2 = sort_iterator.position(|r| **r == *s.title).unwrap();
-        i1.cmp(&i2)
-    });
-    flat_groups
+    sort_order
 }
 
 async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
@@ -455,9 +447,9 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
         info!("Playlist is empty: {}", &target.name);
         Ok(())
     } else {
-        process_watch(target, cfg, &new_playlist);
         let mut flat_new_playlist = flatten_groups(new_playlist);
         sort_playlist(target, &mut flat_new_playlist);
+        process_watch(target, cfg, &flat_new_playlist);
         persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg)
     }
 }

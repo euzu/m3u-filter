@@ -6,17 +6,19 @@ Content-Type: application/json
   "url": "iptv.m3u"
 }
 
-###
-
 ### config request
 GET http://localhost:8901/api/v1/config
 Content-Type: application/json
-
-###
 
 ### auth
 POST http://localhost:8901/auth/token
 Content-Type: application/json
 
 {"username": "test", "password": "test"}
+
+### xtream live_categories
+GET http://localhost:8901/m3u?username=me&password=me
+
+### xtream live_categories
+GET http://localhost:8901/player_api.php?action=get_live_categories&username=xt&password=xt
 

@@ -123,13 +123,13 @@ where
         match bincode::serialize_into(encoder, &self) {
             Ok(()) => Ok(()),
             Err(e) => {
-                println!("Failed to write bplusstree to disk {e}");
+                println!("Failed to write bplustree to disk {e}");
                 Ok(())
             }
         }
     }
 
-    // If file exists the file is deserialized, otherweise an empty tree is returned
+    // If file exists the file is deserialized, otherwise an empty tree is returned
     pub(crate) fn deserialize_from_file(filename: &str) -> Self {
         match File::open(filename) {
             Ok(file) => {

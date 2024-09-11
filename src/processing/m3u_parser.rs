@@ -195,33 +195,30 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigIn
 }
 
 pub(crate) fn parse_m3u(cfg: &Config, input: &ConfigInput, lines: &[String]) -> Vec<PlaylistGroup> {
-    let mut groups: std::collections::HashMap<Rc<String>, Vec<PlaylistItem>> = std::collections::HashMap::new();
-    let mut sort_order: Vec<Rc<String>> = vec![];
-    let mut playlist = Vec::new();
-    consume_m3u(cfg, input, lines.iter().cloned(), |item| playlist.push(item));
-    playlist.drain(..).for_each(|item| {
+    let mut sort_order: Vec<Vec<PlaylistItem>> = vec![];
+    let mut idx: usize = 0;
+    let mut group_map: std::collections::HashMap<Rc<String>, usize> = std::collections::HashMap::new();
+    consume_m3u(cfg, input, lines.iter().cloned(), |item| {
         let key = Rc::clone(&item.header.borrow().group);
-        // let key2 = String::from(&item.header.group);
-        match groups.entry(Rc::clone(&key)) {
-            std::collections::hash_map::Entry::Vacant(e) => {
-                e.insert(vec![item]);
-                sort_order.push(Rc::clone(&key));
+        match group_map.entry(key) {
+            std::collections::hash_map::Entry::Vacant(v) => {
+                v.insert(idx);
+                idx += 1;
+                sort_order.push(vec![item]);
             }
-            std::collections::hash_map::Entry::Occupied(mut e) => { e.get_mut().push(item); }
+            std::collections::hash_map::Entry::Occupied(o) => {
+                sort_order.get_mut(*o.get()).unwrap().push(item);
+            }
         }
     });
 
-    let mut result: Vec<PlaylistGroup> = vec![];
-    for (grp_id, (key, channels)) in (1_u32..).zip(groups.into_iter()) {
-        let cluster = channels.first().map(|pli| pli.header.borrow().xtream_cluster);
-        result.push(PlaylistGroup {id: grp_id, xtream_cluster: cluster.unwrap(), title: Rc::clone(&key), channels });
-    }
-    // apply the sort order from the provider
-    let mut sort_iterator = sort_order.iter();
-    result.sort_by(|f, s| {
-        let i1 = sort_iterator.position(|r| **r == *f.title).unwrap();
-        let i2 = sort_iterator.position(|r| **r == *s.title).unwrap();
-        i1.cmp(&i2)
-    });
+    let mut grp_id = 0;
+    let result: Vec<PlaylistGroup> = sort_order.drain(..).map(|channels| {
+        let channel = channels.first();
+        let cluster = channel.map(|pli| pli.header.borrow().xtream_cluster).unwrap();
+        let group_title = channel.map(|pli| Rc::clone(&pli.header.borrow().group)).unwrap();
+        grp_id += 1;
+        PlaylistGroup { id: grp_id, xtream_cluster: cluster, title: Rc::clone(&group_title), channels }
+    }).collect();
     result
 }
