@@ -1,17 +1,21 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::rc::Rc;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+use enum_iterator::Sequence;
 
 use log::{debug, error};
 use regex::Regex;
 
-use crate::{handle_m3u_filter_error_result, valid_property};
+use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, valid_property};
 use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{AFFIX_FIELDS, ItemField, MAPPER_ATTRIBUTE_FIELDS};
+use crate::model::config::{AFFIX_FIELDS, COUNTER_FIELDS, ItemField, MAPPER_ATTRIBUTE_FIELDS};
 use crate::model::playlist::{FieldAccessor, PlaylistItem};
 use crate::utils::default_utils::{default_as_empty_map, default_as_empty_str,
-                                  default_as_false};
+                                  default_as_false, default_as_zero_u32};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MappingTag {
@@ -23,6 +27,70 @@ pub(crate) struct MappingTag {
     pub prefix: String,
     #[serde(default = "default_as_empty_str")]
     pub suffix: String,
+}
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
+pub(crate) enum CounterModifier {
+    #[serde(rename = "assign")]
+    Assign,
+    #[serde(rename = "suffix")]
+    Suffix,
+    #[serde(rename = "prefix")]
+    Prefix,
+}
+
+impl Default for CounterModifier {
+    fn default() -> Self {
+        Self::Assign
+    }
+}
+
+impl Display for CounterModifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Assign => "assign",
+            Self::Suffix => "suffix",
+            Self::Prefix => "prefix",
+        })
+    }
+}
+
+impl FromStr for CounterModifier {
+    type Err = M3uFilterError;
+
+    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+        if s.eq("assign") {
+            Ok(Self::Assign)
+        } else if s.eq("suffix") {
+            Ok(Self::Suffix)
+        } else if s.eq("prefix") {
+            Ok(Self::Prefix)
+        } else {
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown CounterModifier: {}", s)
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct MappingCounterDefinition {
+    pub filter: String,
+    pub field: String,
+    #[serde(default = "default_as_empty_str")]
+    pub concat: String,
+    #[serde(default = "CounterModifier::default")]
+    pub modifier: CounterModifier,
+    #[serde(default = "default_as_zero_u32")]
+    pub value: u32,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MappingCounter {
+    pub filter: Filter,
+    pub field: String,
+    pub concat: String,
+    pub modifier: CounterModifier,
+    pub value: Arc<Mutex<u32>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -51,6 +119,29 @@ pub(crate) struct Mapper {
 
 impl Mapper {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
+        for (key, _) in &self.attributes {
+            if !valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper attribute field {key}")));
+            }
+        }
+        for (key, _) in &self.suffix {
+            if !valid_property!(key.as_str(), AFFIX_FIELDS) {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper suffix field {key}")));
+            }
+        }
+        for (key, _) in &self.prefix {
+            if !valid_property!(key.as_str(), AFFIX_FIELDS) {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper prefix field {key}")));
+            }
+        }
+        for (key, value) in &self.assignments {
+            if !valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper assignment field {key}")));
+            }
+            if !valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper assignment field {value}")));
+            }
+        }
         match get_filter(&self.pattern, templates) {
             Ok(pattern) => {
                 self.t_pattern = Some(pattern);
@@ -98,16 +189,14 @@ impl MappingValueProcessor<'_> {
         let attr_re = &mapper.t_attre.as_ref().unwrap();
         let attributes = &mapper.attributes;
         for (key, value) in attributes {
-            if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
-                if value.contains('<') { // possible replacement
-                    let replaced = attr_re.replace_all(value, |captures: &regex::Captures| {
-                        let capture_name = &captures[1];
-                        (*captured_names.get(&capture_name).unwrap_or(&&captures[0])).to_string()
-                    });
-                    self.set_property(key, &replaced);
-                } else {
-                    self.set_property(key, value);
-                }
+            if value.contains('<') { // possible replacement
+                let replaced = attr_re.replace_all(value, |captures: &regex::Captures| {
+                    let capture_name = &captures[1];
+                    (*captured_names.get(&capture_name).unwrap_or(&&captures[0])).to_string()
+                });
+                self.set_property(key, &replaced);
+            } else {
+                self.set_property(key, value);
             }
         }
     }
@@ -155,12 +244,10 @@ impl MappingValueProcessor<'_> {
         let suffix = &mapper.suffix;
 
         for (key, value) in suffix {
-            if valid_property!(key.as_str(), AFFIX_FIELDS) {
-                if let Some(suffix) = self.apply_tags(value, captures) {
-                    if let Some(old_value) = self.get_property(key) {
-                        let new_value = format!("{}{}", &old_value, suffix);
-                        self.set_property(key, &new_value);
-                    }
+            if let Some(suffix) = self.apply_tags(value, captures) {
+                if let Some(old_value) = self.get_property(key) {
+                    let new_value = format!("{}{}", &old_value, suffix);
+                    self.set_property(key, &new_value);
                 }
             }
         }
@@ -170,12 +257,10 @@ impl MappingValueProcessor<'_> {
         let mapper = self.mapper;
         let prefix = &mapper.prefix;
         for (key, value) in prefix {
-            if valid_property!(key.as_str(), AFFIX_FIELDS) {
-                if let Some(prefix) = self.apply_tags(value, captures) {
-                    if let Some(old_value) = self.get_property(key) {
-                        let new_value = format!("{}{}", prefix, &old_value);
-                        self.set_property(key, &new_value);
-                    }
+            if let Some(prefix) = self.apply_tags(value, captures) {
+                if let Some(old_value) = self.get_property(key) {
+                    let new_value = format!("{}{}", prefix, &old_value);
+                    self.set_property(key, &new_value);
                 }
             }
         }
@@ -185,11 +270,8 @@ impl MappingValueProcessor<'_> {
         let mapper = self.mapper;
         let assignments = &mapper.assignments;
         for (key, value) in assignments {
-            if valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) &&
-                valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
-                if let Some(prop_value) = self.get_property(value) {
-                    self.set_property(key, &prop_value);
-                }
+            if let Some(prop_value) = self.get_property(value) {
+                self.set_property(key, &prop_value);
             }
         }
     }
@@ -202,16 +284,16 @@ impl ValueProcessor for MappingValueProcessor<'_> {
             rewc.re.captures_iter(value)
                 .filter(|caps| caps.len() > 1)
                 .for_each(|captures|
-                    for capture_name in &rewc.captures {
-                        let match_opt = captures.name(capture_name.as_str());
-                        let capture_value = if match_opt.is_some() {
-                            match_opt.map_or("", |m| m.as_str())
-                        } else {
-                            ""
-                        };
-                        debug!("match {}: {}", capture_name, capture_value);
-                        captured_values.insert(capture_name.as_str(), capture_value);
-                    }
+                for capture_name in &rewc.captures {
+                    let match_opt = captures.name(capture_name.as_str());
+                    let capture_value = if match_opt.is_some() {
+                        match_opt.map_or("", |m| m.as_str())
+                    } else {
+                        ""
+                    };
+                    debug!("match {}: {}", capture_name, capture_value);
+                    captured_values.insert(capture_name.as_str(), capture_value);
+                }
                 );
         }
         MappingValueProcessor::<'_>::apply_attributes(self, &captured_values);
@@ -228,8 +310,11 @@ pub(crate) struct Mapping {
     #[serde(default = "default_as_false")]
     pub match_as_ascii: bool,
     pub mapper: Vec<Mapper>,
-}
+    pub counter: Option<Vec<MappingCounterDefinition>>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub t_counter: Option<Vec<MappingCounter>>,
 
+}
 
 impl Mapping {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
@@ -237,6 +322,30 @@ impl Mapping {
         for mapper in &mut self.mapper {
             handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, mapper.prepare(templates, tags));
         }
+
+        if let Some(counter_def_list) = &self.counter {
+            let mut counters = vec![];
+            for def in counter_def_list {
+                if !valid_property!(def.field.as_str(), COUNTER_FIELDS) {
+                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid counter field {}", def.field)));
+                }
+                match get_filter(&def.filter, templates) {
+                    Ok(flt) => {
+                        counters.push(MappingCounter {
+                            filter: flt,
+                            field: def.field.to_owned(),
+                            concat: def.concat.to_owned(),
+                            modifier: def.modifier.clone(),
+                            value: Arc::new(Mutex::new(def.value)),
+                        }
+                        )
+                    }
+                    Err(e) => return Err(M3uFilterError::new(M3uFilterErrorKind::Info, e.to_string()))
+                }
+            }
+            self.t_counter = Some(counters);
+        }
+
         Ok(())
     }
 }

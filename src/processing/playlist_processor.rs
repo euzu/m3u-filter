@@ -17,8 +17,8 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{MsgKind, send_message};
 use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, InputType,
                            ItemField, ProcessingOrder, ProcessTargets, SortOrder::{Asc, Desc}};
-use crate::model::mapping::{Mapping, MappingValueProcessor};
-use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, XtreamCluster};
+use crate::model::mapping::{CounterModifier, Mapping, MappingValueProcessor};
+use crate::model::playlist::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, XtreamCluster};
 use crate::model::stats::{InputStats, PlaylistStats};
 use crate::processing::affix_processor::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
@@ -208,6 +208,42 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
         Some(new_groups)
     } else {
         None
+    }
+}
+
+fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
+    if target.t_mapping.is_some() {
+        let mut mock_processor = MockValueProcessor {};
+        let mappings = target.t_mapping.as_ref().unwrap();
+        for mapping in mappings {
+            if let Some(counter_list) = &mapping.t_counter {
+                for counter in counter_list {
+                    let mut cntval = counter.value.lock().unwrap();
+                    for plg in &*playlist {
+                        for channel in &plg.channels {
+                            let provider = ValueProvider { pli: RefCell::new(channel) };
+                            if counter.filter.filter(&provider, &mut mock_processor) {
+                               let new_value = if counter.modifier == CounterModifier::Assign {
+                                    cntval.to_string()
+                                } else {
+                                    let value = match channel.header.borrow_mut().get_field(&counter.field) {
+                                        Some(field_value) => field_value.to_string(),
+                                        None => "".to_string(),
+                                    };
+                                    if counter.modifier == CounterModifier::Suffix {
+                                        format!("{}{}{}", value, counter.concat, cntval.to_string())
+                                    }  else {
+                                        format!("{}{}{}", cntval.to_string(), counter.concat, value)
+                                    }
+                                };
+                                channel.header.borrow_mut().set_field(&counter.field, new_value.as_str());
+                                *cntval += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -449,6 +485,7 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
     } else {
         let mut flat_new_playlist = flatten_groups(new_playlist);
         sort_playlist(target, &mut flat_new_playlist);
+        map_playlist_counter(target, &flat_new_playlist);
         process_watch(target, cfg, &flat_new_playlist);
         persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg)
     }

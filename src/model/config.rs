@@ -34,6 +34,8 @@ pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
 
 pub(crate) const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 
+pub(crate) const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
+
 #[macro_export]
 macro_rules! valid_property {
   ($key:expr, $array:expr) => {{
@@ -862,20 +864,18 @@ impl Config {
         None
     }
 
-    pub(crate) fn set_mappings(&mut self, mappings: Option<Mappings>) {
-        if let Some(mapping_list) = mappings {
-            for source in &mut self.sources {
-                for target in &mut source.targets {
-                    if let Some(mapping_ids) = &target.mapping {
-                        let mut target_mappings = Vec::new();
-                        for mapping_id in mapping_ids {
-                            let mapping = mapping_list.get_mapping(mapping_id);
-                            if let Some(mappings) = mapping {
-                                target_mappings.push(mappings);
-                            }
+    pub(crate) fn set_mappings(&mut self, mappings_cfg: Mappings) {
+        for source in &mut self.sources {
+            for target in &mut source.targets {
+                if let Some(mapping_ids) = &target.mapping {
+                    let mut target_mappings = Vec::new();
+                    for mapping_id in mapping_ids {
+                        let mapping = mappings_cfg.get_mapping(mapping_id);
+                        if let Some(mappings) = mapping {
+                            target_mappings.push(mappings);
                         }
-                        target.t_mapping = if target_mappings.is_empty() { None } else { Some(target_mappings) };
                     }
+                    target.t_mapping = if target_mappings.is_empty() { None } else { Some(target_mappings) };
                 }
             }
         }

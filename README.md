@@ -550,6 +550,7 @@ Has the following top level entries:
 - `id` _mandatory_
 - `match_as_ascii` _optional_ default is `false`
 - `mapper` _mandatory_
+- `counter` _optional_
 
 ### 2.3.1 `id`
 Is referenced in the `config.yml`, should be a unique identifier
@@ -569,11 +570,11 @@ Has the following top level entries:
 - `prefix`
 - `assignments`
 
-#### 2.3.4.1 `filter`
+#### 2.3.3.1 `filter`
 The filter  is a string with a statement (@see filter statements).
 It is optional and allows you to filter the content.
 
-#### 2.3.4.2 `pattern`
+#### 2.3.3.2 `pattern`
 The pattern is a string with a statement (@see filter statements).
 The pattern can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
 Filter fields are `Group`, `Title`, `Name` and `Url`.
@@ -587,7 +588,7 @@ To avoid misunderstandings, keep the pattern simply to comparisons.
 The regular expression syntax is similar to Perl-style regular expressions,
 but lacks a few features like look around and backreferences.
 
-#### 2.3.4.3 `attributes`
+#### 2.3.3.3 `attributes`
 Attributes is a map of key value pairs. Valid keys are:
 - `id`
 - `epg_channel_id` or `epg_id`
@@ -618,6 +619,11 @@ mappings:
 
   mapping:
     - id: sport-mapper
+      counter:
+        - filter: '!sports!'
+          value: 9000
+          field: chno
+          modifier: assign
       mapper:
         - filter: '!sports!'
           pattern: "!source!"
@@ -628,7 +634,7 @@ mappings:
 In this example all channels the urls of all channels with a group name containing `SPORT` will be changed.
 
 
-#### 2.3.4.4 `suffix`
+#### 2.3.3.4 `suffix`
 Suffix is a map of key value pairs. Valid keys are
 - name
 - group
@@ -646,7 +652,7 @@ In this example there must be 2 tag definitions `quality` and `group`.
 
 If the regexps matches, the given fields will be appended to field value
 
-#### 2.3.4.5 `prefix`
+#### 2.3.3.5 `prefix`
 Suffix is a map of key value pairs. Valid keys are
 - name
 - group
@@ -664,7 +670,7 @@ In this example there must be 2 tag definitions `quality` and `group`.
 
 If the regexps matches, the given fields will be prefixed to field value
 
-#### 2.3.4.6 `assignments`
+#### 2.3.3.6 `assignments`
 Attributes is a map of key value pairs. Valid keys and values are:
 - `id`
 - `chno`
@@ -685,6 +691,31 @@ assignments:
    title: name
 ```
 This configuration sets `title` property to the value of `name`.
+
+### 2.3.4 counter
+
+Each mapping can have a  list of counter.
+
+A counter has the following fields:
+- `filter`: filter expression
+- `value`: an initial start value
+- `field`: `title`, `name`, `chno`
+- `modifier`: `assign`, `suffix`, `prefix`
+- `concat`: is _optional_ and only used if `suffix` or `prefix` modifier given.
+
+```yaml
+mapping:
+  - id: simple
+    match_as_ascii: true
+    counter:
+      - filter: 'Group ~ ".*FR.*"'
+        value: 9000
+        field: title
+        modifier: suffix
+        concat: " - "
+    mapper:
+      - <Mapper definition>
+```
 
 ### 2.5 Example mapping.yml file.
 ```yaml

@@ -6,6 +6,7 @@
 * epg timeshift, define timeshift api-proxy.yml for each user as `epg_timeshift: hh:mm`, example  `-2:30`, `1:45`, `+0:15`, `2`, `:30`, `:3`, `2:`
 * timeshift.php api implementation
 * New Filter `type` added can be uses as  `Type = vod` or `Type = live` or `Type = series`
+* Counter in `mapping.yml`. Each mapper can have counters to add counter to specific fields.
 
 # 2.0.3(2024-07-11)
 *  added  `source` - `input` - `name` attribute to README
