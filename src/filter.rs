@@ -144,11 +144,16 @@ impl Filter {
             }
             Filter::TypeComparison(field, item_type) => {
                 let value = provider.call(field);
-                let is_match = item_type.is_same(value.as_str());
-                if is_match && log_enabled!(Level::Debug) {
-                    debug!("Match found: {:?} {}", &field, value);
+                match get_filter_item_type(value.as_str()) {
+                    None => false,
+                    Some(pli_type) => {
+                        let is_match = pli_type.eq(item_type);
+                        if is_match && log_enabled!(Level::Debug) {
+                            debug!("Match found: {:?} {}", &field, value);
+                        }
+                        is_match
+                    }
                 }
-                is_match
             }
             Filter::Group(expr) => {
                 expr.filter(provider, processor)
@@ -181,7 +186,7 @@ impl std::fmt::Display for Filter {
                     PlaylistItemType::Live => "live",
                     PlaylistItemType::Movie => "vod",
                     PlaylistItemType::Series => "series",
-                    PlaylistItemType::SeriesInfo => "series-info"
+                    PlaylistItemType::SeriesInfo => "series" // yes series-info is handled as series in filter
                 })
             }
             Filter::Group(stmt) => {
@@ -253,18 +258,26 @@ fn get_parser_field_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate
     }
 }
 
-fn get_parser_type_comparison(expr: Pair<Rule>) -> Result<Filter, M3uFilterError> {
-    let expr_inner = expr.into_inner();
-    let text_item_type = &expr_inner.as_str();
-    let item_type = if text_item_type.eq_ignore_ascii_case("live") {
+fn get_filter_item_type(text_item_type: &str) -> Option<PlaylistItemType> {
+    if text_item_type.eq_ignore_ascii_case("live") {
         Some(PlaylistItemType::Live)
-    } else if text_item_type.eq_ignore_ascii_case("vod") {
+    } else if text_item_type.eq_ignore_ascii_case("movie")  || text_item_type.eq_ignore_ascii_case("vod") {
         Some(PlaylistItemType::Movie)
     } else if text_item_type.eq_ignore_ascii_case("series") {
         Some(PlaylistItemType::Series)
+    } else if text_item_type.eq_ignore_ascii_case("series-info") {
+        // this is necessarry to avoid series and series-info confusion in filter!
+        // we can now use series  for filtering series and series-info (series-info are categories)
+        Some(PlaylistItemType::Series)
     } else {
         None
-    };
+    }
+}
+
+fn get_parser_type_comparison(expr: Pair<Rule>) -> Result<Filter, M3uFilterError> {
+    let expr_inner = expr.into_inner();
+    let text_item_type = expr_inner.as_str();
+    let item_type = get_filter_item_type(text_item_type);
     match item_type {
         None => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse item type: {text_item_type}"),
         Some(itype) => Ok(Filter::TypeComparison(ItemField::Type, itype))

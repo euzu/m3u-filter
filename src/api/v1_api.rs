@@ -134,8 +134,8 @@ fn create_config_input_for_url(url: &str) -> ConfigInput {
     }
 }
 
-async fn get_playlist(inp: Option<&ConfigInput>, cfg: &Config) -> HttpResponse {
-    match inp {
+async fn get_playlist(cfg_input: Option<&ConfigInput>, cfg: &Config) -> HttpResponse {
+    match cfg_input {
         Some(input) => {
             let (result, errors) =
                 match input.input_type {
