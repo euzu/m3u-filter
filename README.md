@@ -911,6 +911,54 @@ If you want to use m3u-filter with docker-compose, there is a `--healthcheck` ar
       start_period: 10s
 ``` 
 
+#### Installing in LXC Container (Alpine)
+To get it started in a Alpine 3.19 LXC
+
+```shell
+apk update
+apk add nano git yarn bash cargo perl-local-lib perl-module-build make 
+cd /opt
+git clone https://github.com/euzu/m3u-filter.git
+cd /opt/m3u-filter/bin
+./build_lin.sh
+ln -s /opt/m3u-filter/target/release/m3u-filter /bin/m3u-filter 
+cd /opt/m3u-filter/frontend
+yarn
+yarn build
+ln -s /opt/m3u-filter/frontend/build /web
+ln -s /opt/m3u-filter/config /config
+mkdir /data
+mkdir /backup
+```
+
+**Creating a service, create /etc/init.d/m3u-filter**
+```shell
+#!/sbin/openrc-run
+name=m3u-filter
+command="/bin/m3u-filter"
+command_args="-p /config -s"
+command_user="root"
+command_background="yes"
+output_log="/var/log/m3u-filter/m3u-filter.log"
+error_log="/var/log/m3u-filter/m3u-filter.log"
+supervisor="supervise-daemon"
+
+depend() {
+    need net
+}
+
+start_pre() {
+    checkpath --directory --owner $command_user:$command_user --mode 0775 \
+           /run/m3u-filter /var/log/m3u-filter
+}
+```
+
+**then add it to boot**
+```shell
+rc-update add m3u-filter default
+```
+
+
 ### Cross compile for windows on linux
 If you want to compile this project on linux for windows, you need to do the following steps.
 
