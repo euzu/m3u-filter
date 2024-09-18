@@ -569,6 +569,7 @@ Has the following top level entries:
 - `suffix`
 - `prefix`
 - `assignments`
+- `transform`
 
 #### 2.3.3.1 `filter`
 The filter  is a string with a statement (@see filter statements).
@@ -691,6 +692,36 @@ assignments:
    title: name
 ```
 This configuration sets `title` property to the value of `name`.
+
+#### 2.3.3.6 `transform`
+
+`transform` is a list of transformations.
+
+Each transformation can have the following attributes:
+- `field` _mandatory_ the field where the transformation will be applied
+- `modifier` _mandatory_, values are: `lowercase`, `uppercase` and `capitalize`
+- `pattern` _optional_  is a regular expression (not filter!) with captures. Only needed when you want to transform parts of the property.
+
+For example: first 3 chars of channel name to lowercase: 
+
+```yaml
+      mapper:
+        - pattern: 'Group ~ ".*"'
+          transform:
+          - field: name
+            pattern: "^(...)"
+            modifier: lowercase
+```
+
+channel name to uppercase:
+
+```yaml
+      mapper:
+        - pattern: 'Group ~ ".*"'
+          transform:
+          - field: name
+            modifier: uppercase
+```
 
 ### 2.3.4 counter
 

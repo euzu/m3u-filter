@@ -7,6 +7,7 @@
 * timeshift.php api implementation
 * New Filter `type` added can be uses as  `Type = vod` or `Type = live` or `Type = series`
 * Counter in `mapping.yml`. Each mapper can have counters to add counter to specific fields.
+* Added new mapper feature `transform`. `uppercase`, `lowercase` and `capitalize` supported.
 
 # 2.0.3(2024-07-11)
 *  added  `source` - `input` - `name` attribute to README

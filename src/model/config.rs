@@ -33,7 +33,6 @@ pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
 
 
 pub(crate) const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
-
 pub(crate) const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
 
 #[macro_export]

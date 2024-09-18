@@ -1,21 +1,23 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use enum_iterator::Sequence;
 
+use enum_iterator::Sequence;
 use log::{debug, error};
 use regex::Regex;
 
 use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, valid_property};
-use crate::filter::{Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
+use crate::filter::{apply_templates_to_pattern, Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{AFFIX_FIELDS, COUNTER_FIELDS, ItemField, MAPPER_ATTRIBUTE_FIELDS};
 use crate::model::playlist::{FieldAccessor, PlaylistItem};
 use crate::utils::default_utils::{default_as_empty_map, default_as_empty_str,
                                   default_as_false, default_as_zero_u32};
+use crate::utils::string_utils::Capitalize;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct MappingTag {
@@ -93,6 +95,80 @@ pub(crate) struct MappingCounter {
     pub value: Arc<Mutex<u32>>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
+pub(crate) enum TransformModifier {
+    #[serde(rename = "lowercase")]
+    Lowercase,
+    #[serde(rename = "uppercase")]
+    Uppercase,
+    #[serde(rename = "capitalize")]
+    Capitalize,
+}
+
+impl Default for TransformModifier {
+    fn default() -> Self {
+        Self::Lowercase
+    }
+}
+
+impl Display for TransformModifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Lowercase => "lowercase",
+            Self::Uppercase => "uppercase",
+            Self::Capitalize => "capitalize"
+        })
+    }
+}
+
+impl FromStr for TransformModifier {
+    type Err = M3uFilterError;
+
+    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+        if s.eq("lowercase") {
+            Ok(Self::Lowercase)
+        } else if s.eq("uppercase") {
+            Ok(Self::Uppercase)
+        } else if s.eq("capitalize") {
+            Ok(Self::Capitalize)
+        } else {
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown TransformModifier: {}", s)
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct MapperTransform {
+    pub field: String,
+    pub modifier: TransformModifier,
+    pub pattern: Option<String>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub t_pattern: Option<Regex>,
+}
+
+impl MapperTransform {
+    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
+        match &self.pattern {
+            None => self.t_pattern = None,
+            Some(pattern) => {
+                let mut new_pattern = pattern.to_string();
+                match templates {
+                    None => {}
+                    Some(template_list) => {
+                        new_pattern = apply_templates_to_pattern(pattern, template_list);
+                    }
+                }
+                let re = Regex::new(&*new_pattern);
+                if re.is_err() {
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", new_pattern);
+                }
+                self.t_pattern = Some(re.unwrap());
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Mapper {
     pub filter: Option<String>,
@@ -105,16 +181,17 @@ pub(crate) struct Mapper {
     prefix: HashMap<String, String>,
     #[serde(default = "default_as_empty_map")]
     assignments: HashMap<String, String>,
+    transform: Option<Vec<MapperTransform>>,
     #[serde(skip_serializing, skip_deserializing)]
     pub(crate) t_filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
     pub(crate) t_pattern: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub t_tags: Vec<MappingTag>,
+    t_tags: Vec<MappingTag>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub t_tagre: Option<Regex>,
+    t_tagre: Option<Regex>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub t_attre: Option<Regex>,
+    t_attre: Option<Regex>,
 }
 
 impl Mapper {
@@ -142,6 +219,22 @@ impl Mapper {
                 return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper assignment field {value}")));
             }
         }
+
+        match &mut self.transform {
+            None => {}
+            Some(transforms) => {
+                for t in transforms {
+                    let field = t.field.as_str();
+                    if !valid_property!(field, AFFIX_FIELDS) {
+                        return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper transform field {field}")));
+                    }
+                    if let Err(err) = t.prepare(templates) {
+                        return Err(err);
+                    }
+                }
+            }
+        }
+
         match get_filter(&self.pattern, templates) {
             Ok(pattern) => {
                 self.t_pattern = Some(pattern);
@@ -275,6 +368,35 @@ impl MappingValueProcessor<'_> {
             }
         }
     }
+
+    fn apply_transform_modifier(modifier: &TransformModifier, value: &str) -> String {
+        match modifier {
+            TransformModifier::Uppercase => value.to_uppercase(),
+            TransformModifier::Lowercase => value.to_lowercase(),
+            TransformModifier::Capitalize => value.capitalize(),
+        }
+    }
+
+    fn apply_transform(&mut self) {
+        let mapper = self.mapper;
+        match &mapper.transform {
+            None => {}
+            Some(transform_list) => {
+                for transform in transform_list {
+                    if let Some(prop_value) = self.get_property(&transform.field) {
+                        let value = if let Some(regex) = &transform.t_pattern {
+                            regex.replace_all(&prop_value, |caps: &regex::Captures| {
+                                Self::apply_transform_modifier(&transform.modifier, &caps[0])
+                            })
+                        } else {
+                            Cow::from(Self::apply_transform_modifier(&transform.modifier, prop_value.as_str()))
+                        };
+                        self.set_property(&transform.field, &value);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl ValueProcessor for MappingValueProcessor<'_> {
@@ -300,6 +422,7 @@ impl ValueProcessor for MappingValueProcessor<'_> {
         MappingValueProcessor::<'_>::apply_suffix(self, &captured_values);
         MappingValueProcessor::<'_>::apply_prefix(self, &captured_values);
         MappingValueProcessor::<'_>::apply_assignments(self);
+        MappingValueProcessor::<'_>::apply_transform(self);
         true
     }
 }

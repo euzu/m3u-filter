@@ -12,3 +12,25 @@ pub (crate) fn get_title_group(text: &str) -> String {
     }
     text.to_string()
 }
+
+pub(crate) trait Capitalize {
+    fn capitalize(&self) -> String;
+}
+
+// Implement the Capitalize trait for &str
+impl Capitalize for &str {
+    fn capitalize(&self) -> String {
+        let mut chars = self.chars();
+        match chars.next() {
+            None => String::new(), // Handle empty string case
+            Some(first_char) => first_char.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    }
+}
+
+// Implement the trait for String as well
+impl Capitalize for String {
+    fn capitalize(&self) -> String {
+        self.as_str().capitalize()  // Reuse the &str implementation
+    }
+}

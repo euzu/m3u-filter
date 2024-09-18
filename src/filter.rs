@@ -222,10 +222,7 @@ fn get_parser_regexp(expr: &Pair<Rule>, templates: &Vec<PatternTemplate>) -> Res
         let mut parsed_text = String::from(expr.as_str());
         parsed_text.pop();
         parsed_text.remove(0);
-        let mut regstr = String::from(parsed_text.as_str());
-        for t in templates {
-            regstr = regstr.replace(format!("!{}!", &t.name).as_str(), &t.value);
-        }
+        let regstr  = apply_templates_to_pattern(&parsed_text, templates);
         let re = regex::Regex::new(regstr.as_str());
         if re.is_err() {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
@@ -369,10 +366,7 @@ fn get_parser_binary_op(expr: &Pair<Rule>) -> Result<BinaryOperator, M3uFilterEr
 pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -> Result<Filter, M3uFilterError> {
     let empty_list = Vec::new();
     let template_list: &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
-    let mut source = String::from(filter_text);
-    for t in template_list {
-        source = source.replace(format!("!{}!", &t.name).as_str(), &t.value);
-    }
+    let source  = apply_templates_to_pattern(filter_text, template_list);
 
     match FilterParser::parse(Rule::main, &source) {
         Ok(pairs) => {
@@ -514,4 +508,12 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<
         debug!("{:#?}", result);
     }
     Ok(result)
+}
+
+pub(crate) fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternTemplate>) -> String {
+    let mut new_pattern = pattern.to_string();
+    for template in templates {
+        new_pattern = new_pattern.replace(format!("!{}!", &template.name).as_str(), &template.value);
+    }
+    new_pattern
 }
