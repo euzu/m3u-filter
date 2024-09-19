@@ -1,5 +1,5 @@
 # Changelog
-# 2.0.4(2024-08-xx)
+# 2.0.4(2024-09-19)
 * if Content type of file download is not set in header, the gzip encoding is checked through magic header.
 * if source is m3u and stream id not a number, the entry is skipped and logged.
 * prefix and suffix was applied wrong, fixed.
