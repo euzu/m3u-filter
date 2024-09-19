@@ -27,13 +27,21 @@ fn get_value(it: &mut std::str::Chars) -> String {
     result.iter().collect::<String>()
 }
 
-fn token_till(it: &mut std::str::Chars, stop_char: char) -> Option<String> {
+fn token_till(it: &mut std::str::Chars, stop_char: char, start_with_alpha: bool) -> Option<String> {
     let mut result: Vec<char> = vec![];
+    let mut skip_non_alpha = start_with_alpha;
     for ch in it.by_ref() {
         if ch == stop_char {
             break;
         } else if ch.is_whitespace() && result.is_empty() {
             continue;
+        }
+        if skip_non_alpha {
+            if ch.is_alphabetic() {
+                skip_non_alpha = false;
+            } else {
+                continue;
+            }
         }
         result.push(ch);
     }
@@ -93,7 +101,7 @@ macro_rules! process_header_fields {
 fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str, url: &str) -> PlaylistItemHeader {
     let mut plih = create_empty_playlistitem_header(input.id, url);
     let mut it = content.chars();
-    let line_token = token_till(&mut it, ':');
+    let line_token = token_till(&mut it, ':', false);
     if line_token == Some(String::from("#EXTINF")) {
         let mut c = skip_digit(&mut it);
         loop {
@@ -103,10 +111,10 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
             if let ',' = c.unwrap() {
                 plih.title = Rc::new(get_value(&mut it));
             } else {
-                let token = token_till(&mut it, '=');
+                let token = token_till(&mut it, '=', true);
                 if let Some(t) = token {
                     let value = token_value(&mut it);
-                    process_header_fields!(plih, t.as_str(),
+                    process_header_fields!(plih, t.to_lowercase().as_str(),
                         (id, "tvg-id"),
                         (group, "group-title"),
                         (name, "tvg-name"),
@@ -162,7 +170,7 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigIn
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
-    let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(std::string::String::as_str).collect();
+    let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(String::as_str).collect();
     for line in lines {
         if line.starts_with("#EXTINF") {
             header = Some(line);
