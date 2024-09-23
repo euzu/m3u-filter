@@ -252,7 +252,7 @@ Each input has the following attributes:
 - `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
 - `enabled` is optional, default is true, if you disable the processing is skipped
 - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.
-- `url` for type `m3u` is the download url or a local filename of the input-source. For type `xtream`it is `http://<hostname>:<port>`
+- `url` for type `m3u` is the download url or a local filename (can be gzip) of the input-source. For type `xtream`it is `http://<hostname>:<port>`
 - `epg_url` _optional_ xmltv url
 - `headers` is optional
 - `username` only mandatory for type `xtream`
@@ -278,7 +278,7 @@ Example input config for `m3u`
 ```yaml
 sources:
 - inputs:
-    - url: 'test-input.m3u'
+    - url: 'http://provder.net/get_php?...'
       name: test_m3u
       epg_url: 'test-epg.xml'
       enabled: false

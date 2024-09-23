@@ -58,7 +58,7 @@ pub(crate) async fn stream_response(stream_url: &str, req: &HttpRequest, input: 
     let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
     debug!("Try to open stream {}", stream_url);
     if let Ok(url) = Url::parse(stream_url) {
-        let client = request_utils::get_client_request(input, url, Some(&req_headers));
+        let client = request_utils::get_client_request(input, &url, Some(&req_headers));
         match client.send().await {
             Ok(response) => {
                 if response.status().is_success() {

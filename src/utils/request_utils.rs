@@ -1,16 +1,18 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Error, ErrorKind, Read};
-use std::path::{PathBuf};
+use std::path::PathBuf;
+
+use flate2::read::{GzDecoder, ZlibDecoder};
 use log::{debug, error, Level, log_enabled};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::header::CONTENT_ENCODING;
+use url::Url;
+
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{ConfigInput};
-use crate::utils::file_utils::{get_file_path, open_file, persist_file};
-use reqwest::header::CONTENT_ENCODING;
-use flate2::read::{GzDecoder, ZlibDecoder};
-use url::Url;
+use crate::model::config::ConfigInput;
+use crate::utils::file_utils::{get_file_path, persist_file};
 
 fn is_gzip(bytes: &[u8]) -> bool {
     // Gzip files start with the bytes 0x1F 0x8B
@@ -48,22 +50,11 @@ pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &St
                             }
                         }
                     };
-                    match open_file(&filepath) {
-                        Ok(file) => {
-                            let mut content = String::new();
-                            match std::io::BufReader::new(file).read_to_string(&mut content) {
-                                Ok(_) => Some(content),
-                                Err(err) => {
-                                    let file_str = &filepath.to_str().unwrap_or("?");
-                                    error!("cant read file: {} {}", file_str,  err);
-                                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
-                                }
-                            }
-                        }
+
+                    match get_local_file_content(&filepath) {
+                        Ok(content) => Some(content),
                         Err(err) => {
-                            let file_str = &filepath.to_str().unwrap_or("?");
-                            error!("cant read file: {} {}", file_str,  err);
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Cant open file : {}  => {}", file_str,  err);
+                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed : {}", err);
                         }
                     }
                 } else {
@@ -82,8 +73,8 @@ pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &St
     }
 }
 
-pub(crate) fn get_client_request(input: Option<&ConfigInput>, url: url::Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
-    let mut request = reqwest::Client::new().get(url);
+pub(crate) fn get_client_request(input: Option<&ConfigInput>, url: &Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
+    let mut request = reqwest::Client::new().get(url.clone());
     let headers = get_request_headers(input.map_or(&HashMap::new(), |i| &i.headers), custom_headers);
     request = request.headers(headers);
     request
@@ -116,64 +107,95 @@ pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, cus
     headers
 }
 
-pub(crate) async fn download_text_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
-    if let Ok(url) = url_str.parse::<url::Url>() {
-        let request = get_client_request(Some(input), url, None);
-        let result = match request.send().await {
-            Ok(response) => {
-                let is_success = response.status().is_success();
-                if is_success {
-                    let header_value = response.headers().get(CONTENT_ENCODING);
-                    let mut encoding = if let Some(encoding_header) = header_value {
-                        match encoding_header.to_str() {
-                            Ok(value) => Some(value.to_string()),
-                            Err(_) => None,
-                        }
-                    } else {
-                        None
-                    };
-                    match response.bytes().await {
-                        Ok(bytes) => {
-                            if bytes.len() >= 2 && is_gzip(&bytes[0..2]) {
-                                encoding = Some("gzip".to_string());
-                            }
-                            let mut decode_buffer = String::new();
-                            if let Some(encoding_type) = encoding {
-                                match encoding_type.as_str() {
-                                    "gzip" => {
-                                        let mut decoder = GzDecoder::new(&bytes[..]);
-                                        match decoder.read_to_string(&mut decode_buffer) {
-                                            Ok(_) => {}
-                                            Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
-                                        };
-                                    }
-                                    "deflate" => {
-                                        let mut decoder = ZlibDecoder::new(&bytes[..]);
-                                        match decoder.read_to_string(&mut decode_buffer) {
-                                            Ok(_) => {}
-                                            Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode zlib content {err}")))
-                                        }
-                                    }
-                                    _ => {}
-                                };
-                            }
+fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
+    // Check if the file is accessible
+    if file_path.exists() && file_path.is_file() {
+        if let Ok(content) = fs::read(&file_path) {
+            if content.len() >= 2 && is_gzip(&content[0..2]) {
+                let mut decoder = GzDecoder::new(&content[..]);
+                let mut decode_buffer = String::new();
+                match decoder.read_to_string(&mut decode_buffer) {
+                    Ok(_) => return Ok(decode_buffer),
+                    Err(err) => return Err(Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
+                };
+            }
+            return Ok(String::from_utf8_lossy(&content).parse().unwrap());
+        }
+    }
+    let file_str = file_path.to_str().unwrap_or("?");
+    Err(Error::new(ErrorKind::InvalidData, format!("Cant find file {file_str}")))
+}
 
-                            if decode_buffer.is_empty() {
-                                match String::from_utf8(bytes.to_vec()) {
-                                    Ok(decoded_content) => Ok(decoded_content),
-                                    Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
-                                }
-                            } else {
-                                Ok(decode_buffer)
-                            }
-                        }
-                        Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to read response {err}")))
+async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Error> {
+    let request = get_client_request(Some(input), url, None);
+    match request.send().await {
+        Ok(response) => {
+            let is_success = response.status().is_success();
+            if is_success {
+                let header_value = response.headers().get(CONTENT_ENCODING);
+                let mut encoding = if let Some(encoding_header) = header_value {
+                    match encoding_header.to_str() {
+                        Ok(value) => Some(value.to_string()),
+                        Err(_) => None,
                     }
                 } else {
-                    Err(std::io::Error::new(ErrorKind::Other, format!("Request failed with status {}", response.status())))
+                    None
+                };
+                match response.bytes().await {
+                    Ok(bytes) => {
+                        if bytes.len() >= 2 && is_gzip(&bytes[0..2]) {
+                            encoding = Some("gzip".to_string());
+                        }
+                        let mut decode_buffer = String::new();
+                        if let Some(encoding_type) = encoding {
+                            match encoding_type.as_str() {
+                                "gzip" => {
+                                    let mut decoder = GzDecoder::new(&bytes[..]);
+                                    match decoder.read_to_string(&mut decode_buffer) {
+                                        Ok(_) => {}
+                                        Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
+                                    };
+                                }
+                                "deflate" => {
+                                    let mut decoder = ZlibDecoder::new(&bytes[..]);
+                                    match decoder.read_to_string(&mut decode_buffer) {
+                                        Ok(_) => {}
+                                        Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode zlib content {err}")))
+                                    }
+                                }
+                                _ => {}
+                            };
+                        }
+
+                        if decode_buffer.is_empty() {
+                            match String::from_utf8(bytes.to_vec()) {
+                                Ok(decoded_content) => Ok(decoded_content),
+                                Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
+                            }
+                        } else {
+                            Ok(decode_buffer)
+                        }
+                    }
+                    Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to read response {err}")))
                 }
+            } else {
+                Err(std::io::Error::new(ErrorKind::Other, format!("Request failed with status {}", response.status())))
             }
-            Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {err}")))
+        }
+        Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {err}")))
+    }
+}
+
+pub(crate) async fn download_text_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
+    if let Ok(url) = url_str.parse::<url::Url>() {
+        let result = if url.scheme() == "file" {
+            if let Ok(file_path) = url.to_file_path() {
+                get_local_file_content(&file_path)
+            } else {
+                Err(Error::new(ErrorKind::Other, format!("Unknown file {url}")))
+            }
+        } else {
+            get_remote_content(input, &url).await
         };
         match result {
             Ok(content) => {
@@ -210,7 +232,6 @@ pub(crate) async fn get_input_json_content(input: &ConfigInput, url: &str, persi
         Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {url}  => {}", e)
     }
 }
-
 
 
 pub(crate) fn get_base_url(url: &str) -> Option<String> {

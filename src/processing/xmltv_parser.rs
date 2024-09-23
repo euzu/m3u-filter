@@ -17,7 +17,7 @@ pub(crate) fn parse_tvguide(content: &str) -> Option<TVGuide> {
             Ok(Event::Eof) => break,
             Ok(Event::Start(e)) => {
                 let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                let attributes = e.attributes().filter_map(std::result::Result::ok)
+                let attributes = e.attributes().filter_map(Result::ok)
                     .filter_map(|a| {
                         let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
                         let value = String::from(a.unescape_value().unwrap().as_ref()).to_string();

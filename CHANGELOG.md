@@ -1,4 +1,7 @@
 # Changelog
+# 2.0.5(2024-09-xx)
+- input url supports now scheme `file://...` (which is not necessary because file paths are supported). Gzip files are also supported.     
+
 # 2.0.4(2024-09-19)
 * if Content type of file download is not set in header, the gzip encoding is checked through magic header.
 * if source is m3u and stream id not a number, the entry is skipped and logged.
