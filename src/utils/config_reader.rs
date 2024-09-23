@@ -19,7 +19,6 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
 
     match read_mapping(mappings_file.as_str()) {
         Ok(mappings) => {
-            info!("Mappings File: {}", &mappings_file);
             match mappings {
                 None => {debug!("no mapping loaded");}
                 Some(mappings_cfg) => {cfg.set_mappings(mappings_cfg);}
