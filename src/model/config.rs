@@ -198,6 +198,7 @@ pub(crate) struct ConfigSortChannel {
     pub group_pattern: String,
     // match against group title
     pub order: SortOrder,
+    pub sequence: Option<Vec<String>>,
     #[serde(skip_serializing, skip_deserializing)]
     pub re: Option<regex::Regex>,
 }

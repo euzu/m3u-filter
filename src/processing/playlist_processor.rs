@@ -68,10 +68,42 @@ fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &Co
     let raw_value_b = get_field_value(b, &channel_sort.field);
     let value_a = if match_as_ascii { Rc::new(unidecode(&raw_value_a)) } else { raw_value_a };
     let value_b = if match_as_ascii { Rc::new(unidecode(&raw_value_b)) } else { raw_value_b };
-    let ordering = value_a.partial_cmp(&value_b).unwrap();
-    match channel_sort.order {
-        Asc => ordering,
-        Desc => ordering.reverse()
+    match &channel_sort.sequence {
+        Some(custom_order) => {
+            // Check indices in the custom order vector
+            let index_a = custom_order.iter().position(|s| s == value_a.as_ref());
+            let index_b = custom_order.iter().position(|s| s == value_b.as_ref());
+
+            match (index_a, index_b) {
+                (Some(idx_a), Some(idx_b)) => {
+                    // Both items found in custom order, compare indices
+                    idx_a.cmp(&idx_b)
+                }
+                (Some(_), None) => {
+                    // Only 'a' found in custom order, it comes first
+                    Ordering::Less
+                }
+                (None, Some(_)) => {
+                    // Only 'b' found in custom order, it comes first
+                    Ordering::Greater
+                }
+                (None, None) => {
+                    // Neither found, fall back to default ordering
+                    let ordering = value_a.partial_cmp(&value_b).unwrap();
+                    match channel_sort.order {
+                        Asc => ordering,
+                        Desc => ordering.reverse(),
+                    }
+                }
+            }
+        },
+        None => {
+            let ordering = value_a.partial_cmp(&value_b).unwrap();
+            match channel_sort.order {
+                Asc => ordering,
+                Desc => ordering.reverse()
+            }
+        }
     }
 }
 

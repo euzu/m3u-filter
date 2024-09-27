@@ -335,6 +335,7 @@ is a list of sort configurations for groups. Each configuration has 3 top level 
 - `field` can be  `group`, `title`, `name` or `url`.
 - `group_pattern` is a regular expression like `'^TR.:\s?(.*)'` which is matched against group title.
 - `order` can be `asc` or `desc`
+- `sequence` _optional_  is a list of field values (based on `field`) which are used to sort based on index. The `order` is ignored for this entries.
 
 The pattern should be selected taking into account the processing sequence.
 
