@@ -11,7 +11,7 @@ use petgraph::algo::toposort;
 use crate::model::playlist::{PlaylistItem, PlaylistItemType};
 use crate::model::config::ItemField;
 use petgraph::graph::DiGraph;
-use crate::{create_m3u_filter_error_result};
+use crate::{create_m3u_filter_error_result, exit};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 
@@ -349,9 +349,13 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, err
             }
         }
     }
-    if stmts.is_empty() || stmts.len() > 1 {
-        errors.push(format!("did not expect multiple rule: {stmts:?}"));
+    if stmts.is_empty() {
+        exit!("Invalid Filter, could not parse {errors:?}")
     }
+    if stmts.len() > 1 {
+        exit!("did not expect multiple rule: {stmts:?}, {errors:?}");
+    }
+
     stmts.pop().unwrap()
 }
 
