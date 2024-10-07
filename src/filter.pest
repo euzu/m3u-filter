@@ -9,13 +9,13 @@ type_comparison = { ^"type" ~ "=" ~ type_value }
 field_comparison_value = _{ regexp }
 field_comparison = { field ~ "~" ~ field_comparison_value }
 comparison = { field_comparison | type_comparison }
-bool_op = { and | or}
+bool_op = { and | or }
 expr_group = { "(" ~ expr ~ ")" }
+basic_expr = _{ comparison | expr_group }
+not_expr = _{ not ~ basic_expr }
 expr = {
-  comparison ~ (bool_op ~ expr)*
-  | expr_group ~ (bool_op ~ expr)*
-  | not ~ expr ~ (bool_op ~ expr)*
+  not_expr ~ (bool_op ~ expr)?
+  | basic_expr ~ (bool_op ~ expr)*
 }
-stmt = { expr  ~ (bool_op ~ expr)* }
+stmt = { expr ~ (bool_op ~ expr)* }
 main = _{ SOI ~ stmt ~ EOI }
-
