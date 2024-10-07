@@ -55,8 +55,8 @@ pub(crate) fn parse_tvguide(content: &str) -> Option<TVGuide> {
                 }
             }
             Ok(Event::Text(e)) => {
-                let text = e.unescape().unwrap().into_owned();
-                if !text.is_empty() {
+                let text = e.unescape().unwrap().trim().to_owned();
+                if !text.is_empty() && !stack.is_empty() {
                     stack.last_mut().unwrap().value = Some(text);
                 }
             }
