@@ -17,25 +17,28 @@ fn token_value(it: &mut std::str::Chars) -> String {
 }
 
 fn get_value(it: &mut std::str::Chars) -> String {
-    let mut result: Vec<char> = vec![];
+    let mut result = String::with_capacity(512);
     for oc in it.by_ref() {
         if oc == '"' {
             break;
         }
         result.push(oc);
     }
-    result.iter().collect::<String>()
+    result.shrink_to_fit();
+    result
 }
 
 fn token_till(it: &mut std::str::Chars, stop_char: char, start_with_alpha: bool) -> Option<String> {
-    let mut result: Vec<char> = vec![];
+    let mut result = String::with_capacity(512);
     let mut skip_non_alpha = start_with_alpha;
+
     for ch in it.by_ref() {
         if ch == stop_char {
             break;
         } else if ch.is_whitespace() && result.is_empty() {
             continue;
         }
+
         if skip_non_alpha {
             if ch.is_alphabetic() {
                 skip_non_alpha = false;
@@ -45,7 +48,13 @@ fn token_till(it: &mut std::str::Chars, stop_char: char, start_with_alpha: bool)
         }
         result.push(ch);
     }
-    if result.is_empty() { None } else { Some(result.iter().collect::<String>()) }
+
+    if result.is_empty() {
+        None
+    } else {
+        result.shrink_to_fit();
+        Some(result)
+    }
 }
 
 fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
@@ -102,7 +111,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
     let mut plih = create_empty_playlistitem_header(input.id, url);
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':', false);
-    if line_token == Some(String::from("#EXTINF")) {
+    if line_token.as_deref() == Some("#EXTINF") {
         let mut c = skip_digit(&mut it);
         loop {
             if c.is_none() {
@@ -138,24 +147,24 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
         plih.epg_channel_id = Some(Rc::clone(&plih.id));
     }
 
-    for suffix in video_suffixes {
-        if url.ends_with(suffix) {
-            // TODO find Series based on group or configured names
-            plih.xtream_cluster = XtreamCluster::Video;
-            plih.item_type = PlaylistItemType::Movie;
-            break;
+    if video_suffixes.iter().any(|suffix| url.ends_with(suffix)) {
+        // TODO find Series based on group or configured names
+        plih.xtream_cluster = XtreamCluster::Video;
+        plih.item_type = PlaylistItemType::Movie;
+    }
+
+    {
+        let mut header = plih.borrow_mut();
+        if header.name.is_empty() {
+            if !header.title.is_empty() {
+                header.name = header.title.clone();
+            } else if !header.id.is_empty() {
+                header.name = header.id.clone();
+                header.title = header.id.clone();
+            }
         }
     }
 
-    let header = plih.borrow_mut();
-    if header.name.is_empty() {
-        if !header.title.is_empty() {
-            header.name = header.title.clone();
-        } else if !header.id.is_empty() {
-            header.name = header.id.clone();
-            header.title = header.id.clone();
-        }
-    }
     plih
 }
 
@@ -174,7 +183,7 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigIn
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
-    let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(String::as_str).collect();
+    let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(String::as_str).collect::<Vec<&str>>();
     for line in lines {
         if line.starts_with("#EXTINF") {
             header = Some(line);
