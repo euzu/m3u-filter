@@ -1,9 +1,10 @@
 # Changelog
-# 2.0.5(2024-09-xx)
+# 2.0.5(2024-10-16)
 - input url supports now scheme `file://...` (which is not necessary because file paths are supported). Gzip files are also supported.     
 - sort takes now a sequence for channel values which has higher priority than sort order
 - fixed error handling in filter parsing
 - `NOT` filter is now `non greedy`. `NOT Name ~ "A" AND Group ~ "B"` was `NOT (Name ~ "A" AND Group ~ "B")`. Now it is `(NOT Name ~ "A") AND Group ~ "B"`  
+- Implemented workaround for missing tvg-ID
 
 # 2.0.4(2024-09-19)
 * if Content type of file download is not set in header, the gzip encoding is checked through magic header.
