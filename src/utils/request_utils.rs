@@ -233,10 +233,14 @@ pub(crate) async fn get_input_json_content(input: &ConfigInput, url: &str, persi
     }
 }
 
-
 pub(crate) fn get_base_url(url: &str) -> Option<String> {
-    match Url::parse(url) {
-        Ok(url) => Some(url.origin().ascii_serialization()),
-        Err(_) => None
+    if let Some((scheme_end, rest)) = url.split_once("://") {
+        let scheme = scheme_end;
+        if let Some(authority_end) = rest.find('/') {
+            let authority = &rest[..authority_end];
+            return Some(format!("{}://{}", scheme, authority));
+        }
+        return Some(format!("{}://{}", scheme, rest));
     }
+    None
 }

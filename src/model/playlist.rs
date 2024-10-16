@@ -2,8 +2,9 @@ use std::cell::RefCell;
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
-use uuid::{Uuid};
-use sha1::{Sha1, Digest};
+use base64::Engine;
+use blake3::Hasher;
+use base64::engine::general_purpose;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
@@ -111,17 +112,21 @@ impl PlaylistItemHeader {
 
     pub(crate) fn gen_uuid(&mut self) {
         let cluster = self.xtream_cluster as u8;
-        let mut hasher = Sha1::new();
-        hasher.update(get_base_url(&self.url).unwrap_or(self.url.to_string()));
-        hasher.update(self.stream_id.as_str());
-        hasher.update(self.title.as_str());
-        hasher.update(self.name.as_str());
-        hasher.update(self.group.as_str());
-        hasher.update(vec![cluster].as_slice());
-        let hashed_bytes = hasher.finalize();
-        let namespace = Uuid::NAMESPACE_OID;
-        let uuid = Uuid::new_v5(&namespace, &hashed_bytes).to_string();
-        self.uuid = Rc::new(uuid);
+        let base_url = get_base_url(&self.url).unwrap_or_else(|| self.url.to_string());
+        // Create a Blake3 hasher
+        let mut hasher = Hasher::new();
+        hasher.update(base_url.as_bytes());
+        // hasher.update(self.stream_id.as_bytes());
+        // hasher.update(self.title.as_bytes());
+        // hasher.update(self.name.as_bytes());
+        // hasher.update(self.group.as_bytes());
+        hasher.update(&[cluster]);
+        // Finalize and get the hash result
+        let hash_bytes = hasher.finalize();
+        // Encode the reduced 128-bit hash to Base62
+        let mut encoded_key = String::new();
+        general_purpose::STANDARD.encode_string(&hash_bytes.as_bytes(), &mut encoded_key);
+        self.uuid = Rc::new(encoded_key);
     }
     pub(crate) fn get_uuid(&self) -> &str {
         self.uuid.as_ref()
