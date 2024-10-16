@@ -1,19 +1,20 @@
 #![allow(clippy::empty_docs)]
 
 use std::cell::RefCell;
-use enum_iterator::all;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::rc::Rc;
+
+use enum_iterator::all;
 use log::{debug, error, Level, log_enabled};
 use pest::iterators::Pair;
 use pest::Parser;
 use petgraph::algo::toposort;
-use crate::model::playlist::{PlaylistItem, PlaylistItemType};
-use crate::model::config::ItemField;
 use petgraph::graph::DiGraph;
+
 use crate::{create_m3u_filter_error_result, exit};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-
+use crate::model::config::ItemField;
+use crate::model::playlist::{PlaylistItem, PlaylistItemType};
 
 pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<String> {
     let header = pli.header.borrow();
@@ -76,7 +77,7 @@ pub(crate) struct RegexWithCaptures {
 
 #[derive(Parser)]
 #[grammar_inline = r#"
-WHITESPACE = _{ " " | "\t" }
+WHITESPACE = _{ " " | "\t" | "\r" | "\n"}
 field = { ^"group" | ^"title" | ^"name" | ^"url" }
 and = { ^"and" }
 or = { ^"or" }
@@ -135,10 +136,14 @@ impl Filter {
             Filter::FieldComparison(field, rewc) => {
                 let value = provider.call(field);
                 let is_match = rewc.re.is_match(value.as_str());
-                if is_match {
-                    if log_enabled!(Level::Debug) {
+                if log_enabled!(Level::Trace) {
+                    if is_match {
                         debug!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);
+                    } else {
+                        debug!("Match failed: {self}: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);
                     }
+                }
+                if is_match {
                     processor.process(field, &value, rewc);
                 }
                 is_match
@@ -149,8 +154,12 @@ impl Filter {
                     None => false,
                     Some(pli_type) => {
                         let is_match = pli_type.eq(item_type);
-                        if is_match && log_enabled!(Level::Debug) {
-                            debug!("Match found: {:?} {}", &field, value);
+                        if log_enabled!(Level::Trace) {
+                            if is_match {
+                                debug!("Match found: {:?} {}", &field, value);
+                            } else {
+                                debug!("Match failed: {self}: {:?} {}", &field, &value);
+                            }
                         }
                         is_match
                     }
@@ -223,7 +232,7 @@ fn get_parser_regexp(expr: &Pair<Rule>, templates: &Vec<PatternTemplate>) -> Res
         let mut parsed_text = String::from(expr.as_str());
         parsed_text.pop();
         parsed_text.remove(0);
-        let regstr  = apply_templates_to_pattern(&parsed_text, templates);
+        let regstr = apply_templates_to_pattern(&parsed_text, templates);
         let re = regex::Regex::new(regstr.as_str());
         if re.is_err() {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
@@ -259,7 +268,7 @@ fn get_parser_field_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate
 fn get_filter_item_type(text_item_type: &str) -> Option<PlaylistItemType> {
     if text_item_type.eq_ignore_ascii_case("live") {
         Some(PlaylistItemType::Live)
-    } else if text_item_type.eq_ignore_ascii_case("movie")  || text_item_type.eq_ignore_ascii_case("vod") {
+    } else if text_item_type.eq_ignore_ascii_case("movie") || text_item_type.eq_ignore_ascii_case("vod") {
         Some(PlaylistItemType::Movie)
     } else if text_item_type.eq_ignore_ascii_case("series") {
         Some(PlaylistItemType::Series)
@@ -371,7 +380,7 @@ fn get_parser_binary_op(expr: &Pair<Rule>) -> Result<BinaryOperator, M3uFilterEr
 pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -> Result<Filter, M3uFilterError> {
     let empty_list = Vec::new();
     let template_list: &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
-    let source  = apply_templates_to_pattern(filter_text, template_list);
+    let source = apply_templates_to_pattern(filter_text, template_list);
 
     match FilterParser::parse(Rule::main, &source) {
         Ok(pairs) => {

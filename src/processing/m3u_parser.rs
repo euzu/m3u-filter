@@ -159,9 +159,13 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
     plih
 }
 
-fn extract_id_from_url(url: &str) -> Option<String> {
+pub(crate) fn extract_id_from_url(url: &str) -> Option<String> {
     if let Some(filename) = url.split('/').last() {
-        return filename.rsplit('.').next().map(std::string::ToString::to_string);
+       return if let Some(index) = filename.rfind('.') {
+            Some(filename[..index].to_string())
+        } else {
+            Some(filename.to_string())
+        };
     }
     None
 }

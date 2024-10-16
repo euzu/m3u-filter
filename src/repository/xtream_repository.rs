@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use std::convert::{TryInto};
+use std::convert::TryInto;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use log::error;
 use serde_json::{json, Value};
@@ -12,11 +13,12 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
+use crate::processing::m3u_parser::extract_id_from_url;
+use crate::repository::index_record::IndexRecord;
 use crate::repository::indexed_document_reader::{IndexedDocumentReader, read_indexed_item};
 use crate::repository::indexed_document_writer::IndexedDocumentWriter;
-use crate::repository::index_record::IndexRecord;
 use crate::utils::file_utils;
-use crate::utils::json_utils::{json_write_documents_to_file, json_iter_array};
+use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 
 pub(crate) static COL_CAT_LIVE: &str = "cat_live";
 pub(crate) static COL_CAT_SERIES: &str = "cat_series";
@@ -246,17 +248,46 @@ pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlis
                         // we skip resolved series, because this is only necessary when writing m3u files
                         let col = if header.item_type == PlaylistItemType::Series {
                             None
-                        } else if header.id.parse::<i32>().is_ok() {
-                            header.category_id = *cat_id;
-                            Some(match header.xtream_cluster {
-                                XtreamCluster::Live => &mut live_col,
-                                XtreamCluster::Series => &mut series_col,
-                                XtreamCluster::Video => &mut vod_col,
-                            })
                         } else {
-                            let title = header.title.as_str();
-                            errors.push(format!("Channel does not have an id: {title}"));
-                            None
+                            if header.id.parse::<i32>().is_err() {
+                                let id_from_url = match extract_id_from_url(&header.url) {
+                                    Some(id) => match id.parse::<i32>() {
+                                        Ok(newid) => Some(newid),
+                                        Err(_) => None,
+                                    },
+                                    None => None,
+                                };
+
+                                let has_id = match id_from_url {
+                                    Some(newid) => {
+                                        header.id = Rc::new(newid.to_string());
+                                        Ok(())
+                                    }
+                                    None => {
+                                        let title = header.title.as_str();
+                                        errors.push(format!("Channel does not have an id: {title}"));
+                                        Err(())
+                                    }
+                                };
+                                // Instead of returning from the function, handle the error by assigning None to col.
+                                if has_id.is_err() {
+                                    None
+                                } else {
+                                    header.category_id = *cat_id;
+                                    Some(match header.xtream_cluster {
+                                        XtreamCluster::Live => &mut live_col,
+                                        XtreamCluster::Series => &mut series_col,
+                                        XtreamCluster::Video => &mut vod_col,
+                                    })
+                                }
+                            } else {
+                                header.category_id = *cat_id;
+                                Some(match header.xtream_cluster {
+                                    XtreamCluster::Live => &mut live_col,
+                                    XtreamCluster::Series => &mut series_col,
+                                    XtreamCluster::Video => &mut vod_col,
+                                })
+                            }
                         };
                         drop(header);
                         if let Some(pl) = col {
@@ -523,7 +554,7 @@ pub(crate) fn xtream_load_catchup_id_mapping(config: &Config, target_name: &str)
                         let provider_id = u32::from_le_bytes(bytes);
                         let mut bytes = [0u8; 4];
                         if reader.read_exact(&mut bytes).is_ok() {
-                            let  stream_id = u32::from_le_bytes(bytes);
+                            let stream_id = u32::from_le_bytes(bytes);
                             result.insert(provider_id, stream_id);
                         } else {
                             break;

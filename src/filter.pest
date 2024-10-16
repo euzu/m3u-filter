@@ -1,4 +1,4 @@
-WHITESPACE = _{ " " | "\t" }
+WHITESPACE = _{ " " | "\t" | "\r" | "\n"}
 field = { ^"group" | ^"title" | ^"name" | ^"url" }
 and = { ^"and" }
 or = { ^"or" }

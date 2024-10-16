@@ -2,6 +2,7 @@
 mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
+    use regex::Regex;
     use crate::filter::{get_filter, MockValueProcessor, ValueProvider};
     use crate::model::playlist::{PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 
@@ -137,4 +138,36 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_filter_6() {
+        let flt = r####"
+            Group ~ "^EU \| FRANCE.*"
+            OR  Group ~ "^VOD \| FR.*"
+            OR  Group ~ "\[FR\].*"
+            OR  Group ~ "^SRS \| FR.*"
+            AND NOT (Group ~ ".* LQ.*"
+            OR Title ~ ".* LQ.*"
+            OR Group ~ ".* SD.*"
+            OR Title ~ ".* SD.*"
+            OR Group ~ ".* HD.*"
+            OR Title ~ ".* HD.*"
+            OR Group ~ "(?i).*sport.*"
+            OR Group ~ "(?i).*DAZN.*"
+            OR Group ~ "(?i).*EQUIPE.*"
+            OR Group ~ "DOM TOM.*"
+            OR Group ~ "(?i).*PLUTO.*"
+            OR Title ~ "(?i).*GOLD.*"
+            OR Title ~ "###.*")"####;
+
+        match get_filter(flt, None) {
+            Ok(filter) => {
+                let re = Regex::new(r"\s+").unwrap();
+                let result = re.replace_all(&flt, " ");
+                assert_eq!(format!("{filter}"), result.trim());
+            },
+            Err(e) => {
+                panic!("{}", e)
+            }
+        }
+    }
 }
