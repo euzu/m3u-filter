@@ -4,6 +4,15 @@ set -o pipefail
 
 source "${HOME}/.ghcr.io"
 
+if [ -f "../target/x86_64-unknown-linux-musl/release/m3u-filter" ]; then
+    echo "Static binary does not exists."
+    exit;
+fi
+if [ -d "../frontend/build" ]; then
+    echo "Web directory does not exists."
+    exit;
+fi
+
 cd ./docker
 cp ../target/x86_64-unknown-linux-musl/release/m3u-filter .
 rm -rf ./web
