@@ -1,30 +1,31 @@
-[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Feuzu%2Fm3u-filter&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com) [![wiki](https://github.com/user-attachments/assets/68251546-7c96-44c1-bebe-f8eaf2675992)](https://github.com/euzu/m3u-filter/wiki)
+[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Feuzu%2Fm3u-filter&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com) 
+[![wiki](https://github.com/user-attachments/assets/68251546-7c96-44c1-bebe-f8eaf2675992)](https://github.com/euzu/m3u-filter/wiki)
 
 
 ![m3u-filter_banner](https://github.com/user-attachments/assets/ea10bc02-eb2d-415f-828f-a14f9b57f5e8)
 
-m3u-filter is a simple application which can:
-  - filter, rename, map and sort entries out of a playlist and persist in EXTM3U, XTREAM or Kodi format.
-  - can process multiple inputs and can create multiple outputs from this input files trough target definitions.
-  - act as simple xtream or m3u server after processing entries
-  - act as `redirect` or `reverse` proxy for xtream 
-  - can schedule updates in server mode
-  - can run as cli-command for serving processed playlists through web-server like nginx or apache.
-  - can define multiple targets for filtering if you want to create multiple playlists from a big playlist.
-  - use regular expressions for matching
-  - define filter as statements like `filter: (Group ~ "^FR.*") AND NOT(Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~".*MOVIES.*")`
-  - DRY - define templates and use them, don't repeat yourself
-  - Send a telegram bot or rest message when something goes wrong
-  - Watch changes in groups and get a message on changes
+**m3u-filter** is a simple application that can:
 
-![m3u-filter-overview](https://github.com/euzu/m3u-filter/assets/33094714/9a3449ac-c646-4bb4-a5ab-320a588d35c8)
+- Filter, rename, map, and sort entries from a playlist, and save them in EXTM3U, XTREAM, or Kodi format.
+- Process multiple input files and create multiple output files through target definitions.
+- Act as a simple Xtream or M3U server after processing entries.
+- Serve as a redirect or reverse proxy for Xtream.
+- Schedule updates in server mode.
+- Run as a CLI command to serve processed playlists via web servers like Nginx or Apache.
+- Define multiple filtering targets to create several playlists from a large one.
+- Use regular expressions for matching.
+- Define filters with statements, e.g.: filter:
+  
+   `(Group ~ "^FR.*") AND NOT (Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~ ".*MOVIES.*")`
+- DRY (Don't Repeat Yourself): Define templates and reuse them.
+- Send a Telegram bot or REST message when something goes wrong.
+- Monitor changes in groups and send notifications on detected changes.
 
-If you have a playlist which contains unwanted entries, you can create filter which include or discard entries
-based on the header information of the playlist entries, you can rename entries or map entries based on regular expressions.
+If you have a playlist containing unwanted entries, you can create filters to include or exclude entries based on the playlist's header information. You can also rename or map entries using regular expressions.
 
-You can run m3u-filter as command line application to update your playlists (manually or as cron job), or you can 
-run it in server mode and open the web-ui to see the contents of the playlist, filter/search content and save 
-the filtered groups as a new playlist.
+You can run m3u-filter as a command-line application to update your playlists (manually or as a cron job), or run it in server mode to open a web UI. From there, you can view the playlist contents, filter or search entries, and save filtered groups as a new playlist.
+
+![m3u-filter_function](https://github.com/user-attachments/assets/1b5ba462-712a-4f41-9140-8cca913ba5f4)
 
 ## Starting in server mode for Web-UI
 The Web-UI is available in server mode. You need to start `m3u-filter` with the `-s` (`--server`) option.
