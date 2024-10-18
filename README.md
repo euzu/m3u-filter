@@ -1,8 +1,7 @@
-[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Feuzu%2Fm3u-filter&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com)
+[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Feuzu%2Fm3u-filter&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com) [![wiki](https://github.com/user-attachments/assets/68251546-7c96-44c1-bebe-f8eaf2675992)](https://github.com/euzu/m3u-filter/wiki)
 
-# m3u-filter
 
-[Wiki](https://github.com/euzu/m3u-filter/wiki)
+![m3u-filter_banner](https://github.com/user-attachments/assets/ea10bc02-eb2d-415f-828f-a14f9b57f5e8)
 
 m3u-filter is a simple application which can:
   - filter, rename, map and sort entries out of a playlist and persist in EXTM3U, XTREAM or Kodi format.
