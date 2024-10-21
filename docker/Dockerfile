@@ -31,7 +31,7 @@ RUN yarn build
 RUN rm -rf node_modules
 
 # Final container
-FROM scratch
+FROM scratch as scratch-final
 WORKDIR /
 
 COPY --from=rust-build /usr/share/zoneinfo /usr/share/zoneinfo
@@ -44,3 +44,18 @@ COPY --from=node-build /app/build /web
 
 ENTRYPOINT ["/m3u-filter"]
 CMD ["-s", "-p", "/config"]
+
+# Final container
+FROM alpine:latest as alpine-final
+
+RUN apk add --no-cache bash curl
+
+WORKDIR /app
+
+COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter m3u-filter
+COPY --from=node-build /app/build web
+# config should be mounted as volume
+# COPY ./config config
+
+ENTRYPOINT ["/app/m3u-filter"]
+CMD ["-s", "-p", "/app/config"]

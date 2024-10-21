@@ -2,8 +2,9 @@
 Change into the root directory and run:
 
 ```shell
-docker build --rm -f docker/Dockerfile -t m3u-filter .  
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final .  
 ```
+PS: If you build `alpine-final` target be aware of the path prefix: `/app`  
 
 This will build the complete project and create a docker image.
 

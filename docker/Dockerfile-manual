@@ -1,7 +1,7 @@
 FROM gcr.io/distroless/base-debian12 as build
 
-
-FROM scratch
+# Scratch Final container
+FROM scratch as scratch-final
 WORKDIR /
 
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
@@ -11,3 +11,18 @@ COPY ./m3u-filter /
 COPY ./web /web
 
 CMD ["./m3u-filter", "-s", "-p", "/config"]
+
+# Alpine Final container
+FROM alpine:latest as alpine-final
+
+RUN apk add --no-cache bash curl strace tcpdump bind-tools nano
+
+WORKDIR /app
+
+COPY ./m3u-filter .
+COPY ./web ./web
+# config should be mounted as volume
+# COPY ./config ./config
+
+ENTRYPOINT ["/app/m3u-filter"]
+CMD ["-s", "-p", "/app/config"]

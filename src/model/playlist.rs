@@ -111,16 +111,11 @@ pub(crate) struct PlaylistItemHeader {
 impl PlaylistItemHeader {
 
     pub(crate) fn gen_uuid(&mut self) {
-        let cluster = self.xtream_cluster as u8;
-        let base_url = get_base_url(&self.url).unwrap_or_else(|| self.url.to_string());
+        //let base_url = get_base_url(&self.url).unwrap_or_else(|| self.url.to_string());
         // Create a Blake3 hasher
         let mut hasher = Hasher::new();
-        hasher.update(base_url.as_bytes());
-        // hasher.update(self.stream_id.as_bytes());
-        // hasher.update(self.title.as_bytes());
-        // hasher.update(self.name.as_bytes());
-        // hasher.update(self.group.as_bytes());
-        hasher.update(&[cluster]);
+        // the url should be different for each entry.
+        hasher.update(self.url.as_bytes());
         // Finalize and get the hash result
         let hash_bytes = hasher.finalize();
         // Encode the reduced 128-bit hash to Base62

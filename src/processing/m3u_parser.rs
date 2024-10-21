@@ -7,17 +7,19 @@ use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, Pl
 use crate::utils::default_utils::{default_as_empty_rc_str, default_playlist_item_type, default_stream_cluster};
 use crate::utils::string_utils;
 
+#[inline]
 fn token_value(it: &mut std::str::Chars) -> String {
-    if let Some(oc) = it.next() {
-        if oc == '"' {
-            return get_value(it);
-        }
+    // Use .find() to skip until the first double quote (") character.
+    if it.find(|&ch| ch == '"').is_some() {
+        // If a quote is found, call get_value to extract the value.
+        return get_value(it);
     }
+    // If no double quote is found, return an empty string.
     String::new()
 }
 
 fn get_value(it: &mut std::str::Chars) -> String {
-    let mut result = String::with_capacity(512);
+    let mut result = String::with_capacity(128);
     for oc in it.by_ref() {
         if oc == '"' {
             break;
@@ -29,13 +31,14 @@ fn get_value(it: &mut std::str::Chars) -> String {
 }
 
 fn token_till(it: &mut std::str::Chars, stop_char: char, start_with_alpha: bool) -> Option<String> {
-    let mut result = String::with_capacity(512);
+    let mut result = String::with_capacity(128);
     let mut skip_non_alpha = start_with_alpha;
 
     for ch in it.by_ref() {
         if ch == stop_char {
             break;
-        } else if ch.is_whitespace() && result.is_empty() {
+        }
+        if result.is_empty() && ch.is_whitespace() {
             continue;
         }
 
@@ -57,6 +60,7 @@ fn token_till(it: &mut std::str::Chars, stop_char: char, start_with_alpha: bool)
     }
 }
 
+#[inline]
 fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     loop {
         match it.next() {
@@ -154,7 +158,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
     }
 
     {
-        let mut header = plih.borrow_mut();
+        let header = plih.borrow_mut();
         if header.name.is_empty() {
             if !header.title.is_empty() {
                 header.name = header.title.clone();
