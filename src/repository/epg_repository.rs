@@ -42,7 +42,7 @@ fn epg_write_file(target: &ConfigTarget, epg: &Epg, path: &Path) -> Result<(), M
     Ok(())
 }
 
-pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, epg: Option<&Epg>, output: &TargetOutput) -> Result<(), M3uFilterError> {
+pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, target_path: &Path, epg: Option<&Epg>, output: &TargetOutput) -> Result<(), M3uFilterError> {
     if let Some(epg_data) = epg {
         match &output.target {
             TargetType::M3u => {
@@ -51,7 +51,7 @@ pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, epg: Option<&Epg>, 
                         M3uFilterErrorKind::Notify,
                         format!("write epg for target {} failed: No filename set", target.name)));
                 }
-                if let Some(path) = m3u_get_epg_file_path(cfg, target) {
+                if let Some(path) = m3u_get_epg_file_path(target_path) {
                     if log_enabled!(Level::Debug) {
                         debug!("writing m3u epg to {}", path.to_str().unwrap_or("?"));
                     }

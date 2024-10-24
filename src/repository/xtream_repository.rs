@@ -17,6 +17,7 @@ use crate::processing::m3u_parser::extract_id_from_url;
 use crate::repository::index_record::IndexRecord;
 use crate::repository::indexed_document_reader::{IndexedDocumentReader, read_indexed_item};
 use crate::repository::indexed_document_writer::IndexedDocumentWriter;
+use crate::repository::storage::get_target_storage_path;
 use crate::utils::file_utils;
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 
@@ -100,8 +101,8 @@ fn write_playlist_to_file(storage_path: &Path, stream_id: &mut u32, cluster: Xtr
         Ok(mut writer) => {
             for pli in playlist.iter_mut() {
                 if let Ok(mut xtream) = pli.to_xtream() {
-                    xtream.stream_id = *stream_id;
-                    match writer.write_doc(&xtream) {
+                    xtream.virtual_id = *stream_id;
+                    match writer.write_doc(xtream.virtual_id, &xtream) {
                         Ok(_) => *stream_id += 1,
                         Err(err) => return cant_write_result!(&xtream_path, err)
                     }
@@ -193,7 +194,10 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
 }
 
 pub(crate) fn xtream_get_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
-    file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(' ', "_"))))
+    match get_target_storage_path(cfg, target_name) {
+        Some(target_path) => Some(target_path.join(std::path::PathBuf::from("xtream"))),
+        None => None,
+    }
 }
 
 pub(crate) fn xtream_get_epg_file_path(path: &Path) -> PathBuf {
@@ -211,7 +215,7 @@ pub(crate) fn xtream_get_file_paths(storage_path: &Path, cluster: XtreamCluster)
     (xtream_path, index_path)
 }
 
-pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, target_path: &Path, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
     match ensure_xtream_storage_path(cfg, target.name.replace(' ', "_").as_str()) {
         Ok(path) => {
             let mut cat_live_col = vec![];
@@ -221,7 +225,7 @@ pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlis
             let mut series_col = vec![];
             let mut vod_col = vec![];
             let mut errors = Vec::new();
-
+// TODO.EUZU old catgeory ids
             // preserve category_ids
             let (max_cat_id, existing_cat_ids) = load_old_category_ids(&path);
             let mut cat_id_counter = max_cat_id;
@@ -473,7 +477,7 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
         if let Some((info_path, idx_path)) = xtream_get_info_file_paths(&storage_path, XtreamCluster::Series) {
             return match IndexedDocumentWriter::new_append(info_path.clone(), idx_path) {
                 Ok(mut writer) => {
-                    match writer.write_doc(content) {
+                    match writer.write_doc(series_id, content) {
                         Ok((_, index_offset)) => {
                             let series_id_index_mapping_path = xtream_get_series_id_series_info_mapping_file_path(&storage_path);
                             IndexRecord::to_file(&series_id_index_mapping_path, series_id, index_offset, true)?;

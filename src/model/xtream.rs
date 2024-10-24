@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 
 use crate::model::config::ConfigTargetOptions;
 use crate::model::playlist::{PlaylistItem, XtreamCluster, XtreamPlaylistItem};
-use crate::utils::default_utils::{default_as_empty_rc_str, default_as_empty_list};
+use crate::utils::default_utils::{default_as_empty_list, default_as_empty_rc_str};
 
 const LIVE_STREAM_FIELDS: &[&str] = &[];
 
@@ -28,8 +28,8 @@ const SERIES_STREAM_FIELDS: &[&str] = &[
 fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     deserializer: D,
 ) -> Result<Option<T>, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     // we define a local enum type inside of the function
     // because it is untagged, serde will deserialize as the first variant
@@ -73,8 +73,8 @@ fn value_to_string(v: &Value) -> Option<String> {
 }
 
 fn deserialize_as_option_rc_string<'de, D>(deserializer: D) -> Result<Option<Rc<String>>, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let value: Value = Deserialize::deserialize(deserializer)?;
 
@@ -86,8 +86,8 @@ fn deserialize_as_option_rc_string<'de, D>(deserializer: D) -> Result<Option<Rc<
 }
 
 fn deserialize_as_rc_string<'de, D>(deserializer: D) -> Result<Rc<String>, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let value: Value = Deserialize::deserialize(deserializer)?;
 
@@ -98,8 +98,8 @@ fn deserialize_as_rc_string<'de, D>(deserializer: D) -> Result<Rc<String>, D::Er
 }
 
 fn deserialize_as_string_array<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     Value::deserialize(deserializer).map(|v| match v {
         Value::Array(value) => Some(value_to_string_array(&value)),
@@ -131,9 +131,9 @@ pub(crate) struct XtreamStream {
     #[serde(default, deserialize_with = "deserialize_as_rc_string")]
     pub category_id: Rc<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    pub stream_id: Option<i32>,
+    pub stream_id: Option<u32>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
-    pub series_id: Option<i32>,
+    pub series_id: Option<u32>,
     #[serde(default = "default_as_empty_rc_str", deserialize_with = "deserialize_as_rc_string")]
     pub stream_icon: Rc<String>,
     #[serde(default = "default_as_empty_rc_str", deserialize_with = "deserialize_as_rc_string")]
@@ -217,10 +217,9 @@ macro_rules! add_i64_property_if_exists {
     }
 }
 
-
 impl XtreamStream {
-    pub(crate) fn get_stream_id(&self) -> String {
-        self.stream_id.map_or_else(|| self.series_id.map_or_else(String::new, |seid| format!("{seid}")), |sid| format!("{sid}"))
+    pub(crate) fn get_stream_id(&self) -> u32 {
+        self.stream_id.unwrap_or(self.series_id.unwrap_or(0))
     }
 
     pub(crate) fn get_additional_properties(&self) -> Option<Value> {
@@ -315,6 +314,18 @@ pub(crate) struct XtreamSeriesInfoEpisode {
     pub direct_source: String,
 }
 
+// impl XtreamSeriesInfoEpisode {
+//     pub(crate) fn get_id(&self) -> u32 {
+//         match self.id.parse::<u32>() {
+//             Ok(id) => id,
+//             Err(_) => {
+//                 error!("Failed to convert id to number {}", self.id);
+//                 0
+//             }
+//         }
+//     }
+// }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct XtreamSeriesInfo {
     pub seasons: Vec<XtreamSeriesInfoSeason>,
@@ -358,7 +369,7 @@ impl XtreamMappingOptions {
     pub fn from_target_options(options: Option<&ConfigTargetOptions>) -> Self {
         let (skip_live_direct_source, skip_video_direct_source, skip_series_direct_source) = options
             .map_or((false, false, false), |o| (o.xtream_skip_live_direct_source,
-                                         o.xtream_skip_video_direct_source, o.xtream_skip_series_direct_source));
+                                                o.xtream_skip_video_direct_source, o.xtream_skip_series_direct_source));
         Self {
             skip_live_direct_source,
             skip_video_direct_source,
@@ -414,7 +425,7 @@ fn append_prepared_series_properties(add_props: Option<&Map<String, Value>>, doc
 }
 
 pub(crate) fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options: &XtreamMappingOptions) -> serde_json::Value {
-    let stream_id_value = Value::Number(serde_json::Number::from(pli.stream_id));
+    let stream_id_value = Value::Number(serde_json::Number::from(pli.virtual_id));
     let mut document = serde_json::Map::from_iter([
         ("category_id".to_string(), Value::String(format!("{}", &pli.category_id))),
         ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(pli.category_id))]))),

@@ -1,35 +1,14 @@
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
-    use std::rc::Rc;
     use regex::Regex;
     use crate::filter::{get_filter, MockValueProcessor, ValueProvider};
-    use crate::model::playlist::{PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+    use crate::model::playlist::{PlaylistItem, PlaylistItemHeader};
 
     fn create_mock_pli(name: &str, group: &str) -> PlaylistItem {
         PlaylistItem {
             header: RefCell::new(PlaylistItemHeader {
-                uuid: Rc::new("".to_string()),
-                stream_id: Rc::new("".to_string()),
-                id: Rc::new("".to_string()),
-                name: Rc::new(name.to_string()),
-                chno: Rc::new("".to_string()),
-                logo: Rc::new("".to_string()),
-                logo_small: Rc::new("".to_string()),
-                group: Rc::new(group.to_string()),
-                title: Rc::new("".to_string()),
-                parent_code: Rc::new("".to_string()),
-                audio_track: Rc::new("".to_string()),
-                time_shift: Rc::new("".to_string()),
-                rec: Rc::new("".to_string()),
-                url: Rc::new("".to_string()),
-                epg_channel_id: None,
-                xtream_cluster: XtreamCluster::Live,
-                additional_properties: None,
-                item_type: PlaylistItemType::Live,
-                series_fetched: false,
-                category_id: 0,
-                input_id: 0,
+                ..Default::default()
             })
         }
     }

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use crate::model::config::ProcessingOrder;
-use crate::model::playlist::{PlaylistItemType, XtreamCluster};
 
 pub(crate) fn default_as_true() -> bool { true }
 
@@ -23,8 +22,6 @@ pub(crate) fn default_as_empty_list<T>() -> Vec<T> { vec![] }
 
 pub(crate) fn default_as_two_u16() -> u16 { 2 }
 
-pub(crate) fn default_playlist_item_type() -> PlaylistItemType { PlaylistItemType::Live }
 pub(crate) fn default_as_zero_u32() -> u32 { 0 }
 pub(crate) fn default_as_zero_u16() -> u16 { 0 }
 
-pub(crate) fn default_stream_cluster() -> XtreamCluster { XtreamCluster::Live }

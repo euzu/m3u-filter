@@ -25,8 +25,8 @@ use crate::processing::playlist_watch::process_group_watch;
 use crate::processing::xmltv_parser::flatten_tvguide;
 use crate::processing::xtream_processor::playlist_resolve_series;
 use crate::repository::playlist_repository::persist_playlist;
-use crate::utils::download;
 use crate::utils::default_utils::default_as_default;
+use crate::utils::download;
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };
@@ -96,7 +96,7 @@ fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &Co
                     }
                 }
             }
-        },
+        }
         None => {
             let ordering = value_a.partial_cmp(&value_b).unwrap();
             match channel_sort.order {
@@ -255,7 +255,7 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
                         for channel in &plg.channels {
                             let provider = ValueProvider { pli: RefCell::new(channel) };
                             if counter.filter.filter(&provider, &mut mock_processor) {
-                               let new_value = if counter.modifier == CounterModifier::Assign {
+                                let new_value = if counter.modifier == CounterModifier::Assign {
                                     cntval.to_string()
                                 } else {
                                     let value = match channel.header.borrow_mut().get_field(&counter.field) {
@@ -264,7 +264,7 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
                                     };
                                     if counter.modifier == CounterModifier::Suffix {
                                         format!("{}{}{}", value, counter.concat, cntval.to_string())
-                                    }  else {
+                                    } else {
                                         format!("{}{}{}", cntval.to_string(), counter.concat, value)
                                     }
                                 };
@@ -295,10 +295,11 @@ fn is_target_enabled(target: &ConfigTarget, user_targets: &ProcessTargets) -> bo
 
 async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
     let source = cfg.sources.get(source_idx).unwrap();
-    let mut source_playlists = Vec::new();
-    let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
     let mut errors = vec![];
     let mut stats = HashMap::<u16, InputStats>::new();
+    let mut source_playlists = Vec::new();
+    let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
+    // Downlod the sources
     for input in &source.inputs {
         let input_id = input.id;
         if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
@@ -306,16 +307,16 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                 InputType::M3u => download::get_m3u_playlist(&cfg, input, &cfg.working_dir).await,
                 InputType::Xtream => download::get_xtream_playlist(input, &cfg.working_dir).await,
             };
+            // @TODO optmization dont hold tv_guide in memory, persist raw and  later use sax parser to extract.
             let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
                 download::get_xmltv(&cfg, input, &cfg.working_dir).await
             } else {
                 (None, vec![])
             };
-            error_list.drain(..).for_each(|err| errors.push(err));
-            tvguide_errors.drain(..).for_each(|err| errors.push(err));
+            errors.extend(error_list.drain(..).chain(tvguide_errors.drain(..)));
             let input_name = match &input.name {
+                Some(name_val) => name_val.as_str(),
                 None => input.url.as_str(),
-                Some(name_val) => name_val.as_str()
             };
             let group_count = playlistgroups.len();
             let channel_count = playlistgroups.iter()
@@ -334,19 +335,8 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                     }
                 );
             }
-            stats.insert(input_id, InputStats {
-                name: input_name.to_string(),
-                input_type: input.input_type.clone(),
-                error_count: error_list.len(),
-                raw_stats: PlaylistStats {
-                    group_count,
-                    channel_count,
-                },
-                processed_stats: PlaylistStats {
-                    group_count: 0,
-                    channel_count: 0,
-                },
-            });
+            stats.insert(input_id, create_input_stat(group_count, channel_count, error_list.len(),
+                                                     input.input_type.clone(), input_name));
         }
     }
     if source_playlists.is_empty() {
@@ -362,12 +352,28 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
             if is_target_enabled(target, &user_targets) {
                 match process_playlist(&mut source_playlists, target, &cfg, &mut stats, &mut errors).await {
                     Ok(()) => {}
-                    Err(mut err) => err.drain(..).for_each(|e| errors.push(e))
+                    Err(mut err) => errors.extend(err.drain(..))
                 }
             }
         }
     }
     (stats.drain().map(|(_, v)| v).collect(), errors)
+}
+
+fn create_input_stat(group_count: usize, channel_count: usize, error_count: usize, input_type: InputType, input_name: &str) -> InputStats {
+    InputStats {
+        name: input_name.to_string(),
+        input_type: input_type,
+        error_count: error_count,
+        raw_stats: PlaylistStats {
+            group_count,
+            channel_count,
+        },
+        processed_stats: PlaylistStats {
+            group_count: 0,
+            channel_count: 0,
+        },
+    }
 }
 
 async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
@@ -390,10 +396,8 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
                 let (mut res_stats, mut res_errors) = System::new().block_on(async {
                     process_source(cfg, index, usr_trgts).await
                 });
-                res_errors.drain(..)
-                    .for_each(|err| shared_errors.lock().unwrap().push(err));
-                res_stats.drain(..)
-                    .for_each(|stat| shared_stats.lock().unwrap().push(stat));
+                shared_errors.lock().unwrap().extend(res_errors.drain(..));
+                shared_stats.lock().unwrap().extend(res_stats.drain(..));
             };
             handles.push(thread::spawn(process));
             if handles.len() >= thread_num as usize {
@@ -401,10 +405,8 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
             }
         } else {
             let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
-            res_errors.drain(..)
-                .for_each(|err| shared_errors.lock().unwrap().push(err));
-            res_stats.drain(..)
-                .for_each(|stat| shared_stats.lock().unwrap().push(stat));
+            shared_errors.lock().unwrap().extend(res_errors.drain(..));
+            shared_stats.lock().unwrap().extend(res_stats.drain(..));
         }
     }
     for handle in handle_list {
@@ -493,12 +495,11 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
     let mut new_epg = vec![];
 
     new_fetched_playlists.drain(..).for_each(|mut fp| {
+        // collect all epg_channel ids
         let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
             .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
 
-        fp.playlistgroups.drain(..).for_each(|group| {
-            new_playlist.push(group);
-        });
+        new_playlist.extend(fp.playlistgroups.drain(..));
         if !epg_channel_ids.is_empty() {
             if let Some(tv_guide) = fp.epg {
                 debug!("found epg information for {}", &target.name);

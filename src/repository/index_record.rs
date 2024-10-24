@@ -39,23 +39,6 @@ impl IndexRecord {
         }
     }
 
-    // pub fn from_bytes(bytes: &[u8], cursor: &mut usize) -> Result<Self, Error> {
-    //     if let Ok(index_bytes) = bytes[*cursor..*cursor + 4].try_into() {
-    //         *cursor += 4;
-    //         if let Ok(size_bytes) = bytes[*cursor..*cursor + 2].try_into() {
-    //             *cursor += 2;
-    //             let index = u32::from_le_bytes(index_bytes);
-    //             let size = u16::from_le_bytes(size_bytes);
-    //             return Ok(IndexRecord { index, size });
-    //         }
-    //     }
-    //     Err(Error::new(ErrorKind::Other, "Failed to read index"))
-    // }
-
-    // pub fn as_bytes(&self) -> [u8; 6] {
-    //     IndexRecord::to_bytes(self.index, self.size)
-    // }
-
     pub fn to_bytes(left: u32, right: u32) -> [u8; 8] {
         let left_bytes: [u8; 4] = left.to_le_bytes();
         let right_bytes: [u8; 4] = right.to_le_bytes();

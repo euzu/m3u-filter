@@ -263,7 +263,7 @@ async fn xtream_player_api_streaming_timeshift(
 fn get_xtream_vod_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
     if let Ok(mut doc) = serde_json::from_str::<Map<String, Value>>(content) {
         if let Some(Value::Object(movie_data)) = doc.get_mut("movie_data") {
-            let stream_id = pli.stream_id;
+            let stream_id = pli.virtual_id;
             let category_id = pli.category_id;
             movie_data.insert("stream_id".to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
             movie_data.insert("category_id".to_string(), Value::Number(serde_json::value::Number::from(category_id)));
@@ -278,7 +278,7 @@ fn get_xtream_vod_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content:
             }
         }
     }
-    Err(Error::new(ErrorKind::Other, format!("Failed to get vod info for id {}", pli.stream_id)))
+    Err(Error::new(ErrorKind::Other, format!("Failed to get vod info for id {}", pli.virtual_id)))
 }
 
 fn get_xtream_series_info(config: &Config, target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
@@ -309,13 +309,13 @@ fn get_xtream_series_info(config: &Config, target: &ConfigTarget, pli: &XtreamPl
                     }
                 }
                 if let Ok(result) = serde_json::to_string(&doc) {
-                    let _ = xtream_repository::xtream_write_series_info(config, target.name.replace(' ', "_").as_str(), pli.stream_id, &new_id_to_provider_id_mapping, &result);
+                    let _ = xtream_repository::xtream_write_series_info(config, target.name.replace(' ', "_").as_str(), pli.virtual_id, &new_id_to_provider_id_mapping, &result);
                     return Ok(result);
                 }
             }
         }
     }
-    Err(Error::new(ErrorKind::Other, format!("Failed to get series info for id {}", pli.stream_id)))
+    Err(Error::new(ErrorKind::Other, format!("Failed to get series info for id {}", pli.virtual_id)))
 }
 
 async fn xtream_get_stream_info_content(info_url: &str, input: &ConfigInput) -> Result<String, Error> {
@@ -325,7 +325,7 @@ async fn xtream_get_stream_info_content(info_url: &str, input: &ConfigInput) -> 
 async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &ConfigTarget,
                                 pli: &XtreamPlaylistItem, info_url: &str, cluster: XtreamCluster) -> Result<String, Error> {
     if cluster == XtreamCluster::Series {
-        if let Ok(content) = xtream_repository::xtream_load_series_info(config, target.name.replace(' ', "_").as_str(), pli.stream_id) {
+        if let Ok(content) = xtream_repository::xtream_load_series_info(config, target.name.replace(' ', "_").as_str(), pli.virtual_id) {
             return Ok(content);
         }
     }
@@ -343,7 +343,7 @@ async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &C
     }
 
     Err(Error::new(std::io::ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}",
-                                                      target.name.replace(' ', "_").as_str(), &cluster, pli.stream_id)))
+                                                      target.name.replace(' ', "_").as_str(), &cluster, pli.virtual_id)))
 }
 
 async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserCredentials,
@@ -549,13 +549,8 @@ async fn xtream_player_api(
             }
         }
         _ => {
-            if api_req.action.is_empty() {
-                debug!("Paremeter action is empty!");
-                HttpResponse::Unauthorized().finish()
-            } else {
-                debug!("cant find user!");
-                HttpResponse::BadRequest().finish()
-            }
+            debug!("{}", if api_req.action.is_empty() { "Paremeter action is empty!" } else { "cant find user!" });
+            HttpResponse::BadRequest().finish()
         }
     }
 }

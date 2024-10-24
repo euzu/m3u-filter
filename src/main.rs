@@ -147,11 +147,10 @@ fn init_logger(log_level: &str) {
     let mut log_builder = Builder::from_default_env();
 
     if log_level.contains('=') {
-        let pairs: Vec<&str> = log_level.split(',').collect();
-        for pair in pairs {
-            let kv: Vec<&str> = pair.split('=').collect();
-            if kv.len() == 2 {
-                log_builder.filter_module(kv[0].trim(), get_log_level(kv[1].trim()));
+        for pair in log_level.split(',').filter(|s| s.contains('=')) {
+            let mut kv_iter = pair.split('=').map(str::trim);
+            if let (Some(module), Some(level)) = (kv_iter.next(), kv_iter.next()) {
+                log_builder.filter_module(module, get_log_level(level));
             }
         }
     } else {

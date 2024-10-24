@@ -30,8 +30,7 @@ pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_
     let persist_file_path = prepare_file_path(input.persist.as_ref(), working_dir, "");
     match request_utils::get_input_text_content(input, working_dir, &url, persist_file_path).await {
         Ok(text) => {
-            let lines = text.lines().map(String::from).collect::<Vec<String>>();
-            (m3u_parser::parse_m3u(cfg, input, &lines), vec![])
+            (m3u_parser::parse_m3u(cfg, input, text.lines()), vec![])
         }
         Err(err) => (vec![], vec![err])
     }
@@ -57,7 +56,7 @@ pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>
                         match parse_xtream_series_info(&series_content, pli.header.borrow().group.as_str(), input) {
                             Ok(series_info) => {
                                 if let Some(mut series) = series_info {
-                                    series.drain(..).for_each(|item| group_series.push(item));
+                                    group_series.extend(series.drain(..));
                                 }
                             }
                             Err(err) => errors.push(err),
@@ -108,7 +107,7 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Series, "get_series_categories", "get_series")];
 
 pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
-    let mut playlist: Vec<PlaylistGroup> = Vec::new();
+    let mut playlist_groups: Vec<PlaylistGroup> = Vec::new();
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
     let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);
@@ -123,35 +122,37 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
             let category_file_path = prepare_file_path(input.persist.as_ref(), working_dir, format!("{category}_").as_str());
             let stream_file_path = prepare_file_path(input.persist.as_ref(), working_dir, format!("{stream}_").as_str());
 
-            match request_utils::get_input_json_content(input, category_url.as_str(), category_file_path).await {
-                Ok(category_content) => {
-                    match request_utils::get_input_json_content(input, stream_url.as_str(), stream_file_path).await {
-                        Ok(stream_content) => {
-                            match xtream_parser::parse_xtream(input,
-                                                              *xtream_cluster,
-                                                              &category_content,
-                                                              &stream_content) {
-                                Ok(sub_playlist_opt) => {
-                                    if let Some(mut sub_playlist) = sub_playlist_opt {
-                                        sub_playlist.drain(..).for_each(|group| playlist.push(group));
-                                    }
-                                }
-                                Err(err) => errors.push(err)
+            match futures::join!(
+                request_utils::get_input_json_content(input, category_url.as_str(), category_file_path),
+                request_utils::get_input_json_content(input, stream_url.as_str(), stream_file_path)
+            ) {
+                (Ok(category_content), Ok(stream_content)) => {
+                    match xtream_parser::parse_xtream(input,
+                                                      *xtream_cluster,
+                                                      &category_content,
+                                                      &stream_content) {
+                        Ok(sub_playlist_parsed) => {
+                            if let Some(mut xtream_sub_playlist) = sub_playlist_parsed {
+                                playlist_groups.extend(xtream_sub_playlist.drain(..));
                             }
                         }
                         Err(err) => errors.push(err)
                     }
-                }
-                Err(err) => errors.push(err)
+                },
+                (Err(err1), Err(err2)) => {
+                    errors.extend([err1, err2]);
+                },
+                (Err(err), _) => errors.push(err),
+                (_, Err(err)) => errors.push(err),
             }
         }
     }
-    playlist.sort_by(|a, b| a.title.partial_cmp(&b.title).unwrap_or(Ordering::Greater));
+    playlist_groups.sort_by(|a, b| a.title.partial_cmp(&b.title).unwrap_or(Ordering::Greater));
 
-    for (grp_id, plg) in (1_u32..).zip(playlist.iter_mut()) {
+    for (grp_id, plg) in (1_u32..).zip(playlist_groups.iter_mut()) {
         plg.id = grp_id;
     }
-    (playlist, errors)
+    (playlist_groups, errors)
 }
 
 pub(crate) async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Option<TVGuide>, Vec<M3uFilterError>) {
