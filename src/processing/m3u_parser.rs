@@ -136,7 +136,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
     if video_suffixes.iter().any(|suffix| url.ends_with(suffix)) {
         // TODO find Series based on group or configured names
         plih.xtream_cluster = XtreamCluster::Video;
-        plih.item_type = PlaylistItemType::Movie;
+        plih.item_type = PlaylistItemType::Video;
     }
 
     {

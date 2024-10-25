@@ -3,10 +3,31 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
 use std::path::PathBuf;
 
-use crate::repository::index_record::IndexRecord;
 use crate::utils::file_utils;
 use crate::utils::file_utils::create_file_tuple;
 
+pub(in crate::repository) fn get_record_size() -> u32 { 8 }
+
+fn to_bytes(left: u32, right: u32) -> [u8; 8] {
+    let left_bytes: [u8; 4] = left.to_le_bytes();
+    let right_bytes: [u8; 4] = right.to_le_bytes();
+    let mut combined_bytes: [u8; 8] = [0; 8];
+    combined_bytes[..4].copy_from_slice(&left_bytes);
+    combined_bytes[4..].copy_from_slice(&right_bytes);
+    combined_bytes
+}
+
+/**
+* Creates two files,
+* - content
+* - index
+*
+* Layout of content file record is:
+*   - content-size (u32) + content
+*
+* Layout of index file record is:
+*  - document_id (u32) + content file offset + (u32)
+*/
 pub(in crate::repository) struct IndexedDocumentWriter {
     main_path: PathBuf,
     index_path: PathBuf,
@@ -55,15 +76,18 @@ impl IndexedDocumentWriter {
         let current_main_index = self.main_offset;
         let current_index_index = self.index_offset;
         if let Ok(encoded) = bincode::serialize(doc) {
-            match file_utils::check_write(&self.main_file.write_all(&encoded)) {
+            let content_bytes = u32::try_from(encoded.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
+            let mut data: Vec<u8> = content_bytes.to_le_bytes().to_vec();
+            data.extend(&encoded);
+            match file_utils::check_write(&self.main_file.write_all(&data)) {
                 Ok(()) => {
-                    let bytes_written = u32::try_from(encoded.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
-                    let combined_bytes = IndexRecord::to_bytes(doc_id, bytes_written);
+                    let combined_bytes = to_bytes(doc_id, self.main_offset);
                     if let Err(err) = file_utils::check_write(&self.index_file.write_all(&combined_bytes)) {
                         return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.index_path.to_str().unwrap(), err)));
                     }
-                    self.main_offset += bytes_written;
-                    self.index_offset += IndexRecord::get_record_size();
+                    let written_bytes = u32::try_from(data.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
+                    self.main_offset += written_bytes;
+                    self.index_offset += get_record_size();
                 }
                 Err(err) => {
                     return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.main_path.to_str().unwrap(), err)));

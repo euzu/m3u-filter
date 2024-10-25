@@ -10,7 +10,6 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
-use crate::repository::index_record::IndexRecord;
 use crate::repository::indexed_document_reader::{IndexedDocumentReader, read_indexed_item};
 use crate::repository::indexed_document_writer::IndexedDocumentWriter;
 use crate::repository::storage::{ensure_target_storage_path};
@@ -135,5 +134,5 @@ pub(crate) fn m3u_get_item_for_stream_id(stream_id: u32, m3u_path: &Path, idx_pa
     if stream_id < 1 {
         return Err(Error::new(ErrorKind::Other, "id should start with 1"));
     }
-    read_indexed_item::<M3uPlaylistItem>(m3u_path, idx_path, IndexRecord::get_index_offset(stream_id - 1))
+    read_indexed_item::<M3uPlaylistItem>(m3u_path, idx_path, stream_id)
 }

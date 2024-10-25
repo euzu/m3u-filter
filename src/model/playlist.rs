@@ -2,13 +2,15 @@ use std::cell::RefCell;
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
+use crate::processing::m3u_parser::extract_id_from_url;
 use crate::repository::storage::hash_string;
 use crate::utils::default_utils::{default_as_false, default_as_zero_u16, default_as_zero_u32};
 
@@ -41,6 +43,29 @@ pub(crate) enum XtreamCluster {
     Series = 3,
 }
 
+impl XtreamCluster {
+    // pub fn to_bytes(self) -> [u8; 1] {
+    //     [self as u8]
+    // }
+    //
+    // pub fn from_bytes(bytes: [u8; 1]) -> Result<Self, String> {
+    //     match bytes[0] {
+    //         1 => Ok(XtreamCluster::Live),
+    //         2 => Ok(XtreamCluster::Video),
+    //         3 => Ok(XtreamCluster::Series),
+    //         _ => Err(format!("Invalid value for XtreamCluster: {}", bytes[0])),
+    //     }
+    // }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            XtreamCluster::Live => "Live",
+            XtreamCluster::Video => "Video",
+            XtreamCluster::Series => "Series",
+        }
+    }
+}
+
 impl Default for XtreamCluster {
     fn default() -> Self {
         XtreamCluster::Live
@@ -49,21 +74,47 @@ impl Default for XtreamCluster {
 
 impl Display for XtreamCluster {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            XtreamCluster::Live => "live",
-            XtreamCluster::Video => "movie",
-            XtreamCluster::Series => "series",
-        })
+        write!(f, "{}", self.as_str())
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+impl TryFrom<PlaylistItemType> for XtreamCluster {
+    type Error = String;
+    fn try_from(item_type: PlaylistItemType) -> Result<Self, Self::Error> {
+        match item_type {
+            PlaylistItemType::Live => Ok(XtreamCluster::Live),
+            PlaylistItemType::Video => Ok(XtreamCluster::Video),
+            PlaylistItemType::Series => Ok(XtreamCluster::Series),
+            PlaylistItemType::SeriesInfo => Err(format!("Cant convert {item_type}")),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[repr(u8)]
 pub(crate) enum PlaylistItemType {
     Live = 1,
-    Movie = 2,
+    Video = 2,
     Series = 3,
     SeriesInfo = 4,
 }
+
+impl PlaylistItemType {
+    pub fn to_bytes(self) -> [u8; 1] {
+        [self as u8]
+    }
+
+    pub fn from_bytes(bytes: [u8; 1]) -> Result<Self, String> {
+        match bytes[0] {
+            1 => Ok(PlaylistItemType::Live),
+            2 => Ok(PlaylistItemType::Video),
+            3 => Ok(PlaylistItemType::Series),
+            4 => Ok(PlaylistItemType::SeriesInfo),
+            _ => Err(format!("Invalid value for PlaylistItemType: {}", bytes[0])),
+        }
+    }
+}
+
 
 impl Default for PlaylistItemType {
     fn default() -> Self {
@@ -75,7 +126,7 @@ impl From<XtreamCluster> for PlaylistItemType {
     fn from(xtream_cluster: XtreamCluster) -> Self {
         match xtream_cluster {
             XtreamCluster::Live => PlaylistItemType::Live,
-            XtreamCluster::Video => PlaylistItemType::Movie,
+            XtreamCluster::Video => PlaylistItemType::Video,
             XtreamCluster::Series => PlaylistItemType::SeriesInfo,
         }
     }
@@ -85,7 +136,7 @@ impl Display for PlaylistItemType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
             PlaylistItemType::Live => "live",
-            PlaylistItemType::Movie => "movie",
+            PlaylistItemType::Video => "video",
             PlaylistItemType::Series => "series",
             PlaylistItemType::SeriesInfo => "series-info",
         })
@@ -99,7 +150,7 @@ pub(crate) trait FieldAccessor {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub(crate) struct PlaylistItemHeader {
-    pub uuid: Rc<[u8;32]>, // calculated
+    pub uuid: Rc<[u8; 32]>, // calculated
     pub id: Rc<String>, // provider id
     pub virtual_id: u32, // virtual id
     pub name: Rc<String>,
@@ -127,12 +178,27 @@ pub(crate) struct PlaylistItemHeader {
 }
 
 impl PlaylistItemHeader {
-
     pub(crate) fn gen_uuid(&mut self) {
         self.uuid = Rc::new(hash_string(&self.url))
     }
     pub(crate) fn get_uuid(&self) -> &Rc<[u8; 32]> {
         &self.uuid
+    }
+
+    pub(crate) fn get_provider_id(&mut self) -> Option<u32> {
+        match self.id.parse::<u32>() {
+            Ok(id) => Some(id),
+            Err(_) => match extract_id_from_url(&self.url) {
+                Some(id) => match id.parse::<u32>() {
+                    Ok(newid) => {
+                        self.id = Rc::new(newid.to_string());
+                        Some(newid)
+                    }
+                    Err(_) => None,
+                },
+                None => None,
+            }
+        }
     }
 }
 
@@ -325,7 +391,6 @@ pub(crate) struct PlaylistGroup {
 }
 
 impl PlaylistGroup {
-
     pub(crate) fn on_load(&mut self) {
         self.channels.iter().for_each(|pl| pl.header.borrow_mut().gen_uuid());
     }

@@ -194,7 +194,7 @@ impl std::fmt::Display for Filter {
             Filter::TypeComparison(field, item_type) => {
                 write!(f, "{} = {}", field, match item_type {
                     PlaylistItemType::Live => "live",
-                    PlaylistItemType::Movie => "vod",
+                    PlaylistItemType::Video => "vod",
                     PlaylistItemType::Series => "series",
                     PlaylistItemType::SeriesInfo => "series" // yes series-info is handled as series in filter
                 })
@@ -268,8 +268,8 @@ fn get_parser_field_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate
 fn get_filter_item_type(text_item_type: &str) -> Option<PlaylistItemType> {
     if text_item_type.eq_ignore_ascii_case("live") {
         Some(PlaylistItemType::Live)
-    } else if text_item_type.eq_ignore_ascii_case("movie") || text_item_type.eq_ignore_ascii_case("vod") {
-        Some(PlaylistItemType::Movie)
+    } else if text_item_type.eq_ignore_ascii_case("movie") || text_item_type.eq_ignore_ascii_case("video") || text_item_type.eq_ignore_ascii_case("vod") {
+        Some(PlaylistItemType::Video)
     } else if text_item_type.eq_ignore_ascii_case("series") {
         Some(PlaylistItemType::Series)
     } else if text_item_type.eq_ignore_ascii_case("series-info") {

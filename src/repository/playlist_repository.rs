@@ -20,13 +20,14 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
             for group in &mut *playlist {
                 for channel in &group.channels {
                     let mut header = channel.header.borrow_mut();
-                    match header.id.parse::<u32>() {
-                        Ok(provider_id) => {
+                    match header.get_provider_id() {
+                        Some(provider_id) => {
                             let uuid = header.get_uuid();
-                            header.virtual_id = target_id_mapping.insert_entry(provider_id, **uuid);
+                            let item_type = header.item_type;
+                            header.virtual_id = target_id_mapping.insert_entry(provider_id, **uuid, &item_type, 0);
                         }
-                        Err(err) => {
-                            errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
+                        None => {
+                            errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Playlistitem has no provider id: {}", &header.title)));
                         }
                     }
                 }
@@ -35,7 +36,7 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
             for output in &target.output {
                 match match output.target {
                     TargetType::M3u => m3u_write_playlist(target, cfg, &target_path, playlist),
-                    TargetType::Xtream => xtream_write_playlist(target, cfg, &target_path, playlist),
+                    TargetType::Xtream => xtream_write_playlist(target, cfg, playlist),
                     TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, &output.filename),
                 } {
                     Ok(()) => {
@@ -52,9 +53,14 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
                     Err(err) => errors.push(err)
                 }
             }
+            if let Err(err) = target_id_mapping.persist() {
+                errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
+            }
         }
-        Err(err) => errors.push(err),
-    }
+        Err(err) => {
+            errors.push(err);
+        },
+    };
 
     if errors.is_empty() { Ok(()) } else { Err(errors) }
 }

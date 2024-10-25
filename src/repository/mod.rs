@@ -5,7 +5,6 @@ pub(crate) mod epg_repository;
 pub(crate) mod kodi_repository;
 pub(crate) mod storage;
 
-mod index_record;
 mod indexed_document_writer;
 mod indexed_document_reader;
-mod target_id_mapping_record;
+pub(crate) mod target_id_mapping_record;
