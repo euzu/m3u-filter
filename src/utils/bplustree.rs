@@ -427,17 +427,20 @@ mod tests {
     use crate::utils::bplustree::{BPlusTree, BPlusTreeQuery};
 
     // Example usage with a simple struct
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    struct Value {
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    struct Record {
         id: u32,
         data: String,
     }
 
     #[test]
     fn insert_test() -> io::Result<()> {
-        let mut tree = BPlusTree::<u32, String>::new();
+        let mut tree = BPlusTree::<u32, Record>::new();
         for i in 0u32..=500 {
-            tree.insert(i, format!("Entry {i}"));
+            tree.insert(i, Record {
+                id: i,
+                data: format!("Entry {i}"),
+            });
         }
 
         // // Traverse the tree
@@ -449,23 +452,29 @@ mod tests {
         tree.serialize("/tmp/tree.bin")?;
 
         // Deserialize the tree from the file
-        tree = BPlusTree::<u32, String>::deserialize("/tmp/tree.bin")?;
+        tree = BPlusTree::<u32, Record>::deserialize("/tmp/tree.bin")?;
 
         // Query the tree
         for i in 0u32..=500 {
             let found = tree.query(&i);
             assert!(found.is_some(), "Entry {} not found", i);
-            assert!(found.unwrap().eq(&format!("Entry {i}")), "Entry {} not found", i);
+            assert!(found.unwrap().eq(&Record {
+                id: i,
+                data: format!("Entry {i}"),
+            }), "Entry {} not found", i);
         }
 
-        let mut tree_query: BPlusTreeQuery<u32, String> = BPlusTreeQuery::new("/tmp/tree.bin")?;
+        let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::new("/tmp/tree.bin")?;
         for i in 0u32..=500 {
             let found = tree_query.query(&i);
             assert!(found.is_ok(), "Query not ok");
             let found_entry = found.unwrap(); // Unwrap once and store the Option
             assert!(found_entry.is_some(), "Entry {} not found", i);
             let entry = found_entry.unwrap();
-            assert!(entry.eq(&format!("Entry {i}")), "Entry {} not found", i);
+            assert!(entry.eq(&Record {
+                id: i,
+                data: format!("Entry {i}"),
+            }), "Entry {} not found", i);
         }
 
         Ok(())
