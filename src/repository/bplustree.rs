@@ -2,6 +2,8 @@ use std::array::TryFromSliceError;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 
 const BINCODE_OVERHEAD: usize = 4;
@@ -15,7 +17,9 @@ fn u32_from_bytes(bytes: &[u8]) -> io::Result<u32> {
 
 #[inline]
 fn bincode_serialize<T: ?Sized>(value: &T) -> io::Result<Vec<u8>>
-where T: serde::Serialize, {
+where
+    T: serde::Serialize,
+{
     bincode::serialize(value).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
 }
 
@@ -32,7 +36,6 @@ where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
-
     #[inline]
     fn new(is_leaf: bool) -> Self {
         BPlusTreeNode {
@@ -41,6 +44,10 @@ where
             children: vec![],
             values: vec![],
         }
+    }
+
+    pub(crate) fn max_key(&self) -> Option<&K> {
+        self.keys.iter().max()
     }
 
     #[inline]
@@ -152,13 +159,13 @@ where
         }
     }
 
-    // pub(crate) fn traverse<F>(&self, visit: &mut F)
-    // where
-    //     F: FnMut(&BPlusTreeNode<K, V>),
-    // {
-    //     visit(self);
-    //     self.children.iter().for_each(|child| child.traverse(visit));
-    // }
+    pub(crate) fn traverse<F>(&self, visit: &mut F)
+    where
+        F: FnMut(&BPlusTreeNode<K, V>),
+    {
+        visit(self);
+        self.children.iter().for_each(|child| child.traverse(visit));
+    }
 
     fn serialize_to_blocks<W: Write + Seek>(&self, file: &mut W, buffer: &mut Vec<u8>, offset: u64) -> io::Result<u64> {
         let mut current_offset = offset;
@@ -178,7 +185,7 @@ where
 
         // If leaf, serialize and write values
         if self.is_leaf {
-            let values_encoded =  bincode_serialize(&self.values)?;
+            let values_encoded = bincode_serialize(&self.values)?;
             let values_bytes = values_encoded.len() as u32;
             buffer_slice[write_pos..write_pos + 4].copy_from_slice(&values_bytes.to_le_bytes());
             write_pos += 4;
@@ -199,7 +206,7 @@ where
                 current_offset = child.serialize_to_blocks(file, buffer, current_offset)?;
             }
 
-            let pointer_encoded =  bincode_serialize(&pointer)?;
+            let pointer_encoded = bincode_serialize(&pointer)?;
             let pointer_bytes = pointer_encoded.len() as u32;
 
             file.seek(SeekFrom::Start(pointer_offset))?;
@@ -328,27 +335,27 @@ where
         self.root.query(key)
     }
 
-    pub(crate) fn serialize(&self, filename: &str) -> io::Result<u64> {
-        let mut file = OpenOptions::new().write(true).create(true).open(filename)?;
+    pub(crate) fn serialize(&self, filepath: &Path) -> io::Result<u64> {
+        let mut file = OpenOptions::new().write(true).create(true).open(filepath)?;
         let mut buffer = vec![0u8; BLOCK_SIZE];
         let result = self.root.serialize_to_blocks(&mut file, &mut buffer, 0u64);
         file.flush()?;
         result
     }
 
-    pub(crate) fn deserialize(filename: &str) -> io::Result<Self> {
-        let mut file = File::open(filename)?;
+    pub(crate) fn deserialize(filepath: &Path) -> io::Result<Self> {
+        let mut file = File::open(filepath)?;
         let mut buffer = vec![0u8; BLOCK_SIZE];
         let (root, _) = BPlusTreeNode::deserialize_from_blocks(&mut file, &mut buffer, 0, true)?;
         Ok(BPlusTree::new_with_root(root))
     }
 
-    // pub(crate) fn traverse<F>(&self, mut visit: F)
-    // where
-    //     F: FnMut(&BPlusTreeNode<K, V>),
-    // {
-    //     self.root.traverse(&mut visit);
-    // }
+    pub(crate) fn traverse<F>(&self, mut visit: F)
+    where
+        F: FnMut(&BPlusTreeNode<K, V>),
+    {
+        self.root.traverse(&mut visit);
+    }
 }
 
 pub(crate) struct BPlusTreeQuery<K, V> {
@@ -367,8 +374,8 @@ where
         Ok(file_size % (BLOCK_SIZE as u64) == 0) // Check if file size is a multiple of BLOCK_SIZE
     }
 
-    pub(crate) fn new(filename: &str) -> io::Result<Self> {
-        let file = File::open(filename)?;
+    pub(crate) fn new(filepath: &Path) -> io::Result<Self> {
+        let file = File::open(filepath)?;
         match BPlusTreeQuery::<K, V>::is_multiple_of_block_size(&file) {
             Ok(valid) => {
                 if !valid {
@@ -421,10 +428,11 @@ where
 #[cfg(test)]
 mod tests {
     use std::io;
+    use std::path::PathBuf;
 
     use serde::{Deserialize, Serialize};
 
-    use crate::utils::bplustree::{BPlusTree, BPlusTreeQuery};
+    use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery};
 
     // Example usage with a simple struct
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -449,10 +457,10 @@ mod tests {
         // });
 
         // Serialize the tree to a file
-        tree.serialize("/tmp/tree.bin")?;
+        tree.serialize(&PathBuf::from("/tmp/tree.bin"))?;
 
         // Deserialize the tree from the file
-        tree = BPlusTree::<u32, Record>::deserialize("/tmp/tree.bin")?;
+        tree = BPlusTree::<u32, Record>::deserialize(&PathBuf::from("/tmp/tree.bin"))?;
 
         // Query the tree
         for i in 0u32..=500 {
@@ -464,7 +472,7 @@ mod tests {
             }), "Entry {} not found", i);
         }
 
-        let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::new("/tmp/tree.bin")?;
+        let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::new(&PathBuf::from("/tmp/tree.bin"))?;
         for i in 0u32..=500 {
             let found = tree_query.query(&i);
             assert!(found.is_ok(), "Query not ok");

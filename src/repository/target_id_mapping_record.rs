@@ -1,17 +1,18 @@
 use std::cmp::max;
-use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
-use std::path::Path;
-use std::rc::Rc;
-use crate::model::playlist::{PlaylistItemType};
+use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+
+use crate::model::playlist::PlaylistItemType;
+use crate::repository::bplustree::BPlusTree;
 use crate::utils::file_utils;
 
 /**
 This file contains the provider id, the virtual id, and an uuid
-
  */
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct TargetIdMappingRecord {
     pub provider_id: u32,
     pub virtual_id: u32,
@@ -57,118 +58,58 @@ impl TargetIdMappingRecord {
 pub(crate) struct TargetIdMapping {
     dirty: bool,
     virtual_id_counter: u32,
-    by_provider_id: BTreeMap<u32, Rc<TargetIdMappingRecord>>,
-    by_virtual_id: BTreeMap<u32, Rc<TargetIdMappingRecord>>,
-    by_uuid: BTreeMap<[u8; 32], Rc<TargetIdMappingRecord>>,
-    records: Vec<Rc<TargetIdMappingRecord>>,
-    file: Option<File>
+    by_virtual_id: BPlusTree<u32, TargetIdMappingRecord>,
+    path: PathBuf
 }
 
 impl TargetIdMapping {
-    pub(crate) fn insert_entry(&mut self, provider_id: u32, uuid: [u8; 32], item_type: &PlaylistItemType, parent_virtual_id: u32) -> u32 {
-        self.dirty = true;
-        self.virtual_id_counter += 1;
-        self.insert(TargetIdMappingRecord { provider_id, virtual_id: self.virtual_id_counter, uuid, item_type: *item_type, parent_virtual_id});
-        self.virtual_id_counter
-    }
+    pub(crate) fn new(path: PathBuf) -> Self {
+        let mut by_virtual_id: BPlusTree<u32, TargetIdMappingRecord> = match BPlusTree::<u32, TargetIdMappingRecord>::deserialize(&path) {
+            Ok(tree) => {
+                tree
+            }
+            _ => BPlusTree::<u32, TargetIdMappingRecord>::new()
+        };
 
-    fn new(records: Vec<Rc<TargetIdMappingRecord>>, file: Option<File>) -> Self {
-        let mut by_provider_id: BTreeMap<u32, Rc<TargetIdMappingRecord>> = BTreeMap::new();
-        let mut by_virtual_id: BTreeMap<u32, Rc<TargetIdMappingRecord>> = BTreeMap::new();
-        let mut by_uuid: BTreeMap<[u8; 32], Rc<TargetIdMappingRecord>> = BTreeMap::new();
         let mut virtual_id_counter: u32 = 0;
-        for record in &records {
-            by_provider_id.insert(record.provider_id, Rc::clone(record));
-            by_virtual_id.insert(record.virtual_id, Rc::clone(record));
-            by_uuid.insert(record.uuid, Rc::clone(record));
-            virtual_id_counter = max(record.virtual_id, virtual_id_counter);
-        }
+        by_virtual_id.traverse(|node| {
+            match node.max_key() {
+                None => {}
+                Some(max_value) => {
+                    virtual_id_counter = max(virtual_id_counter, *max_value);
+                }
+            }
+        });
         TargetIdMapping {
             dirty: false,
             virtual_id_counter,
-            by_provider_id,
             by_virtual_id,
-            by_uuid,
-            records,
-            file
+            path
         }
     }
 
     fn insert(&mut self, record: TargetIdMappingRecord) {
-        let provider_id = record.provider_id;
         let virtual_id = record.virtual_id;
-        let uuid = record.uuid;
-        let shared_record = Rc::new(record);
-        self.by_provider_id.insert(provider_id, Rc::clone(&shared_record));
-        self.by_virtual_id.insert(virtual_id, Rc::clone(&shared_record));
-        self.by_uuid.insert(uuid, Rc::clone(&shared_record));
-        self.records.push(shared_record);
+        self.by_virtual_id.insert(virtual_id, record);
     }
 
-   pub(crate) fn get_by_provider_id(&self, provider_id: u32) -> Option<&Rc<TargetIdMappingRecord>> {
-        self.by_provider_id.get(&provider_id)
+    pub(crate) fn insert_entry(&mut self, provider_id: u32, uuid: [u8; 32], item_type: &PlaylistItemType, parent_virtual_id: u32) -> u32 {
+        self.dirty = true;
+        self.virtual_id_counter += 1;
+        self.insert(TargetIdMappingRecord { provider_id, virtual_id: self.virtual_id_counter, uuid, item_type: *item_type, parent_virtual_id });
+        self.virtual_id_counter
     }
 
-    pub(crate) fn get_by_virtual_id(&self, virtual_id: u32) -> Option<&Rc<TargetIdMappingRecord>> {
-        self.by_virtual_id.get(&virtual_id)
+    pub(crate) fn get_by_virtual_id(&self, virtual_id: u32) -> Option<&TargetIdMappingRecord> {
+        self.by_virtual_id.query(&virtual_id)
     }
 
-    pub(crate) fn get_by_uuid(&self, uuid: &[u8; 32]) -> Option<&Rc<TargetIdMappingRecord>> {
-        self.by_uuid.get(uuid)
-    }
-
-
-    pub fn persist(&mut self) -> Result<(), Error> {
-        let mut file = match self.file.take() {
-            Some(file) => file,
-            None => return Err(Error::new(ErrorKind::NotFound, "No file given")),
-        };
-        let result = self.to_file(&mut file);
-        self.file = Some(file);
-        result
-    }
-
-    pub fn to_file(&mut self, file: &mut File) -> Result<(), Error> {
+    pub(crate) fn persist(&mut self) -> Result<(), Error> {
         if self.dirty {
-            for record in &self.records {
-                let bytes = record.to_bytes();
-                if let Err(err) = file.write_all(&bytes) {
-                    return Err(err);
-                }
-            }
+            self.by_virtual_id.serialize(&self.path)?;
         }
         self.dirty = false;
         Ok(())
     }
 
-    pub fn to_path(&mut self, path: &Path) -> Result<(), Error>  {
-        match file_utils::open_file_append(path, false) {
-            Ok(mut file) => self.to_file(&mut file),
-            Err(err) => Err(err)
-        }
-    }
-
-    pub fn from_path(path: &Path) -> Self {
-        match file_utils::open_file_append(path, false) {
-            Ok(mut file) => {
-                let records = TargetIdMapping::read_records_from_file(&mut file);
-                TargetIdMapping::new(records, Some(file))
-            },
-            _ => TargetIdMapping::new(vec![], None)
-        }
-    }
-
-    fn read_records_from_file(file: &mut File) -> Vec<Rc<TargetIdMappingRecord>> {
-        let mut records = vec![];
-        if let Ok(_) = file.seek(SeekFrom::Start(0)) {
-            let mut bytes = [0u8;45];
-            loop {
-                if let Err(_) = file.read_exact(&mut bytes) {
-                    break;
-                }
-                records.push(Rc::new(TargetIdMappingRecord::from_bytes(&bytes)));
-            }
-        }
-        records
-    }
 }

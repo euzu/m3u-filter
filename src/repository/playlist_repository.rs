@@ -13,10 +13,9 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
                                target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
 
-    // TODO get previous virtual-ids and match them to the playlist items
     match ensure_target_storage_path(cfg, target.name.as_str()) {
         Ok(target_path) => {
-            let mut target_id_mapping = TargetIdMapping::from_path(&get_target_id_mapping_file(&target_path));
+            let mut target_id_mapping = TargetIdMapping::new(get_target_id_mapping_file(&target_path));
             for group in &mut *playlist {
                 for channel in &group.channels {
                     let mut header = channel.header.borrow_mut();
@@ -40,7 +39,7 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
                     TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, &output.filename),
                 } {
                     Ok(()) => {
-                        if let Err(err) = target_id_mapping.to_path(&target_path) {
+                        if let Err(err) = target_id_mapping.persist() {
                             errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
                         }
                         if !playlist.is_empty() {
