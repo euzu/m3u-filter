@@ -1,25 +1,12 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 
 const BINCODE_OVERHEAD: usize = 4;
 const BLOCK_SIZE: usize = 4096;
 const POINTER_SIZE: usize = size_of::<Option<u64>>();
-//
-// #[derive(Serialize, Deserialize, Debug, Clone)]
-// struct LeafKeyValue<K, V> {
-//     key: K,
-//     value: V,
-// }
-//
-// #[derive(Serialize, Deserialize, Debug, Clone)]
-// struct InnerKeyValue<K, V> {
-//     key: K,
-//     value: V,
-//     children: u64
-// }
-//
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct BPlusTreeNode<K, V> {
@@ -34,6 +21,8 @@ where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
+
+    #[inline]
     fn new(is_leaf: bool) -> Self {
         BPlusTreeNode {
             is_leaf,
@@ -43,10 +32,12 @@ where
         }
     }
 
+    #[inline]
     fn is_overflow(&self, order: usize) -> bool {
         self.keys.len() > order
     }
 
+    #[inline]
     fn get_median_index(order: usize) -> usize {
         order >> 1
     }
@@ -60,69 +51,71 @@ where
         }
     }
 
-    fn query(&self, k: &K) -> Option<&V> {
+    fn query(&self, key: &K) -> Option<&V> {
         if self.is_leaf {
-            return match self.keys.binary_search(&k) {
+            return match self.keys.binary_search(&key) {
                 Ok(idx) => self.values.get(idx),
                 Err(_) => None,
             };
         }
-        let node = self.children.get(self.get_entry_index_upper_bound(k)).unwrap();
-        node.query(k)
+        let node = self.children.get(self.get_entry_index_upper_bound(key)).unwrap();
+        node.query(key)
     }
 
-    fn get_equal_entry_index(&self, key: &K) -> Option<usize> {
-        let mut l = 0;
-        let mut r = self.keys.len() - 1;
-        while l <= r {
-            let mid = l + ((r - l) >> 1);
-            let mid_key = self.keys.get(mid).unwrap();
+    fn get_equal_entry_index(&self, key: &K) -> Option<usize>
+    where
+        K: Ord,
+    {
+        let mut left = 0;
+        let mut right = self.keys.len().checked_sub(1)?;
+        while left <= right {
+            let mid = left + ((right - left) >> 1);
+            let mid_key = &self.keys[mid];
             if mid_key == key {
                 return Some(mid);
             } else if mid_key > key {
-                r = mid - 1;
+                right = mid.checked_sub(1)?;
             } else {
-                l = mid + 1;
+                left = mid + 1;
             }
         }
-        return None;
+        None
     }
 
     fn get_entry_index_upper_bound(&self, key: &K) -> usize {
-        let mut l = 0;
-        let mut r = self.keys.len();
-        while l < r {
-            let mid = l + ((r - l) >> 1);
-            let mid_key = self.keys.get(mid).unwrap();
-            if mid_key <= key {
-                l = mid + 1;
+        let mut left = 0;
+        let mut right = self.keys.len();
+        while left < right {
+            let mid = left + ((right - left) >> 1);
+            if &self.keys[mid] <= key {
+                left = mid + 1;
             } else {
-                r = mid;
+                right = mid;
             }
         }
-        return l;
+        left
     }
 
-    fn insert(&mut self, k: K, v: V, inner_order: usize, leaf_order: usize) -> Option<BPlusTreeNode<K, V>> {
+    fn insert(&mut self, key: K, v: V, inner_order: usize, leaf_order: usize) -> Option<BPlusTreeNode<K, V>> {
         if self.is_leaf {
-            if let Some(eq_entry_index) = self.get_equal_entry_index(&k) {
+            if let Some(eq_entry_index) = self.get_equal_entry_index(&key) {
                 self.values.insert(eq_entry_index, v);
                 return None;
             }
-            let pos = self.get_entry_index_upper_bound(&k);
-            self.keys.insert(pos, k);
+            let pos = self.get_entry_index_upper_bound(&key);
+            self.keys.insert(pos, key);
             self.values.insert(pos, v);
             if self.is_overflow(leaf_order) {
                 return Some(self.split(leaf_order));
             }
         } else {
-            let pos = self.get_entry_index_upper_bound(&k);
+            let pos = self.get_entry_index_upper_bound(&key);
             let child = self.children.get_mut(pos).unwrap();
-            let node = child.insert(k, v, inner_order, leaf_order);
+            let node = child.insert(key, v, inner_order, leaf_order);
             if node.is_some() {
-                let key = self.find_leaf_entry(node.as_ref().unwrap());
-                let idx = self.get_entry_index_upper_bound(key);
-                self.keys.insert(idx, key.clone());
+                let leaf_key = self.find_leaf_entry(node.as_ref().unwrap());
+                let idx = self.get_entry_index_upper_bound(leaf_key);
+                self.keys.insert(idx, leaf_key.clone());
                 self.children.insert(idx + 1, node.unwrap());
                 if self.is_overflow(inner_order) {
                     return Some(self.split(inner_order));
@@ -160,21 +153,21 @@ where
         let mut current_offset = offset;
         let mut cursor = io::Cursor::new(&mut *buffer);
 
-        cursor.write_all(if self.is_leaf { &[1u8] } else { &[0u8] }).expect("Failed to serialize node type");
+        cursor.write_all(if self.is_leaf { &[1u8] } else { &[0u8] })?;
 
-        let keys_encoded = bincode::serialize(&self.keys).expect("Failed to serialize keys");
+        let keys_encoded = bincode::serialize(&self.keys).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         let keys_bytes = keys_encoded.len() as u32;
-        cursor.write_all(&keys_bytes.to_le_bytes()).expect("Failed to write keys length");
-        cursor.write_all(&keys_encoded).expect("Failed to write keys");
+        cursor.write_all(&keys_bytes.to_le_bytes())?;
+        cursor.write_all(&keys_encoded)?;
 
         if self.is_leaf {
-            let values_encoded = bincode::serialize(&self.values).expect("Failed to serialize values");
-            cursor.write_all(&(values_encoded.len() as u32).to_le_bytes()).expect("Failed to write values length");
-            cursor.write_all(&values_encoded).expect("Failed to write values");
+            let values_encoded = bincode::serialize(&self.values).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            cursor.write_all(&(values_encoded.len() as u32).to_le_bytes())?;
+            cursor.write_all(&values_encoded)?;
         }
 
         let cursor_pos = cursor.position();
-        cursor.flush().expect("failed to flush cursor");
+        cursor.flush()?;
         file.seek(SeekFrom::Start(offset))?;
         file.write_all(&buffer)?;
         current_offset += BLOCK_SIZE as u64;
@@ -182,12 +175,12 @@ where
         if !self.is_leaf {
             let pointer_offset = offset + cursor_pos as u64;
             let mut pointer = vec![];
-            for  child in &self.children {
+            for child in &self.children {
                 pointer.push(current_offset);
                 current_offset = child.serialize_to_blocks(file, buffer, current_offset)?;
             }
 
-            let pointer_encoded = bincode::serialize(&pointer).expect("Failed to encode pointer");
+            let pointer_encoded = bincode::serialize(&pointer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
             let pointer_bytes = pointer_encoded.len() as u32;
 
             file.seek(SeekFrom::Start(pointer_offset))?;
@@ -198,7 +191,7 @@ where
         Ok(current_offset)
     }
 
-    fn deserialize_from_blocks<R: Read + Seek>(file: &mut R, buffer: &mut Vec<u8>, offset: u64) -> io::Result<Self> {
+    fn deserialize_from_blocks<R: Read + Seek>(file: &mut R, buffer: &mut Vec<u8>, offset: u64, nested: bool) -> io::Result<(Self, Option<Vec<u64>>)> {
         file.seek(SeekFrom::Start(offset))?;
         file.read_exact(buffer)?;
 
@@ -215,7 +208,7 @@ where
 
         let mut keys_buffer: Vec<u8> = vec![0; keys_length];
         cursor.read_exact(&mut keys_buffer)?;
-        let keys: Vec<K> = bincode::deserialize_from(&*keys_buffer).expect("Failed to deserialize keys");
+        let keys: Vec<K> = bincode::deserialize_from(&*keys_buffer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
 
         // Deserialize values if leaf node
         let values = if is_leaf {
@@ -223,32 +216,43 @@ where
             let values_length = u32::from_le_bytes(length_bytes) as usize;
             let mut values_buffer: Vec<u8> = vec![0; values_length];
             cursor.read_exact(&mut values_buffer)?;
-            let values: Vec<V> = bincode::deserialize_from(&*values_buffer).expect("Failed to deserialize values");
+            let values: Vec<V> = bincode::deserialize_from(&*values_buffer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
             values
         } else {
             vec![]
         };
 
         // Deserialize children indices if internal node
-        let children = if !is_leaf {
+        let (children, children_pointer) = if !is_leaf {
             cursor.read_exact(&mut length_bytes)?;
             let pointers_length = u32::from_le_bytes(length_bytes) as usize;
             let mut pointers_buffer: Vec<u8> = vec![0; pointers_length];
             cursor.read_exact(&mut pointers_buffer)?;
-            let pointers: Vec<u64> = bincode::deserialize_from(&*pointers_buffer).expect("Failed to deserialize pointers");
-            pointers.iter().map(|pointer| {
-                BPlusTreeNode::<K, V>::deserialize_from_blocks(file, buffer, *pointer).expect("failed to deserialize at offset {pointer}")
-            }).collect()
+            let pointers: Vec<u64> = bincode::deserialize_from(&*pointers_buffer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            if nested {
+                let nodes: Result<Vec<BPlusTreeNode<K, V>>, io::Error> = pointers
+                    .iter()
+                    .map(|pointer| {
+                        BPlusTreeNode::<K, V>::deserialize_from_blocks(file, buffer, *pointer, nested)
+                            .map(|(node, _)| node)
+                            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))
+                    })
+                    .collect();
+
+                (nodes?, None)
+            } else {
+                (vec![], Some(pointers))
+            }
         } else {
-            vec![]
+            (vec![], None)
         };
 
-        Ok(BPlusTreeNode {
+        Ok((BPlusTreeNode {
             is_leaf,
             keys,
             values,
             children,
-        })
+        }, children_pointer))
     }
 }
 
@@ -316,13 +320,15 @@ where
     pub(crate) fn serialize(&self, filename: &str) -> io::Result<u64> {
         let mut file = OpenOptions::new().write(true).create(true).open(filename)?;
         let mut buffer = vec![0u8; BLOCK_SIZE];
-        self.root.serialize_to_blocks(&mut file, &mut buffer, 0u64)
+        let result = self.root.serialize_to_blocks(&mut file, &mut buffer, 0u64);
+        file.flush()?;
+        result
     }
 
     pub(crate) fn deserialize(filename: &str) -> io::Result<Self> {
-        let mut file = File::open(filename).expect("Failed to open file");
+        let mut file = File::open(filename)?;
         let mut buffer = vec![0u8; BLOCK_SIZE];
-        let root = BPlusTreeNode::deserialize_from_blocks(&mut file, &mut buffer, 0)?;
+        let (root, _) = BPlusTreeNode::deserialize_from_blocks(&mut file, &mut buffer, 0, true)?;
         Ok(BPlusTree::new_with_root(root))
     }
 
@@ -334,13 +340,67 @@ where
     // }
 }
 
+pub(crate) struct BPlusTreeQuery<K, V> {
+    file: File,
+    _marker_k: PhantomData<K>,
+    _marker_v: PhantomData<V>,
+}
+
+impl<K, V> BPlusTreeQuery<K, V>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    pub(crate) fn new(filename: &str) -> io::Result<Self> {
+        let file = File::open(filename)?;
+        Ok(BPlusTreeQuery {
+            file,
+            _marker_k: Default::default(),
+            _marker_v: Default::default(),
+        })
+    }
+
+    fn get_entry_index_upper_bound(keys: &Vec<K>, key: &K) -> usize {
+        let mut left = 0;
+        let mut right = keys.len();
+        while left < right {
+            let mid = left + ((right - left) >> 1);
+            if &keys[mid] <= key {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+        left
+    }
+
+    pub(crate) fn query(&mut self, key: &K) -> io::Result<Option<V>> {
+        let mut offset = 0;
+        let mut buffer = vec![0u8; BLOCK_SIZE];
+        loop {
+            let (node, pointers) =
+                BPlusTreeNode::<K, V>::deserialize_from_blocks(&mut self.file, &mut buffer, offset, false)?;
+
+            if node.is_leaf {
+                return match node.keys.binary_search(key) {
+                    Ok(idx) => Ok(node.values.get(idx).cloned()),
+                    Err(_) => Ok(None),
+                };
+            }
+
+            let child_idx = BPlusTreeQuery::<K, V>::get_entry_index_upper_bound(&node.keys, key);
+            offset = *pointers.unwrap().get(child_idx).unwrap();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io;
 
     use serde::{Deserialize, Serialize};
 
-    use crate::utils::bplustree::BPlusTree;
+    use crate::utils::bplustree::{BPlusTree, BPlusTreeQuery};
 
     // Example usage with a simple struct
     #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -356,7 +416,6 @@ mod tests {
             tree.insert(i, format!("Entry {i}"));
         }
 
-
         // // Traverse the tree
         // tree.traverse(|node| {
         //     println!("Node: {:?}", node);
@@ -370,7 +429,19 @@ mod tests {
 
         // Query the tree
         for i in 0u32..=500 {
-            assert!(tree.query(&i).is_some(), "Entry {} not found", i);
+            let found = tree.query(&i);
+            assert!(found.is_some(), "Entry {} not found", i);
+            assert!(found.unwrap().eq(&format!("Entry {i}")), "Entry {} not found", i);
+        }
+
+        let mut tree_query: BPlusTreeQuery<u32, String> = BPlusTreeQuery::new("/tmp/tree.bin")?;
+        for i in 0u32..=500 {
+            let found = tree_query.query(&i);
+            assert!(found.is_ok(), "Query ok");
+            let found_entry = found.unwrap(); // Unwrap once and store the Option
+            assert!(found_entry.is_some(), "Entry {} not found", i);
+            let entry = found_entry.unwrap();
+            assert!(entry.eq(&format!("Entry {i}")), "Entry {} not found", i);
         }
 
         Ok(())
