@@ -183,6 +183,7 @@ where
             let pointer_encoded = bincode::serialize(&pointer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
             let pointer_bytes = pointer_encoded.len() as u32;
 
+            // got to pointer part of the own block and write the pointers of the children
             file.seek(SeekFrom::Start(pointer_offset))?;
             file.write_all(&pointer_bytes.to_le_bytes())?;
             file.write_all(&pointer_encoded)?;
@@ -351,8 +352,21 @@ where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
+    fn is_multiple_of_block_size(file: &File) -> io::Result<bool> {
+        let file_size = file.metadata()?.len(); // Get the file size in bytes
+        Ok(file_size % (BLOCK_SIZE as u64) == 0) // Check if file size is a multiple of BLOCK_SIZE
+    }
+
     pub(crate) fn new(filename: &str) -> io::Result<Self> {
         let file = File::open(filename)?;
+        match BPlusTreeQuery::<K, V>::is_multiple_of_block_size(&file) {
+            Ok(valid) => {
+                if !valid {
+                    return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Tree file has to be multiple of block size {BLOCK_SIZE}")));
+                }
+            }
+            Err(err) => return Err(err)
+        }
         Ok(BPlusTreeQuery {
             file,
             _marker_k: Default::default(),
@@ -437,7 +451,7 @@ mod tests {
         let mut tree_query: BPlusTreeQuery<u32, String> = BPlusTreeQuery::new("/tmp/tree.bin")?;
         for i in 0u32..=500 {
             let found = tree_query.query(&i);
-            assert!(found.is_ok(), "Query ok");
+            assert!(found.is_ok(), "Query not ok");
             let found_entry = found.unwrap(); // Unwrap once and store the Option
             assert!(found_entry.is_some(), "Entry {} not found", i);
             let entry = found_entry.unwrap();
