@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    use std::rc::Rc;
     use regex::Regex;
     use crate::filter::{get_filter, MockValueProcessor, ValueProvider};
     use crate::model::playlist::{PlaylistItem, PlaylistItemHeader};
@@ -8,6 +9,8 @@ mod tests {
     fn create_mock_pli(name: &str, group: &str) -> PlaylistItem {
         PlaylistItem {
             header: RefCell::new(PlaylistItemHeader {
+                name: Rc::new(name.to_string()),
+                group: Rc::new(group.to_string()),
                 ..Default::default()
             })
         }
