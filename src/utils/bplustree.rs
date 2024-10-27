@@ -1,7 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
-
 use serde::{Deserialize, Serialize};
 
 const BINCODE_OVERHEAD: usize = 4;
@@ -151,29 +150,37 @@ where
 
     fn serialize_to_blocks<W: Write + Seek>(&self, file: &mut W, buffer: &mut Vec<u8>, offset: u64) -> io::Result<u64> {
         let mut current_offset = offset;
-        let mut cursor = io::Cursor::new(&mut *buffer);
+        let buffer_slice = &mut buffer[..];
 
-        cursor.write_all(if self.is_leaf { &[1u8] } else { &[0u8] })?;
+        // Write node type (leaf or internal)
+        buffer_slice[0] = if self.is_leaf { 1u8 } else { 0u8 };
+        let mut write_pos = 1;
 
+        // Serialize and write keys
         let keys_encoded = bincode::serialize(&self.keys).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         let keys_bytes = keys_encoded.len() as u32;
-        cursor.write_all(&keys_bytes.to_le_bytes())?;
-        cursor.write_all(&keys_encoded)?;
+        buffer_slice[write_pos..write_pos + 4].copy_from_slice(&keys_bytes.to_le_bytes());
+        write_pos += 4;
+        buffer_slice[write_pos..write_pos + keys_encoded.len()].copy_from_slice(&keys_encoded);
+        write_pos += keys_encoded.len();
 
+        // If leaf, serialize and write values
         if self.is_leaf {
             let values_encoded = bincode::serialize(&self.values).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-            cursor.write_all(&(values_encoded.len() as u32).to_le_bytes())?;
-            cursor.write_all(&values_encoded)?;
+            let values_bytes = values_encoded.len() as u32;
+            buffer_slice[write_pos..write_pos + 4].copy_from_slice(&values_bytes.to_le_bytes());
+            write_pos += 4;
+            buffer_slice[write_pos..write_pos + values_encoded.len()].copy_from_slice(&values_encoded);
+            write_pos += values_encoded.len();
         }
 
-        let cursor_pos = cursor.position();
-        cursor.flush()?;
+        // Write buffer to file
         file.seek(SeekFrom::Start(offset))?;
-        file.write_all(&buffer)?;
+        file.write_all(&buffer_slice[..BLOCK_SIZE])?;
         current_offset += BLOCK_SIZE as u64;
 
         if !self.is_leaf {
-            let pointer_offset = offset + cursor_pos as u64;
+            let pointer_offset = offset + write_pos as u64;
             let mut pointer = vec![];
             for child in &self.children {
                 pointer.push(current_offset);
@@ -183,7 +190,6 @@ where
             let pointer_encoded = bincode::serialize(&pointer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
             let pointer_bytes = pointer_encoded.len() as u32;
 
-            // got to pointer part of the own block and write the pointers of the children
             file.seek(SeekFrom::Start(pointer_offset))?;
             file.write_all(&pointer_bytes.to_le_bytes())?;
             file.write_all(&pointer_encoded)?;
@@ -196,28 +202,22 @@ where
         file.seek(SeekFrom::Start(offset))?;
         file.read_exact(buffer)?;
 
-        let mut cursor = io::Cursor::new(&mut *buffer);
-        // Read the node type
-        let mut node_type = [0u8; 1];
-        cursor.read_exact(&mut node_type)?;
-        let is_leaf = u8::from_le_bytes(node_type) == 1u8;
+        // Read the node type directly from buffer
+        let is_leaf = buffer[0] == 1u8;
+        let mut read_pos = 1;
 
         // Deserialize keys
-        let mut length_bytes = [0u8; 4];
-        cursor.read_exact(&mut length_bytes)?;
-        let keys_length = u32::from_le_bytes(length_bytes) as usize;
-
-        let mut keys_buffer: Vec<u8> = vec![0; keys_length];
-        cursor.read_exact(&mut keys_buffer)?;
-        let keys: Vec<K> = bincode::deserialize_from(&*keys_buffer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        let keys_length = u32::from_le_bytes(buffer[read_pos..read_pos + 4].try_into().unwrap()) as usize;
+        read_pos += 4;
+        let keys: Vec<K> = bincode::deserialize(&buffer[read_pos..read_pos + keys_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        read_pos += keys_length;
 
         // Deserialize values if leaf node
         let values = if is_leaf {
-            cursor.read_exact(&mut length_bytes)?;
-            let values_length = u32::from_le_bytes(length_bytes) as usize;
-            let mut values_buffer: Vec<u8> = vec![0; values_length];
-            cursor.read_exact(&mut values_buffer)?;
-            let values: Vec<V> = bincode::deserialize_from(&*values_buffer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            let values_length = u32::from_le_bytes(buffer[read_pos..read_pos + 4].try_into().unwrap()) as usize;
+            read_pos += 4;
+            let values: Vec<V> = bincode::deserialize(&buffer[read_pos..read_pos + values_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            read_pos += values_length;
             values
         } else {
             vec![]
@@ -225,11 +225,9 @@ where
 
         // Deserialize children indices if internal node
         let (children, children_pointer) = if !is_leaf {
-            cursor.read_exact(&mut length_bytes)?;
-            let pointers_length = u32::from_le_bytes(length_bytes) as usize;
-            let mut pointers_buffer: Vec<u8> = vec![0; pointers_length];
-            cursor.read_exact(&mut pointers_buffer)?;
-            let pointers: Vec<u64> = bincode::deserialize_from(&*pointers_buffer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            let pointers_length = u32::from_le_bytes(buffer[read_pos..read_pos + 4].try_into().unwrap()) as usize;
+            read_pos += 4;
+            let pointers: Vec<u64> = bincode::deserialize(&buffer[read_pos..read_pos + pointers_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
             if nested {
                 let nodes: Result<Vec<BPlusTreeNode<K, V>>, io::Error> = pointers
                     .iter()
