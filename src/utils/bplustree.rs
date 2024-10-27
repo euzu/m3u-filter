@@ -1,3 +1,4 @@
+use std::array::TryFromSliceError;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
@@ -6,6 +7,17 @@ use serde::{Deserialize, Serialize};
 const BINCODE_OVERHEAD: usize = 4;
 const BLOCK_SIZE: usize = 4096;
 const POINTER_SIZE: usize = size_of::<Option<u64>>();
+
+#[inline]
+fn u32_from_bytes(bytes: &[u8]) -> io::Result<u32> {
+    Ok(u32::from_le_bytes(bytes.try_into().map_err(|e: TryFromSliceError| io::Error::new(io::ErrorKind::Other, e.to_string()))?))
+}
+
+#[inline]
+fn bincode_serialize<T: ?Sized>(value: &T) -> io::Result<Vec<u8>>
+where T: serde::Serialize, {
+    bincode::serialize(value).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct BPlusTreeNode<K, V> {
@@ -157,7 +169,7 @@ where
         let mut write_pos = 1;
 
         // Serialize and write keys
-        let keys_encoded = bincode::serialize(&self.keys).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        let keys_encoded = bincode_serialize(&self.keys)?;
         let keys_bytes = keys_encoded.len() as u32;
         buffer_slice[write_pos..write_pos + 4].copy_from_slice(&keys_bytes.to_le_bytes());
         write_pos += 4;
@@ -166,7 +178,7 @@ where
 
         // If leaf, serialize and write values
         if self.is_leaf {
-            let values_encoded = bincode::serialize(&self.values).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            let values_encoded =  bincode_serialize(&self.values)?;
             let values_bytes = values_encoded.len() as u32;
             buffer_slice[write_pos..write_pos + 4].copy_from_slice(&values_bytes.to_le_bytes());
             write_pos += 4;
@@ -181,13 +193,13 @@ where
 
         if !self.is_leaf {
             let pointer_offset = offset + write_pos as u64;
-            let mut pointer = vec![];
+            let mut pointer = Vec::with_capacity(self.children.len());
             for child in &self.children {
                 pointer.push(current_offset);
                 current_offset = child.serialize_to_blocks(file, buffer, current_offset)?;
             }
 
-            let pointer_encoded = bincode::serialize(&pointer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            let pointer_encoded =  bincode_serialize(&pointer)?;
             let pointer_bytes = pointer_encoded.len() as u32;
 
             file.seek(SeekFrom::Start(pointer_offset))?;
@@ -207,14 +219,14 @@ where
         let mut read_pos = 1;
 
         // Deserialize keys
-        let keys_length = u32::from_le_bytes(buffer[read_pos..read_pos + 4].try_into().unwrap()) as usize;
+        let keys_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
         read_pos += 4;
         let keys: Vec<K> = bincode::deserialize(&buffer[read_pos..read_pos + keys_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         read_pos += keys_length;
 
         // Deserialize values if leaf node
         let values = if is_leaf {
-            let values_length = u32::from_le_bytes(buffer[read_pos..read_pos + 4].try_into().unwrap()) as usize;
+            let values_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
             read_pos += 4;
             let values: Vec<V> = bincode::deserialize(&buffer[read_pos..read_pos + values_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
             read_pos += values_length;
@@ -225,7 +237,7 @@ where
 
         // Deserialize children indices if internal node
         let (children, children_pointer) = if !is_leaf {
-            let pointers_length = u32::from_le_bytes(buffer[read_pos..read_pos + 4].try_into().unwrap()) as usize;
+            let pointers_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
             read_pos += 4;
             let pointers: Vec<u64> = bincode::deserialize(&buffer[read_pos..read_pos + pointers_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
             if nested {
@@ -290,7 +302,7 @@ where
     }
 
     pub(crate) fn insert(&mut self, key: K, value: V) {
-        if self.root.keys.len() == 0 {
+        if self.root.keys.is_empty() {
             self.root.keys.push(key);
             self.root.values.push(value);
             return;
