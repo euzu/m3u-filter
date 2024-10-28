@@ -3,8 +3,20 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::path::Path;
-use crate::repository::indexed_document_writer::get_record_size;
+use crate::repository::bplustree::BPlusTreeQuery;
+use crate::repository::indexed_document_writer::OffsetPointer;
 
+fn get_offset(index_path: &Path, doc_id: u32) -> Result<u64, Error> {
+    match BPlusTreeQuery::<u32,OffsetPointer>::try_new(index_path) {
+        Ok(mut tree) => {
+            match tree.query(&doc_id) {
+                Some(offset) => Ok(offset as u64),
+                None => Err(Error::new(ErrorKind::NotFound, format!("doc_id not found {doc_id}"))),
+            }
+        },
+        Err(err) => Err(err)
+    }
+}
 
 fn read_content_size(main_file: &mut File) -> Result<usize, Error>  {
     let mut size_bytes = [0u8; 4];
@@ -23,36 +35,31 @@ pub(in crate::repository) struct IndexedDocumentReader<T> {
 }
 
 impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
-    pub fn new(main_path: &Path, index_path: &Path) -> Result<IndexedDocumentReader<T>, Error> {
-        if main_path.exists() && index_path.exists() {
+    pub fn new(main_path: &Path) -> Result<IndexedDocumentReader<T>, Error> {
+        if main_path.exists() {
             match File::open(main_path) {
                 Ok(main_file) => {
-                    match File::open(index_path) {
-                        Ok(index_file) => {
-                            let size = match index_file.metadata() {
-                                Ok(metadata) => {
-                                    usize::try_from(metadata.len()).map_err(|err| Error::new(ErrorKind::Other, err))?
-                                }
-                                Err(_e) => 0,
-                            };
-                            Ok(Self {
-                                main_file,
-                                cursor: 0,
-                                size: u32::try_from(size).map_err(|err| Error::new(ErrorKind::Other, err))?,
-                                failed: false,
-                                t_buffer: Vec::new(),
-                                t_type: PhantomData,
-                            })
+                    let size = match main_file.metadata() {
+                        Ok(metadata) => {
+                            usize::try_from(metadata.len()).map_err(|err| Error::new(ErrorKind::Other, err))?
                         }
-                        Err(e) => Err(e)
-                    }
+                        Err(_e) => 0,
+                    };
+
+                    Ok(Self {
+                        main_file,
+                        cursor: 0,
+                        size: u32::try_from(size).map_err(|err| Error::new(ErrorKind::Other, err))?,
+                        failed: false,
+                        t_buffer: Vec::new(),
+                        t_type: PhantomData,
+                    })
                 }
                 Err(e) => Err(e)
             }
         } else {
-            Err(Error::new(ErrorKind::NotFound, format!("File not found {} or {}",
-                                                        main_path.to_str().unwrap(),
-                                                        index_path.to_str().unwrap())))
+            Err(Error::new(ErrorKind::NotFound, format!("File not found {}",
+                                                        main_path.to_str().unwrap())))
         }
     }
 
@@ -69,6 +76,7 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
         }
         // read content-size
         let buf_size: usize = read_content_size(&mut self.main_file)?;
+        self.cursor += 4;
         // resize buffer if necessary
         if self.t_buffer.capacity() < buf_size {
             self.t_buffer.reserve(buf_size - self.t_buffer.capacity());
@@ -77,18 +85,33 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
 
         // read content
         self.main_file.read_exact(&mut self.t_buffer[0..buf_size])?;
+        self.cursor += buf_size as u32;
 
         // deserialize buffer
         return match bincode::deserialize::<T>(&self.t_buffer[0..buf_size]) {
-            Ok(value) => {
-                self.cursor += get_record_size();
-                Ok(Some(value))
-            }
+            Ok(value) => Ok(Some(value)),
             Err(err) => {
                 self.failed = true;
                 Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {err}")))
             }
         };
+    }
+
+    pub(in crate::repository) fn read_indexed_item(main_path: &Path, index_path: &Path, doc_id: u32) -> Result<T, Error>
+    {
+        if main_path.exists() && index_path.exists() {
+            // get the offset from index
+            let offset = crate::repository::indexed_document_reader::get_offset(index_path, doc_id)?;
+            let mut main_file = File::open(main_path)?;
+            main_file.seek(SeekFrom::Start(offset))?;
+            let buf_size = read_content_size(&mut main_file)?;
+            let mut buffer: Vec<u8> = vec![0; buf_size];
+            main_file.read_exact(&mut buffer)?;
+            if let Ok(item) = bincode::deserialize::<T>(&buffer) {
+                return Ok(item);
+            }
+        }
+        Err(Error::new(ErrorKind::Other, format!("Failed to read item for id {} - {}", doc_id, main_path.to_str().unwrap())))
     }
 }
 
@@ -104,36 +127,4 @@ impl<T: ?Sized + serde::de::DeserializeOwned> Iterator for IndexedDocumentReader
         }
         None
     }
-}
-
-fn get_offset(file: &mut File, doc_id: u32) -> Result<u64, Error> {
-    // TODO optimize this, sequential searching trough complete file!
-    let mut bytes = [0u8; 8];
-    file.seek(SeekFrom::Start(0))?;
-    loop {
-        file.read_exact(&mut bytes)?;
-        let id = u32::from_le_bytes(bytes[..4].try_into().unwrap());
-        if id == doc_id {
-            return Ok(u64::from(u32::from_le_bytes(bytes[4..].try_into().unwrap())));
-        }
-    }
-}
-
-pub(in crate::repository) fn read_indexed_item<T>(main_path: &Path, index_path: &Path, doc_id: u32) -> Result<T, Error>
-where
-    T: ?Sized + serde::de::DeserializeOwned,
-{
-    if main_path.exists() && index_path.exists() {
-        let mut index_file = File::open(index_path)?;
-        let mut main_file = File::open(main_path)?;
-        let offset = get_offset(&mut index_file, doc_id)?;
-        main_file.seek(SeekFrom::Start(offset))?;
-        let buf_size = read_content_size(&mut main_file)?;
-        let mut buffer: Vec<u8> = vec![0; buf_size];
-        main_file.read_exact(&mut buffer)?;
-        if let Ok(item) = bincode::deserialize::<T>(&buffer[..]) {
-            return Ok(item);
-        }
-    }
-    Err(Error::new(ErrorKind::Other, format!("Failed to read item for id {} - {}", doc_id, main_path.to_str().unwrap())))
 }

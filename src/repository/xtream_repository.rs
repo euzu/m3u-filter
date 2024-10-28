@@ -1,22 +1,22 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::io::{BufReader, Error, ErrorKind};
 use std::path::{Path, PathBuf};
 
 use log::error;
 use serde_json::{json, Value};
 
-use crate::create_m3u_filter_error_result;
+use crate::{create_m3u_filter_error, create_m3u_filter_error_result};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
-use crate::repository::indexed_document_reader::{IndexedDocumentReader, read_indexed_item};
+use crate::repository::bplustree::{BPlusTreeQuery};
+use crate::repository::id_mapping::IdMapping;
+use crate::repository::indexed_document_reader::{IndexedDocumentReader};
 use crate::repository::indexed_document_writer::IndexedDocumentWriter;
-use crate::repository::storage::{get_target_id_mapping_file, get_target_storage_path};
-use crate::repository::target_id_mapping_record::TargetIdMapping;
-use crate::utils::file_utils;
+use crate::repository::storage::{get_target_id_mapping_file, get_target_storage_path, hash_string};
+use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 
 pub(crate) static COL_CAT_LIVE: &str = "cat_live";
@@ -25,29 +25,12 @@ pub(crate) static COL_CAT_VOD: &str = "cat_vod";
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
-        create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write xtream playlist: {} - {}", $path.to_str().unwrap() ,$err)
+        create_m3u_filter_error!(M3uFilterErrorKind::Notify, "failed to write xtream playlist: {} - {}", $path.to_str().unwrap() ,$err)
     }
 }
 
 fn get_collection_path(path: &Path, collection: &str) -> PathBuf {
     path.join(format!("{collection}.json"))
-}
-
-// Maps episode id -> to provider_episode_id and series_id
-fn xtream_get_series_episode_id_mapping_file_path(storage_path: &Path) -> PathBuf {
-    storage_path.join("mapping_episode.db")
-}
-
-// maps series_id to the index of series_info index
-// direct access is not possible because the series_id is not ascending, it is random
-fn xtream_get_series_id_series_info_mapping_file_path(storage_path: &Path) -> PathBuf {
-    storage_path.join("mapping_series_info.db_idx")
-}
-
-// maps catchup_id to provider_id
-// direct access is not possible because the series_id is not ascending, it is random
-fn xtream_get_catchup_id_mapping_file_path(storage_path: &Path) -> PathBuf {
-    storage_path.join("mapping_catchup.db")
 }
 
 fn ensure_xtream_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, M3uFilterError> {
@@ -65,7 +48,7 @@ fn ensure_xtream_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf
 
 fn xtream_get_info_file_paths(storage_path: &Path, cluster: XtreamCluster) -> Option<(PathBuf, PathBuf)> {
     if cluster == XtreamCluster::Series {
-        let xtream_path = storage_path.join("series_info.db");
+        let xtream_path = storage_path.join("series_episodes.db");
         let extension = xtream_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or("")));
         let index_path = xtream_path.with_extension(format!("{}idx", &extension.unwrap_or_default()));
         return Some((xtream_path, index_path));
@@ -73,17 +56,8 @@ fn xtream_get_info_file_paths(storage_path: &Path, cluster: XtreamCluster) -> Op
     None
 }
 
-fn xtream_clear_series_info(storage_path: &Path) {
-    if let Some((info_path, idx_path)) = xtream_get_info_file_paths(storage_path, XtreamCluster::Series) {
-        let _ = std::fs::remove_file(info_path);
-        let _ = std::fs::remove_file(idx_path);
-        let _ = std::fs::remove_file(xtream_get_series_episode_id_mapping_file_path(storage_path));
-        let _ = std::fs::remove_file(xtream_get_series_id_series_info_mapping_file_path(storage_path));
-    }
-}
-
-fn xtream_clear_catchup(storage_path: &Path) {
-    let _ = std::fs::remove_file(xtream_get_catchup_id_mapping_file_path(storage_path));
+fn xtream_get_catchup_id_mapping_file_path(storage_path: &Path) -> PathBuf {
+    storage_path.join("catchup_mapping.db")
 }
 
 fn write_playlists_to_file(storage_path: &Path, collections: Vec<(XtreamCluster, &mut [PlaylistItem])>) -> Result<(), M3uFilterError> {
@@ -96,19 +70,15 @@ fn write_playlists_to_file(storage_path: &Path, collections: Vec<(XtreamCluster,
                         Ok(xtream) => {
                             match writer.write_doc(item.header.borrow().virtual_id, &xtream) {
                                 Ok(_) => {}
-                                Err(err) => return cant_write_result!(&xtream_path, err)
+                                Err(err) => return Err(cant_write_result!(&xtream_path, err))
                             }
                         },
-                        Err(err) => return cant_write_result!(&xtream_path, err)
+                        Err(err) => return Err(cant_write_result!(&xtream_path, err))
                     }
                 }
+                writer.flush().map_err(|err| cant_write_result!(&xtream_path, err))?;
             }
-            Err(err) => return cant_write_result!(&xtream_path, err)
-        }
-        if cluster == XtreamCluster::Live {
-            xtream_clear_catchup(storage_path);
-        } else if cluster == XtreamCluster::Series {
-            xtream_clear_series_info(storage_path);
+            Err(err) => return Err(cant_write_result!(&xtream_path, err))
         }
     }
     Ok(())
@@ -282,45 +252,64 @@ pub(crate) fn xtream_get_collection_path(cfg: &Config, target_name: &str, collec
 
 fn xtream_read_item_for_stream_id(stream_id: u32, storage_path: &Path, cluster: &XtreamCluster) -> Result<XtreamPlaylistItem, Error> {
     let (xtream_path, idx_path) = xtream_get_file_paths(storage_path, cluster);
-    return read_indexed_item::<XtreamPlaylistItem>(&xtream_path, &idx_path, stream_id);
+    return IndexedDocumentReader::<XtreamPlaylistItem>::read_indexed_item(&xtream_path, &idx_path, stream_id);
 }
 
 fn xtream_read_series_item_for_stream_id(stream_id: u32, storage_path: &Path) -> Result<XtreamPlaylistItem, Error> {
     let (xtream_path, idx_path) = xtream_get_file_paths_for_series(storage_path);
-    return read_indexed_item::<XtreamPlaylistItem>(&xtream_path, &idx_path, stream_id);
+    return IndexedDocumentReader::<XtreamPlaylistItem>::read_indexed_item(&xtream_path, &idx_path, stream_id);
 }
 
-pub(crate) fn xtream_get_item_for_stream_id(stream_id: u32, config: &Config, target: &ConfigTarget, xtream_cluster: Option<XtreamCluster>) -> Result<XtreamPlaylistItem, Error> {
-    if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
-        let cluster = match xtream_cluster {
-            Some(c) => c,
-            None => {
-                if let Some(target_path) = get_target_storage_path(config, target.name.as_str()) {
-                    let target_id_mapping = TargetIdMapping::from_path(&get_target_id_mapping_file(&target_path));
-                    if let Some(mapping) = target_id_mapping.get_by_virtual_id(stream_id) {
-                        if mapping.item_type == PlaylistItemType::SeriesInfo {
-                            return xtream_read_series_item_for_stream_id(stream_id, &storage_path);
-                        } else {
-                            XtreamCluster::try_from(mapping.item_type).unwrap()
-                        }
-                    } else {
-                        return Err(Error::new(ErrorKind::Other, format!("Could not determine cluster for xtream item with stream-id {stream_id}")));
-                    }
-                } else {
-                    return Err(Error::new(ErrorKind::Other, format!("Could not find path for target {}", &target.name)));
-                }
-            }
-        };
-        xtream_read_item_for_stream_id(stream_id, &storage_path, &cluster)
+pub(crate) fn xtream_get_item_for_stream_id(virtual_id: u32, config: &Config, target: &ConfigTarget, xtream_cluster: Option<XtreamCluster>) -> Result<XtreamPlaylistItem, Error> {
+    if let Some(target_path) = get_target_storage_path(config, target.name.as_str()) {
+        if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
+            match BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&get_target_id_mapping_file(&target_path)) {
+                Ok(mut target_id_mapping) => {
+                    return match target_id_mapping.query(&virtual_id) {
+                        Some(mapping) => {
+                            if mapping.item_type == PlaylistItemType::SeriesInfo {
+                                xtream_read_series_item_for_stream_id(virtual_id, &storage_path)
+                            } else if mapping.item_type == PlaylistItemType::Series && mapping.parent_virtual_id > 0 {
+                                // we load the original series item
+                                match xtream_read_series_item_for_stream_id(mapping.parent_virtual_id, &storage_path) {
+                                    Ok(mut item) => {
+                                        // we need to replace the provider id with the episode provider id
+                                        item.provider_id = mapping.provider_id;
+                                        Ok(item)
+                                    },
+                                    Err(err) => Err(err)
+                                }
+                            } else {
+                                let cluster = match xtream_cluster {
+                                    Some(c) => Some(c),
+                                    None => match XtreamCluster::try_from(mapping.item_type) {
+                                        Ok(item_type) => Some(item_type),
+                                        Err(_) => None
+                                    }
+                                };
+                                match cluster {
+                                    Some(xc) => xtream_read_item_for_stream_id(virtual_id, &storage_path, &xc),
+                                    None => Err(Error::new(ErrorKind::Other, format!("Could not determine cluster for xtream item with stream-id {virtual_id}")))
+                                }
+                            }
+                        },
+                        None => Err(Error::new(ErrorKind::Other, format!("Could not find mappping for target {} and id {}", target.name, virtual_id))),
+                    };
+                },
+                Err(err) => return Err(Error::new(ErrorKind::Other, format!("Could not load id mappping for target {} err:{}", target.name, err.to_string())))
+            };
+        } else {
+            return Err(Error::new(ErrorKind::Other, format!("Could not find path for target {} xtream output", &target.name)));
+        }
     } else {
-        Err(Error::new(ErrorKind::Other, format!("Failed to read xtream item for stream-id {stream_id}, storage path not found")))
+        return Err(Error::new(ErrorKind::Other, format!("Could not find path for target {}", &target.name)));
     }
 }
 
 pub(crate) fn xtream_load_rewrite_playlist(cluster: &XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<String, Error> {
     if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
-        let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
-        match IndexedDocumentReader::<XtreamPlaylistItem>::new(&xtream_path, &idx_path) {
+        let (xtream_path, _) = xtream_get_file_paths(&storage_path, cluster);
+        match IndexedDocumentReader::<XtreamPlaylistItem>::new(&xtream_path) {
             Ok(mut reader) => {
                 let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
                 let result: Vec<Value> = reader.by_ref().filter(|pli| category_id == 0 || pli.category_id == category_id)
@@ -347,9 +336,10 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
             return match IndexedDocumentWriter::new_append(info_path.clone(), idx_path) {
                 Ok(mut writer) => {
                     match writer.write_doc(series_id, content) {
-                        Ok(_) => Ok(()),
+                        Ok(_) => {},
                         Err(_) => return Err(Error::new(ErrorKind::Other, format!("failed to write xtream series info for target {target_name}")))
                     }
+                    return Ok(writer.flush()?);
                 }
                 Err(err) => Err(err)
             };
@@ -361,82 +351,85 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
 // Reads the series info entry if exists, otherwise error
 pub(crate) fn xtream_load_series_info(config: &Config, target_name: &str, series_id: u32) -> Result<String, Error> {
     if let Some(storage_path) = xtream_get_storage_path(config, target_name) {
-        let series_id_index_mapping_path = xtream_get_series_id_series_info_mapping_file_path(&storage_path);
-        if series_id_index_mapping_path.exists() {
-            if let Some(storage_path) = xtream_get_storage_path(config, target_name) {
-                if let Some((info_path, idx_path)) = xtream_get_info_file_paths(&storage_path, XtreamCluster::Series) {
-                    if info_path.exists() && idx_path.exists() {
-                        let mut file = File::open(series_id_index_mapping_path)?;
-                        let mut buffer = [0u8; 8];
-                        loop {
-                            match file.read_exact(&mut buffer) {
-                                Ok(()) => {
-                                    let stream_id = u32::from_le_bytes(buffer[..4].try_into().unwrap());
-                                    if stream_id == series_id {
-                                        let index = u32::from_le_bytes(buffer[4..].try_into().unwrap());
-                                        return read_indexed_item::<String>(&info_path, &idx_path, index);
-                                    }
-                                }
-                                Err(e) => return Err(e),
-                            }
-                        }
-                    }
-                }
+        if let Some((info_path, idx_path)) = xtream_get_info_file_paths(&storage_path, XtreamCluster::Series) {
+            if info_path.exists() && idx_path.exists() {
+                return IndexedDocumentReader::<String>::read_indexed_item(&info_path, &idx_path, series_id);
             }
         }
     }
     Err(Error::new(ErrorKind::Other, format!("Failed to read series info for id {series_id} for {target_name}")))
 }
 
-pub(crate) fn xtream_write_catchup_id_mapping(config: &Config, target_name: &str, id_mappings: &Vec<(u32, u32)>) -> Result<(), Error> {
-    if let Some(storage_path) = xtream_get_storage_path(config, target_name) {
-        let file_path = xtream_get_catchup_id_mapping_file_path(&storage_path);
-        if let Ok(mut file) = if file_path.exists() {
-            std::fs::OpenOptions::new()
-                .append(true) // Open in append mode
-                .open(file_path)
-        } else {
-            File::create(file_path)
-        } {
-            for (provider_id, stream_id) in id_mappings {
-                let mut bytes: Vec<u8> = Vec::new();
-                bytes.extend_from_slice(&provider_id.to_le_bytes());
-                bytes.extend_from_slice(&stream_id.to_le_bytes());
-                file_utils::check_write(&file.write_all(&bytes[..]))?;
-            }
-            return Ok(());
-        }
-    }
-    Err(Error::new(ErrorKind::Other, format!("Failed to get catchup info for {target_name}")))
-}
-
-// Returns hashmap with provider_id -> new_stream_id
-pub(crate) fn xtream_load_catchup_id_mapping(config: &Config, target_name: &str) -> HashMap<u32, u32> {
-    let mut result = HashMap::new();
+pub(crate) fn xtream_load_catchup_id_mapping(config: &Config, target_name: &str) -> Result<IdMapping<u32>, Error> {
     if let Some(storage_path) = xtream_get_storage_path(config, target_name) {
         let catchup_file = xtream_get_catchup_id_mapping_file_path(&storage_path);
-        if catchup_file.exists() {
-            if let Ok(file) = File::open(catchup_file) {
-                let mut reader = BufReader::new(&file);
-                let mut bytes = [0u8; 4];
-                loop {
-                    if reader.read_exact(&mut bytes).is_ok() {
-                        let provider_id = u32::from_le_bytes(bytes);
-                        let mut bytes = [0u8; 4];
-                        if reader.read_exact(&mut bytes).is_ok() {
-                            let stream_id = u32::from_le_bytes(bytes);
-                            result.insert(provider_id, stream_id);
-                        } else {
-                            break;
+        return Ok(IdMapping::<u32>::new(&catchup_file));
+    }
+    Err(Error::new(ErrorKind::Other, format!("Failed to load catchup id mapping {target_name}")))
+}
+
+pub(crate) fn write_and_get_xtream_series_info(config: &Config, target: &ConfigTarget, pli_series_info: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
+    if let Ok(mut doc) = serde_json::from_str::<Value>(content) {
+        if let Some(target_path) = get_target_storage_path(config, target.name.as_str()) {
+            let mut target_id_mapping = TargetIdMapping::new(&get_target_id_mapping_file(&target_path));
+            if let Some(episodes) = doc.get_mut("episodes").and_then(|e| e.as_object_mut()) {
+                let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+                for episode_list in episodes.values_mut() {
+                    if let Some(entries) = episode_list.as_array_mut() {
+                        for episode in entries.iter_mut().filter_map(|e| e.as_object_mut()) {
+                            if let Some(episode_id) = episode.get("id").and_then(|id| id.as_str()) {
+                                if let Ok(provider_id) = episode_id.parse::<u32>() {
+                                    let uuid = hash_string(&format!("{}/{}", pli_series_info.url, provider_id));
+                                    let virtual_id = target_id_mapping.insert_entry(provider_id, uuid, &PlaylistItemType::Series, pli_series_info.virtual_id);
+                                    episode.insert("id".to_string(), Value::String(virtual_id.to_string()));
+                                }
+                            }
+
+                            if options.skip_series_direct_source {
+                                episode.insert("direct_source".to_string(), Value::String(String::new()));
+                            }
                         }
-                    } else {
-                        break;
                     }
                 }
+
+                drop(target_id_mapping);
+                if let Ok(result) = serde_json::to_string(&doc) {
+                    let _ = xtream_write_series_info(config, target.name.as_str(), pli_series_info.virtual_id, &result);
+                    return Ok(result);
+                }
             }
+
+
+            // if let Some(episodes) = doc.get_mut("episodes") {
+            //     if let Some(episodes_map) = episodes.as_object_mut() {
+            //         let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+            //         for (_season, episode_list) in episodes_map {
+            //             // Iterate over items in the episode
+            //             if let Some(entries) = episode_list.as_array_mut() {
+            //                 for entry in entries {
+            //                     if let Some(episode) = entry.as_object_mut() {
+            //                         if let Some(episode_id) = episode.get("id") {
+            //                             if let Ok(provider_id) = episode_id.as_str().unwrap().parse::<u32>() {
+            //                                 let uuid = hash_string(format!("{}/{}", pli_series_info.url, provider_id).as_str());
+            //                                 let virtual_id = target_id_mapping.insert_entry(provider_id, uuid, &PlaylistItemType::Series, pli_series_info.virtual_id);
+            //                                 episode.insert("id".to_string(), Value::String(virtual_id.to_string()));
+            //                             }
+            //                         }
+            //                         if options.skip_series_direct_source {
+            //                             episode.insert("direct_source".to_string(), Value::String(String::new()));
+            //                         }
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            //     drop(target_id_mapping);
+            //     if let Ok(result) = serde_json::to_string(&doc) {
+            //         let _ = xtream_repository::xtream_write_series_info(config, target.name.as_str(), pli_series_info.virtual_id, &result);
+            //         return Ok(result);
+            //     }
+            // }
         }
-    } else {
-        error!("Failed to open catchup id-mapping file for {target_name}");
     }
-    result
+    Err(Error::new(ErrorKind::Other, format!("Failed to get series info for id {}", pli_series_info.virtual_id)))
 }

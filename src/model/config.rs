@@ -43,6 +43,13 @@ macro_rules! valid_property {
 }
 
 #[macro_export]
+macro_rules! create_m3u_filter_error {
+     ($kind: expr, $($arg:tt)*) => {
+        M3uFilterError::new($kind, format!($($arg)*))
+    }
+}
+
+#[macro_export]
 macro_rules! create_m3u_filter_error_result {
      ($kind: expr, $($arg:tt)*) => {
         Err(M3uFilterError::new($kind, format!($($arg)*)))

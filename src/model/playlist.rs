@@ -44,18 +44,6 @@ pub(crate) enum XtreamCluster {
 }
 
 impl XtreamCluster {
-    // pub fn to_bytes(self) -> [u8; 1] {
-    //     [self as u8]
-    // }
-    //
-    // pub fn from_bytes(bytes: [u8; 1]) -> Result<Self, String> {
-    //     match bytes[0] {
-    //         1 => Ok(XtreamCluster::Live),
-    //         2 => Ok(XtreamCluster::Video),
-    //         3 => Ok(XtreamCluster::Series),
-    //         _ => Err(format!("Invalid value for XtreamCluster: {}", bytes[0])),
-    //     }
-    // }
 
     pub fn as_str(&self) -> &str {
         match self {
@@ -98,23 +86,6 @@ pub(crate) enum PlaylistItemType {
     Series = 3,
     SeriesInfo = 4,
 }
-
-impl PlaylistItemType {
-    pub fn to_bytes(self) -> [u8; 1] {
-        [self as u8]
-    }
-
-    pub fn from_bytes(bytes: [u8; 1]) -> Result<Self, String> {
-        match bytes[0] {
-            1 => Ok(PlaylistItemType::Live),
-            2 => Ok(PlaylistItemType::Video),
-            3 => Ok(PlaylistItemType::Series),
-            4 => Ok(PlaylistItemType::SeriesInfo),
-            _ => Err(format!("Invalid value for PlaylistItemType: {}", bytes[0])),
-        }
-    }
-}
-
 
 impl Default for PlaylistItemType {
     fn default() -> Self {

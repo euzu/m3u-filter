@@ -196,16 +196,3 @@ pub(crate) fn open_file_append(path: &Path, append: bool) -> Result<File, std::i
     File::create(path)
 }
 
-pub(crate) fn create_file_tuple(path1: &Path, path2: &Path, append: bool) -> Result<(File, File), std::io::Error> {
-    match open_file_append(path1, append) {
-        Ok(file1) => {
-            match open_file_append(path2, append) {
-                Ok(file2) => Ok((file1, file2)),
-                Err(err) =>
-                    Err(std::io::Error::new(err.kind(), format!("failed to create file {} - {}", path2.to_str().unwrap(), err)))
-            }
-        }
-        Err(err) =>
-            Err(std::io::Error::new(err.kind(), format!("failed to create file {} - {}", path1.to_str().unwrap(), err)))
-    }
-}

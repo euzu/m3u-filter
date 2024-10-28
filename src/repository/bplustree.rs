@@ -3,12 +3,19 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::Path;
+use flate2::Compression;
+use log::error;
 
 use serde::{Deserialize, Serialize};
 
 const BINCODE_OVERHEAD: usize = 4;
 const BLOCK_SIZE: usize = 4096;
 const POINTER_SIZE: usize = size_of::<Option<u64>>();
+
+fn is_multiple_of_block_size(file: &File) -> io::Result<bool> {
+    let file_size = file.metadata()?.len(); // Get the file size in bytes
+    Ok(file_size % (BLOCK_SIZE as u64) == 0) // Check if file size is a multiple of BLOCK_SIZE
+}
 
 #[inline]
 fn u32_from_bytes(bytes: &[u8]) -> io::Result<u32> {
@@ -22,6 +29,15 @@ where
 {
     bincode::serialize(value).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
 }
+
+#[inline]
+fn bincode_deserialize<T: ?Sized>(value: &[u8]) -> io::Result<T>
+where
+    T: for<'a> serde::Deserialize<'a>,
+{
+    bincode::deserialize(value).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+}
+
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct BPlusTreeNode<K, V> {
@@ -44,10 +60,6 @@ where
             children: vec![],
             values: vec![],
         }
-    }
-
-    pub(crate) fn max_key(&self) -> Option<&K> {
-        self.keys.iter().max()
     }
 
     #[inline]
@@ -161,9 +173,11 @@ where
 
     pub(crate) fn traverse<F>(&self, visit: &mut F)
     where
-        F: FnMut(&BPlusTreeNode<K, V>),
+        F: FnMut(&Vec<K>, &Vec<V>),
     {
-        visit(self);
+        if self.is_leaf {
+            visit(&self.keys, &self.values);
+        }
         self.children.iter().for_each(|child| child.traverse(visit));
     }
 
@@ -177,25 +191,28 @@ where
 
         // Serialize and write keys
         let keys_encoded = bincode_serialize(&self.keys)?;
-        let keys_bytes = keys_encoded.len() as u32;
-        buffer_slice[write_pos..write_pos + 4].copy_from_slice(&keys_bytes.to_le_bytes());
+        let keys_bytes_len = keys_encoded.len();
+        buffer_slice[write_pos..write_pos + 4].copy_from_slice(&(keys_bytes_len as u32).to_le_bytes());
         write_pos += 4;
-        buffer_slice[write_pos..write_pos + keys_encoded.len()].copy_from_slice(&keys_encoded);
-        write_pos += keys_encoded.len();
+        buffer_slice[write_pos..write_pos + keys_bytes_len].copy_from_slice(&keys_encoded);
+        write_pos += keys_bytes_len;
 
         // If leaf, serialize and write values
         if self.is_leaf {
             let values_encoded = bincode_serialize(&self.values)?;
-            let values_bytes = values_encoded.len() as u32;
-            buffer_slice[write_pos..write_pos + 4].copy_from_slice(&values_bytes.to_le_bytes());
+            let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), Compression::fast());
+            encoder.write_all(&values_encoded)?;
+            let compressed_bytes = encoder.finish()?;
+            let values_bytes_len = compressed_bytes.len();
+            buffer_slice[write_pos..write_pos + 4].copy_from_slice(&(values_bytes_len  as u32).to_le_bytes());
             write_pos += 4;
-            buffer_slice[write_pos..write_pos + values_encoded.len()].copy_from_slice(&values_encoded);
-            write_pos += values_encoded.len();
+            buffer_slice[write_pos..write_pos + values_bytes_len].copy_from_slice(&compressed_bytes);
+            write_pos += values_bytes_len;
         }
 
-        // Write buffer to file
+        // Write the complete buffer to file, do not optimize to real filled size,
         file.seek(SeekFrom::Start(offset))?;
-        file.write_all(&buffer_slice[..BLOCK_SIZE])?;
+        file.write_all(&buffer_slice[..BLOCK_SIZE])?; // use BLOCK_SIZE
         current_offset += BLOCK_SIZE as u64;
 
         if !self.is_leaf {
@@ -207,10 +224,10 @@ where
             }
 
             let pointer_encoded = bincode_serialize(&pointer)?;
-            let pointer_bytes = pointer_encoded.len() as u32;
+            let pointer_bytes_len = pointer_encoded.len() as u32;
 
             file.seek(SeekFrom::Start(pointer_offset))?;
-            file.write_all(&pointer_bytes.to_le_bytes())?;
+            file.write_all(&pointer_bytes_len.to_le_bytes())?;
             file.write_all(&pointer_encoded)?;
         }
 
@@ -228,14 +245,18 @@ where
         // Deserialize keys
         let keys_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
         read_pos += 4;
-        let keys: Vec<K> = bincode::deserialize(&buffer[read_pos..read_pos + keys_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        let keys: Vec<K> = bincode_deserialize(&buffer[read_pos..read_pos + keys_length])?;
         read_pos += keys_length;
 
         // Deserialize values if leaf node
         let values = if is_leaf {
             let values_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
             read_pos += 4;
-            let values: Vec<V> = bincode::deserialize(&buffer[read_pos..read_pos + values_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            let compressed_bytes = &buffer[read_pos..read_pos + values_length];
+            let mut decoder = flate2::write::ZlibDecoder::new(Vec::new());
+            decoder.write_all(&compressed_bytes)?;
+            let values_bytes = decoder.finish()?;
+            let values: Vec<V> = bincode_deserialize(&values_bytes)?;
             read_pos += values_length;
             values
         } else {
@@ -246,7 +267,7 @@ where
         let (children, children_pointer) = if !is_leaf {
             let pointers_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
             read_pos += 4;
-            let pointers: Vec<u64> = bincode::deserialize(&buffer[read_pos..read_pos + pointers_length]).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            let pointers: Vec<u64> = bincode_deserialize(&buffer[read_pos..read_pos + pointers_length])?;
             if nested {
                 let nodes: Result<Vec<BPlusTreeNode<K, V>>, io::Error> = pointers
                     .iter()
@@ -345,6 +366,9 @@ where
 
     pub(crate) fn deserialize(filepath: &Path) -> io::Result<Self> {
         let mut file = File::open(filepath)?;
+        if is_multiple_of_block_size(&file).is_err() {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Tree file has to be multiple of block size {BLOCK_SIZE}")));
+        }
         let mut buffer = vec![0u8; BLOCK_SIZE];
         let (root, _) = BPlusTreeNode::deserialize_from_blocks(&mut file, &mut buffer, 0, true)?;
         Ok(BPlusTree::new_with_root(root))
@@ -352,7 +376,7 @@ where
 
     pub(crate) fn traverse<F>(&self, mut visit: F)
     where
-        F: FnMut(&BPlusTreeNode<K, V>),
+        F: FnMut(&Vec<K>, &Vec<V>),
     {
         self.root.traverse(&mut visit);
     }
@@ -369,14 +393,9 @@ where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
-    fn is_multiple_of_block_size(file: &File) -> io::Result<bool> {
-        let file_size = file.metadata()?.len(); // Get the file size in bytes
-        Ok(file_size % (BLOCK_SIZE as u64) == 0) // Check if file size is a multiple of BLOCK_SIZE
-    }
-
-    pub(crate) fn new(filepath: &Path) -> io::Result<Self> {
+    pub(crate) fn try_new(filepath: &Path) -> io::Result<Self> {
         let file = File::open(filepath)?;
-        match BPlusTreeQuery::<K, V>::is_multiple_of_block_size(&file) {
+        match is_multiple_of_block_size(&file) {
             Ok(valid) => {
                 if !valid {
                     return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Tree file has to be multiple of block size {BLOCK_SIZE}")));
@@ -405,22 +424,26 @@ where
         left
     }
 
-    pub(crate) fn query(&mut self, key: &K) -> io::Result<Option<V>> {
+    pub(crate) fn query(&mut self, key: &K) -> Option<V> {
         let mut offset = 0;
         let mut buffer = vec![0u8; BLOCK_SIZE];
         loop {
-            let (node, pointers) =
-                BPlusTreeNode::<K, V>::deserialize_from_blocks(&mut self.file, &mut buffer, offset, false)?;
-
-            if node.is_leaf {
-                return match node.keys.binary_search(key) {
-                    Ok(idx) => Ok(node.values.get(idx).cloned()),
-                    Err(_) => Ok(None),
-                };
-            }
-
-            let child_idx = BPlusTreeQuery::<K, V>::get_entry_index_upper_bound(&node.keys, key);
-            offset = *pointers.unwrap().get(child_idx).unwrap();
+            match BPlusTreeNode::<K, V>::deserialize_from_blocks(&mut self.file, &mut buffer, offset, false) {
+                Ok((node, pointers)) => {
+                    if node.is_leaf {
+                        return match node.keys.binary_search(key) {
+                            Ok(idx) => node.values.get(idx).cloned(),
+                            Err(_) => None,
+                        };
+                    }
+                    let child_idx = BPlusTreeQuery::<K, V>::get_entry_index_upper_bound(&node.keys, key);
+                    offset = *pointers.unwrap().get(child_idx).unwrap();
+                }
+                Err(err) => {
+                    error!("Failed to read id tree from file {err}");
+                    return None;
+                }
+            };
         }
     }
 }
@@ -456,11 +479,12 @@ mod tests {
         //     println!("Node: {:?}", node);
         // });
 
+        let filepath = PathBuf::from("/tmp/tree.bin");
         // Serialize the tree to a file
-        tree.serialize(&PathBuf::from("/tmp/tree.bin"))?;
+        tree.serialize(&filepath)?;
 
         // Deserialize the tree from the file
-        tree = BPlusTree::<u32, Record>::deserialize(&PathBuf::from("/tmp/tree.bin"))?;
+        tree = BPlusTree::<u32, Record>::deserialize(&filepath)?;
 
         // Query the tree
         for i in 0u32..=500 {
@@ -472,13 +496,11 @@ mod tests {
             }), "Entry {} not found", i);
         }
 
-        let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::new(&PathBuf::from("/tmp/tree.bin"))?;
+        let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::try_new(&filepath)?;
         for i in 0u32..=500 {
             let found = tree_query.query(&i);
-            assert!(found.is_ok(), "Query not ok");
-            let found_entry = found.unwrap(); // Unwrap once and store the Option
-            assert!(found_entry.is_some(), "Entry {} not found", i);
-            let entry = found_entry.unwrap();
+            assert!(found.is_some(), "Entry {} not found", i);
+            let entry = found.unwrap();
             assert!(entry.eq(&Record {
                 id: i,
                 data: format!("Entry {i}"),

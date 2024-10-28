@@ -6,7 +6,7 @@ use crate::repository::epg_repository::epg_write;
 use crate::repository::kodi_repository::kodi_write_strm_playlist;
 use crate::repository::m3u_repository::m3u_write_playlist;
 use crate::repository::storage::{ensure_target_storage_path, get_target_id_mapping_file};
-use crate::repository::target_id_mapping_record::TargetIdMapping;
+use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
 
 pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
@@ -15,7 +15,8 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
 
     match ensure_target_storage_path(cfg, target.name.as_str()) {
         Ok(target_path) => {
-            let mut target_id_mapping = TargetIdMapping::new(get_target_id_mapping_file(&target_path));
+            // reassign old virtual id or assign a new one
+            let mut target_id_mapping = TargetIdMapping::new(&get_target_id_mapping_file(&target_path));
             for group in &mut *playlist {
                 for channel in &group.channels {
                     let mut header = channel.header.borrow_mut();
@@ -23,7 +24,10 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
                         Some(provider_id) => {
                             let uuid = header.get_uuid();
                             let item_type = header.item_type;
-                            header.virtual_id = target_id_mapping.insert_entry(provider_id, **uuid, &item_type, 0);
+                            header.virtual_id = match target_id_mapping.get_by_uuid(&header.uuid) {
+                                None => target_id_mapping.insert_entry(provider_id, **uuid, &item_type, 0),
+                                Some(existing_id) => *existing_id
+                            };
                         }
                         None => {
                             errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Playlistitem has no provider id: {}", &header.title)));

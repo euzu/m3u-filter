@@ -16,7 +16,6 @@ async fn m3u_api(
     //let api_req = UserApiRequest::from_map(&_api_req);
     match get_user_target(&api_req, &app_state) {
         Some((user, target)) => {
-            // let filename = target.get_m3u_filename();
             if let Some(content) = m3u_load_rewrite_playlist(&app_state.config, target, &user) {
                 HttpResponse::Ok().content_type(mime::TEXT_PLAIN_UTF_8).body(content)
             } else {
@@ -39,7 +38,6 @@ async fn m3u_api_stream(
     if let Ok(m3u_stream_id) = stream_id.parse::<u32>() {
         if let Some((_user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state) {
             if target.has_output(&TargetType::M3u) {
-
                 match get_target_storage_path(&app_state.config, target.name.as_str()) {
                     Some(target_path) => {
                         if let Some((m3u_path, idx_path)) = m3u_get_file_paths(&target_path) {

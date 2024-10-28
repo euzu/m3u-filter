@@ -4,20 +4,20 @@ use std::path::{Path, PathBuf};
 
 use log::error;
 
-use crate::{create_m3u_filter_error_result};
+use crate::{create_m3u_filter_error};
 use crate::api::api_utils::get_user_server_info;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
-use crate::repository::indexed_document_reader::{IndexedDocumentReader, read_indexed_item};
+use crate::repository::indexed_document_reader::{IndexedDocumentReader};
 use crate::repository::indexed_document_writer::IndexedDocumentWriter;
 use crate::repository::storage::{ensure_target_storage_path};
 use crate::utils::file_utils;
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
-        create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
+        create_m3u_filter_error!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
     }
 }
 
@@ -77,11 +77,12 @@ pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_pat
                     for m3u in m3u_playlist {
                         match writer.write_doc(m3u.virtual_id, &m3u) {
                             Ok(_) => {},
-                            Err(err) => return cant_write_result!(&m3u_path, err)
+                            Err(err) => return Err(cant_write_result!(&m3u_path, err))
                         }
                     }
+                    writer.flush().map_err(|err| cant_write_result!(&m3u_path, err))?;
                 }
-                Err(err) => return cant_write_result!(&m3u_path, err)
+                Err(err) => return Err(cant_write_result!(&m3u_path, err))
             }
         }
     }
@@ -91,8 +92,8 @@ pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_pat
 pub(crate) fn m3u_load_rewrite_playlist(cfg: &Config, target: &ConfigTarget, user: &ProxyUserCredentials) -> Option<String> {
     match ensure_target_storage_path(cfg, target.name.as_str()) {
         Ok(target_path) => {
-            if let Some((m3u_path, idx_path)) = m3u_get_file_paths(&target_path) {
-                match IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path, &idx_path) {
+            if let Some((m3u_path, _)) = m3u_get_file_paths(&target_path) {
+                match IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path) {
                     Ok(mut reader) => {
                         let server_info = get_user_server_info(cfg, user);
                         let url = format!("{}/m3u-stream/{}/{}", server_info.get_base_url(), user.username, user.password);
@@ -101,8 +102,7 @@ pub(crate) fn m3u_load_rewrite_playlist(cfg: &Config, target: &ConfigTarget, use
                         for m3u_pli in reader.by_ref() {
                             match user.proxy {
                                 ProxyType::Reverse => {
-                                    let stream_id = m3u_pli.virtual_id;
-                                    result.push(m3u_pli.to_m3u(target, Some(format!("{url}/{stream_id}").as_str())));
+                                    result.push(m3u_pli.to_m3u(target, Some(format!("{url}/{}", m3u_pli.virtual_id).as_str())));
                                 }
                                 ProxyType::Redirect => {
                                     result.push(m3u_pli.to_m3u(target, None));
@@ -134,5 +134,5 @@ pub(crate) fn m3u_get_item_for_stream_id(stream_id: u32, m3u_path: &Path, idx_pa
     if stream_id < 1 {
         return Err(Error::new(ErrorKind::Other, "id should start with 1"));
     }
-    read_indexed_item::<M3uPlaylistItem>(m3u_path, idx_path, stream_id)
+    IndexedDocumentReader::<M3uPlaylistItem>::read_indexed_item(m3u_path, idx_path, stream_id)
 }

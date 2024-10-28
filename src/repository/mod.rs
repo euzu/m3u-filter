@@ -7,5 +7,6 @@ pub(crate) mod storage;
 
 mod indexed_document_writer;
 mod indexed_document_reader;
-pub(crate) mod target_id_mapping_record; // pub (crate) mod file_reader;
+pub(crate) mod target_id_mapping;
+pub(crate) mod id_mapping;
 pub(crate) mod bplustree;
