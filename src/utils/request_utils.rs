@@ -232,15 +232,15 @@ pub(crate) async fn get_input_json_content(input: &ConfigInput, url: &str, persi
         Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {url}  => {}", e)
     }
 }
-
-pub(crate) fn get_base_url(url: &str) -> Option<String> {
-    if let Some((scheme_end, rest)) = url.split_once("://") {
-        let scheme = scheme_end;
-        if let Some(authority_end) = rest.find('/') {
-            let authority = &rest[..authority_end];
-            return Some(format!("{}://{}", scheme, authority));
-        }
-        return Some(format!("{}://{}", scheme, rest));
-    }
-    None
-}
+//
+// pub(crate) fn get_base_url(url: &str) -> Option<String> {
+//     if let Some((scheme_end, rest)) = url.split_once("://") {
+//         let scheme = scheme_end;
+//         if let Some(authority_end) = rest.find('/') {
+//             let authority = &rest[..authority_end];
+//             return Some(format!("{}://{}", scheme, authority));
+//         }
+//         return Some(format!("{}://{}", scheme, rest));
+//     }
+//     None
+// }

@@ -17,6 +17,7 @@ use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::config::TargetType;
 use crate::repository::m3u_repository::m3u_get_epg_file_path;
+use crate::repository::storage::get_target_storage_path;
 use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
 use crate::utils::{file_utils, request_utils};
 
@@ -51,10 +52,13 @@ fn get_epg_path_for_target_of_type(target_name: &str, file_path: Option<PathBuf>
 }
 
 fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<PathBuf> {
+    // TODO if we share the same virtual_id for epg, can we store an epg file for the target ?
     for output in &target.output {
         match output.target {
             TargetType::M3u => {
-                return get_epg_path_for_target_of_type(&target.name, m3u_get_epg_file_path(config, target));
+                if let Some(target_path) = get_target_storage_path(config, &target.name) {
+                    return get_epg_path_for_target_of_type(&target.name, m3u_get_epg_file_path(&target_path));
+                }
             }
             TargetType::Xtream => {
                 if let Some(storage_path) = xtream_get_storage_path(config, &target.name) {

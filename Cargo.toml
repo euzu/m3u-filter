@@ -14,10 +14,10 @@ strip = true
 
 [dependencies]
 serde = { version = "1.0", features = ["derive", "rc"] }
-serde_yaml = "0.9.33"
+serde_yaml = "0.9.34"
 serde_json = "1"
 quick-xml = { version = "0.36", features = ["serialize"] }
-regex = "1.10"
+regex = "1.11"
 clap = { version = "4", features = ["derive"] }
 url = "2.5"
 reqwest = { version = "0", features = ["blocking", "json", "stream", "rustls-tls"] }
@@ -49,5 +49,4 @@ rand = "0.8"
 rpassword = "7.3"
 flate2 = "1"
 time = "0.3"
-blake3 = "1.5.4"
-base64 = "0.22.1"
+blake3 = "1.5"

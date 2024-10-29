@@ -24,6 +24,7 @@ use crate::utils::{config_reader, file_utils};
 use crate::utils::default_utils::{default_as_default, default_as_false, default_as_true,
                                   default_as_empty_list, default_as_frm, default_as_empty_map,
                                   default_as_zero_u8, default_as_two_u16};
+use crate::utils::file_lock_manager::FileLockManager;
 
 pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
@@ -40,6 +41,13 @@ macro_rules! valid_property {
   ($key:expr, $array:expr) => {{
         $array.contains(&$key)
     }};
+}
+
+#[macro_export]
+macro_rules! create_m3u_filter_error {
+     ($kind: expr, $($arg:tt)*) => {
+        M3uFilterError::new($kind, format!($($arg)*))
+    }
 }
 
 #[macro_export]
@@ -802,7 +810,8 @@ pub(crate) struct Config {
     pub t_sources_file_path: String,
     #[serde(skip_serializing, skip_deserializing)]
     pub t_api_proxy_file_path: String,
-
+    #[serde(skip)]
+    pub file_locks : Arc<FileLockManager>
 }
 
 impl Config {

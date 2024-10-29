@@ -4,7 +4,6 @@ use std::rc::Rc;
 
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
-use crate::utils::default_utils::{default_as_empty_rc_str, default_playlist_item_type, default_stream_cluster};
 use crate::utils::string_utils;
 
 #[inline]
@@ -76,27 +75,10 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
 
 fn create_empty_playlistitem_header(input_id: u16, url: &str) -> PlaylistItemHeader {
     PlaylistItemHeader {
-        uuid: default_as_empty_rc_str(),
-        id: default_as_empty_rc_str(),
-        stream_id: default_as_empty_rc_str(),
-        name: default_as_empty_rc_str(),
-        chno: default_as_empty_rc_str(),
-        logo: default_as_empty_rc_str(),
-        logo_small: default_as_empty_rc_str(),
-        group: default_as_empty_rc_str(),
-        title: default_as_empty_rc_str(),
-        parent_code: default_as_empty_rc_str(),
-        audio_track: default_as_empty_rc_str(),
-        time_shift: default_as_empty_rc_str(),
-        rec: default_as_empty_rc_str(),
         url: Rc::new(url.to_owned()),
-        epg_channel_id: None,
-        item_type: default_playlist_item_type(),
-        xtream_cluster: default_stream_cluster(),
-        additional_properties: None,
-        series_fetched: false,
         category_id: 0,
         input_id,
+        ..Default::default()
     }
 }
 
@@ -147,14 +129,14 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
                 plih.id = Rc::new(chanid);
             }
         }
-        plih.stream_id = Rc::clone(&plih.id);
+        // plih.virtual_id = plih.id;
         plih.epg_channel_id = Some(Rc::clone(&plih.id));
     }
 
     if video_suffixes.iter().any(|suffix| url.ends_with(suffix)) {
         // TODO find Series based on group or configured names
         plih.xtream_cluster = XtreamCluster::Video;
-        plih.item_type = PlaylistItemType::Movie;
+        plih.item_type = PlaylistItemType::Video;
     }
 
     {
@@ -174,7 +156,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str
 
 pub(crate) fn extract_id_from_url(url: &str) -> Option<String> {
     if let Some(filename) = url.split('/').last() {
-       return if let Some(index) = filename.rfind('.') {
+        return if let Some(index) = filename.rfind('.') {
             Some(filename[..index].to_string())
         } else {
             Some(filename.to_string())
@@ -183,14 +165,17 @@ pub(crate) fn extract_id_from_url(url: &str) -> Option<String> {
     None
 }
 
-pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigInput, lines: impl Iterator<Item=String>, mut visit: F) {
+pub(crate) fn consume_m3u<'a, I, F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigInput, lines: I, mut visit: F)
+where
+    I: Iterator<Item=&'a str>,
+{
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
 
     let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(String::as_str).collect::<Vec<&str>>();
     for line in lines {
         if line.starts_with("#EXTINF") {
-            header = Some(line);
+            header = Some(String::from(line));
             continue;
         }
         if line.starts_with("#EXTGRP") {
@@ -219,29 +204,33 @@ pub(crate) fn consume_m3u<F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigIn
     }
 }
 
-pub(crate) fn parse_m3u(cfg: &Config, input: &ConfigInput, lines: &[String]) -> Vec<PlaylistGroup> {
+pub(crate) fn parse_m3u<'a, I>(cfg: &Config, input: &ConfigInput, lines: I) -> Vec<PlaylistGroup>
+where
+    I: Iterator<Item=&'a str>,
+{
     let mut sort_order: Vec<Vec<PlaylistItem>> = vec![];
-    let mut idx: usize = 0;
+    let mut sort_order_idx: usize = 0;
     let mut group_map: std::collections::HashMap<Rc<String>, usize> = std::collections::HashMap::new();
-    consume_m3u(cfg, input, lines.iter().cloned(), |item| {
+    consume_m3u(cfg, input, lines, |item| {
+        // keep the original sort order for groups and group the playlist items
         let key = Rc::clone(&item.header.borrow().group);
         match group_map.entry(key) {
             std::collections::hash_map::Entry::Vacant(v) => {
-                v.insert(idx);
-                idx += 1;
+                v.insert(sort_order_idx);
                 sort_order.push(vec![item]);
+                sort_order_idx += 1;
             }
             std::collections::hash_map::Entry::Occupied(o) => {
                 sort_order.get_mut(*o.get()).unwrap().push(item);
             }
         }
     });
-
     let mut grp_id = 0;
     let result: Vec<PlaylistGroup> = sort_order.drain(..).map(|channels| {
+        // create a group based on the first playlist item
         let channel = channels.first();
-        let cluster = channel.map(|pli| pli.header.borrow().xtream_cluster).unwrap();
-        let group_title = channel.map(|pli| Rc::clone(&pli.header.borrow().group)).unwrap();
+        let (cluster, group_title) = channel.map(|pli|
+                                                 (pli.header.borrow().xtream_cluster, Rc::clone(&pli.header.borrow().group))).unwrap();
         grp_id += 1;
         PlaylistGroup { id: grp_id, xtream_cluster: cluster, title: Rc::clone(&group_title), channels }
     }).collect();

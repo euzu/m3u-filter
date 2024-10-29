@@ -17,10 +17,19 @@ Content-Type: application/json
 {"username": "test", "password": "test"}
 
 ### xtream live_categories
-GET http://localhost:8901/m3u?username=me&password=me
+GET http://localhost:8901/player_api.php?action=get_live_categories&username=xt&password=xt
 
 ### xtream live_streams
-GET http://localhost:8901/player_api.php?action=get_live_streams&username=xt&password=xt&category_id=203
+GET http://localhost:8901/player_api.php?action=get_live_streams&username=xt&password=xt&category_id=102
 
 ### xtream series_categories
 GET http://localhost:8901/player_api.php?action=get_series_categories&username=xt&password=xt
+
+### xtream series
+GET http://localhost:8901/player_api.php?action=get_series&username=xt&password=xt&category_id=120
+
+### xtream series info
+GET http://localhost:8901/player_api.php?action=get_series_info&username=xt&password=xt&series_id=16441
+
+### xtream series stream
+ GET http://localhost:8901/series/xt/xt/18130
