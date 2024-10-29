@@ -150,6 +150,10 @@ where
 
     fn insert(&mut self, key: K, v: V, inner_order: usize, leaf_order: usize) -> Option<BPlusTreeNode<K, V>> {
         if self.is_leaf {
+            if let Ok(pos) = self.keys.binary_search(&key) {
+                self.values[pos] = v;
+                return None;
+            }
             if let Some(eq_entry_index) = self.get_equal_entry_index(&key) {
                 self.values.insert(eq_entry_index, v);
                 return None;
@@ -163,14 +167,16 @@ where
         } else {
             let pos = self.get_entry_index_upper_bound(&key);
             let child = self.children.get_mut(pos).unwrap();
-            let node = child.insert(key, v, inner_order, leaf_order);
+            let node = child.insert(key.clone(), v, inner_order, leaf_order);
             if node.is_some() {
                 let leaf_key = self.find_leaf_entry(node.as_ref().unwrap());
                 let idx = self.get_entry_index_upper_bound(leaf_key);
-                self.keys.insert(idx, leaf_key.clone());
-                self.children.insert(idx + 1, node.unwrap());
-                if self.is_overflow(inner_order) {
-                    return Some(self.split(inner_order));
+                if let Err(_) = self.keys.binary_search(&key) {
+                    self.keys.insert(idx, leaf_key.clone());
+                    self.children.insert(idx + 1, node.unwrap());
+                    if self.is_overflow(inner_order) {
+                        return Some(self.split(inner_order));
+                    }
                 }
             }
         }
@@ -610,6 +616,32 @@ mod tests {
             };
             assert!(entry.eq(&expected), "Entry not equal {:?} != {:?}", entry, expected);
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn insert_dulplicate_test() -> io::Result<()> {
+        let mut tree = BPlusTree::<u32, Record>::new();
+        for i in 0u32..=500 {
+            tree.insert(i, Record {
+                id: i,
+                data: format!("Entry {i}"),
+            });
+        }
+        for i in 0u32..=500 {
+            tree.insert(i, Record {
+                id: i,
+                data: format!("Entry {}", i+1),
+            });
+        }
+
+        tree.traverse(|keys, values| {
+            keys.iter().zip(values.iter()).for_each(|(k, v)| {
+                assert!(format!("Entry {}", k+1).eq(&v.data), "Wrong entry")
+            });
+        });
+
 
         Ok(())
     }

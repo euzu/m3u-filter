@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::model::playlist::PlaylistItemType;
 use crate::repository::bplustree::BPlusTree;
 
+// TODO make configurable
 const EXPIRATION_DURATION: i64 = 86400;
 
 #[derive(Serialize, Deserialize, Clone)]
