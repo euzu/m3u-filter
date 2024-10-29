@@ -359,6 +359,9 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
         let _file_lock = config.file_locks.write_lock(&info_path)?;
         let mut writer = IndexedDocumentWriter::new_append(info_path.clone(), idx_path)?;
 
+        // TODO if the series_info is expried, the new data is appended. The old data is wasted.
+        // file grows at each update
+
         writer
             .write_doc(series_info_id, content)
             .map_err(|_| Error::new(ErrorKind::Other, format!("failed to write xtream series info for target {target_name}")))?;
