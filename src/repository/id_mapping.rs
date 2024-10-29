@@ -1,3 +1,5 @@
+// This module is not included in the build
+
 use std::cmp::max;
 use std::io::Error;
 use std::path::{Path, PathBuf};

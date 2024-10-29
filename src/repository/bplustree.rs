@@ -3,9 +3,9 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::Path;
+
 use flate2::Compression;
 use log::error;
-
 use serde::{Deserialize, Serialize};
 
 const BINCODE_OVERHEAD: usize = 4;
@@ -15,6 +15,18 @@ const POINTER_SIZE: usize = size_of::<Option<u64>>();
 fn is_multiple_of_block_size(file: &File) -> io::Result<bool> {
     let file_size = file.metadata()?.len(); // Get the file size in bytes
     Ok(file_size % (BLOCK_SIZE as u64) == 0) // Check if file size is a multiple of BLOCK_SIZE
+}
+
+fn is_file_valid(file: File) -> io::Result<File> {
+    match is_multiple_of_block_size(&file) {
+        Ok(valid) => {
+            if !valid {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, format!("Tree file has to be multiple of block size {BLOCK_SIZE}")));
+            }
+        }
+        Err(err) => return Err(err)
+    }
+    Ok(file)
 }
 
 #[inline]
@@ -36,6 +48,25 @@ where
     T: for<'a> serde::Deserialize<'a>,
 {
     bincode::deserialize(value).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+}
+
+
+fn get_entry_index_upper_bound<K, V>(keys: &Vec<K>, key: &K) -> usize
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    let mut left = 0;
+    let mut right = keys.len();
+    while left < right {
+        let mid = left + ((right - left) >> 1);
+        if &keys[mid] <= key {
+            left = mid + 1;
+        } else {
+            right = mid;
+        }
+    }
+    left
 }
 
 
@@ -81,6 +112,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     fn query(&self, key: &K) -> Option<&V> {
         if self.is_leaf {
             return match self.keys.binary_search(&key) {
@@ -113,17 +145,7 @@ where
     }
 
     fn get_entry_index_upper_bound(&self, key: &K) -> usize {
-        let mut left = 0;
-        let mut right = self.keys.len();
-        while left < right {
-            let mid = left + ((right - left) >> 1);
-            if &self.keys[mid] <= key {
-                left = mid + 1;
-            } else {
-                right = mid;
-            }
-        }
-        left
+        get_entry_index_upper_bound::<K, V>(&self.keys, key)
     }
 
     fn insert(&mut self, key: K, v: V, inner_order: usize, leaf_order: usize) -> Option<BPlusTreeNode<K, V>> {
@@ -181,7 +203,7 @@ where
         self.children.iter().for_each(|child| child.traverse(visit));
     }
 
-    fn serialize_to_blocks<W: Write + Seek>(&self, file: &mut W, buffer: &mut Vec<u8>, offset: u64) -> io::Result<u64> {
+    fn serialize_to_block<W: Write + Seek>(&self, file: &mut W, buffer: &mut Vec<u8>, offset: u64) -> io::Result<u64> {
         let mut current_offset = offset;
         let buffer_slice = &mut buffer[..];
 
@@ -204,7 +226,7 @@ where
             encoder.write_all(&values_encoded)?;
             let compressed_bytes = encoder.finish()?;
             let values_bytes_len = compressed_bytes.len();
-            buffer_slice[write_pos..write_pos + 4].copy_from_slice(&(values_bytes_len  as u32).to_le_bytes());
+            buffer_slice[write_pos..write_pos + 4].copy_from_slice(&(values_bytes_len as u32).to_le_bytes());
             write_pos += 4;
             buffer_slice[write_pos..write_pos + values_bytes_len].copy_from_slice(&compressed_bytes);
             write_pos += values_bytes_len;
@@ -220,7 +242,7 @@ where
             let mut pointer = Vec::with_capacity(self.children.len());
             for child in &self.children {
                 pointer.push(current_offset);
-                current_offset = child.serialize_to_blocks(file, buffer, current_offset)?;
+                current_offset = child.serialize_to_block(file, buffer, current_offset)?;
             }
 
             let pointer_encoded = bincode_serialize(&pointer)?;
@@ -234,7 +256,7 @@ where
         Ok(current_offset)
     }
 
-    fn deserialize_from_blocks<R: Read + Seek>(file: &mut R, buffer: &mut Vec<u8>, offset: u64, nested: bool) -> io::Result<(Self, Option<Vec<u64>>)> {
+    fn deserialize_from_block<R: Read + Seek>(file: &mut R, buffer: &mut Vec<u8>, offset: u64, nested: bool) -> io::Result<(Self, Option<Vec<u64>>)> {
         file.seek(SeekFrom::Start(offset))?;
         file.read_exact(buffer)?;
 
@@ -272,7 +294,7 @@ where
                 let nodes: Result<Vec<BPlusTreeNode<K, V>>, io::Error> = pointers
                     .iter()
                     .map(|pointer| {
-                        BPlusTreeNode::<K, V>::deserialize_from_blocks(file, buffer, *pointer, nested)
+                        BPlusTreeNode::<K, V>::deserialize_from_block(file, buffer, *pointer, nested)
                             .map(|(node, _)| node)
                             .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))
                     })
@@ -352,6 +374,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn query(&self, key: &K) -> Option<&V> {
         self.root.query(key)
     }
@@ -359,7 +382,7 @@ where
     pub(crate) fn serialize(&self, filepath: &Path) -> io::Result<u64> {
         let mut file = OpenOptions::new().write(true).create(true).open(filepath)?;
         let mut buffer = vec![0u8; BLOCK_SIZE];
-        let result = self.root.serialize_to_blocks(&mut file, &mut buffer, 0u64);
+        let result = self.root.serialize_to_block(&mut file, &mut buffer, 0u64);
         file.flush()?;
         result
     }
@@ -370,7 +393,7 @@ where
             return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Tree file has to be multiple of block size {BLOCK_SIZE}")));
         }
         let mut buffer = vec![0u8; BLOCK_SIZE];
-        let (root, _) = BPlusTreeNode::deserialize_from_blocks(&mut file, &mut buffer, 0, true)?;
+        let (root, _) = BPlusTreeNode::deserialize_from_block(&mut file, &mut buffer, 0, true)?;
         Ok(BPlusTree::new_with_root(root))
     }
 
@@ -379,6 +402,33 @@ where
         F: FnMut(&Vec<K>, &Vec<V>),
     {
         self.root.traverse(&mut visit);
+    }
+}
+
+fn query_tree<K, V>(file: &mut File, key: &K) -> Option<V>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    let mut offset = 0;
+    let mut buffer = vec![0u8; BLOCK_SIZE];
+    loop {
+        match BPlusTreeNode::<K, V>::deserialize_from_block(file, &mut buffer, offset, false) {
+            Ok((node, pointers)) => {
+                if node.is_leaf {
+                    return match node.keys.binary_search(key) {
+                        Ok(idx) => node.values.get(idx).cloned(),
+                        Err(_) => None,
+                    };
+                }
+                let child_idx = get_entry_index_upper_bound::<K, V>(&node.keys, key);
+                offset = *pointers.unwrap().get(child_idx).unwrap();
+            }
+            Err(err) => {
+                error!("Failed to read id tree from file {err}");
+                return None;
+            }
+        };
     }
 }
 
@@ -394,15 +444,7 @@ where
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
     pub(crate) fn try_new(filepath: &Path) -> io::Result<Self> {
-        let file = File::open(filepath)?;
-        match is_multiple_of_block_size(&file) {
-            Ok(valid) => {
-                if !valid {
-                    return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Tree file has to be multiple of block size {BLOCK_SIZE}")));
-                }
-            }
-            Err(err) => return Err(err)
-        }
+        let file = is_file_valid(File::open(filepath)?)?;
         Ok(BPlusTreeQuery {
             file,
             _marker_k: Default::default(),
@@ -410,43 +452,80 @@ where
         })
     }
 
-    fn get_entry_index_upper_bound(keys: &Vec<K>, key: &K) -> usize {
-        let mut left = 0;
-        let mut right = keys.len();
-        while left < right {
-            let mid = left + ((right - left) >> 1);
-            if &keys[mid] <= key {
-                left = mid + 1;
-            } else {
-                right = mid;
-            }
+    pub(crate) fn query(&mut self, key: &K) -> Option<V> {
+        query_tree(&mut self.file, key)
+    }
+}
+
+pub(crate) struct BPlusTreeUpdate<K, V> {
+    file: File,
+    _marker_k: PhantomData<K>,
+    _marker_v: PhantomData<V>,
+}
+
+impl<K, V> BPlusTreeUpdate<K, V>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    pub(crate) fn try_new(filepath: &Path) -> io::Result<Self> {
+        if !filepath.exists() {
+            return Err(io::Error::new(io::ErrorKind::NotFound, format!("File not found {}", filepath.to_str().unwrap_or("?"))));
         }
-        left
+        let file = OpenOptions::new()
+            .write(true)
+            .read(true)
+            .open(filepath)?;
+        let file = is_file_valid(file)?;
+        Ok(BPlusTreeUpdate {
+            file,
+            _marker_k: Default::default(),
+            _marker_v: Default::default(),
+        })
     }
 
     pub(crate) fn query(&mut self, key: &K) -> Option<V> {
+        query_tree(&mut self.file, key)
+    }
+
+    fn serialize_node(&mut self, offset: u64, node: BPlusTreeNode<K, V>) -> io::Result<u64> {
+        let mut buffer = vec![0u8; BLOCK_SIZE];
+        let result = node.serialize_to_block(&mut self.file, &mut buffer, offset);
+        self.file.flush()?;
+        result
+    }
+
+    pub(crate) fn update(&mut self, key: &K, value: V) -> io::Result<u64> {
         let mut offset = 0;
         let mut buffer = vec![0u8; BLOCK_SIZE];
         loop {
-            match BPlusTreeNode::<K, V>::deserialize_from_blocks(&mut self.file, &mut buffer, offset, false) {
-                Ok((node, pointers)) => {
+            match BPlusTreeNode::<K, V>::deserialize_from_block(&mut self.file, &mut buffer, offset, false) {
+                Ok((mut node, pointers)) => {
                     if node.is_leaf {
                         return match node.keys.binary_search(key) {
-                            Ok(idx) => node.values.get(idx).cloned(),
-                            Err(_) => None,
+                            Ok(idx) => {
+                                let old_value = node.values.get(idx);
+                                if let Some(_) = old_value {
+                                    node.values[idx] = value;
+                                    return self.serialize_node(offset, node);
+                                }
+                                Err(io::Error::new(io::ErrorKind::NotFound, "Entry not found"))
+                            }
+                            Err(_) => Err(io::Error::new(io::ErrorKind::NotFound, "Entry not found")),
                         };
                     }
-                    let child_idx = BPlusTreeQuery::<K, V>::get_entry_index_upper_bound(&node.keys, key);
+                    let child_idx = get_entry_index_upper_bound::<K, V>(&node.keys, key);
                     offset = *pointers.unwrap().get(child_idx).unwrap();
                 }
                 Err(err) => {
                     error!("Failed to read id tree from file {err}");
-                    return None;
+                    return Err(io::Error::new(io::ErrorKind::NotFound, format!("Failed to read id tree from file {err}")));
                 }
             };
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -455,7 +534,7 @@ mod tests {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery};
+    use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 
     // Example usage with a simple struct
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -505,6 +584,31 @@ mod tests {
                 id: i,
                 data: format!("Entry {i}"),
             }), "Entry {} not found", i);
+        }
+
+        let mut tree_update: BPlusTreeUpdate<u32, Record> = BPlusTreeUpdate::try_new(&filepath)?;
+        for i in 0u32..=500 {
+            if let Some(record) = tree_update.query(&i) {
+                let new_record = Record {
+                    id: record.id,
+                    data: format!("Entry {}", record.id + 9000),
+                };
+                tree_update.update(&i, new_record)?;
+            } else {
+                assert!(false, "Entry {} not found", i);
+            }
+        }
+
+        let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::try_new(&filepath)?;
+        for i in 0u32..=500 {
+            let found = tree_query.query(&i);
+            assert!(found.is_some(), "Entry {} not found", i);
+            let entry = found.unwrap();
+            let expected = Record {
+                id: i,
+                data: format!("Entry {}", i + 9000),
+            };
+            assert!(entry.eq(&expected), "Entry not equal {:?} != {:?}", entry, expected);
         }
 
         Ok(())

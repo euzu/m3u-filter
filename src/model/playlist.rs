@@ -73,7 +73,7 @@ impl TryFrom<PlaylistItemType> for XtreamCluster {
             PlaylistItemType::Live => Ok(XtreamCluster::Live),
             PlaylistItemType::Video => Ok(XtreamCluster::Video),
             PlaylistItemType::Series => Ok(XtreamCluster::Series),
-            PlaylistItemType::SeriesInfo => Err(format!("Cant convert {item_type}")),
+            _ => Err(format!("Cant convert {item_type}")),
         }
     }
 }
@@ -83,8 +83,10 @@ impl TryFrom<PlaylistItemType> for XtreamCluster {
 pub(crate) enum PlaylistItemType {
     Live = 1,
     Video = 2,
-    Series = 3,
-    SeriesInfo = 4,
+    Series = 3, //  xtream series description
+    SeriesInfo = 4, //  xtream series info fetched for series description
+    SeriesEpisode = 5, // from SeriesInfo parsed episodes
+    Catchup = 6,
 }
 
 impl Default for PlaylistItemType {
@@ -110,6 +112,8 @@ impl Display for PlaylistItemType {
             PlaylistItemType::Video => "video",
             PlaylistItemType::Series => "series",
             PlaylistItemType::SeriesInfo => "series-info",
+            PlaylistItemType::SeriesEpisode => "series-episode",
+            PlaylistItemType::Catchup => "catchup"
         })
     }
 }

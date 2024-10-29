@@ -8,7 +8,7 @@ pub(crate) fn hash_string(url: &str) -> [u8; 32] {
     hash.into() // Konvertiere den Hash in ein Array mit fester Größe
 }
 
-pub(crate) fn get_target_id_mapping_file(target_path: &Path) -> PathBuf {
+pub(in crate::repository) fn get_target_id_mapping_file(target_path: &Path) -> PathBuf {
     target_path.join(PathBuf::from("id_mapping.db"))
 }
 

@@ -466,7 +466,8 @@ fn flatten_groups(mut playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> 
 }
 
 async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
-                              target: &ConfigTarget, cfg: &Config,
+                              target: &ConfigTarget,
+                              cfg: &Config,
                               stats: &mut HashMap<u16, InputStats>,
                               errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
     let pipe = get_processing_pipe(target);

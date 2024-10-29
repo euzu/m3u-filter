@@ -6,3 +6,4 @@ pub (crate) mod json_utils;
 pub (crate) mod config_reader;
 pub (crate) mod default_utils;
 pub (crate) mod multi_file_reader;
+pub (crate) mod file_lock_manager;

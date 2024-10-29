@@ -31,6 +31,10 @@ impl VirtualIdRecord {
     pub(crate) fn is_expired(&self) -> bool {
         (Local::now().timestamp() - self.last_updated) > EXPIRATION_DURATION
     }
+
+    pub(crate) fn copy_update_timestamp(&self) -> Self {
+        Self::new(self.provider_id, self.virtual_id, self.item_type, self.parent_virtual_id, self.uuid)
+    }
 }
 
 pub(crate) struct TargetIdMapping {
@@ -69,16 +73,17 @@ impl TargetIdMapping {
         }
     }
 
-    pub(crate) fn insert_entry(&mut self, provider_id: u32, uuid: [u8; 32], item_type: &PlaylistItemType, parent_virtual_id: u32) -> u32 {
-        self.dirty = true;
-        self.virtual_id_counter += 1;
-        let record = VirtualIdRecord::new(provider_id, self.virtual_id_counter, *item_type, parent_virtual_id, uuid);
-        self.by_virtual_id.insert(self.virtual_id_counter, record);
-        self.virtual_id_counter
-    }
-
-    pub(crate) fn get_by_uuid(&self, uuid: &[u8; 32]) -> Option<&u32> {
-        self.by_uuid.get(uuid)
+    pub(crate) fn insert_entry(&mut self, uuid: [u8; 32], provider_id: u32, item_type: &PlaylistItemType, parent_virtual_id: u32) -> u32 {
+        match self.by_uuid.get(&uuid) {
+            None => {
+                self.dirty = true;
+                self.virtual_id_counter += 1;
+                let record = VirtualIdRecord::new(provider_id, self.virtual_id_counter, *item_type, parent_virtual_id, uuid);
+                self.by_virtual_id.insert(self.virtual_id_counter, record);
+                self.virtual_id_counter
+            }
+            Some(record) => *record
+        }
     }
 
     pub(crate) fn persist(&mut self) -> Result<(), Error> {

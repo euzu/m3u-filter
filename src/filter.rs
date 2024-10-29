@@ -196,7 +196,8 @@ impl std::fmt::Display for Filter {
                     PlaylistItemType::Live => "live",
                     PlaylistItemType::Video => "vod",
                     PlaylistItemType::Series => "series",
-                    PlaylistItemType::SeriesInfo => "series" // yes series-info is handled as series in filter
+                    PlaylistItemType::SeriesInfo => "series", // yes series-info is handled as series in filter
+                    _ => "unsupported"
                 })
             }
             Filter::Group(stmt) => {

@@ -41,7 +41,7 @@ async fn m3u_api_stream(
                 match get_target_storage_path(&app_state.config, target.name.as_str()) {
                     Some(target_path) => {
                         if let Some((m3u_path, idx_path)) = m3u_get_file_paths(&target_path) {
-                            match m3u_get_item_for_stream_id(m3u_stream_id, &m3u_path, &idx_path) {
+                            match m3u_get_item_for_stream_id(&app_state.config, m3u_stream_id, &m3u_path, &idx_path) {
                                 Ok(m3u_item) => {
                                     return stream_response(m3u_item.url.as_str(), &req, None).await;
                                 }
