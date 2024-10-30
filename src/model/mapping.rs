@@ -158,7 +158,7 @@ impl MapperTransform {
                         new_pattern = apply_templates_to_pattern(pattern, template_list);
                     }
                 }
-                let re = Regex::new(&*new_pattern);
+                let re = Regex::new(&new_pattern);
                 if re.is_err() {
                     return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", new_pattern);
                 }
@@ -196,17 +196,17 @@ pub(crate) struct Mapper {
 
 impl Mapper {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
-        for (key, _) in &self.attributes {
+        for key in self.attributes.keys() {
             if !valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
                 return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper attribute field {key}")));
             }
         }
-        for (key, _) in &self.suffix {
+        for key in self.suffix.keys() {
             if !valid_property!(key.as_str(), AFFIX_FIELDS) {
                 return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper suffix field {key}")));
             }
         }
-        for (key, _) in &self.prefix {
+        for key in self.prefix.keys() {
             if !valid_property!(key.as_str(), AFFIX_FIELDS) {
                 return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper prefix field {key}")));
             }
@@ -228,9 +228,7 @@ impl Mapper {
                     if !valid_property!(field, AFFIX_FIELDS) {
                         return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper transform field {field}")));
                     }
-                    if let Err(err) = t.prepare(templates) {
-                        return Err(err);
-                    }
+                    t.prepare(templates)?;
                 }
             }
         }
@@ -456,12 +454,11 @@ impl Mapping {
                     Ok(flt) => {
                         counters.push(MappingCounter {
                             filter: flt,
-                            field: def.field.to_owned(),
-                            concat: def.concat.to_owned(),
+                            field: def.field.clone(),
+                            concat: def.concat.clone(),
                             modifier: def.modifier.clone(),
                             value: Arc::new(Mutex::new(def.value)),
-                        }
-                        )
+                        });
                     }
                     Err(e) => return Err(M3uFilterError::new(M3uFilterErrorKind::Info, e.to_string()))
                 }

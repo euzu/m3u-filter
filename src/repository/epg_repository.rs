@@ -51,12 +51,11 @@ pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, target_path: &Path,
                         M3uFilterErrorKind::Notify,
                         format!("write epg for target {} failed: No filename set", target.name)));
                 }
-                if let Some(path) = m3u_get_epg_file_path(target_path) {
-                    if log_enabled!(Level::Debug) {
-                        debug!("writing m3u epg to {}", path.to_str().unwrap_or("?"));
-                    }
-                    epg_write_file(target, epg_data, &path)?;
+                let path = m3u_get_epg_file_path(target_path);
+                if log_enabled!(Level::Debug) {
+                    debug!("writing m3u epg to {}", path.to_str().unwrap_or("?"));
                 }
+                epg_write_file(target, epg_data, &path)?;
             }
             TargetType::Xtream => {
                 match xtream_get_storage_path(cfg, &target.name) {

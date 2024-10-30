@@ -21,7 +21,7 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
         Ok(mappings) => {
             match mappings {
                 None => {debug!("no mapping loaded");}
-                Some(mappings_cfg) => {cfg.set_mappings(mappings_cfg);}
+                Some(mappings_cfg) => {cfg.set_mappings(&mappings_cfg);}
             }
             Ok(())
         }

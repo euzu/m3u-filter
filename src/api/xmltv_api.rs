@@ -41,13 +41,11 @@ fn time_correct(date_time: &str, correction: &TimeDelta) -> String {
     }
 }
 
-fn get_epg_path_for_target_of_type(target_name: &str, file_path: Option<PathBuf>) -> Option<PathBuf> {
-    if let Some(epg_path) = file_path {
-        if file_utils::path_exists(&epg_path) {
-            return Some(epg_path);
-        }
-        info!("Cant find epg file for {target_name} target: {}", epg_path.to_str().unwrap_or("?"));
+fn get_epg_path_for_target_of_type(target_name: &str, epg_path: PathBuf) -> Option<PathBuf> {
+    if file_utils::path_exists(&epg_path) {
+        return Some(epg_path);
     }
+    info!("Cant find epg file for {target_name} target: {}", epg_path.to_str().unwrap_or("?"));
     None
 }
 
@@ -62,7 +60,7 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
             }
             TargetType::Xtream => {
                 if let Some(storage_path) = xtream_get_storage_path(config, &target.name) {
-                    return get_epg_path_for_target_of_type(&target.name, Some(xtream_get_epg_file_path(&storage_path)));
+                    return get_epg_path_for_target_of_type(&target.name, xtream_get_epg_file_path(&storage_path));
                 }
             }
             TargetType::Strm => {}

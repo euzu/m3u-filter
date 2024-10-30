@@ -28,7 +28,7 @@ pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>
                                     Some(provider_id) => {
                                         let uuid = header.get_uuid();
                                         let item_type = header.item_type;
-                                        header.virtual_id = target_id_mapping.insert_entry(**uuid, provider_id, &item_type, 0);
+                                        header.virtual_id = target_id_mapping.insert_entry(**uuid, provider_id, item_type, 0);
                                     }
                                     None => {
                                         errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Playlistitem has no provider id: {}", &header.title)));

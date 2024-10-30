@@ -1,6 +1,7 @@
 # Changelog
 # 2.0.6 (2024-10-*)
 - breaking change virtual_id handling. You need to clear the data directory.
+- fixed schedular implementation
 
 # 2.0.5(2024-10-16)
 - input url supports now scheme `file://...` (which is not necessary because file paths are supported). Gzip files are also supported.     

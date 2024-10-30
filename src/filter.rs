@@ -195,8 +195,7 @@ impl std::fmt::Display for Filter {
                 write!(f, "{} = {}", field, match item_type {
                     PlaylistItemType::Live => "live",
                     PlaylistItemType::Video => "vod",
-                    PlaylistItemType::Series => "series",
-                    PlaylistItemType::SeriesInfo => "series", // yes series-info is handled as series in filter
+                    PlaylistItemType::Series | PlaylistItemType::SeriesInfo => "series", // yes series-info is handled as series in filter
                     _ => "unsupported"
                 })
             }

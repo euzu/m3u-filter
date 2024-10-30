@@ -23,7 +23,6 @@ use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository;
 use crate::utils::{json_utils, request_utils};
 
-
 macro_rules! try_option_bad_request {
     ($option:expr, $msg_is_error:expr, $msg:expr) => {
         match $option {
@@ -200,7 +199,7 @@ async fn xtream_player_api_stream(
     }
     let (action_stream_id, stream_ext) = xtream_api_request_separate_number_and_rest(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
-    let pli =  try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
+    let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
     let query_path = if stream_req.action_path.is_empty() {
@@ -430,7 +429,7 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
         // TODO epg_id
         if let Some(catchup_provider_id) = epg_list_item.get("id").and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok()) {
             let uuid = hash_string(&format!("{}/{}", pli.url, catchup_provider_id));
-            let virtual_id = target_id_mapping.insert_entry(uuid, catchup_provider_id, &PlaylistItemType::Catchup, pli.provider_id);
+            let virtual_id = target_id_mapping.insert_entry(uuid, catchup_provider_id, PlaylistItemType::Catchup, pli.provider_id);
             epg_list_item.insert("id".to_string(), Value::String(virtual_id.to_string()));
         }
     }
@@ -450,67 +449,64 @@ async fn xtream_player_api(
     api_req: UserApiRequest,
     app_state: &web::Data<AppState>,
 ) -> HttpResponse {
-    match get_user_target(&api_req, app_state) {
-        Some((user, target)) => {
-            let action = api_req.action.trim();
-            let target_name = &target.name;
-            if target.has_output(&TargetType::Xtream) {
-                if action.is_empty() {
-                    return HttpResponse::Ok().json(get_user_info(&user, &app_state.config));
-                }
+    if let Some((user, target)) = get_user_target(&api_req, app_state) {
+        let action = api_req.action.trim();
+        let target_name = &target.name;
+        if target.has_output(&TargetType::Xtream) {
+            if action.is_empty() {
+                return HttpResponse::Ok().json(get_user_info(&user, &app_state.config));
+            }
 
-                match action {
-                    "get_series_info" => {
-                        xtream_get_stream_info_response(app_state, &user, target,
-                                                        api_req.series_id.trim(),
-                                                        XtreamCluster::Series).await
-                    }
-                    "get_vod_info" => {
-                        xtream_get_stream_info_response(app_state, &user, target,
-                                                        api_req.vod_id.trim(),
-                                                        XtreamCluster::Video).await
-                    }
-                    "get_epg" |
-                    "get_short_epg" => {
-                        xtream_get_short_epg(app_state, &user, target,
-                                             api_req.stream_id.trim(),
-                                             api_req.limit.trim()).await
-                    }
-                    "get_simple_data_table" => {
-                        xtream_get_catchup_response(app_state, target,
-                                                    api_req.stream_id.trim(),
-                                                    api_req.start.trim(),
-                                                    api_req.end.trim()).await
-                    }
-                    _ => {
-                        let category_id = api_req.category_id.as_str().trim();
-                        if let Some(response) = xtream_player_api_handle_content_action(&app_state.config, target_name, action, category_id, req).await {
-                            response
-                        } else {
-                            let cat_id = if category_id.is_empty() { 0 } else { category_id.parse::<u32>().unwrap_or(0) };
-                            match match action {
-                                "get_live_streams" => xtream_repository::xtream_load_rewrite_playlist(&XtreamCluster::Live, &app_state.config, target, cat_id),
-                                "get_vod_streams" => xtream_repository::xtream_load_rewrite_playlist(&XtreamCluster::Video, &app_state.config, target, cat_id),
-                                "get_series" => xtream_repository::xtream_load_rewrite_playlist(&XtreamCluster::Series, &app_state.config, target, cat_id),
-                                _ => Err(Error::new(ErrorKind::Unsupported, format!("Cant find action: {action} for target: {target_name}"))),
-                            } {
-                                Ok(payload) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(payload),
-                                Err(err) => {
-                                    error!("Could not create response for xtream target: {} action: {} err: {}", target_name, action, err);
-                                    HttpResponse::NoContent().finish()
-                                }
+            match action {
+                "get_series_info" => {
+                    xtream_get_stream_info_response(app_state, &user, target,
+                                                    api_req.series_id.trim(),
+                                                    XtreamCluster::Series).await
+                }
+                "get_vod_info" => {
+                    xtream_get_stream_info_response(app_state, &user, target,
+                                                    api_req.vod_id.trim(),
+                                                    XtreamCluster::Video).await
+                }
+                "get_epg" |
+                "get_short_epg" => {
+                    xtream_get_short_epg(app_state, &user, target,
+                                         api_req.stream_id.trim(),
+                                         api_req.limit.trim()).await
+                }
+                "get_simple_data_table" => {
+                    xtream_get_catchup_response(app_state, target,
+                                                api_req.stream_id.trim(),
+                                                api_req.start.trim(),
+                                                api_req.end.trim()).await
+                }
+                _ => {
+                    let category_id = api_req.category_id.as_str().trim();
+                    if let Some(response) = xtream_player_api_handle_content_action(&app_state.config, target_name, action, category_id, req).await {
+                        response
+                    } else {
+                        let cat_id = if category_id.is_empty() { 0 } else { category_id.parse::<u32>().unwrap_or(0) };
+                        match match action {
+                            "get_live_streams" => xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, cat_id),
+                            "get_vod_streams" => xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, cat_id),
+                            "get_series" => xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, cat_id),
+                            _ => Err(Error::new(ErrorKind::Unsupported, format!("Cant find action: {action} for target: {target_name}"))),
+                        } {
+                            Ok(payload) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(payload),
+                            Err(err) => {
+                                error!("Could not create response for xtream target: {} action: {} err: {}", target_name, action, err);
+                                HttpResponse::NoContent().finish()
                             }
                         }
                     }
                 }
-            } else {
-                HttpResponse::Ok().json(get_user_info(&user, &app_state.config))
             }
+        } else {
+            HttpResponse::Ok().json(get_user_info(&user, &app_state.config))
         }
-        _ => {
-            debug!("{}", if api_req.action.is_empty() { "Paremeter action is empty!" } else { "cant find user!" });
-            HttpResponse::BadRequest().finish()
-        }
+    } else {
+        debug!("{}", if api_req.action.is_empty() { "Paremeter action is empty!" } else { "cant find user!" });
+        HttpResponse::BadRequest().finish()
     }
 }
 

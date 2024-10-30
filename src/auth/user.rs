@@ -1,5 +1,6 @@
 use std::ptr;
 
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UserCredential {
     pub username: String,

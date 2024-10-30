@@ -873,7 +873,7 @@ impl Config {
         None
     }
 
-    pub(crate) fn set_mappings(&mut self, mappings_cfg: Mappings) {
+    pub(crate) fn set_mappings(&mut self, mappings_cfg: &Mappings) {
         for source in &mut self.sources {
             for target in &mut source.targets {
                 if let Some(mapping_ids) = &target.mapping {

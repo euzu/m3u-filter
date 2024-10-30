@@ -35,9 +35,10 @@ impl FetchedPlaylist<'_> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
 #[repr(u8)]
 pub(crate) enum XtreamCluster {
+    #[default]
     Live = 1,
     Video = 2,
     Series = 3,
@@ -51,12 +52,6 @@ impl XtreamCluster {
             XtreamCluster::Video => "Video",
             XtreamCluster::Series => "Series",
         }
-    }
-}
-
-impl Default for XtreamCluster {
-    fn default() -> Self {
-        XtreamCluster::Live
     }
 }
 
@@ -78,21 +73,16 @@ impl TryFrom<PlaylistItemType> for XtreamCluster {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
 #[repr(u8)]
 pub(crate) enum PlaylistItemType {
+    #[default]
     Live = 1,
     Video = 2,
     Series = 3, //  xtream series description
     SeriesInfo = 4, //  xtream series info fetched for series description
     SeriesEpisode = 5, // from SeriesInfo parsed episodes
     Catchup = 6,
-}
-
-impl Default for PlaylistItemType {
-    fn default() -> Self {
-        PlaylistItemType::Live
-    }
 }
 
 impl From<XtreamCluster> for PlaylistItemType {
@@ -154,7 +144,7 @@ pub(crate) struct PlaylistItemHeader {
 
 impl PlaylistItemHeader {
     pub(crate) fn gen_uuid(&mut self) {
-        self.uuid = Rc::new(hash_string(&self.url))
+        self.uuid = Rc::new(hash_string(&self.url));
     }
     pub(crate) fn get_uuid(&self) -> &Rc<[u8; 32]> {
         &self.uuid
@@ -343,7 +333,7 @@ impl PlaylistItem {
                             Err(_) => None
                         }
                     },
-                    item_type: header.item_type.clone(),
+                    item_type: header.item_type,
                     series_fetched: header.series_fetched,
                     category_id: header.category_id,
                     input_id: header.input_id,

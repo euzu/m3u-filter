@@ -29,7 +29,7 @@ GET http://localhost:8901/player_api.php?action=get_series_categories&username=x
 GET http://localhost:8901/player_api.php?action=get_series&username=xt&password=xt&category_id=120
 
 ### xtream series info
-GET http://localhost:8901/player_api.php?action=get_series_info&username=xt&password=xt&series_id=16441
+GET http://localhost:8901/player_api.php?action=get_series_info&username=xt&password=xt&series_id=16467
 
 ### xtream series stream
- GET http://localhost:8901/series/xt/xt/18130
+ GET http://localhost:8901/series/xt/xt/18137

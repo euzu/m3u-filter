@@ -16,7 +16,7 @@ pub(in crate::repository) type OffsetPointer = u32;
 * - index
 *
 * Layout of content file record is:
-*   - content-size (u32) + content
+*   - content-size (u32) + content (deflate)
 *
 * index file is a bplustree
 */
@@ -30,32 +30,32 @@ pub(in crate::repository) struct IndexedDocumentWriter {
 
 impl IndexedDocumentWriter {
     fn new_with_mode(main_path: PathBuf, index_path: PathBuf, append: bool) -> Result<Self, Error> {
-        match open_file_append(&main_path, append) {
-            Ok(main_file) => {
-                let main_offset = match &main_file.metadata() {
-                    Ok(meta) => u32::try_from(meta.len()).map_err(|err| Error::new(ErrorKind::Other, err))?,
-                    Err(_) => 0
-                };
+        // Attempt to open the main file in the specified mode (append or not)
+        let main_file = open_file_append(&main_path, append)?;
 
-                let index_tree = if append && index_path.exists() {
-                    BPlusTree::<u32, OffsetPointer>::deserialize(&index_path).unwrap_or_else(|err| {
-                        error!("Failed to load index {:?} {err}", index_path);
-                        BPlusTree::<u32, OffsetPointer>::new()
-                    })
-                } else {
-                    BPlusTree::<u32, OffsetPointer>::new()
-                };
+        // Retrieve file size and convert to `u32` for `main_offset`, if possible
+        let main_offset = main_file
+            .metadata()
+            .and_then(|meta| u32::try_from(meta.len()).map_err(|err| Error::new(ErrorKind::Other, err)))
+            .unwrap_or(0);
 
-                Ok(Self {
-                    main_path,
-                    index_path,
-                    main_file,
-                    main_offset,
-                    index_tree
-                })
-            }
-            Err(e) => Err(e)
-        }
+        // Initialize the index tree (BPlusTree) - either by deserializing an existing one or creating a new one
+        let index_tree = if append && index_path.exists() {
+            BPlusTree::<u32, OffsetPointer>::deserialize(&index_path).unwrap_or_else(|err| {
+                error!("Failed to load index {:?}: {}", index_path, err);
+                BPlusTree::<u32, OffsetPointer>::new()
+            })
+        } else {
+            BPlusTree::<u32, OffsetPointer>::new()
+        };
+
+        Ok(Self {
+            main_path,
+            index_path,
+            main_file,
+            main_offset,
+            index_tree,
+        })
     }
 
     pub fn new(main_path: PathBuf, index_path: PathBuf) -> Result<Self, Error> {
@@ -74,19 +74,17 @@ impl IndexedDocumentWriter {
     pub fn write_doc<T>(&mut self, doc_id: u32, doc: &T) -> Result<(), Error>
         where
             T: ?Sized + serde::Serialize {
-        if let Ok(encoded) = bincode::serialize(doc) {
-            let content_bytes_len = u32::try_from(encoded.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
-            let mut data: Vec<u8> = content_bytes_len.to_le_bytes().to_vec();
-            data.extend(&encoded);
-            match file_utils::check_write(&self.main_file.write_all(&data)) {
-                Ok(()) => {
-                    self.index_tree.insert(doc_id, self.main_offset);
-                    let written_bytes = u32::try_from(data.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
-                    self.main_offset += written_bytes;
-                }
-                Err(err) => {
-                    return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.main_path.to_str().unwrap(), err)));
-                }
+        let encoded_bytes = bincode::serialize(doc).map_err(|_| Error::new(ErrorKind::InvalidData, "Failed to deserialize document"))?;
+        let encoded_bytes_len =  u32::try_from(encoded_bytes.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
+        self.main_file.write_all(&encoded_bytes_len.to_le_bytes())?;
+        match file_utils::check_write(&self.main_file.write_all(&encoded_bytes)) {
+            Ok(()) => {
+                self.index_tree.insert(doc_id, self.main_offset);
+                let written_bytes = u32::try_from(encoded_bytes.len() + 4).map_err(|err| Error::new(ErrorKind::Other, err))?;
+                self.main_offset += written_bytes;
+            }
+            Err(err) => {
+                return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.main_path.to_str().unwrap(), err)));
             }
         }
         Ok(())

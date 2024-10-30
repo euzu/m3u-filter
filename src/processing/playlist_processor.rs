@@ -68,41 +68,38 @@ fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &Co
     let raw_value_b = get_field_value(b, &channel_sort.field);
     let value_a = if match_as_ascii { Rc::new(unidecode(&raw_value_a)) } else { raw_value_a };
     let value_b = if match_as_ascii { Rc::new(unidecode(&raw_value_b)) } else { raw_value_b };
-    match &channel_sort.sequence {
-        Some(custom_order) => {
-            // Check indices in the custom order vector
-            let index_a = custom_order.iter().position(|s| s == value_a.as_ref());
-            let index_b = custom_order.iter().position(|s| s == value_b.as_ref());
+    if let Some(custom_order) = &channel_sort.sequence {
+        // Check indices in the custom order vector
+        let index_a = custom_order.iter().position(|s| s == value_a.as_ref());
+        let index_b = custom_order.iter().position(|s| s == value_b.as_ref());
 
-            match (index_a, index_b) {
-                (Some(idx_a), Some(idx_b)) => {
-                    // Both items found in custom order, compare indices
-                    idx_a.cmp(&idx_b)
-                }
-                (Some(_), None) => {
-                    // Only 'a' found in custom order, it comes first
-                    Ordering::Less
-                }
-                (None, Some(_)) => {
-                    // Only 'b' found in custom order, it comes first
-                    Ordering::Greater
-                }
-                (None, None) => {
-                    // Neither found, fall back to default ordering
-                    let ordering = value_a.partial_cmp(&value_b).unwrap();
-                    match channel_sort.order {
-                        Asc => ordering,
-                        Desc => ordering.reverse(),
-                    }
+        match (index_a, index_b) {
+            (Some(idx_a), Some(idx_b)) => {
+                // Both items found in custom order, compare indices
+                idx_a.cmp(&idx_b)
+            }
+            (Some(_), None) => {
+                // Only 'a' found in custom order, it comes first
+                Ordering::Less
+            }
+            (None, Some(_)) => {
+                // Only 'b' found in custom order, it comes first
+                Ordering::Greater
+            }
+            (None, None) => {
+                // Neither found, fall back to default ordering
+                let ordering = value_a.partial_cmp(&value_b).unwrap();
+                match channel_sort.order {
+                    Asc => ordering,
+                    Desc => ordering.reverse(),
                 }
             }
         }
-        None => {
-            let ordering = value_a.partial_cmp(&value_b).unwrap();
-            match channel_sort.order {
-                Asc => ordering,
-                Desc => ordering.reverse()
-            }
+    } else {
+        let ordering = value_a.partial_cmp(&value_b).unwrap();
+        match channel_sort.order {
+            Asc => ordering,
+            Desc => ordering.reverse()
         }
     }
 }
@@ -251,7 +248,7 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
             if let Some(counter_list) = &mapping.t_counter {
                 for counter in counter_list {
                     let mut cntval = counter.value.lock().unwrap();
-                    for plg in &*playlist {
+                    for plg in playlist {
                         for channel in &plg.channels {
                             let provider = ValueProvider { pli: RefCell::new(channel) };
                             if counter.filter.filter(&provider, &mut mock_processor) {
@@ -260,12 +257,12 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
                                 } else {
                                     let value = match channel.header.borrow_mut().get_field(&counter.field) {
                                         Some(field_value) => field_value.to_string(),
-                                        None => "".to_string(),
+                                        None => String::new(),
                                     };
                                     if counter.modifier == CounterModifier::Suffix {
-                                        format!("{}{}{}", value, counter.concat, cntval.to_string())
+                                        format!("{value}{}{cntval}", counter.concat)
                                     } else {
-                                        format!("{}{}{}", cntval.to_string(), counter.concat, value)
+                                        format!("{cntval}{}{value}", counter.concat)
                                     }
                                 };
                                 channel.header.borrow_mut().set_field(&counter.field, new_value.as_str());
@@ -352,7 +349,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
             if is_target_enabled(target, &user_targets) {
                 match process_playlist(&mut source_playlists, target, &cfg, &mut stats, &mut errors).await {
                     Ok(()) => {}
-                    Err(mut err) => errors.extend(err.drain(..))
+                    Err(mut err) => errors.append(&mut err)
                 }
             }
         }
@@ -363,8 +360,8 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
 fn create_input_stat(group_count: usize, channel_count: usize, error_count: usize, input_type: InputType, input_name: &str) -> InputStats {
     InputStats {
         name: input_name.to_string(),
-        input_type: input_type,
-        error_count: error_count,
+        input_type,
+        error_count,
         raw_stats: PlaylistStats {
             group_count,
             channel_count,
@@ -500,7 +497,7 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
         let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
             .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
 
-        new_playlist.extend(fp.playlistgroups.drain(..));
+        new_playlist.append(&mut fp.playlistgroups);
         if !epg_channel_ids.is_empty() {
             if let Some(tv_guide) = fp.epg {
                 debug!("found epg information for {}", &target.name);

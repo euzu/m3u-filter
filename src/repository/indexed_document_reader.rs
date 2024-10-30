@@ -3,22 +3,23 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::path::Path;
+
 use crate::repository::bplustree::BPlusTreeQuery;
 use crate::repository::indexed_document_writer::OffsetPointer;
 
 fn get_offset(index_path: &Path, doc_id: u32) -> Result<u64, Error> {
-    match BPlusTreeQuery::<u32,OffsetPointer>::try_new(index_path) {
+    match BPlusTreeQuery::<u32, OffsetPointer>::try_new(index_path) {
         Ok(mut tree) => {
             match tree.query(&doc_id) {
-                Some(offset) => Ok(offset as u64),
+                Some(offset) => Ok(u64::from(offset)),
                 None => Err(Error::new(ErrorKind::NotFound, format!("doc_id not found {doc_id}"))),
             }
-        },
+        }
         Err(err) => Err(err)
     }
 }
 
-fn read_content_size(main_file: &mut File) -> Result<usize, Error>  {
+fn read_content_size(main_file: &mut File) -> Result<usize, Error> {
     let mut size_bytes = [0u8; 4];
     main_file.read_exact(&mut size_bytes)?;
     let buf_size = u32::from_le_bytes(size_bytes) as usize;
@@ -34,7 +35,7 @@ pub(in crate::repository) struct IndexedDocumentReader<T> {
     t_type: PhantomData<T>,
 }
 
-impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
+impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
     pub fn new(main_path: &Path) -> Result<IndexedDocumentReader<T>, Error> {
         if main_path.exists() {
             match File::open(main_path) {
@@ -82,26 +83,24 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
             self.t_buffer.reserve(buf_size - self.t_buffer.capacity());
         }
         self.t_buffer.resize(buf_size, 0u8);
-
         // read content
         self.main_file.read_exact(&mut self.t_buffer[0..buf_size])?;
-        self.cursor += buf_size as u32;
-
+        self.cursor += u32::try_from(buf_size).map_err(|err| Error::new(ErrorKind::Other, err))?;
         // deserialize buffer
-        return match bincode::deserialize::<T>(&self.t_buffer[0..buf_size]) {
+        match bincode::deserialize::<T>(&self.t_buffer[0..buf_size]) {
             Ok(value) => Ok(Some(value)),
             Err(err) => {
                 self.failed = true;
                 Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {err}")))
             }
-        };
+        }
     }
 
     pub(in crate::repository) fn read_indexed_item(main_path: &Path, index_path: &Path, doc_id: u32) -> Result<T, Error>
     {
         if main_path.exists() && index_path.exists() {
             // get the offset from index
-            let offset = crate::repository::indexed_document_reader::get_offset(index_path, doc_id)?;
+            let offset = get_offset(index_path, doc_id)?;
             let mut main_file = File::open(main_path)?;
             main_file.seek(SeekFrom::Start(offset))?;
             let buf_size = read_content_size(&mut main_file)?;
@@ -115,7 +114,7 @@ impl<T: ?Sized + serde::de::DeserializeOwned> IndexedDocumentReader<T> {
     }
 }
 
-impl<T: ?Sized + serde::de::DeserializeOwned> Iterator for IndexedDocumentReader<T> {
+impl<T: serde::de::DeserializeOwned> Iterator for IndexedDocumentReader<T> {
     type Item = T;
 
     // Implement the next() method

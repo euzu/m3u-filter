@@ -56,7 +56,7 @@ pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>
                         match parse_xtream_series_info(&series_content, pli.header.borrow().group.as_str(), input) {
                             Ok(series_info) => {
                                 if let Some(mut series) = series_info {
-                                    group_series.extend(series.drain(..));
+                                    group_series.append(&mut series);
                                 }
                             }
                             Err(err) => errors.push(err),
@@ -133,7 +133,7 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
                                                       &stream_content) {
                         Ok(sub_playlist_parsed) => {
                             if let Some(mut xtream_sub_playlist) = sub_playlist_parsed {
-                                playlist_groups.extend(xtream_sub_playlist.drain(..));
+                                playlist_groups.append(&mut xtream_sub_playlist);
                             }
                         }
                         Err(err) => errors.push(err)
@@ -142,8 +142,7 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
                 (Err(err1), Err(err2)) => {
                     errors.extend([err1, err2]);
                 },
-                (Err(err), _) => errors.push(err),
-                (_, Err(err)) => errors.push(err),
+                (_, Err(err)) | (Err(err), _) => errors.push(err),
             }
         }
     }

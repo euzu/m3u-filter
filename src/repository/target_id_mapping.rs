@@ -26,7 +26,7 @@ pub(crate) struct VirtualIdRecord {
 impl VirtualIdRecord {
     fn new(provider_id: u32, virtual_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32, uuid: [u8; 32]) -> Self {
         let last_updated = Local::now().timestamp();
-        VirtualIdRecord { provider_id, virtual_id, uuid, item_type, parent_virtual_id, last_updated }
+        VirtualIdRecord { virtual_id, provider_id, uuid, item_type, parent_virtual_id, last_updated }
     }
 
     pub(crate) fn is_expired(&self) -> bool {
@@ -48,7 +48,7 @@ pub(crate) struct TargetIdMapping {
 
 impl TargetIdMapping {
     pub(crate) fn new(path: &Path) -> Self {
-        let tree_virtual_id: BPlusTree<u32, VirtualIdRecord> = match BPlusTree::<u32, VirtualIdRecord>::deserialize(&path) {
+        let tree_virtual_id: BPlusTree<u32, VirtualIdRecord> = match BPlusTree::<u32, VirtualIdRecord>::deserialize(path) {
             Ok(tree) => tree,
             _ => BPlusTree::<u32, VirtualIdRecord>::new()
         };
@@ -61,9 +61,9 @@ impl TargetIdMapping {
                     virtual_id_counter = max(virtual_id_counter, *max_value);
                 }
             }
-            values.iter().for_each(|v| {
+            for v in values {
                 tree_uuid.insert(v.uuid, v.virtual_id);
-            });
+            }
         });
         TargetIdMapping {
             dirty: false,
@@ -74,12 +74,12 @@ impl TargetIdMapping {
         }
     }
 
-    pub(crate) fn insert_entry(&mut self, uuid: [u8; 32], provider_id: u32, item_type: &PlaylistItemType, parent_virtual_id: u32) -> u32 {
+    pub(crate) fn insert_entry(&mut self, uuid: [u8; 32], provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
         match self.by_uuid.get(&uuid) {
             None => {
                 self.dirty = true;
                 self.virtual_id_counter += 1;
-                let record = VirtualIdRecord::new(provider_id, self.virtual_id_counter, *item_type, parent_virtual_id, uuid);
+                let record = VirtualIdRecord::new(provider_id, self.virtual_id_counter, item_type, parent_virtual_id, uuid);
                 self.by_virtual_id.insert(self.virtual_id_counter, record);
                 self.virtual_id_counter
             }
@@ -98,11 +98,8 @@ impl TargetIdMapping {
 
 impl Drop for TargetIdMapping {
     fn drop(&mut self) {
-        match self.persist() {
-            Ok(_) => {}
-            Err(err) => {
-                error!("Failed to persist target id mapping {:?} err:{}", &self.path, err.to_string())
-            }
+        if let Err(err) = self.persist() {
+            error!("Failed to persist target id mapping {:?} err:{err}", &self.path);
         }
     }
 }

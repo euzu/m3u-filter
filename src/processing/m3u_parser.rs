@@ -9,7 +9,7 @@ use crate::utils::string_utils;
 #[inline]
 fn token_value(it: &mut std::str::Chars) -> String {
     // Use .find() to skip until the first double quote (") character.
-    if it.find(|&ch| ch == '"').is_some() {
+    if it.any(|ch| ch == '"') {
         // If a quote is found, call get_value to extract the value.
         return get_value(it);
     }
@@ -93,7 +93,7 @@ macro_rules! process_header_fields {
     };
 }
 
-fn process_header(input: &ConfigInput, video_suffixes: &Vec<&str>, content: &str, url: &str) -> PlaylistItemHeader {
+fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, url: &str) -> PlaylistItemHeader {
     let mut plih = create_empty_playlistitem_header(input.id, url);
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':', false);
@@ -186,7 +186,7 @@ where
             continue;
         }
         if let Some(header_value) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(input, &video_suffixes, &header_value, &line)) };
+            let item = PlaylistItem { header: RefCell::new(process_header(input, &video_suffixes, &header_value, line)) };
             let mut header = item.header.borrow_mut();
             if header.group.is_empty() {
                 if let Some(group_value) = group {

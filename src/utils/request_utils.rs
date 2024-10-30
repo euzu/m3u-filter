@@ -110,7 +110,7 @@ pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, cus
 fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
     // Check if the file is accessible
     if file_path.exists() && file_path.is_file() {
-        if let Ok(content) = fs::read(&file_path) {
+        if let Ok(content) = fs::read(file_path) {
             if content.len() >= 2 && is_gzip(&content[0..2]) {
                 let mut decoder = GzDecoder::new(&content[..]);
                 let mut decode_buffer = String::new();
