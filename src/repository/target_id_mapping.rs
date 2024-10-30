@@ -48,7 +48,7 @@ pub(crate) struct TargetIdMapping {
 
 impl TargetIdMapping {
     pub(crate) fn new(path: &Path) -> Self {
-        let tree_virtual_id: BPlusTree<u32, VirtualIdRecord> = match BPlusTree::<u32, VirtualIdRecord>::deserialize(path) {
+        let tree_virtual_id: BPlusTree<u32, VirtualIdRecord> = match BPlusTree::<u32, VirtualIdRecord>::load(path) {
             Ok(tree) => tree,
             _ => BPlusTree::<u32, VirtualIdRecord>::new()
         };
@@ -89,7 +89,7 @@ impl TargetIdMapping {
 
     pub(crate) fn persist(&mut self) -> Result<(), Error> {
         if self.dirty {
-            self.by_virtual_id.serialize(&self.path)?;
+            self.by_virtual_id.store(&self.path)?;
         }
         self.dirty = false;
         Ok(())

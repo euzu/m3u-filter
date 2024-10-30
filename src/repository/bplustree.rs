@@ -335,6 +335,7 @@ pub(crate) struct BPlusTree<K, V> {
     root: BPlusTreeNode<K, V>,
     inner_order: usize,
     leaf_order: usize,
+    dirty: bool,
 }
 
 impl<K, V> BPlusTree<K, V>
@@ -350,6 +351,7 @@ where
             root: BPlusTreeNode::<K, V>::new(true),
             inner_order,
             leaf_order,
+            dirty: false,
         }
     }
 
@@ -361,10 +363,12 @@ where
             root,
             inner_order,
             leaf_order,
+            dirty: false,
         }
     }
 
     pub(crate) fn insert(&mut self, key: K, value: V) {
+        self.dirty= true;
         if self.root.keys.is_empty() {
             self.root.keys.push(key);
             self.root.values.push(value);
@@ -392,15 +396,20 @@ where
         self.root.query(key)
     }
 
-    pub(crate) fn serialize(&self, filepath: &Path) -> io::Result<u64> {
-        let mut file = OpenOptions::new().write(true).create(true).truncate(true).open(filepath)?;
-        let mut buffer = vec![0u8; BLOCK_SIZE];
-        let result = self.root.serialize_to_block(&mut file, &mut buffer, 0u64);
-        file.flush()?;
-        result
+    pub(crate) fn store(&mut self, filepath: &Path) -> io::Result<u64> {
+        if self.dirty {
+            let mut file = OpenOptions::new().write(true).create(true).truncate(true).open(filepath)?;
+            let mut buffer = vec![0u8; BLOCK_SIZE];
+            let result = self.root.serialize_to_block(&mut file, &mut buffer, 0u64);
+            file.flush()?;
+            self.dirty = false;
+            result
+        } else {
+            Ok(0)
+        }
     }
 
-    pub(crate) fn deserialize(filepath: &Path) -> io::Result<Self> {
+    pub(crate) fn load(filepath: &Path) -> io::Result<Self> {
         let mut file = File::open(filepath)?;
         if is_multiple_of_block_size(&file).is_err() {
             return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Tree file has to be multiple of block size {BLOCK_SIZE}")));
@@ -573,10 +582,10 @@ mod tests {
 
         let filepath = PathBuf::from("/tmp/tree.bin");
         // Serialize the tree to a file
-        tree.serialize(&filepath)?;
+        tree.store(&filepath)?;
 
         // Deserialize the tree from the file
-        tree = BPlusTree::<u32, Record>::deserialize(&filepath)?;
+        tree = BPlusTree::<u32, Record>::load(&filepath)?;
 
         // Query the tree
         for i in 0u32..=500 {

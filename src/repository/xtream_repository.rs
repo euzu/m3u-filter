@@ -73,7 +73,7 @@ fn write_playlists_to_file(cfg: &Config, storage_path: &Path, collections: Vec<(
                             Err(err) => return Err(cant_write_result!(&xtream_path, err))
                         }
                     }
-                    writer.flush().map_err(|err| cant_write_result!(&xtream_path, err))?;
+                    writer.store().map_err(|err| cant_write_result!(&xtream_path, err))?;
                 }
                 Err(err) => return Err(cant_write_result!(&xtream_path, err))
             }
@@ -309,10 +309,10 @@ pub(crate) fn xtream_get_item_for_stream_id(
 
 pub(crate) fn xtream_load_rewrite_playlist(cluster: XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<String, Error> {
     if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
-        let (xtream_path, _) = xtream_get_file_paths(&storage_path, cluster);
+        let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
         {
             let _file_lock = config.file_locks.read_lock(&xtream_path)?;
-            match IndexedDocumentReader::<XtreamPlaylistItem>::new(&xtream_path) {
+            match IndexedDocumentReader::<XtreamPlaylistItem>::new(&xtream_path, &idx_path) {
                 Ok(mut reader) => {
                     let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
                     let result: Vec<Value> = reader.by_ref().filter(|pli| category_id == 0 || pli.category_id == category_id)
@@ -358,7 +358,7 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
             .write_doc(series_info_id, content)
             .map_err(|_| Error::new(ErrorKind::Other, format!("failed to write xtream series info for target {target_name}")))?;
 
-        writer.flush()?;
+        writer.store()?;
     }
     {
         let target_id_mapping_file = get_target_id_mapping_file(&target_path);

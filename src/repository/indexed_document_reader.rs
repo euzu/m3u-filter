@@ -1,56 +1,39 @@
-use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::path::Path;
 
-use crate::repository::bplustree::BPlusTreeQuery;
-use crate::repository::indexed_document_writer::OffsetPointer;
+use crate::repository::bplustree::{BPlusTree};
+use crate::repository::indexed_document::{IndexedDocument, OffsetPointer};
 
-fn get_offset(index_path: &Path, doc_id: u32) -> Result<u64, Error> {
-    match BPlusTreeQuery::<u32, OffsetPointer>::try_new(index_path) {
-        Ok(mut tree) => {
-            match tree.query(&doc_id) {
-                Some(offset) => Ok(u64::from(offset)),
-                None => Err(Error::new(ErrorKind::NotFound, format!("doc_id not found {doc_id}"))),
-            }
-        }
-        Err(err) => Err(err)
-    }
-}
 
-fn read_content_size(main_file: &mut File) -> Result<usize, Error> {
-    let mut size_bytes = [0u8; 4];
-    main_file.read_exact(&mut size_bytes)?;
-    let buf_size = u32::from_le_bytes(size_bytes) as usize;
-    Ok(buf_size)
-}
 
 pub(in crate::repository) struct IndexedDocumentReader<T> {
     main_file: File,
-    cursor: u32,
-    size: u32,
+    offsets: Vec<OffsetPointer>,
+    index: usize,
     failed: bool,
     t_buffer: Vec<u8>,
     t_type: PhantomData<T>,
 }
 
 impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
-    pub fn new(main_path: &Path) -> Result<IndexedDocumentReader<T>, Error> {
-        if main_path.exists() {
+    pub fn new(main_path: &Path, index_path: &Path) -> Result<IndexedDocumentReader<T>, Error> {
+        if main_path.exists() && index_path.exists() {
+            let mut offsets = Vec::<OffsetPointer>::new();
+            {
+                let index_tree = BPlusTree::<u32, OffsetPointer>::load(index_path)?;
+                index_tree.traverse(|_, values| {
+                    offsets.extend(values);
+                });
+                offsets.sort_unstable();
+            }
             match File::open(main_path) {
                 Ok(main_file) => {
-                    let size = match main_file.metadata() {
-                        Ok(metadata) => {
-                            usize::try_from(metadata.len()).map_err(|err| Error::new(ErrorKind::Other, err))?
-                        }
-                        Err(_e) => 0,
-                    };
-
                     Ok(Self {
                         main_file,
-                        cursor: 0,
-                        size: u32::try_from(size).map_err(|err| Error::new(ErrorKind::Other, err))?,
+                        offsets,
+                        index: 0,
                         failed: false,
                         t_buffer: Vec::new(),
                         t_type: PhantomData,
@@ -69,15 +52,16 @@ impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
     }
 
     pub fn has_next(&self) -> bool {
-        !self.failed && self.cursor < self.size
+        !self.failed && self.index < self.offsets.len()
     }
     pub fn read_next(&mut self) -> Result<Option<T>, Error> {
         if !self.has_next() {
             return Ok(None);
         }
         // read content-size
-        let buf_size: usize = read_content_size(&mut self.main_file)?;
-        self.cursor += 4;
+        self.main_file.seek(SeekFrom::Start(u64::from(self.offsets[self.index])))?;
+        self.index += 1;
+        let buf_size: usize = IndexedDocument::read_content_size(&mut self.main_file)?;
         // resize buffer if necessary
         if self.t_buffer.capacity() < buf_size {
             self.t_buffer.reserve(buf_size - self.t_buffer.capacity());
@@ -85,7 +69,6 @@ impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
         self.t_buffer.resize(buf_size, 0u8);
         // read content
         self.main_file.read_exact(&mut self.t_buffer[0..buf_size])?;
-        self.cursor += u32::try_from(buf_size).map_err(|err| Error::new(ErrorKind::Other, err))?;
         // deserialize buffer
         match bincode::deserialize::<T>(&self.t_buffer[0..buf_size]) {
             Ok(value) => Ok(Some(value)),
@@ -100,10 +83,10 @@ impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
     {
         if main_path.exists() && index_path.exists() {
             // get the offset from index
-            let offset = get_offset(index_path, doc_id)?;
+            let offset = IndexedDocument::get_offset(index_path, doc_id)?;
             let mut main_file = File::open(main_path)?;
             main_file.seek(SeekFrom::Start(offset))?;
-            let buf_size = read_content_size(&mut main_file)?;
+            let buf_size = IndexedDocument::read_content_size(&mut main_file)?;
             let mut buffer: Vec<u8> = vec![0; buf_size];
             main_file.read_exact(&mut buffer)?;
             if let Ok(item) = bincode::deserialize::<T>(&buffer) {

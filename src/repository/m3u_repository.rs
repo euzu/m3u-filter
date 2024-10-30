@@ -76,7 +76,7 @@ pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_pat
                             Err(err) => return Err(cant_write_result!(&m3u_path, err))
                         }
                     }
-                    writer.flush().map_err(|err| cant_write_result!(&m3u_path, err))?;
+                    writer.store().map_err(|err| cant_write_result!(&m3u_path, err))?;
                 }
                 Err(err) => return Err(cant_write_result!(&m3u_path, err))
             }
@@ -88,14 +88,14 @@ pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_pat
 pub(crate) fn m3u_load_rewrite_playlist(cfg: &Config, target: &ConfigTarget, user: &ProxyUserCredentials) -> Option<String> {
     match ensure_target_storage_path(cfg, target.name.as_str()) {
         Ok(target_path) => {
-            let (m3u_path, _) = m3u_get_file_paths(&target_path);
+            let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
             {
                 let _file_lock = cfg.file_locks.read_lock(&m3u_path).map_err(|err| {
                     error!("Could not lock document {:?}: {}", m3u_path, err);
                     Error::new(ErrorKind::Other, format!("Document Reader error for target {}", &target.name))
                 }).ok()?;
 
-                match IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path) {
+                match IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path, &idx_path) {
                     Ok(mut reader) => {
                         let server_info = get_user_server_info(cfg, user);
                         let url = format!("{}/m3u-stream/{}/{}", server_info.get_base_url(), user.username, user.password);

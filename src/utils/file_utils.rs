@@ -1,5 +1,5 @@
 use std::fs;
-use std::fs::{File, OpenOptions};
+use std::fs::{File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -187,12 +187,7 @@ pub(crate) fn check_write(res: &std::io::Result<()>) -> Result<(), std::io::Erro
     }
 }
 
-pub(crate) fn open_file_append(path: &Path, append: bool) -> Result<File, std::io::Error> {
-    if append && path.exists() {
-        return OpenOptions::new()
-            .append(true) // Open in append mode
-            .open(path);
-    }
-    File::create(path)
+pub(crate) fn append_extension(path: &Path, ext: &str) -> PathBuf {
+    let extension = path.extension().map(|ext| ext.to_str().unwrap_or(""));
+    path.with_extension(format!("{}{ext}", &extension.unwrap_or_default()))
 }
-
