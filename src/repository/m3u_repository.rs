@@ -10,8 +10,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
-use crate::repository::indexed_document_reader::IndexedDocumentReader;
-use crate::repository::indexed_document_writer::IndexedDocumentWriter;
+use crate::repository::indexed_document::{IndexedDocumentReader, IndexedDocumentWriter};
 use crate::repository::storage::ensure_target_storage_path;
 use crate::utils::file_utils;
 

@@ -23,7 +23,6 @@ mod model;
 mod filter;
 mod repository;
 mod messaging;
-mod test;
 mod api;
 mod processing;
 mod utils;

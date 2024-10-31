@@ -5,7 +5,7 @@ use crate::utils::file_utils;
 
 pub(crate) fn hash_string(url: &str) -> [u8; 32] {
     let hash = blake3::hash(url.as_bytes());
-    hash.into() // Konvertiere den Hash in ein Array mit fester Größe
+    hash.into() // convert to hash array
 }
 
 pub(in crate::repository) fn get_target_id_mapping_file(target_path: &Path) -> PathBuf {

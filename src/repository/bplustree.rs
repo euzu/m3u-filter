@@ -1,6 +1,6 @@
 use std::array::TryFromSliceError;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::Path;
 
@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 const BINCODE_OVERHEAD: usize = 4;
 const BLOCK_SIZE: usize = 4096;
 const POINTER_SIZE: usize = size_of::<Option<u64>>();
+const LEN_SIZE: usize = 4;
+const FLAG_SIZE: usize = 1;
 
 fn is_multiple_of_block_size(file: &File) -> io::Result<bool> {
     let file_size = file.metadata()?.len(); // Get the file size in bytes
@@ -212,24 +214,25 @@ where
         let buffer_slice = &mut buffer[..];
 
         // Write node type (leaf or internal)
+        // Write node type (leaf or internal)
         buffer_slice[0] = u8::from(self.is_leaf);
-        let mut write_pos = 1;
+        let mut write_pos = FLAG_SIZE;
 
         // Serialize and write keys
         let keys_encoded = bincode_serialize(&self.keys)?;
         let keys_bytes_len = keys_encoded.len();
-        buffer_slice[write_pos..write_pos + 4].copy_from_slice(&(u32::try_from(keys_bytes_len).map_err(|err| Error::new(ErrorKind::Other, err))?).to_le_bytes());
-        write_pos += 4;
+        buffer_slice[write_pos..write_pos + LEN_SIZE].copy_from_slice(&(u32::try_from(keys_bytes_len).map_err(|err| Error::new(ErrorKind::Other, err))?).to_le_bytes());
+        write_pos += LEN_SIZE;
         buffer_slice[write_pos..write_pos + keys_bytes_len].copy_from_slice(&keys_encoded);
         write_pos += keys_bytes_len;
 
         // If leaf, serialize and write values
         if self.is_leaf {
             let values_encoded = bincode_serialize(&self.values)?;
-            let use_compression = values_encoded.len() + 5 > BLOCK_SIZE;
+            let use_compression = values_encoded.len() + LEN_SIZE + FLAG_SIZE > BLOCK_SIZE;
             let compression_byte = if use_compression {1u8.to_le_bytes()} else {0u8.to_le_bytes()};
             buffer_slice[write_pos..=write_pos].copy_from_slice(&compression_byte);
-            write_pos += 1;
+            write_pos += FLAG_SIZE;
             let content_bytes =  if use_compression {
                 let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), Compression::fast());
                 encoder.write_all(&values_encoded)?;
@@ -238,8 +241,8 @@ where
                 values_encoded
             };
             let values_bytes_len = content_bytes.len();
-            buffer_slice[write_pos..write_pos + 4].copy_from_slice(&(u32::try_from(values_bytes_len).map_err(|err| Error::new(ErrorKind::Other, err))?).to_le_bytes());
-            write_pos += 4;
+            buffer_slice[write_pos..write_pos + LEN_SIZE].copy_from_slice(&(u32::try_from(values_bytes_len).map_err(|err| Error::new(ErrorKind::Other, err))?).to_le_bytes());
+            write_pos += LEN_SIZE;
             buffer_slice[write_pos..write_pos + values_bytes_len].copy_from_slice(&content_bytes);
             write_pos += values_bytes_len;
         }
@@ -274,20 +277,20 @@ where
 
         // Read the node type directly from buffer
         let is_leaf = buffer[0] == 1u8;
-        let mut read_pos = 1;
+        let mut read_pos = FLAG_SIZE;
 
         // Deserialize keys
-        let keys_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
-        read_pos += 4;
+        let keys_length = u32_from_bytes(&buffer[read_pos..read_pos + LEN_SIZE])? as usize;
+        read_pos += LEN_SIZE;
         let keys: Vec<K> = bincode_deserialize(&buffer[read_pos..read_pos + keys_length])?;
         read_pos += keys_length;
 
         // Deserialize values if leaf node
         let values = if is_leaf {
             let use_compression = u8::from_le_bytes(buffer[read_pos..=read_pos].try_into().unwrap()) == 1;
-            read_pos += 1;
-            let values_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
-            read_pos += 4;
+            read_pos += FLAG_SIZE;
+            let values_length = u32_from_bytes(&buffer[read_pos..read_pos + LEN_SIZE])? as usize;
+            read_pos += LEN_SIZE;
             let content_bytes = &buffer[read_pos..read_pos + values_length];
             let values_bytes = if use_compression {
                 let mut decoder = flate2::write::ZlibDecoder::new(Vec::new());
@@ -307,8 +310,8 @@ where
         let (children, children_pointer) = if is_leaf {
             (vec![], None)
         } else {
-            let pointers_length = u32_from_bytes(&buffer[read_pos..read_pos + 4])? as usize;
-            read_pos += 4;
+            let pointers_length = u32_from_bytes(&buffer[read_pos..read_pos + LEN_SIZE])? as usize;
+            read_pos += LEN_SIZE;
             let pointers: Vec<u64> = bincode_deserialize(&buffer[read_pos..read_pos + pointers_length])?;
             if nested {
                 let nodes: Result<Vec<BPlusTreeNode<K, V>>, io::Error> = pointers
@@ -338,15 +341,20 @@ pub(crate) struct BPlusTree<K, V> {
     dirty: bool,
 }
 
+fn calc_order<K, V>() -> (usize, usize) {
+    let key_size = size_of::<K>() + POINTER_SIZE + size_of::<bool>() + BINCODE_OVERHEAD;
+    let inner_order = BLOCK_SIZE / key_size;
+    let leaf_order = BLOCK_SIZE / (key_size + size_of::<V>() + BINCODE_OVERHEAD);
+    (inner_order, leaf_order)
+}
+
 impl<K, V> BPlusTree<K, V>
 where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
     pub(crate) fn new() -> Self {
-        let key_size = size_of::<K>() + POINTER_SIZE + size_of::<bool>() + BINCODE_OVERHEAD;
-        let inner_order = BLOCK_SIZE / key_size;
-        let leaf_order = BLOCK_SIZE / (key_size + size_of::<V>() + BINCODE_OVERHEAD);
+        let (inner_order, leaf_order) = calc_order::<K, V>();
         BPlusTree {
             root: BPlusTreeNode::<K, V>::new(true),
             inner_order,
@@ -356,9 +364,7 @@ where
     }
 
     fn new_with_root(root: BPlusTreeNode::<K, V>) -> Self {
-        let key_size = size_of::<K>() + POINTER_SIZE + size_of::<bool>() + BINCODE_OVERHEAD;
-        let inner_order = BLOCK_SIZE / key_size;
-        let leaf_order = BLOCK_SIZE / (key_size + size_of::<V>() + BINCODE_OVERHEAD);
+        let (inner_order, leaf_order) = calc_order::<K, V>();
         BPlusTree {
             root,
             inner_order,
@@ -398,7 +404,7 @@ where
 
     pub(crate) fn store(&mut self, filepath: &Path) -> io::Result<u64> {
         if self.dirty {
-            let mut file = OpenOptions::new().write(true).create(true).truncate(true).open(filepath)?;
+            let mut file = BufWriter::new(OpenOptions::new().write(true).create(true).truncate(true).open(filepath)?);
             let mut buffer = vec![0u8; BLOCK_SIZE];
             let result = self.root.serialize_to_block(&mut file, &mut buffer, 0u64);
             file.flush()?;
@@ -410,12 +416,10 @@ where
     }
 
     pub(crate) fn load(filepath: &Path) -> io::Result<Self> {
-        let mut file = File::open(filepath)?;
-        if is_multiple_of_block_size(&file).is_err() {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Tree file has to be multiple of block size {BLOCK_SIZE}")));
-        }
+        let file = is_file_valid(File::open(filepath)?)?;
+        let mut reader = BufReader::new(file);
         let mut buffer = vec![0u8; BLOCK_SIZE];
-        let (root, _) = BPlusTreeNode::deserialize_from_block(&mut file, &mut buffer, 0, true)?;
+        let (root, _) = BPlusTreeNode::deserialize_from_block(&mut reader, &mut buffer, 0, true)?;
         Ok(BPlusTree::new_with_root(root))
     }
 
@@ -427,7 +431,7 @@ where
     }
 }
 
-fn query_tree<K, V>(file: &mut File, key: &K) -> Option<V>
+fn query_tree<K, V, R: Read+Seek>(file: &mut R, key: &K) -> Option<V>
 where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
@@ -455,7 +459,7 @@ where
 }
 
 pub(crate) struct BPlusTreeQuery<K, V> {
-    file: File,
+    file: BufReader<File>,
     _marker_k: PhantomData<K>,
     _marker_v: PhantomData<V>,
 }
@@ -468,7 +472,7 @@ where
     pub(crate) fn try_new(filepath: &Path) -> io::Result<Self> {
         let file = is_file_valid(File::open(filepath)?)?;
         Ok(BPlusTreeQuery {
-            file,
+            file: BufReader::new(file),
             _marker_k: PhantomData,
             _marker_v: PhantomData,
         })
@@ -494,11 +498,10 @@ where
         if !filepath.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, format!("File not found {}", filepath.to_str().unwrap_or("?"))));
         }
-        let file = OpenOptions::new()
+        let file = is_file_valid(OpenOptions::new()
             .write(true)
             .read(true)
-            .open(filepath)?;
-        let file = is_file_valid(file)?;
+            .open(filepath)?)?;
         Ok(BPlusTreeUpdate {
             file,
             _marker_k: PhantomData,
@@ -507,7 +510,8 @@ where
     }
 
     pub(crate) fn query(&mut self, key: &K) -> Option<V> {
-        query_tree(&mut self.file, key)
+        let mut reader = BufReader::new(&mut self.file);
+        query_tree(&mut reader, key)
     }
 
     fn serialize_node(&mut self, offset: u64, node: &BPlusTreeNode<K, V>) -> io::Result<u64> {
@@ -520,8 +524,9 @@ where
     pub(crate) fn update(&mut self, key: &K, value: V) -> io::Result<u64> {
         let mut offset = 0;
         let mut buffer = vec![0u8; BLOCK_SIZE];
+        let mut reader =  BufReader::new(&mut self.file);
         loop {
-            match BPlusTreeNode::<K, V>::deserialize_from_block(&mut self.file, &mut buffer, offset, false) {
+            match BPlusTreeNode::<K, V>::deserialize_from_block(&mut reader, &mut buffer, offset, false) {
                 Ok((mut node, pointers)) => {
                     if node.is_leaf {
                         return match node.keys.binary_search(key) {
@@ -547,7 +552,6 @@ where
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -12,8 +12,7 @@ use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
 use crate::repository::bplustree::{BPlusTreeQuery, BPlusTreeUpdate};
-use crate::repository::indexed_document_reader::IndexedDocumentReader;
-use crate::repository::indexed_document_writer::IndexedDocumentWriter;
+use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentReader, IndexedDocumentWriter};
 use crate::repository::storage::{get_target_id_mapping_file, get_target_storage_path, hash_string};
 use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
@@ -26,6 +25,15 @@ macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
         create_m3u_filter_error!(M3uFilterErrorKind::Notify, "failed to write xtream playlist: {} - {}", $path.to_str().unwrap() ,$err)
     }
+}
+
+macro_rules! try_option_ok {
+    ($option:expr) => {
+        match $option {
+            Some(value) => value,
+            None => return Ok(()),
+        }
+    };
 }
 
 fn get_collection_path(path: &Path, collection: &str) -> PathBuf {
@@ -142,91 +150,103 @@ pub(crate) fn xtream_get_file_paths_for_series(storage_path: &Path) -> (PathBuf,
     xtream_get_file_paths_for_name(storage_path, "series")
 }
 
+fn xtream_garbage_collect(config: &Config, target_name: &str) -> std::io::Result<()> {
+    // Garbage collect series
+    let storage_path = try_option_ok!(xtream_get_storage_path(config, target_name));
+    let (info_path, idx_path) = try_option_ok!(xtream_get_info_file_paths(&storage_path, XtreamCluster::Series));
+    {
+        let _file_lock = config.file_locks.write_lock(&info_path)?;
+        IndexedDocumentGarbageCollector::new(info_path, idx_path)?.garbage_collect()?;
+    }
+    Ok(())
+}
+
 pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
-    match ensure_xtream_storage_path(cfg, target.name.as_str()) {
-        Ok(path) => {
-            let mut cat_live_col = vec![];
-            let mut cat_series_col = vec![];
-            let mut cat_vod_col = vec![];
-            let mut live_col = vec![];
-            let mut series_col = vec![];
-            let mut vod_col = vec![];
-            let mut errors = Vec::new();
+    let path = ensure_xtream_storage_path(cfg, target.name.as_str())?;
+    let mut errors = Vec::new();
+    let mut cat_live_col = vec![];
+    let mut cat_series_col = vec![];
+    let mut cat_vod_col = vec![];
+    let mut live_col = vec![];
+    let mut series_col = vec![];
+    let mut vod_col = vec![];
 
-            // preserve category_ids
-            let (max_cat_id, existing_cat_ids) = load_old_category_ids(&path);
-            let mut cat_id_counter = max_cat_id;
-            for plg in playlist.iter_mut() {
-                if !&plg.channels.is_empty() {
-                    let cat_id = existing_cat_ids.get(plg.title.as_ref()).unwrap_or_else(|| {
-                        cat_id_counter += 1;
-                        &cat_id_counter
-                    });
-                    plg.id = *cat_id;
+    // preserve category_ids
+    let (max_cat_id, existing_cat_ids) = load_old_category_ids(&path);
+    let mut cat_id_counter = max_cat_id;
+    for plg in playlist.iter_mut() {
+        if !&plg.channels.is_empty() {
+            let cat_id = existing_cat_ids.get(plg.title.as_ref()).unwrap_or_else(|| {
+                cat_id_counter += 1;
+                &cat_id_counter
+            });
+            plg.id = *cat_id;
 
-                    match &plg.xtream_cluster {
-                        XtreamCluster::Live => &mut cat_live_col,
-                        XtreamCluster::Series => &mut cat_series_col,
-                        XtreamCluster::Video => &mut cat_vod_col,
-                    }.push(json!({
-                      "category_id": format!("{}", &cat_id),
-                      "category_name": plg.title.clone(),
-                      "parent_id": 0
-                    }));
+            match &plg.xtream_cluster {
+                XtreamCluster::Live => &mut cat_live_col,
+                XtreamCluster::Series => &mut cat_series_col,
+                XtreamCluster::Video => &mut cat_vod_col,
+            }.push(json!({
+              "category_id": format!("{}", &cat_id),
+              "category_name": plg.title.clone(),
+              "parent_id": 0
+            }));
 
-                    for pli in plg.channels.drain(..) {
-                        let mut header = pli.header.borrow_mut();
-                        // we skip resolved series, because this is only necessary when writing m3u files
-                        let col = if header.item_type == PlaylistItemType::Series {
-                            None
-                        } else if header.get_provider_id().is_some() {
-                            header.category_id = *cat_id;
-                            Some(match header.xtream_cluster {
-                                XtreamCluster::Live => &mut live_col,
-                                XtreamCluster::Series => &mut series_col,
-                                XtreamCluster::Video => &mut vod_col,
-                            })
-                        } else {
-                            let title = header.title.as_str();
-                            errors.push(format!("Channel does not have an id: {title}"));
-                            None
-                        };
-                        drop(header);
-                        if let Some(pl) = col {
-                            pl.push(pli);
-                        }
-                    }
+            for pli in plg.channels.drain(..) {
+                let mut header = pli.header.borrow_mut();
+                // we skip resolved series, because this is only necessary when writing m3u files
+                let col = if header.item_type == PlaylistItemType::Series {
+                    None
+                } else if header.get_provider_id().is_some() {
+                    header.category_id = *cat_id;
+                    Some(match header.xtream_cluster {
+                        XtreamCluster::Live => &mut live_col,
+                        XtreamCluster::Series => &mut series_col,
+                        XtreamCluster::Video => &mut vod_col,
+                    })
+                } else {
+                    let title = header.title.as_str();
+                    errors.push(format!("Channel does not have an id: {title}"));
+                    None
+                };
+                drop(header);
+                if let Some(pl) = col {
+                    pl.push(pli);
                 }
-            }
-
-            for (col_path, data) in [
-                (get_collection_path(&path, COL_CAT_LIVE), &cat_live_col),
-                (get_collection_path(&path, COL_CAT_VOD), &cat_vod_col),
-                (get_collection_path(&path, COL_CAT_SERIES), &cat_series_col)] {
-                match json_write_documents_to_file(&col_path, data) {
-                    Ok(()) => {}
-                    Err(err) => {
-                        errors.push(format!("Persisting collection failed: {}: {}", &col_path.to_str().unwrap(), err));
-                    }
-                }
-            }
-
-            match write_playlists_to_file(cfg, &path, vec![
-                (XtreamCluster::Live, &mut live_col),
-                (XtreamCluster::Video, &mut vod_col),
-                (XtreamCluster::Series, &mut series_col)]) {
-                Ok(()) => {}
-                Err(err) => {
-                    errors.push(format!("Persisting collection failed:{err}"));
-                }
-            }
-
-            if !errors.is_empty() {
-                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", errors.join("\n"));
             }
         }
-        Err(err) => return Err(err)
     }
+
+    for (col_path, data) in [
+        (get_collection_path(&path, COL_CAT_LIVE), &cat_live_col),
+        (get_collection_path(&path, COL_CAT_VOD), &cat_vod_col),
+        (get_collection_path(&path, COL_CAT_SERIES), &cat_series_col)] {
+        match json_write_documents_to_file(&col_path, data) {
+            Ok(()) => {}
+            Err(err) => {
+                errors.push(format!("Persisting collection failed: {}: {}", &col_path.to_str().unwrap(), err));
+            }
+        }
+    }
+
+    match write_playlists_to_file(cfg, &path, vec![
+        (XtreamCluster::Live, &mut live_col),
+        (XtreamCluster::Video, &mut vod_col),
+        (XtreamCluster::Series, &mut series_col)]) {
+        Ok(()) => {
+            if let Err(err) = xtream_garbage_collect(cfg, &target.name) {
+                errors.push(format!("Garbage collection failed:{err}"));
+            }
+        }
+        Err(err) => {
+            errors.push(format!("Persisting collection failed:{err}"));
+        }
+    }
+
+    if !errors.is_empty() {
+        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", errors.join("\n"));
+    }
+
     Ok(())
 }
 
@@ -331,14 +351,6 @@ pub(crate) fn xtream_load_rewrite_playlist(cluster: XtreamCluster, config: &Conf
     }
     Err(Error::new(ErrorKind::Other, format!("Failed to find xtream storage for target {}", &target.name)))
 }
-macro_rules! try_option_ok {
-    ($option:expr) => {
-        match $option {
-            Some(value) => value,
-            None => return Ok(()),
-        }
-    };
-}
 
 pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
                                        series_info_id: u32,
@@ -350,10 +362,6 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
     {
         let _file_lock = config.file_locks.write_lock(&info_path)?;
         let mut writer = IndexedDocumentWriter::new_append(info_path.clone(), idx_path)?;
-
-        // TODO if the series_info is expried, the new data is appended. The old data is wasted.
-        // file grows at each update
-
         writer
             .write_doc(series_info_id, content)
             .map_err(|_| Error::new(ErrorKind::Other, format!("failed to write xtream series info for target {target_name}")))?;
