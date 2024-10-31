@@ -11,28 +11,24 @@ use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::repository::indexed_document::{IndexedDocumentReader, IndexedDocumentWriter};
-use crate::repository::storage::ensure_target_storage_path;
+use crate::repository::storage::{ensure_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::utils::file_utils;
 
+const FILE_M3U: &str = "m3u";
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
         create_m3u_filter_error!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
     }
 }
 
-fn m3u_get_base_file_path(target_path: &Path) -> PathBuf {
-    target_path.join(PathBuf::from("m3u.db"))
-}
-
 pub(crate) fn m3u_get_file_paths(target_path: &Path) -> (PathBuf, PathBuf) {
-    let m3u_path = m3u_get_base_file_path(target_path);
-    let extension = m3u_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or("")));
-    let index_path = m3u_path.with_extension(format!("{}idx", &extension.unwrap_or_default()));
+    let m3u_path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_DB}")));
+    let index_path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_INDEX}")));
     (m3u_path, index_path)
 }
 
 pub(crate) fn m3u_get_epg_file_path(target_path: &Path) -> PathBuf {
-    let path = m3u_get_base_file_path(target_path);
+    let path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_DB}")));
     file_utils::add_prefix_to_filename(&path, "epg_", Some("xml"))
 }
 

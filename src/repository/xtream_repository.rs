@@ -13,13 +13,21 @@ use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType, Xtre
 use crate::model::xtream::XtreamMappingOptions;
 use crate::repository::bplustree::{BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentReader, IndexedDocumentWriter};
-use crate::repository::storage::{get_target_id_mapping_file, get_target_storage_path, hash_string};
+use crate::repository::storage::{get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 
 pub(crate) static COL_CAT_LIVE: &str = "cat_live";
 pub(crate) static COL_CAT_SERIES: &str = "cat_series";
 pub(crate) static COL_CAT_VOD: &str = "cat_vod";
+const FILE_SERIES_EPISODES: &str = "series_episodes";
+const FILE_SERIES: &str = "series";
+const FILE_EPG: &str = "epg.xml";
+const PATH_XTREAM: &str = "xtream";
+const TAG_CATEGORY_ID: &str = "category_id";
+const TAG_CATEGORY_NAME: &str = "category_name";
+const TAG_DIRECT_SOURCE: &str = "direct_source";
+const TAG_PARENT_ID: &str = "parent_id";
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
@@ -55,9 +63,8 @@ fn ensure_xtream_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf
 
 fn xtream_get_info_file_paths(storage_path: &Path, cluster: XtreamCluster) -> Option<(PathBuf, PathBuf)> {
     if cluster == XtreamCluster::Series {
-        let xtream_path = storage_path.join("series_episodes.db");
-        let extension = xtream_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or("")));
-        let index_path = xtream_path.with_extension(format!("{}idx", &extension.unwrap_or_default()));
+        let xtream_path = storage_path.join(format!("{FILE_SERIES_EPISODES}.{FILE_SUFFIX_DB}"));
+        let index_path = storage_path.join(format!("{FILE_SERIES_EPISODES}.{FILE_SUFFIX_INDEX}"));
         return Some((xtream_path, index_path));
     }
     None
@@ -111,8 +118,8 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
                 let reader = BufReader::new(file);
                 for entry in json_iter_array::<Value, BufReader<File>>(reader).flatten() {
                     if let Some(item) = entry.as_object() {
-                        if let Some(category_id) = get_map_item_as_str(item, "category_id") {
-                            if let Some(category_name) = get_map_item_as_str(item, "category_name") {
+                        if let Some(category_id) = get_map_item_as_str(item, TAG_CATEGORY_ID) {
+                            if let Some(category_name) = get_map_item_as_str(item, TAG_CATEGORY_NAME) {
                                 if let Ok(cat_id) = category_id.parse::<u32>() {
                                     result.insert(category_name, cat_id);
                                     max_id = max_id.max(cat_id);
@@ -128,17 +135,16 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
 }
 
 pub(crate) fn xtream_get_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
-    get_target_storage_path(cfg, target_name).map(|target_path| target_path.join(PathBuf::from("xtream")))
+    get_target_storage_path(cfg, target_name).map(|target_path| target_path.join(PathBuf::from(PATH_XTREAM)))
 }
 
 pub(crate) fn xtream_get_epg_file_path(path: &Path) -> PathBuf {
-    path.join("epg.xml")
+    path.join(FILE_EPG)
 }
 
 fn xtream_get_file_paths_for_name(storage_path: &Path, name: &str) -> (PathBuf, PathBuf) {
-    let xtream_path = storage_path.join(format!("{name}.db"));
-    let extension = xtream_path.extension().map(|ext| format!("{}_", ext.to_str().unwrap_or("")));
-    let index_path = xtream_path.with_extension(format!("{}idx", &extension.unwrap_or_default()));
+    let xtream_path = storage_path.join(format!("{name}.{FILE_SUFFIX_DB}"));
+    let index_path = storage_path.join(format!("{name}.{FILE_SUFFIX_INDEX}"));
     (xtream_path, index_path)
 }
 
@@ -147,7 +153,7 @@ pub(crate) fn xtream_get_file_paths(storage_path: &Path, cluster: XtreamCluster)
 }
 
 pub(crate) fn xtream_get_file_paths_for_series(storage_path: &Path) -> (PathBuf, PathBuf) {
-    xtream_get_file_paths_for_name(storage_path, "series")
+    xtream_get_file_paths_for_name(storage_path, FILE_SERIES)
 }
 
 fn xtream_garbage_collect(config: &Config, target_name: &str) -> std::io::Result<()> {
@@ -187,9 +193,9 @@ pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlis
                 XtreamCluster::Series => &mut cat_series_col,
                 XtreamCluster::Video => &mut cat_vod_col,
             }.push(json!({
-              "category_id": format!("{}", &cat_id),
-              "category_name": plg.title.clone(),
-              "parent_id": 0
+              TAG_CATEGORY_ID: format!("{}", &cat_id),
+              TAG_CATEGORY_NAME: plg.title.clone(),
+              TAG_PARENT_ID: 0
             }));
 
             for pli in plg.channels.drain(..) {
@@ -235,7 +241,9 @@ pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlis
         (XtreamCluster::Series, &mut series_col)]) {
         Ok(()) => {
             if let Err(err) = xtream_garbage_collect(cfg, &target.name) {
-                errors.push(format!("Garbage collection failed:{err}"));
+                if err.kind() != ErrorKind::NotFound {
+                    errors.push(format!("Garbage collection failed:{err}"));
+                }
             }
         }
         Err(err) => {
@@ -457,7 +465,7 @@ pub(crate) fn write_and_get_xtream_series_info(
                     episode.insert("id".to_string(), Value::String(virtual_id.to_string()));
                 }
                 if options.skip_series_direct_source {
-                    episode.insert("direct_source".to_string(), Value::String(String::new()));
+                    episode.insert(TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
                 }
             }
         }
