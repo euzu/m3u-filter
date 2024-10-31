@@ -454,6 +454,9 @@ mod tests {
                 })?;
             }
 
+            let size_main_file_1 = std::fs::metadata(&main_path)?.len();
+
+            // update same block, file size should not increase
             for i in 0u32..=500 {
                 idw.write_doc(i, &Record {
                     id: i,
@@ -461,6 +464,8 @@ mod tests {
                 })?;
             }
 
+            let size_main_file_2 = std::fs::metadata(&main_path)?.len();
+            assert_eq!(size_main_file_1, size_main_file_2, "Failed, the filesize should be the same");
 
             // fragmentation
             for i in 0u32..=500 {
@@ -470,11 +475,19 @@ mod tests {
                 })?;
             }
 
+            let size_main_file_3 = std::fs::metadata(&main_path)?.len();
+            assert!(size_main_file_1 < size_main_file_3, "Failed, the filesize should be greater");
+
             idw.store()?;
         }
         {
+            let size_main_file_4 = std::fs::metadata(&main_path)?.len();
+
             let mut gc = IndexedDocumentGarbageCollector::new(main_path.clone(), index_path.clone())?;
             gc.garbage_collect()?;
+
+            let size_main_file_5 = std::fs::metadata(&main_path)?.len();
+            assert!(size_main_file_5 < size_main_file_4, "Failed, the filesize should be less");
         }
         {
             let reader = IndexedDocumentReader::<Record>::new(&main_path, &index_path)?;
