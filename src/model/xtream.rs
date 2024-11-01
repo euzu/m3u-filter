@@ -113,6 +113,7 @@ pub(crate) struct XtreamCategory {
     #[serde(deserialize_with = "deserialize_as_rc_string")]
     pub category_name: Rc<String>,
     //pub parent_id: i32,
+    #[serde(default)]
     pub channels: Vec<PlaylistItem>,
 }
 

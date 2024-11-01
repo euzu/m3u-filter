@@ -140,11 +140,13 @@ pub(crate) struct PlaylistItemHeader {
     pub epg_channel_id: Option<Rc<String>>,
     pub xtream_cluster: XtreamCluster,
     pub additional_properties: Option<Value>,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub item_type: PlaylistItemType,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub series_fetched: bool, // only used for series_info
+    #[serde(default)]
     pub category_id: u32,
+    #[serde(default)]
     pub input_id: u16,
 }
 

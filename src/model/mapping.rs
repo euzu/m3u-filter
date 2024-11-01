@@ -21,8 +21,11 @@ use crate::utils::string_utils::Capitalize;
 pub(crate) struct MappingTag {
     pub name: String,
     pub captures: Vec<String>,
+    #[serde(default)]
     pub concat: String,
+    #[serde(default)]
     pub prefix: String,
+    #[serde(default)]
     pub suffix: String,
 }
 
@@ -79,8 +82,11 @@ impl FromStr for CounterModifier {
 pub(crate) struct MappingCounterDefinition {
     pub filter: String,
     pub field: String,
+    #[serde(default)]
     pub concat: String,
+    #[serde(default)]
     pub modifier: CounterModifier,
+    #[serde(default)]
     pub value: u32,
 }
 
@@ -177,10 +183,15 @@ impl MapperTransform {
 pub(crate) struct Mapper {
     pub filter: Option<String>,
     pub pattern: String,
+    #[serde(default)]
     attributes: HashMap<String, String>,
+    #[serde(default)]
     suffix: HashMap<String, String>,
+    #[serde(default)]
     prefix: HashMap<String, String>,
+    #[serde(default)]
     assignments: HashMap<String, String>,
+    #[serde(default)]
     transform: Option<Vec<MapperTransform>>,
     #[serde(skip_serializing, skip_deserializing)]
     pub(crate) t_filter: Option<Filter>,
@@ -428,6 +439,7 @@ impl ValueProcessor for MappingValueProcessor<'_> {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct Mapping {
     pub id: String,
+    #[serde(default)]
     pub match_as_ascii: bool,
     pub mapper: Vec<Mapper>,
     pub counter: Option<Vec<MappingCounterDefinition>>,

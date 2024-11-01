@@ -246,8 +246,11 @@ impl ConfigSortChannel {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigSort {
+    #[serde(default)]
     pub match_as_ascii: bool,
+    #[serde(default)]
     pub groups: Option<ConfigSortGroup>,
+    #[serde(default)]
     pub channels: Option<Vec<ConfigSortChannel>>,
 }
 
@@ -283,9 +286,13 @@ impl ConfigRename {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigTargetOptions {
+    #[serde(default)]
     pub ignore_logo: bool,
+    #[serde(default)]
     pub underscore_whitespace: bool,
+    #[serde(default)]
     pub cleanup: bool,
+    #[serde(default)]
     pub kodi_style: bool,
     #[serde(default = "default_as_true")]
     pub xtream_skip_live_direct_source: bool,
@@ -293,6 +300,7 @@ pub(crate) struct ConfigTargetOptions {
     pub xtream_skip_video_direct_source: bool,
     #[serde(default = "default_as_true")]
     pub xtream_skip_series_direct_source: bool,
+    #[serde(default)]
     pub xtream_resolve_series: bool,
     #[serde(default = "default_as_two_u16")]
     pub xtream_resolve_series_delay: u16,
@@ -314,24 +322,27 @@ pub(crate) struct ConfigTarget {
     pub enabled: bool,
     #[serde(default = "default_as_default")]
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<ConfigTargetOptions>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<ConfigSort>,
+    #[serde(default)]
     pub filter: String,
+    #[serde(default)]
     pub output: Vec<TargetOutput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rename: Option<Vec<ConfigRename>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mapping: Option<Vec<String>>,
+    #[serde(default)]
     pub processing_order: ProcessingOrder,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub watch: Option<Vec<String>>,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub t_watch_re: Option<Vec<regex::Regex>>,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub t_filter: Option<Filter>,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub t_mapping: Option<Vec<Mapping>>,
 }
 
@@ -495,8 +506,11 @@ impl FromStr for InputType {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigInputOptions {
+    #[serde(default)]
     pub xtream_skip_live: bool,
+    #[serde(default)]
     pub xtream_skip_vod: bool,
+    #[serde(default)]
     pub xtream_skip_series: bool,
 }
 
@@ -510,27 +524,29 @@ pub(crate) struct InputUserInfo {
 pub(crate) struct ConfigInput {
     #[serde(skip)]
     pub id: u16,
-    #[serde(rename = "type")]
+    #[serde(default, rename = "type")]
     pub input_type: InputType,
+    #[serde(default)]
     pub headers: HashMap<String, String>,
+    #[serde(default)]
     pub url: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub epg_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persist: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prefix: Option<InputAffix>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suffix: Option<InputAffix>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(default = "default_as_true")]
     pub enabled: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<ConfigInputOptions>,
 
 }
@@ -608,6 +624,7 @@ impl ConfigInput {
 pub(crate) struct ConfigApi {
     pub host: String,
     pub port: u16,
+    #[serde(default)]
     pub web_root: String,
 }
 
@@ -632,31 +649,39 @@ pub(crate) struct RestMessagingConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct MessagingConfig {
+    #[serde(default)]
     pub notify_on: Vec<MsgKind>,
+    #[serde(default)]
     pub telegram: Option<TelegramMessagingConfig>,
+    #[serde(default)]
     pub rest: Option<RestMessagingConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct VideoDownloadConfig {
+    #[serde(default)]
     pub headers: HashMap<String, String>,
+    #[serde(default)]
     pub directory: Option<String>,
+    #[serde(default)]
     pub organize_into_directories: bool,
+    #[serde(default)]
     pub episode_pattern: Option<String>,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub t_re_episode_pattern: Option<regex::Regex>,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub t_re_filename: Option<regex::Regex>,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub t_re_remove_filename_ending: Option<regex::Regex>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct VideoConfig {
+    #[serde(default)]
     pub extensions: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub download: Option<VideoDownloadConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub web_search: Option<String>,
 }
 
@@ -692,12 +717,18 @@ impl VideoConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigDto {
+    #[serde(default)]
     pub threads: u8,
     pub api: ConfigApi,
+    #[serde(default)]
     pub working_dir: String,
+    #[serde(default)]
     pub backup_dir: Option<String>,
+    #[serde(default)]
     pub video: Option<VideoConfig>,
+    #[serde(default)]
     pub schedule: Option<String>,
+    #[serde(default)]
     pub messaging: Option<MessagingConfig>,
 }
 
@@ -792,18 +823,26 @@ impl WebAuthConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct Config {
+    #[serde(default)]
     pub threads: u8,
     pub api: ConfigApi,
     pub sources: Vec<ConfigSource>,
     pub working_dir: String,
+    #[serde(default)]
     pub backup_dir: Option<String>,
+    #[serde(default)]
     pub templates: Option<Vec<PatternTemplate>>,
+    #[serde(default)]
     pub video: Option<VideoConfig>,
+    #[serde(default)]
     pub schedule: Option<String>,
+    #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]
     pub web_ui_enabled: bool,
+    #[serde(default)]
     pub web_auth: Option<WebAuthConfig>,
+    #[serde(default)]
     pub messaging: Option<MessagingConfig>,
     #[serde(skip_serializing, skip_deserializing)]
     pub t_api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
