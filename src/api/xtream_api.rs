@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use actix_web::{HttpRequest, HttpResponse, web};
 use bytes::Bytes;
-use futures::stream;
+use futures::stream::{self, StreamExt};
 use log::{debug, error};
 use serde_json::{Map, Value};
 
@@ -497,7 +497,11 @@ async fn xtream_player_api(
                         } {
                             Ok(xtream_iter) => {
                                 // Convert the iterator into a stream of `Bytes`
-                                let content_stream = stream::iter(xtream_iter.map(|line| Ok::<Bytes, String>(Bytes::from(line))));
+                                let mut first_item = true;
+                                let content_stream = stream::iter(xtream_iter.map(move |line| {
+                                    let line = if first_item {first_item = false;format!("[{line}")} else {format!(",{line}")};
+                                    Ok::<Bytes, String>(Bytes::from(line))
+                                })).chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) }));
                                 HttpResponse::Ok()
                                     .content_type(mime::APPLICATION_JSON)
                                     .streaming(content_stream)
