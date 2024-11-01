@@ -437,17 +437,17 @@ impl ConfigSource {
         Ok(index + (self.inputs.len() as u16))
     }
 
-    pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
-        for target in &self.targets {
-            if target.name.eq(target_name) {
-                let inputs = self.inputs.iter().filter(|&i| i.enabled).collect::<Vec<&ConfigInput>>();
-                if !inputs.is_empty() {
-                    return Some(inputs);
-                }
-            }
-        }
-        None
-    }
+    // pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
+    //     for target in &self.targets {
+    //         if target.name.eq(target_name) {
+    //             let inputs = self.inputs.iter().filter(|&i| i.enabled).collect::<Vec<&ConfigInput>>();
+    //             if !inputs.is_empty() {
+    //                 return Some(inputs);
+    //             }
+    //         }
+    //     }
+    //     None
+    // }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -840,14 +840,14 @@ impl Config {
         }
     }
 
-    pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
-        for source in &self.sources {
-            if let Some(cfg) = source.get_inputs_for_target(target_name) {
-                return Some(cfg);
-            }
-        }
-        None
-    }
+    // pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
+    //     for source in &self.sources {
+    //         if let Some(cfg) = source.get_inputs_for_target(target_name) {
+    //             return Some(cfg);
+    //         }
+    //     }
+    //     None
+    // }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
         match self.t_api_proxy.read().unwrap().as_ref() {

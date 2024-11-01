@@ -2,9 +2,8 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use actix_web::{HttpRequest, HttpResponse, web, http::header};
-use log::{debug, info};
+use log::{info};
 use quick_xml::{Reader, Writer};
-use url::{ParseError};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use quick_xml::events::{BytesStart, Event};
@@ -13,13 +12,13 @@ use chrono::{Duration, NaiveDateTime, TimeDelta};
 
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::api::api_utils::{get_user_target, serve_file};
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigInput, ConfigTarget};
+use crate::model::api_proxy::{ProxyUserCredentials};
+use crate::model::config::{Config, ConfigTarget};
 use crate::model::config::TargetType;
 use crate::repository::m3u_repository::m3u_get_epg_file_path;
 use crate::repository::storage::get_target_storage_path;
 use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
-use crate::utils::{file_utils, request_utils};
+use crate::utils::{file_utils};
 
 fn time_correct(date_time: &str, correction: &TimeDelta) -> String {
     // Split the dateTime string into date and time parts
@@ -194,64 +193,14 @@ async fn xmltv_api(
     if let Some((user, target)) = get_user_target(&api_req, &app_state) {
         match get_epg_path_for_target(&app_state.config, target) {
             None => {
-                // No epg configured, we try to figure out an epg url and redirect.
-                // No processing or timeshift 
-                if let Some(value) = get_xmltv_raw_epg(&app_state.config, &user, &target.name).await {
-                    return value;
-                }
+                // No epg configured,  No processing or timeshift, epg can't be mapped to the channels.
+                // we do not deliver epg
             }
             Some(epg_path) => return serve_epg(&epg_path, &req, &user).await
         }
     }
     HttpResponse::Ok().content_type(mime::TEXT_XML).body(
         r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)
-}
-
-fn get_xmltv_epg_url(input: &ConfigInput) -> Result<String, ParseError> {
-    let epg_url = input.epg_url.as_ref().map_or(String::new(), std::borrow::ToOwned::to_owned);
-    if epg_url.is_empty() {
-        if let Some(user_info) = input.get_user_info() {
-            let url = user_info.base_url.as_str();
-            let username = user_info.username.as_str();
-            let password = user_info.password.as_str();
-            Ok(format!("{url}/xmltv.php?username={username}&password={password}"))
-        } else {
-            Err(ParseError::EmptyHost)
-        }
-    } else {
-        Ok(epg_url)
-    }
-}
-
-async fn get_xmltv_raw_epg(config: &Config, user: &ProxyUserCredentials, target_name: &str) -> Option<HttpResponse> {
-    // If no epg_url is provided for input, we did not process the xmltv for our channels.
-    // We are now delivering the original untouched xmltv.
-    // If you want to use xmltv then provide the url in the config to filter unnecessary content.
-    // If you have multiple xtream sources, no response because of mapped ids
-    // if you want epg for multi xtream input, then provide  epg_url.
-    if let Some(inputs) = config.get_inputs_for_target(target_name) {
-        if inputs.len() == 1 {
-            if let Some(&input) = inputs.first() {
-                if let Ok(url) = get_xmltv_epg_url(input) {
-                    if user.proxy == ProxyType::Redirect {
-                        debug!("Redirecting epg request to {}", url.as_str());
-                        return Some(HttpResponse::Found().insert_header(("Location", url.as_str())).finish());
-                    }
-                    match request_utils::download_text_content(input, url.as_str(), None).await {
-                        Ok(content) => return Some(HttpResponse::Ok().content_type(mime::TEXT_XML).body(content)),
-                        Err(err) => {
-                            debug!("Could not generate epg url for {target_name} {err}");
-                        }
-                    }
-                } else {
-                    debug!("Could not generate epg url for {target_name}");
-                }
-            }
-        } else {
-            debug!("No epg_url is provided for target {target_name}, multi input requires epg_url");
-        }
-    }
-    None
 }
 
 pub(crate) fn xmltv_api_register(cfg: &mut web::ServiceConfig) {

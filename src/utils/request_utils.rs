@@ -14,6 +14,9 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
 use crate::utils::file_utils::{get_file_path, persist_file};
 
+const ENCODING_GZIP: &str = "gzip";
+const ENCODING_DEFLATE: &str = "deflate";
+
 fn is_gzip(bytes: &[u8]) -> bool {
     // Gzip files start with the bytes 0x1F 0x8B
     bytes.len() >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B
@@ -144,19 +147,19 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
                 match response.bytes().await {
                     Ok(bytes) => {
                         if bytes.len() >= 2 && is_gzip(&bytes[0..2]) {
-                            encoding = Some("gzip".to_string());
+                            encoding = Some(ENCODING_GZIP.to_string());
                         }
                         let mut decode_buffer = String::new();
                         if let Some(encoding_type) = encoding {
                             match encoding_type.as_str() {
-                                "gzip" => {
+                                ENCODING_GZIP => {
                                     let mut decoder = GzDecoder::new(&bytes[..]);
                                     match decoder.read_to_string(&mut decode_buffer) {
                                         Ok(_) => {}
                                         Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
                                     };
                                 }
-                                "deflate" => {
+                                ENCODING_DEFLATE => {
                                     let mut decoder = ZlibDecoder::new(&bytes[..]);
                                     match decoder.read_to_string(&mut decode_buffer) {
                                         Ok(_) => {}
