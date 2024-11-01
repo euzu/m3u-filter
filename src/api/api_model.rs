@@ -11,7 +11,6 @@ use unidecode::unidecode;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigApi, ConfigRename, ConfigSort, ConfigTargetOptions, InputType, MessagingConfig, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig};
 use crate::model::config::ProcessingOrder;
-use crate::utils::default_utils::default_as_empty_str;
 
 /// File-Download information.
 #[derive(Clone)]
@@ -200,33 +199,20 @@ impl XtreamAuthorizationResponse {
 }
 
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct UserApiRequest {
-    #[serde(default = "default_as_empty_str")]
     pub username: String,
-    #[serde(default = "default_as_empty_str")]
     pub password: String,
-    #[serde(default = "default_as_empty_str")]
     pub token: String,
-    #[serde(default = "default_as_empty_str")]
     pub action: String,
-    #[serde(default = "default_as_empty_str")]
     pub series_id: String,
-    #[serde(default = "default_as_empty_str")]
     pub vod_id: String,
-    #[serde(default = "default_as_empty_str")]
     pub stream_id: String,
-    #[serde(default = "default_as_empty_str")]
     pub category_id: String,
-    #[serde(default = "default_as_empty_str")]
     pub limit: String,
-    #[serde(default = "default_as_empty_str")]
     pub start: String,
-    #[serde(default = "default_as_empty_str")]
     pub end: String,
-    #[serde(default = "default_as_empty_str")]
     pub stream: String,
-    #[serde(default = "default_as_empty_str")]
     pub duration: String,
 }
 

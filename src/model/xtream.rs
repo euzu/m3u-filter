@@ -8,7 +8,6 @@ use serde_json::{Map, Value};
 
 use crate::model::config::ConfigTargetOptions;
 use crate::model::playlist::{PlaylistItem, XtreamCluster, XtreamPlaylistItem};
-use crate::utils::default_utils::{default_as_empty_list, default_as_empty_rc_str};
 
 const LIVE_STREAM_FIELDS: &[&str] = &[];
 
@@ -107,14 +106,13 @@ where
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub(crate) struct XtreamCategory {
     #[serde(deserialize_with = "deserialize_as_rc_string")]
     pub category_id: Rc<String>,
     #[serde(deserialize_with = "deserialize_as_rc_string")]
     pub category_name: Rc<String>,
     //pub parent_id: i32,
-    #[serde(default = "default_as_empty_list")]
     pub channels: Vec<PlaylistItem>,
 }
 
@@ -134,9 +132,9 @@ pub(crate) struct XtreamStream {
     pub stream_id: Option<u32>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub series_id: Option<u32>,
-    #[serde(default = "default_as_empty_rc_str", deserialize_with = "deserialize_as_rc_string")]
+    #[serde(default, deserialize_with = "deserialize_as_rc_string")]
     pub stream_icon: Rc<String>,
-    #[serde(default = "default_as_empty_rc_str", deserialize_with = "deserialize_as_rc_string")]
+    #[serde(default, deserialize_with = "deserialize_as_rc_string")]
     pub direct_source: Rc<String>,
 
     // optional attributes

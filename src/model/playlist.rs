@@ -12,7 +12,6 @@ use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
 use crate::processing::m3u_parser::extract_id_from_url;
 use crate::repository::storage::hash_string;
-use crate::utils::default_utils::{default_as_false, default_as_zero_u16, default_as_zero_u32};
 
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
@@ -143,11 +142,9 @@ pub(crate) struct PlaylistItemHeader {
     pub additional_properties: Option<Value>,
     #[serde(skip_serializing, skip_deserializing)]
     pub item_type: PlaylistItemType,
-    #[serde(default = "default_as_false", skip_serializing, skip_deserializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub series_fetched: bool, // only used for series_info
-    #[serde(default = "default_as_zero_u32")]
     pub category_id: u32,
-    #[serde(default = "default_as_zero_u16")]
     pub input_id: u16,
 }
 

@@ -21,9 +21,7 @@ use crate::model::api_proxy::{ApiProxyConfig, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
 use crate::utils::{config_reader, file_utils};
-use crate::utils::default_utils::{default_as_default, default_as_false, default_as_true,
-                                  default_as_empty_list, default_as_frm, default_as_empty_map,
-                                  default_as_zero_u8, default_as_two_u16};
+use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
 use crate::utils::file_lock_manager::FileLockManager;
 
 pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
@@ -111,9 +109,10 @@ impl Display for TargetType {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Default)]
 pub(crate) enum ProcessingOrder {
     #[serde(rename = "frm")]
+    #[default]
     Frm,
     #[serde(rename = "fmr")]
     Fmr,
@@ -245,9 +244,8 @@ impl ConfigSortChannel {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigSort {
-    #[serde(default = "default_as_false")]
     pub match_as_ascii: bool,
     pub groups: Option<ConfigSortGroup>,
     pub channels: Option<Vec<ConfigSortChannel>>,
@@ -283,15 +281,11 @@ impl ConfigRename {
 }
 
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigTargetOptions {
-    #[serde(default = "default_as_false")]
     pub ignore_logo: bool,
-    #[serde(default = "default_as_false")]
     pub underscore_whitespace: bool,
-    #[serde(default = "default_as_false")]
     pub cleanup: bool,
-    #[serde(default = "default_as_false")]
     pub kodi_style: bool,
     #[serde(default = "default_as_true")]
     pub xtream_skip_live_direct_source: bool,
@@ -299,7 +293,6 @@ pub(crate) struct ConfigTargetOptions {
     pub xtream_skip_video_direct_source: bool,
     #[serde(default = "default_as_true")]
     pub xtream_skip_series_direct_source: bool,
-    #[serde(default = "default_as_false")]
     pub xtream_resolve_series: bool,
     #[serde(default = "default_as_two_u16")]
     pub xtream_resolve_series_delay: u16,
@@ -313,7 +306,7 @@ pub(crate) struct TargetOutput {
     pub filename: Option<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigTarget {
     #[serde(skip)]
     pub id: u16,
@@ -326,13 +319,11 @@ pub(crate) struct ConfigTarget {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort: Option<ConfigSort>,
     pub filter: String,
-    #[serde(alias = "type", default = "default_as_empty_list")]
     pub output: Vec<TargetOutput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rename: Option<Vec<ConfigRename>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mapping: Option<Vec<String>>,
-    #[serde(default = "default_as_frm")]
     pub processing_order: ProcessingOrder,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub watch: Option<Vec<String>>,
@@ -465,9 +456,10 @@ pub(crate) struct InputAffix {
     pub value: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Default)]
 pub(crate) enum InputType {
     #[serde(rename = "m3u")]
+    #[default]
     M3u,
     #[serde(rename = "xtream")]
     Xtream,
@@ -501,13 +493,10 @@ impl FromStr for InputType {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigInputOptions {
-    #[serde(default = "default_as_false")]
     pub xtream_skip_live: bool,
-    #[serde(default = "default_as_false")]
     pub xtream_skip_vod: bool,
-    #[serde(default = "default_as_false")]
     pub xtream_skip_series: bool,
 }
 
@@ -517,15 +506,12 @@ pub(crate) struct InputUserInfo {
     pub password: String,
 }
 
-fn default_as_type_m3u() -> InputType { InputType::M3u }
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigInput {
     #[serde(skip)]
     pub id: u16,
-    #[serde(rename = "type", default = "default_as_type_m3u")]
+    #[serde(rename = "type")]
     pub input_type: InputType,
-    #[serde(default = "default_as_empty_map")]
     pub headers: HashMap<String, String>,
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -618,7 +604,7 @@ impl ConfigInput {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigApi {
     pub host: String,
     pub port: u16,
@@ -644,20 +630,17 @@ pub(crate) struct RestMessagingConfig {
     pub url: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct MessagingConfig {
-    #[serde(default = "default_as_empty_list")]
     pub notify_on: Vec<MsgKind>,
     pub telegram: Option<TelegramMessagingConfig>,
     pub rest: Option<RestMessagingConfig>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct VideoDownloadConfig {
-    #[serde(default = "default_as_empty_map")]
     pub headers: HashMap<String, String>,
     pub directory: Option<String>,
-    #[serde(default = "default_as_false")]
     pub organize_into_directories: bool,
     pub episode_pattern: Option<String>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -668,9 +651,8 @@ pub(crate) struct VideoDownloadConfig {
     pub t_re_remove_filename_ending: Option<regex::Regex>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct VideoConfig {
-    #[serde(default = "default_as_empty_list")]
     pub extensions: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download: Option<VideoDownloadConfig>,
@@ -708,9 +690,8 @@ impl VideoConfig {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct ConfigDto {
-    #[serde(default = "default_as_zero_u8")]
     pub threads: u8,
     pub api: ConfigApi,
     pub working_dir: String,
@@ -809,9 +790,8 @@ impl WebAuthConfig {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct Config {
-    #[serde(default = "default_as_zero_u8")]
     pub threads: u8,
     pub api: ConfigApi,
     pub sources: Vec<ConfigSource>,
@@ -820,7 +800,6 @@ pub(crate) struct Config {
     pub templates: Option<Vec<PatternTemplate>>,
     pub video: Option<VideoConfig>,
     pub schedule: Option<String>,
-    #[serde(default = "default_as_false")]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]
     pub web_ui_enabled: bool,

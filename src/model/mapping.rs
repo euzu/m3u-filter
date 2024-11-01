@@ -15,19 +15,14 @@ use crate::filter::{apply_templates_to_pattern, Filter, get_filter, PatternTempl
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{AFFIX_FIELDS, COUNTER_FIELDS, ItemField, MAPPER_ATTRIBUTE_FIELDS};
 use crate::model::playlist::{FieldAccessor, PlaylistItem};
-use crate::utils::default_utils::{default_as_empty_map, default_as_empty_str,
-                                  default_as_false, default_as_zero_u32};
 use crate::utils::string_utils::Capitalize;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct MappingTag {
     pub name: String,
     pub captures: Vec<String>,
-    #[serde(default = "default_as_empty_str")]
     pub concat: String,
-    #[serde(default = "default_as_empty_str")]
     pub prefix: String,
-    #[serde(default = "default_as_empty_str")]
     pub suffix: String,
 }
 
@@ -80,15 +75,12 @@ impl FromStr for CounterModifier {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct MappingCounterDefinition {
     pub filter: String,
     pub field: String,
-    #[serde(default = "default_as_empty_str")]
     pub concat: String,
-    #[serde(default = "CounterModifier::default")]
     pub modifier: CounterModifier,
-    #[serde(default = "default_as_zero_u32")]
     pub value: u32,
 }
 
@@ -181,17 +173,13 @@ impl MapperTransform {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct Mapper {
     pub filter: Option<String>,
     pub pattern: String,
-    #[serde(default = "default_as_empty_map")]
     attributes: HashMap<String, String>,
-    #[serde(default = "default_as_empty_map")]
     suffix: HashMap<String, String>,
-    #[serde(default = "default_as_empty_map")]
     prefix: HashMap<String, String>,
-    #[serde(default = "default_as_empty_map")]
     assignments: HashMap<String, String>,
     transform: Option<Vec<MapperTransform>>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -437,10 +425,9 @@ impl ValueProcessor for MappingValueProcessor<'_> {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct Mapping {
     pub id: String,
-    #[serde(default = "default_as_false")]
     pub match_as_ascii: bool,
     pub mapper: Vec<Mapper>,
     pub counter: Option<Vec<MappingCounterDefinition>>,

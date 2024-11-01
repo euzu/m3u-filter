@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix_web::{HttpResponse, web};
@@ -114,22 +113,15 @@ async fn playlist_update(
 fn create_config_input_for_url(url: &str) -> ConfigInput {
     ConfigInput {
         id: 0,
-        headers: HashMap::default(),
         input_type: InputType::M3u,
         url: String::from(url),
-        epg_url: None,
-        username: None,
-        password: None,
-        persist: None,
-        prefix: None,
-        suffix: None,
-        name: None,
         enabled: true,
         options: Some(ConfigInputOptions {
             xtream_skip_live: false,
             xtream_skip_vod: false,
             xtream_skip_series: false,
         }),
+        ..Default::default()
     }
 }
 
