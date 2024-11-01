@@ -112,12 +112,17 @@ pub(crate) enum BinaryOperator {
     Or,
 }
 
+impl BinaryOperator {
+    const OP_OR: &'static str = "OR";
+    const OP_AND: &'static str = "AND";
+}
+
 impl std::fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            BinaryOperator::Or => write!(f, "OR"),
-            BinaryOperator::And => write!(f, "AND"),
-        }
+        write!(f, "{}", match *self {
+            BinaryOperator::Or => Self::OP_OR,
+            BinaryOperator::And => Self::OP_AND,
+        })
     }
 }
 
@@ -185,6 +190,13 @@ impl Filter {
     }
 }
 
+impl Filter {
+    const LIVE: &'static str = "live";
+    const VOD: &'static str = "vod";
+    const SERIES: &'static str = "series";
+    const UNSUPPORTED: &'static str = "unsupported";
+}
+
 impl std::fmt::Display for Filter {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -193,10 +205,10 @@ impl std::fmt::Display for Filter {
             }
             Filter::TypeComparison(field, item_type) => {
                 write!(f, "{} = {}", field, match item_type {
-                    PlaylistItemType::Live => "live",
-                    PlaylistItemType::Video => "vod",
-                    PlaylistItemType::Series | PlaylistItemType::SeriesInfo => "series", // yes series-info is handled as series in filter
-                    _ => "unsupported"
+                    PlaylistItemType::Live => Self::LIVE,
+                    PlaylistItemType::Video => Self::VOD,
+                    PlaylistItemType::Series | PlaylistItemType::SeriesInfo => Self::SERIES, // yes series-info is handled as series in filter
+                    _ => Self::UNSUPPORTED
                 })
             }
             Filter::Group(stmt) => {
@@ -533,12 +545,13 @@ pub(crate) fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternT
 }
 
 
-
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
+
     use regex::Regex;
+
     use crate::filter::{get_filter, MockValueProcessor, ValueProvider};
     use crate::model::playlist::{PlaylistItem, PlaylistItemHeader};
 
@@ -558,19 +571,20 @@ mod tests {
         match get_filter(flt1, None) {
             Ok(filter) => {
                 assert_eq!(format!("{filter}"), flt1);
-            },
+            }
             Err(e) => {
                 panic!("{}", e)
             }
         }
     }
+
     #[test]
     fn test_filter_2() {
         let flt2 = r#"Group ~ "d" AND ((Name ~ "e" AND NOT ((Name ~ "c" OR Name ~ "f"))) OR (Name ~ "a" OR Name ~ "b"))"#;
         match get_filter(flt2, None) {
             Ok(filter) => {
                 assert_eq!(format!("{filter}"), flt2);
-            },
+            }
             Err(e) => {
                 panic!("{}", e)
             }
@@ -583,7 +597,7 @@ mod tests {
         match get_filter(flt, None) {
             Ok(filter) => {
                 assert_eq!(format!("{filter}"), flt);
-            },
+            }
             Err(e) => {
                 panic!("{}", e)
             }
@@ -622,7 +636,7 @@ mod tests {
                     let name = chan.header.borrow().name.to_string();
                     name.eq("24/7: Cars") && group.eq("US Channels")
                 }), false);
-            },
+            }
             Err(e) => {
                 panic!("{}", e)
             }
@@ -649,7 +663,7 @@ mod tests {
                     filter.filter(&provider, &mut processor)
                 }).collect();
                 assert_eq!(filtered.len(), 1);
-            },
+            }
             Err(e) => {
                 panic!("{}", e)
             }
@@ -682,7 +696,7 @@ mod tests {
                 let re = Regex::new(r"\s+").unwrap();
                 let result = re.replace_all(&flt, " ");
                 assert_eq!(format!("{filter}"), result.trim());
-            },
+            }
             Err(e) => {
                 panic!("{}", e)
             }

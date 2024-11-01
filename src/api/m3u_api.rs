@@ -1,5 +1,7 @@
 use actix_web::{HttpRequest, HttpResponse, web};
 use log::error;
+use futures::{stream};
+use bytes::Bytes;
 
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, stream_response};
 use crate::api::api_model::{AppState, UserApiRequest};
@@ -13,18 +15,23 @@ async fn m3u_api(
     _req: HttpRequest,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    //let api_req = UserApiRequest::from_map(&_api_req);
     match get_user_target(&api_req, &app_state) {
         Some((user, target)) => {
-            if let Some(content) = m3u_load_rewrite_playlist(&app_state.config, target, &user) {
-                HttpResponse::Ok().content_type(mime::TEXT_PLAIN_UTF_8).body(content)
-            } else {
-                HttpResponse::NoContent().finish()
+            match m3u_load_rewrite_playlist(&app_state.config, target, &user) {
+                Ok(m3u_iter) => {
+                    // Convert the iterator into a stream of `Bytes`
+                    let content_stream = stream::iter(m3u_iter.map(|line| Ok::<Bytes, String>(Bytes::from(format!("{line}\n")))));
+                    HttpResponse::Ok()
+                        .content_type(mime::TEXT_PLAIN_UTF_8)
+                        .streaming(content_stream)
+                }
+                Err(err) => {
+                    error!("{err}");
+                    HttpResponse::NoContent().finish()
+                }
             }
         }
-        None => {
-            HttpResponse::BadRequest().finish()
-        }
+        None => HttpResponse::BadRequest().finish(),
     }
 }
 

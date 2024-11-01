@@ -1447,6 +1447,7 @@ dependencies = [
  "actix-web-httpauth",
  "bincode",
  "blake3",
+ "bytes",
  "chrono",
  "clap",
  "cron",

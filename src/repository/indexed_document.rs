@@ -216,6 +216,7 @@ impl Drop for IndexedDocumentWriter {
 ////////////////////////////////////////////////////////
 
 pub(in crate::repository) struct IndexedDocumentReader<T> {
+    main_path: PathBuf,
     main_file: BufReader<File>,
     offsets: Vec<OffsetPointer>,
     index: usize,
@@ -238,6 +239,7 @@ impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
             match File::open(main_path) {
                 Ok(file) => {
                     Ok(Self {
+                        main_path: main_path.to_path_buf(),
                         main_file: BufReader::new(file),
                         offsets,
                         index: 0,
@@ -252,6 +254,11 @@ impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
             Err(Error::new(ErrorKind::NotFound, format!("File not found {}",
                                                         main_path.to_str().unwrap())))
         }
+    }
+
+
+    pub fn get_path(&self) -> &Path {
+      &self.main_path
     }
 
     pub fn has_error(&self) -> bool {

@@ -1,6 +1,8 @@
 # Changelog
 # 2.0.6 (2024-10-*)
 - breaking change virtual_id handling. You need to clear the data directory.
+- new content storage implementation with BPlusTree indexing. 
+- api responses are now streamed directly from disk to avoid memory allocation.
 - fixed schedular implementation
 
 # 2.0.5(2024-10-16)

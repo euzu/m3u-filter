@@ -48,12 +48,18 @@ impl Default for CounterModifier {
     }
 }
 
+impl CounterModifier {
+    const ASSIGN: &'static str = "assign";
+    const SUFFIX: &'static str = "suffix";
+    const PREFIX: &'static str = "prefix";
+}
+
 impl Display for CounterModifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Self::Assign => "assign",
-            Self::Suffix => "suffix",
-            Self::Prefix => "prefix",
+            Self::Assign => Self::ASSIGN,
+            Self::Suffix => Self::SUFFIX,
+            Self::Prefix => Self::PREFIX,
         })
     }
 }
@@ -111,12 +117,18 @@ impl Default for TransformModifier {
     }
 }
 
+impl TransformModifier {
+    const LOWERCASE: &'static str = "lowercase";
+    const UPPERCASE: &'static str = "uppercase";
+    const CAPITALIZE: &'static str = "capitalize";
+}
+
 impl Display for TransformModifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Self::Lowercase => "lowercase",
-            Self::Uppercase => "uppercase",
-            Self::Capitalize => "capitalize"
+            Self::Lowercase => Self::LOWERCASE,
+            Self::Uppercase => Self::UPPERCASE,
+            Self::Capitalize => Self::CAPITALIZE,
         })
     }
 }

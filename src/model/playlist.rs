@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{ConfigInput, ConfigTarget};
+use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
 use crate::processing::m3u_parser::extract_id_from_url;
@@ -95,15 +95,24 @@ impl From<XtreamCluster> for PlaylistItemType {
     }
 }
 
+impl PlaylistItemType {
+    const LIVE: &'static str = "live";
+    const VIDEO: &'static str = "video";
+    const SERIES: &'static str = "series";
+    const SERIES_INFO: &'static str = "series-info";
+    const SERIES_EPISODE: &'static str = "series-episode";
+    const CATCHUP: &'static str = "catchup";
+}
+
 impl Display for PlaylistItemType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            PlaylistItemType::Live => "live",
-            PlaylistItemType::Video => "video",
-            PlaylistItemType::Series => "series",
-            PlaylistItemType::SeriesInfo => "series-info",
-            PlaylistItemType::SeriesEpisode => "series-episode",
-            PlaylistItemType::Catchup => "catchup"
+            PlaylistItemType::Live => Self::LIVE,
+            PlaylistItemType::Video => Self::VIDEO,
+            PlaylistItemType::Series => Self::SERIES,
+            PlaylistItemType::SeriesInfo => Self::SERIES_INFO,
+            PlaylistItemType::SeriesEpisode => Self::SERIES_EPISODE,
+            PlaylistItemType::Catchup => Self::CATCHUP,
         })
     }
 }
@@ -233,8 +242,8 @@ pub(crate) struct M3uPlaylistItem {
 }
 
 impl M3uPlaylistItem {
-    pub fn to_m3u(&self, target: &ConfigTarget, url: Option<&str>) -> String {
-        let options = target.options.as_ref();
+    pub fn to_m3u(&self, target_options: &Option<ConfigTargetOptions>, url: Option<&str>) -> String {
+        let options = target_options.as_ref();
         let ignore_logo = options.map_or(false, |o| o.ignore_logo);
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",
                                self.epg_channel_id.as_ref().map_or("", |o| o.as_ref()),

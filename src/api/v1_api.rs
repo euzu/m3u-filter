@@ -126,7 +126,6 @@ fn create_config_input_for_url(url: &str) -> ConfigInput {
         name: None,
         enabled: true,
         options: Some(ConfigInputOptions {
-            xtream_info_cache: false,
             xtream_skip_live: false,
             xtream_skip_vod: false,
             xtream_skip_series: false,

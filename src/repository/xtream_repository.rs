@@ -13,8 +13,9 @@ use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType, Xtre
 use crate::model::xtream::XtreamMappingOptions;
 use crate::repository::bplustree::{BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentReader, IndexedDocumentWriter};
-use crate::repository::storage::{get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
+use crate::repository::storage::{FILE_SUFFIX_DB, FILE_SUFFIX_INDEX, get_target_id_mapping_file, get_target_storage_path, hash_string};
 use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
+use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 
 pub(crate) static COL_CAT_LIVE: &str = "cat_live";
@@ -335,29 +336,8 @@ pub(crate) fn xtream_get_item_for_stream_id(
 }
 
 
-pub(crate) fn xtream_load_rewrite_playlist(cluster: XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<String, Error> {
-    if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
-        let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
-        {
-            let _file_lock = config.file_locks.read_lock(&xtream_path)?;
-            match IndexedDocumentReader::<XtreamPlaylistItem>::new(&xtream_path, &idx_path) {
-                Ok(mut reader) => {
-                    let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
-                    let result: Vec<Value> = reader.by_ref().filter(|pli| category_id == 0 || pli.category_id == category_id)
-                        .map(|pli| pli.to_doc(&options)).collect();
-                    if reader.by_ref().has_error() {
-                        error!("Could not deserialize item {}", &xtream_path.to_str().unwrap());
-                    } else {
-                        return Ok(serde_json::to_string(&result).unwrap());
-                    }
-                }
-                Err(err) => {
-                    error!("Could not deserialize file {} - {}", &xtream_path.to_str().unwrap(), err);
-                }
-            }
-        }
-    }
-    Err(Error::new(ErrorKind::Other, format!("Failed to find xtream storage for target {}", &target.name)))
+pub(crate) fn xtream_load_rewrite_playlist(cluster: XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<Box<dyn Iterator<Item=String>>, M3uFilterError> {
+    Ok(Box::new(XtreamPlaylistIterator::new(cluster, config, target, category_id)?))
 }
 
 pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,

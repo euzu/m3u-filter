@@ -1,13 +1,16 @@
-use std::collections::{VecDeque};
+use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
+
 use actix_web::web;
+use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
 use unidecode::unidecode;
-use crate::model::api_proxy::{ApiProxyConfig};
-use crate::model::config::{Config, ConfigTargetOptions, ConfigRename, ConfigSort, InputType, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig, ConfigApi, MessagingConfig};
-use crate::model::config::{ProcessingOrder};
+
+use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
+use crate::model::config::{Config, ConfigApi, ConfigRename, ConfigSort, ConfigTargetOptions, InputType, MessagingConfig, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig};
+use crate::model::config::ProcessingOrder;
 use crate::utils::default_utils::default_as_empty_str;
 
 /// File-Download information.
@@ -65,11 +68,11 @@ const FILENAME_TRIM_PATTERNS: &[char] = &['.', '-', '_'];
 
 impl FileDownload {
 
-// TODO read header size info  and restart support
-// "content-type" => ".../..."
-// "content-length" => "1975828544"
-// "accept-ranges" => "0-1975828544"
-// "content-range" => "bytes 0-1975828543/1975828544"
+    // TODO read header size info  and restart support
+    // "content-type" => ".../..."
+    // "content-length" => "1975828544"
+    // "accept-ranges" => "0-1975828544"
+    // "content-range" => "bytes 0-1975828543/1975828544"
 
     pub fn new(req_url: &str, req_filename: &str, download_cfg: &VideoDownloadConfig) -> Option<FileDownload> {
         match reqwest::Url::parse(req_url) {
@@ -163,6 +166,37 @@ pub(crate) struct XtreamServerInfo {
 pub(crate) struct XtreamAuthorizationResponse {
     pub user_info: XtreamUserInfo,
     pub server_info: XtreamServerInfo,
+}
+
+impl XtreamAuthorizationResponse {
+    pub(crate) fn new(server_info: &ApiProxyServerInfo, user: &ProxyUserCredentials) -> Self {
+        let now = Local::now();
+        XtreamAuthorizationResponse {
+            user_info: XtreamUserInfo {
+                active_cons: "0".to_string(),
+                allowed_output_formats: Vec::from(["ts".to_string(), "m3u8".to_string(), "rtmp".to_string()]),
+                auth: 1,
+                created_at: (now - Duration::days(365)).timestamp(), // fake
+                exp_date: (now + Duration::days(365)).timestamp(), // fake
+                is_trial: "0".to_string(),
+                max_connections: "1".to_string(),
+                message: server_info.message.to_string(),
+                password: user.password.to_string(),
+                username: user.username.to_string(),
+                status: "Active".to_string(),
+            },
+            server_info: XtreamServerInfo {
+                url: server_info.host.clone(),
+                port: server_info.http_port.clone(),
+                https_port: server_info.https_port.clone(),
+                server_protocol: server_info.protocol.clone(),
+                rtmp_port: server_info.rtmp_port.clone(),
+                timezone: server_info.timezone.to_string(),
+                timestamp_now: now.timestamp(),
+                time_now: now.format("%Y-%m-%d %H:%M:%S").to_string(),
+            },
+        }
+    }
 }
 
 

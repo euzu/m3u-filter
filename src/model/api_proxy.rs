@@ -22,11 +22,16 @@ impl Default for ProxyType {
     }
 }
 
+impl ProxyType {
+    const REVERSE: &'static str = "reverse";
+    const REDIRECT: &'static str = "redirect";
+}
+
 impl Display for ProxyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Self::Reverse => "reverse",
-            Self::Redirect => "redirect"
+            Self::Reverse => Self::REVERSE,
+            Self::Redirect => Self::REDIRECT
         })
     }
 }

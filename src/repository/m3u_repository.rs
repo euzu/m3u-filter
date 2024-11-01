@@ -1,17 +1,16 @@
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::path::{Path, PathBuf};
-
 use log::error;
 
-use crate::api::api_utils::get_user_server_info;
 use crate::create_m3u_filter_error;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
+use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::repository::indexed_document::{IndexedDocumentReader, IndexedDocumentWriter};
-use crate::repository::storage::{ensure_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
+use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
+use crate::repository::storage::{FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::utils::file_utils;
 
 const FILE_M3U: &str = "m3u";
@@ -40,7 +39,7 @@ fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlis
                     let mut buf_writer = BufWriter::new(file);
                     let _ = buf_writer.write("#EXTM3U\n".as_bytes());
                     for m3u in m3u_playlist {
-                        let _ = buf_writer.write(m3u.to_m3u(target, None).as_bytes());
+                        let _ = buf_writer.write(m3u.to_m3u(&target.options, None).as_bytes());
                         let _ = buf_writer.write("\n".as_bytes());
                     }
                 }
@@ -80,50 +79,14 @@ pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_pat
     Ok(())
 }
 
-pub(crate) fn m3u_load_rewrite_playlist(cfg: &Config, target: &ConfigTarget, user: &ProxyUserCredentials) -> Option<String> {
-    match ensure_target_storage_path(cfg, target.name.as_str()) {
-        Ok(target_path) => {
-            let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
-            {
-                let _file_lock = cfg.file_locks.read_lock(&m3u_path).map_err(|err| {
-                    error!("Could not lock document {:?}: {}", m3u_path, err);
-                    Error::new(ErrorKind::Other, format!("Document Reader error for target {}", &target.name))
-                }).ok()?;
-
-                match IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path, &idx_path) {
-                    Ok(mut reader) => {
-                        let server_info = get_user_server_info(cfg, user);
-                        let url = format!("{}/m3u-stream/{}/{}", server_info.get_base_url(), user.username, user.password);
-                        let mut result = vec![];
-                        result.push("#EXTM3U".to_string());
-                        for m3u_pli in reader.by_ref() {
-                            match user.proxy {
-                                ProxyType::Reverse => {
-                                    result.push(m3u_pli.to_m3u(target, Some(format!("{url}/{}", m3u_pli.virtual_id).as_str())));
-                                }
-                                ProxyType::Redirect => {
-                                    result.push(m3u_pli.to_m3u(target, None));
-                                }
-                            }
-                        };
-                        if reader.by_ref().has_error() {
-                            error!("Could not deserialize m3u item {}", &m3u_path.to_str().unwrap());
-                        } else {
-                            return Some(result.join("\n"));
-                        }
-                    }
-                    Err(err) => {
-                        error!("Could not deserialize file {} - {}", &m3u_path.to_str().unwrap(), err);
-                    }
-                }
-            }
-        }
-        Err(err) => {
-            error!("Could not find storage path for target  {} - {}", target.name.as_str(), err);
-        }
-    }
-    None
+pub(crate) fn m3u_load_rewrite_playlist(
+    cfg: &Config,
+    target: &ConfigTarget,
+    user: &ProxyUserCredentials,
+) -> Result<Box<dyn Iterator<Item = String>>, M3uFilterError> {
+    Ok(Box::new(M3uPlaylistIterator::new(cfg, target, user)?))
 }
+
 
 pub(crate) fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
     if stream_id < 1 {

@@ -16,6 +16,9 @@ Content-Type: application/json
 
 {"username": "test", "password": "test"}
 
+### m3u playlist
+GET http://localhost:8901/m3u?username=xt&password=xt
+
 ### xtream live_categories
 GET http://localhost:8901/player_api.php?action=get_live_categories&username=xt&password=xt
 

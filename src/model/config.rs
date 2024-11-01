@@ -95,13 +95,19 @@ pub(crate) enum TargetType {
     Strm,
 }
 
+impl TargetType {
+    const M3U: &'static str = "M3u";
+    const XTREAM: &'static str = "Xtream";
+    const STRM: &'static str = "Strm";
+}
+
 impl Display for TargetType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Self::M3u => write!(f, "M3u"),
-            Self::Xtream => write!(f, "Xtream"),
-            Self::Strm => write!(f, "Strm"),
-        }
+        write!(f, "{}", match *self {
+            Self::M3u => Self::M3U,
+            Self::Xtream => Self::XTREAM,
+            Self::Strm => Self::STRM,
+        })
     }
 }
 
@@ -121,16 +127,25 @@ pub(crate) enum ProcessingOrder {
     Mrf,
 }
 
-impl std::fmt::Display for ProcessingOrder {
+impl ProcessingOrder {
+    const FRM: &'static str = "filter, rename, map";
+    const FMR: &'static str = "filter, map, rename";
+    const RFM: &'static str = "rename, filter, map";
+    const RMF: &'static str = "rename, map, filter";
+    const MFR: &'static str = "map, filter, rename";
+    const MRF: &'static str = "map, rename, filter";
+}
+
+impl Display for ProcessingOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Self::Frm => write!(f, "filter, rename, map"),
-            Self::Fmr => write!(f, "filter, map, rename"),
-            Self::Rfm => write!(f, "rename, filter, map"),
-            Self::Rmf => write!(f, "rename, map, filter"),
-            Self::Mfr => write!(f, "map, filter, rename"),
-            Self::Mrf => write!(f, "map, rename, filter"),
-        }
+        write!(f, "{}", match *self {
+            Self::Frm => Self::FRM,
+            Self::Fmr => Self::FMR,
+            Self::Rfm => Self::RFM,
+            Self::Rmf => Self::RMF,
+            Self::Mfr => Self::MFR,
+            Self::Mrf => Self::MRF,
+        })
     }
 }
 
@@ -148,15 +163,23 @@ pub(crate) enum ItemField {
     Type,
 }
 
+impl ItemField {
+    const GROUP: &'static str = "Group";
+    const NAME: &'static str = "Name";
+    const TITLE: &'static str = "Title";
+    const URL: &'static str = "Url";
+    const TYPE: &'static str = "Type";
+}
+
 impl Display for ItemField {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Self::Group => write!(f, "Group"),
-            Self::Name => write!(f, "Name"),
-            Self::Title => write!(f, "Title"),
-            Self::Url => write!(f, "Url"),
-            Self::Type => write!(f, "Type"),
-        }
+        write!(f, "{}", match *self {
+            Self::Group => Self::GROUP,
+            Self::Name => Self::NAME,
+            Self::Title => Self::TITLE,
+            Self::Url => Self::URL,
+            Self::Type => Self::TYPE,
+        })
     }
 }
 
@@ -450,11 +473,16 @@ pub(crate) enum InputType {
     Xtream,
 }
 
+impl InputType {
+    const M3U: &'static str = "m3u";
+    const XTREAM: &'static str = "xtream";
+}
+
 impl Display for InputType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            InputType::M3u => "m3u",
-            InputType::Xtream => "xtream"
+            InputType::M3u => Self::M3U,
+            InputType::Xtream => Self::XTREAM,
         })
     }
 }
@@ -475,8 +503,6 @@ impl FromStr for InputType {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigInputOptions {
-    #[serde(default = "default_as_false")]
-    pub xtream_info_cache: bool,
     #[serde(default = "default_as_false")]
     pub xtream_skip_live: bool,
     #[serde(default = "default_as_false")]
