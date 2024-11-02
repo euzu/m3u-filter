@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{Error, ErrorKind, Read};
-use std::path::PathBuf;
+use std::fs::File;
+use std::io::{BufWriter, Error, ErrorKind, Read, Write};
+use std::path::{Path, PathBuf};
 
 use flate2::read::{GzDecoder, ZlibDecoder};
+use futures::StreamExt;
 use log::{debug, error, Level, log_enabled};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::header::CONTENT_ENCODING;
@@ -12,19 +14,65 @@ use url::Url;
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
+use crate::repository::storage::{get_input_storage_path};
+use crate::repository::xtream_repository::FILE_EPG;
+use crate::utils::compression_utils::{ENCODING_GZIP, ENCODING_DEFLATE, is_gzip};
 use crate::utils::file_utils::{get_file_path, persist_file};
-
-const ENCODING_GZIP: &str = "gzip";
-const ENCODING_DEFLATE: &str = "deflate";
-
-fn is_gzip(bytes: &[u8]) -> bool {
-    // Gzip files start with the bytes 0x1F 0x8B
-    bytes.len() >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B
-}
 
 pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
 }
+
+pub(crate) async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
+    if log_enabled!(Level::Debug) {
+        debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
+    }
+
+    if url_str.parse::<url::Url>().is_ok() {
+        match download_text_content_as_file(input, url_str, working_dir, persist_filepath).await {
+            Ok(content) => Ok(content),
+            Err(e) => {
+                error!("cant download input url: {}  => {}", url_str, e);
+                create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
+            }
+        }
+    } else {
+        let result = match get_file_path(working_dir, Some(PathBuf::from(url_str))) {
+            Some(filepath) => {
+                if filepath.exists() {
+                    if let Some(persist_file_value) = persist_filepath {
+                        let to_file = &persist_file_value;
+                        match fs::copy(&filepath, to_file) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e);
+                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
+                            }
+                        }
+                    };
+
+                    if filepath.exists() {
+                        Some(filepath)
+                    } else {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed: file does not exists {filepath:?}");
+                    }
+                } else {
+                    None
+                }
+            }
+            None => None
+        };
+
+        if let Some(path) = result {
+            Ok(path)
+        } else {
+            let msg = format!("cant read input url: {url_str:?}");
+            error!("{}", msg);
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
+        }
+    }
+}
+
 
 pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
     if log_enabled!(Level::Debug) {
@@ -129,6 +177,38 @@ fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
     Err(Error::new(ErrorKind::InvalidData, format!("Cant find file {file_str}")))
 }
 
+
+async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &Path) -> Result<PathBuf, std::io::Error> {
+    let request = get_client_request(Some(input), url, None);
+    match request.send().await {
+        Ok(response) => {
+            if response.status().is_success() {
+                // Open a file in write mode
+                let mut file = BufWriter::with_capacity(8192, File::create(file_path)?);
+                // Stream the response body in chunks
+                let mut stream = response.bytes_stream();
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(bytes) => {
+                            file.write_all(&bytes)?;
+                        }
+                        Err(err) => {
+                            return Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to read chunk: {err}")));
+                        }
+                    }
+                }
+
+                file.flush()?;
+                debug!("File downloaded successfully to {file_path:?}");
+                Ok(file_path.to_path_buf())
+            } else {
+                Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed with status {}", response.status())))
+            }
+        }
+        Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed: {err}"))),
+    }
+}
+
 async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Error> {
     let request = get_client_request(Some(input), url, None);
     match request.send().await {
@@ -158,7 +238,7 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
                                         Ok(_) => {}
                                         Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
                                     };
-                                }
+                                },
                                 ENCODING_DEFLATE => {
                                     let mut decoder = ZlibDecoder::new(&bytes[..]);
                                     match decoder.read_to_string(&mut decode_buffer) {
@@ -188,6 +268,42 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
         Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {err}")))
     }
 }
+
+pub(crate) async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, working_dir: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, Error> {
+    if let Ok(url) = url_str.parse::<url::Url>() {
+
+        if url.scheme() == "file" {
+            if let Ok(file_path) = url.to_file_path() {
+                if file_path.exists() {
+                    Ok(file_path)
+                } else {
+                    Err(Error::new(ErrorKind::NotFound, format!("Unknown file {file_path:?}")))
+                }
+            } else {
+                Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {url}")))
+            }
+        } else {
+            let file_path = match persist_filepath {
+                None => {
+                    match get_input_storage_path(input, working_dir) {
+                        Ok(download_path) => {
+                            Ok(download_path.join(FILE_EPG))
+                        }
+                        Err(err) => Err(err)
+                    }
+                }
+                Some(path) => Ok(path),
+            };
+            match file_path {
+                Ok(persist_path) => get_remote_content_as_file(input, &url, &persist_path).await,
+                Err(err) => Err(err)
+            }
+        }
+    } else {
+        Err(std::io::Error::new(ErrorKind::Unsupported, format!("Malformed URL {url_str}")))
+    }
+}
+
 
 pub(crate) async fn download_text_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {

@@ -1,7 +1,15 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
+use std::path::PathBuf;
 use std::rc::Rc;
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+
 use quick_xml::{Error, Writer};
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+
+pub(crate) const EPG_TAG_TV: &str = "tv";
+pub(crate) const EPG_TAG_PROGRAMME: &str = "programme";
+pub(crate) const EPG_TAG_CHANNEL: &str = "channel";
+pub(crate) const EPG_ATTRIB_ID: &str = "id";
+pub(crate) const EPG_ATTRIB_CHANNEL: &str = "channel";
 
 // https://github.com/XMLTV/xmltv/blob/master/xmltv.dtd
 
@@ -43,7 +51,7 @@ impl XmlTag {
 #[derive(Debug, Clone)]
 pub(crate) struct Epg {
     pub attributes: Option<Rc<HashMap<String, String>>>,
-    pub children: Vec<Rc<XmlTag>>,
+    pub children: Vec<XmlTag>,
 }
 
 impl Epg {
@@ -62,40 +70,5 @@ impl Epg {
 
 #[derive(Debug, Clone)]
 pub(crate) struct TVGuide {
-    pub epg: XmlTag,
+    pub file: PathBuf,
 }
-
-impl TVGuide {
-    pub(crate) fn filter(&self, channel_ids: &HashSet<Rc<String>>) -> Option<Epg> {
-        if !channel_ids.is_empty() {
-            if let Some(epg_children) = &self.epg.children {
-                let children: Vec<Rc<XmlTag>> = epg_children.iter().filter(|c| {
-                    match c.name.as_str() {
-                        "channel" => {
-                            match c.get_attribute_value("id") {
-                                None => false,
-                                Some(val) => channel_ids.contains(val)
-                            }
-                        }
-                        "programme" => {
-                            match c.get_attribute_value("channel") {
-                                None => false,
-                                Some(val) => channel_ids.contains(val)
-                            }
-                        }
-                        _ => false,
-                    }
-                }).cloned().collect();
-
-                if !children.is_empty() {
-                    return Some(Epg {
-                        attributes: self.epg.attributes.clone(),
-                        children,
-                    });
-                }
-            }
-        }
-        None
-    }
-}
-

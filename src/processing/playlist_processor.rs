@@ -310,7 +310,8 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
             } else {
                 (None, vec![])
             };
-            errors.extend(error_list.drain(..).chain(tvguide_errors.drain(..)));
+            errors.append(&mut error_list);
+            errors.append(&mut tvguide_errors);
             let input_name = match &input.name {
                 Some(name_val) => name_val.as_str(),
                 None => input.url.as_str(),
@@ -354,7 +355,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
             }
         }
     }
-    (stats.drain().map(|(_, v)| v).collect(), errors)
+    (stats.into_values().collect(), errors)
 }
 
 fn create_input_stat(group_count: usize, channel_count: usize, error_count: usize, input_type: InputType, input_name: &str) -> InputStats {
@@ -393,8 +394,8 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
                 let (mut res_stats, mut res_errors) = System::new().block_on(async {
                     process_source(cfg, index, usr_trgts).await
                 });
-                shared_errors.lock().unwrap().extend(res_errors.drain(..));
-                shared_stats.lock().unwrap().extend(res_stats.drain(..));
+                shared_errors.lock().unwrap().append(&mut res_errors);
+                shared_stats.lock().unwrap().append(&mut res_stats);
             };
             handles.push(thread::spawn(process));
             if handles.len() >= thread_num as usize {
@@ -402,8 +403,8 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
             }
         } else {
             let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
-            shared_errors.lock().unwrap().extend(res_errors.drain(..));
-            shared_stats.lock().unwrap().extend(res_stats.drain(..));
+            shared_errors.lock().unwrap().append(&mut res_errors);
+            shared_stats.lock().unwrap().append(&mut res_stats);
         }
     }
     for handle in handle_list {
@@ -492,6 +493,8 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
 
+    // each fetched playlist can have its own epgl url.
+    // we need to process each input epg.
     new_fetched_playlists.drain(..).for_each(|mut fp| {
         // collect all epg_channel ids
         let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)

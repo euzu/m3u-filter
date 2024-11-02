@@ -6,11 +6,11 @@ use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::model::xmltv::TVGuide;
-use crate::processing::{m3u_parser, xmltv_parser, xtream_parser};
+use crate::processing::{m3u_parser, xtream_parser};
 use crate::processing::xtream_parser::parse_xtream_series_info;
 use crate::utils::{file_utils, request_utils};
 
-fn prepare_file_path(persist: Option<&String>, working_dir: &String, action: &str) -> Option<PathBuf> {
+fn prepare_file_path(persist: Option<&String>, working_dir: &str, action: &str) -> Option<PathBuf> {
     let persist_file: Option<PathBuf> =
         persist.map(|persist_path| file_utils::prepare_persist_path(persist_path.as_str(), action));
     if persist_file.is_some() {
@@ -106,7 +106,7 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Video, "get_vod_categories", "get_vod_streams"),
     (XtreamCluster::Series, "get_series_categories", "get_series")];
 
-pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let mut playlist_groups: Vec<PlaylistGroup> = Vec::new();
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
@@ -154,15 +154,17 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &Strin
     (playlist_groups, errors)
 }
 
-pub(crate) async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Option<TVGuide>, Vec<M3uFilterError>) {
+pub(crate) async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Option<TVGuide>, Vec<M3uFilterError>) {
     match &input.epg_url {
         None => (None, vec![]),
         Some(url) => {
             debug!("Getting epg file path for url: {}", url);
-            let persist_file_path = prepare_file_path(input.persist.as_ref(), working_dir, "").map(|path| file_utils::add_prefix_to_filename(&path, "epg_", Some("xml")));
-            match request_utils::get_input_text_content(input, working_dir, url, persist_file_path).await {
-                Ok(xml_content) => {
-                    (xmltv_parser::parse_tvguide(xml_content.as_str()), vec![])
+            let persist_file_path = prepare_file_path(input.persist.as_ref(), working_dir, "")
+                .map(|path| file_utils::add_prefix_to_filename(&path, "epg_", Some("xml")));
+
+            match request_utils::get_input_text_content_as_file(input, working_dir, url, persist_file_path).await {
+                Ok(file) => {
+                    (Some(TVGuide { file }), vec![])
                 }
                 Err(err) => (None, vec![err])
             }

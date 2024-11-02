@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
+
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::Config;
+use crate::model::config::{Config, ConfigInput};
 use crate::utils::file_utils;
 
 pub(in crate::repository) const FILE_SUFFIX_DB: &str = "db";
@@ -32,4 +33,12 @@ pub(crate) fn ensure_target_storage_path(cfg: &Config, target_name: &str) -> Res
 
 pub(crate) fn get_target_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
     file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(' ', "_"))))
+}
+
+pub(crate) fn get_input_storage_path(input: &ConfigInput, working_dir: &str) -> std::io::Result<PathBuf> {
+    let name =  format!("input_{}", input.name.clone().unwrap_or_else(|| format!("{}", input.id)));
+    let path = Path::new(working_dir).join(name);
+
+    // Create the directory and return the path or propagate the error
+    std::fs::create_dir_all(&path).map(|()| path)
 }

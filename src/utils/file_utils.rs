@@ -6,6 +6,13 @@ use std::path::{Path, PathBuf};
 use log::{debug, error};
 use path_absolutize::Absolutize;
 
+const USER_FILE: &str = "user.txt";
+const CONFIG_PATH: &str = "config";
+const CONFIG_FILE: &str = "config.yml";
+const SOURCE_FILE: &str = "source.yml";
+const MAPPING_FILE: &str = "mapping.yml";
+const API_PROXY_FILE: &str = "api-proxy.yml";
+
 #[macro_export]
 macro_rules! exit {
     ($($arg:tt)*) => {{
@@ -47,13 +54,6 @@ pub(crate) fn get_default_file_path(config_path: &str, file: &str) -> String {
         file
     })
 }
-
-static USER_FILE: &str = "user.txt";
-static CONFIG_PATH: &str = "config";
-static CONFIG_FILE: &str = "config.yml";
-static SOURCE_FILE: &str = "source.yml";
-static MAPPING_FILE: &str = "mapping.yml";
-static API_PROXY_FILE: &str = "api-proxy.yml";
 
 #[inline]
 pub(crate) fn get_default_user_file_path(config_path: &str) -> String {
@@ -143,7 +143,7 @@ pub(crate) fn prepare_persist_path(file_name: &str, date_prefix: &str) -> PathBu
     std::path::PathBuf::from(persist_filename)
 }
 
-pub(crate) fn get_file_path(wd: &String, path: Option<PathBuf>) -> Option<PathBuf> {
+pub(crate) fn get_file_path(wd: &str, path: Option<PathBuf>) -> Option<PathBuf> {
     match path {
         Some(p) => {
             if p.is_relative() {
@@ -190,4 +190,13 @@ pub(crate) fn check_write(res: &std::io::Result<()>) -> Result<(), std::io::Erro
 pub(crate) fn append_extension(path: &Path, ext: &str) -> PathBuf {
     let extension = path.extension().map(|ext| ext.to_str().unwrap_or(""));
     path.with_extension(format!("{}{ext}", &extension.unwrap_or_default()))
+}
+
+
+#[inline]
+pub(crate) fn sanitize_filename(file_name: &str) -> String {
+    file_name
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .collect()
 }

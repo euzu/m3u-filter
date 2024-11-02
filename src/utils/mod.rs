@@ -7,3 +7,5 @@ pub (crate) mod config_reader;
 pub (crate) mod default_utils;
 pub (crate) mod multi_file_reader;
 pub (crate) mod file_lock_manager;
+pub(crate) mod compressed_file_reader;
+mod compression_utils;
