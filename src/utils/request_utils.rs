@@ -3,6 +3,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use flate2::read::{GzDecoder, ZlibDecoder};
 use futures::StreamExt;
@@ -14,9 +15,10 @@ use url::Url;
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
-use crate::repository::storage::{get_input_storage_path};
+use crate::model::stats::format_elapsed_time;
+use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::FILE_EPG;
-use crate::utils::compression_utils::{ENCODING_GZIP, ENCODING_DEFLATE, is_gzip};
+use crate::utils::compression_utils::{ENCODING_DEFLATE, ENCODING_GZIP, is_deflate, is_gzip};
 use crate::utils::file_utils::{get_file_path, persist_file};
 
 pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
@@ -179,6 +181,7 @@ fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
 
 
 async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &Path) -> Result<PathBuf, std::io::Error> {
+    let start_time = Instant::now();
     let request = get_client_request(Some(input), url, None);
     match request.send().await {
         Ok(response) => {
@@ -199,7 +202,8 @@ async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &
                 }
 
                 file.flush()?;
-                debug!("File downloaded successfully to {file_path:?}");
+                let elapsed = start_time.elapsed().as_secs();
+                debug!("File downloaded successfully to {file_path:?}, took:{}", format_elapsed_time(elapsed));
                 Ok(file_path.to_path_buf())
             } else {
                 Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed with status {}", response.status())))
@@ -210,6 +214,7 @@ async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &
 }
 
 async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Error> {
+    let start_time = Instant::now();
     let request = get_client_request(Some(input), url, None);
     match request.send().await {
         Ok(response) => {
@@ -226,9 +231,14 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
                 };
                 match response.bytes().await {
                     Ok(bytes) => {
-                        if bytes.len() >= 2 && is_gzip(&bytes[0..2]) {
-                            encoding = Some(ENCODING_GZIP.to_string());
+                        if bytes.len() >= 2 {
+                            if is_gzip(&bytes[0..2]) {
+                                encoding = Some(ENCODING_GZIP.to_string());
+                            } else if is_deflate(&bytes[0..2]) {
+                                encoding = Some(ENCODING_DEFLATE.to_string());
+                            }
                         }
+
                         let mut decode_buffer = String::new();
                         if let Some(encoding_type) = encoding {
                             match encoding_type.as_str() {
@@ -238,7 +248,7 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
                                         Ok(_) => {}
                                         Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
                                     };
-                                },
+                                }
                                 ENCODING_DEFLATE => {
                                     let mut decoder = ZlibDecoder::new(&bytes[..]);
                                     match decoder.read_to_string(&mut decode_buffer) {
@@ -252,10 +262,14 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
 
                         if decode_buffer.is_empty() {
                             match String::from_utf8(bytes.to_vec()) {
-                                Ok(decoded_content) => Ok(decoded_content),
+                                Ok(decoded_content) => {
+                                    debug!("Request took:{} {url}", format_elapsed_time(start_time.elapsed().as_secs()));
+                                    Ok(decoded_content)
+                                },
                                 Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
                             }
                         } else {
+                            debug!("Request took:{},  {url:?}", format_elapsed_time(start_time.elapsed().as_secs()));
                             Ok(decode_buffer)
                         }
                     }
@@ -271,7 +285,6 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
 
 pub(crate) async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, working_dir: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
-
         if url.scheme() == "file" {
             if let Ok(file_path) = url.to_file_path() {
                 if file_path.exists() {

@@ -7,7 +7,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use enum_iterator::Sequence;
-use log::{debug, error};
+use log::{trace, debug, error};
 use regex::Regex;
 
 use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, valid_property};
@@ -283,7 +283,7 @@ impl MappingValueProcessor<'_> {
         if !self.pli.borrow().header.borrow_mut().set_field(key, value) {
             error!("Cant set unknown field {} to {}", key, value);
         }
-        debug!("Property {} set to {}", key, value);
+        trace!("Property {} set to {}", key, value);
     }
 
     fn apply_attributes(&mut self, captured_names: &HashMap<&str, &str>) {

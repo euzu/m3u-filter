@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::fs::File;
-use serde::de::DeserializeOwned;
-use serde_json::{self, Deserializer};
 use std::io::{self, BufReader, BufWriter, Error, Read, Write};
 use std::path::Path;
+
+use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde_json::{self, Deserializer, Value};
 
 fn read_skipping_ws(mut reader: impl Read) -> io::Result<u8> {
     loop {
@@ -64,25 +65,27 @@ pub(crate) fn json_iter_array<T: DeserializeOwned, R: Read>(
 
 pub(crate) fn json_filter_file(file_path: &Path, filter: &HashMap<&str, &str>) -> Vec<serde_json::Value> {
     let mut filtered: Vec<serde_json::Value> = Vec::new();
-    if file_path.exists() {
-        if let Ok(file) = File::open(file_path) {
-            let reader = BufReader::new(file);
-            for entry in json_iter_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
-                if let Some(item) = entry.as_object() {
-                    for (&key, &value) in filter {
-                        if let Some(field_value) = item.get(key) {
-                            if field_value.is_string() && field_value.eq(value) {
-                                filtered.push(entry.clone());
-                            } else if let Some(num_val) = field_value.as_i64() {
-                                if let Ok(filter_num_val) = value.parse::<i64>() {
-                                    if num_val == filter_num_val {
-                                        filtered.push(entry.clone());
-                                    }
-                                }
-                            }
-                        }
+    if !file_path.exists() {
+        return filtered; // Return early if the file does not exist
+    }
+
+    let Ok(file) = File::open(file_path) else { return filtered };
+
+    let reader = BufReader::new(file);
+    for entry in json_iter_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
+        if let Some(item) = entry.as_object() {
+            if filter.iter().all(|(&key, &value)| {
+                if let Some(field_value) = item.get(key) {
+                    match field_value {
+                        Value::String(s) => s == value,
+                        Value::Number(n) => value.parse::<i64>().ok() == n.as_i64(),
+                        _ => false,
                     }
+                } else {
+                    false
                 }
+            }) {
+                filtered.push(entry);
             }
         }
     }
@@ -91,8 +94,9 @@ pub(crate) fn json_filter_file(file_path: &Path, filter: &HashMap<&str, &str>) -
 }
 
 pub(crate) fn json_write_documents_to_file<T>(file: &Path, value: &T) -> Result<(), Error>
-    where
-        T: ?Sized + Serialize {
+where
+    T: ?Sized + Serialize,
+{
     match File::create(file) {
         Ok(file) => {
             let mut writer = BufWriter::new(file);

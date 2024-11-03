@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use enum_iterator::all;
-use log::{debug, error, Level, log_enabled};
+use log::{trace, debug, error, Level, log_enabled};
 use pest::iterators::Pair;
 use pest::Parser;
 use petgraph::algo::toposort;
@@ -252,8 +252,8 @@ fn get_parser_regexp(expr: &Pair<Rule>, templates: &Vec<PatternTemplate>) -> Res
         let regexp = re.unwrap();
         let captures = regexp.capture_names()
             .flatten().map(String::from).filter(|x| !x.is_empty()).collect::<Vec<String>>();
-        if log_enabled!(Level::Debug) {
-            debug!("Created regex: {} with captures: [{}]", regstr, captures.join(", "));
+        if log_enabled!(Level::Trace) {
+            trace!("Created regex: {} with captures: [{}]", regstr, captures.join(", "));
         }
         return Ok(RegexWithCaptures {
             restr: regstr,

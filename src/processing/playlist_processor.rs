@@ -8,7 +8,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use actix_rt::System;
-use log::{debug, error, info, Level, log_enabled};
+use log::{trace, debug, error, info, Level, log_enabled};
+use std::time::Instant;
+
 use unidecode::unidecode;
 
 use crate::{Config, get_errors_notify_message, model::config};
@@ -40,7 +42,7 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
     for pg in playlist.iter_mut() {
         let channels = pg.channels.iter()
             .filter(|&pli| is_valid(pli, target)).cloned().collect::<Vec<PlaylistItem>>();
-        debug!("Filtered group {} has now {}/{} items", pg.title, channels.len(), pg.channels.len());
+        trace!("Filtered group {} has now {}/{} items", pg.title, channels.len(), pg.channels.len());
         if !channels.is_empty() {
             new_playlist.push(PlaylistGroup {
                 id: pg.id,
@@ -181,7 +183,7 @@ fn map_channel(channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
     if !mapping.mapper.is_empty() {
         let header = channel.header.borrow();
         let channel_name = if mapping.match_as_ascii { Rc::new(unidecode(&header.name)) } else { header.name.clone() };
-        if mapping.match_as_ascii && log_enabled!(Level::Debug) { debug!("Decoded {} for matching to {}", &header.name, &channel_name); };
+        if mapping.match_as_ascii && log_enabled!(Level::Trace) { trace!("Decoded {} for matching to {}", &header.name, &channel_name); };
         drop(header);
         let ref_chan = RefCell::new(&channel);
         let provider = ValueProvider { pli: ref_chan.clone() };
@@ -298,6 +300,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
     let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
     // Downlod the sources
     for input in &source.inputs {
+        let start_time = Instant::now();
         let input_id = input.id;
         if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
             let (mut playlistgroups, mut error_list) = match input.input_type {
@@ -333,8 +336,9 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                     }
                 );
             }
+            let elapsed = start_time.elapsed().as_secs();
             stats.insert(input_id, create_input_stat(group_count, channel_count, error_list.len(),
-                                                     input.input_type.clone(), input_name));
+                                                     input.input_type.clone(), input_name, elapsed));
         }
     }
     if source_playlists.is_empty() {
@@ -358,7 +362,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
     (stats.into_values().collect(), errors)
 }
 
-fn create_input_stat(group_count: usize, channel_count: usize, error_count: usize, input_type: InputType, input_name: &str) -> InputStats {
+fn create_input_stat(group_count: usize, channel_count: usize, error_count: usize, input_type: InputType, input_name: &str, secs_took: u64) -> InputStats {
     InputStats {
         name: input_name.to_string(),
         input_type,
@@ -371,6 +375,7 @@ fn create_input_stat(group_count: usize, channel_count: usize, error_count: usiz
             group_count: 0,
             channel_count: 0,
         },
+        secs_took
     }
 }
 
