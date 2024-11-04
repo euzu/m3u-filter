@@ -1,6 +1,9 @@
 # Changelog
 # 2.0.7 (2024-11-x)
 - epg is now first downloaded to disk and not into memory. It is processed than from disk with a sax parser (slower but previously used up to 2GB ram).
+- a lot of code optimizations
+- regexp matching log output is now trace level 
+- processing stats has now took field which indicates the processing time.
 
 # 2.0.6 (2024-11-02)
 - breaking change virtual_id handling. You need to clear the data directory.
