@@ -6,7 +6,7 @@ pub(crate) struct DirectedGraph<K>
 where
     K: Eq + std::hash::Hash + Clone + Display + Debug,
 {
-    adjacency_list: HashMap<K, Vec<K>>,
+    adjacencies: HashMap<K, Vec<K>>,
 }
 
 impl<K> DirectedGraph<K>
@@ -15,18 +15,18 @@ where
 {
     pub(crate) fn new() -> Self {
         DirectedGraph {
-            adjacency_list: HashMap::new(),
+            adjacencies: HashMap::new(),
         }
     }
 
     // Add a node to the graph, ignore if it already exists
     pub(crate) fn add_node(&mut self, node: &K) {
-        self.adjacency_list.entry(node.to_owned()).or_default();
+        self.adjacencies.entry(node.to_owned()).or_default();
     }
 
     // Add a directed edge to the graph, ignore if it already exists
     pub(crate) fn add_edge(&mut self, from: &K, to: &K) {
-        match self.adjacency_list.entry(from.clone()) {
+        match self.adjacencies.entry(from.clone()) {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 let edges = entry.get_mut();
                 if !edges.contains(to) {
@@ -45,7 +45,7 @@ where
         let mut recursion_stack = Vec::new();
         let mut cycles = Vec::new();
 
-        for node in self.adjacency_list.keys() {
+        for node in self.adjacencies.keys() {
             if !visited.contains(node) {
                 self.dfs_find_cycles(node, &mut visited, &mut recursion_stack, &mut cycles);
             }
@@ -65,7 +65,7 @@ where
         visited.insert(node.clone());
         recursion_stack.push(node.clone());
 
-        if let Some(neighbors) = self.adjacency_list.get(node) {
+        if let Some(neighbors) = self.adjacencies.get(node) {
             for neighbor in neighbors {
                 if !visited.contains(neighbor) {
                     self.dfs_find_cycles(neighbor, visited, recursion_stack, cycles);
@@ -85,7 +85,7 @@ where
         let mut visited = HashSet::new();
         let mut recursion_stack = HashSet::new();
 
-        for node in self.adjacency_list.keys() {
+        for node in self.adjacencies.keys() {
             if !visited.contains(node) && self.dfs(node, &mut visited, &mut recursion_stack) {
                 return true;
             }
@@ -104,7 +104,7 @@ where
             visited.insert(node.clone());
             recursion_stack.insert(node.clone());
 
-            if let Some(neighbors) = self.adjacency_list.get(node) {
+            if let Some(neighbors) = self.adjacencies.get(node) {
                 for neighbor in neighbors {
                     if (!visited.contains(neighbor) && self.dfs(neighbor, visited, recursion_stack)) || recursion_stack.contains(neighbor) {
                         return true;
@@ -124,7 +124,7 @@ where
         }
 
         let mut dependencies = HashMap::new();
-        for (node, adj_nodes) in &self.adjacency_list {
+        for (node, adj_nodes) in &self.adjacencies {
             if !adj_nodes.is_empty() {
                 dependencies.insert(node.clone(), adj_nodes.clone());
             }
@@ -142,7 +142,7 @@ where
         let mut temp_mark = HashSet::new();
         let mut result = Vec::new();
 
-        for node in self.adjacency_list.keys() {
+        for node in self.adjacencies.keys() {
             if !visited.contains(node) && !self.dfs_topological_sort(node, &mut visited, &mut temp_mark, &mut result) {
                 return None; // Cycle detected
             }
@@ -166,7 +166,7 @@ where
         if !visited.contains(node) {
             temp_mark.insert(node.clone());
 
-            if let Some(neighbors) = self.adjacency_list.get(node) {
+            if let Some(neighbors) = self.adjacencies.get(node) {
                 for neighbor in neighbors {
                     if !self.dfs_topological_sort(neighbor, visited, temp_mark, result) {
                         return false;
@@ -189,7 +189,7 @@ where
     K: Eq + std::hash::Hash + Clone + Display + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        for (node, edges) in &self.adjacency_list {
+        for (node, edges) in &self.adjacencies {
             writeln!(f, "{node} -> {edges:?}")?;
         }
         Ok(())
