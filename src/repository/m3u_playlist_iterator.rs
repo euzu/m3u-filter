@@ -8,7 +8,7 @@ use crate::repository::m3u_repository::m3u_get_file_paths;
 use crate::repository::storage::ensure_target_storage_path;
 use crate::utils::file_lock_manager::FileReadGuard;
 
-pub(crate) struct M3uPlaylistIterator {
+pub struct M3uPlaylistIterator {
     reader: IndexedDocumentReader<M3uPlaylistItem>,
     base_url: String,
     target_options: Option<ConfigTargetOptions>,

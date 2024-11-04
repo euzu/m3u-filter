@@ -41,10 +41,7 @@ impl IndexedDocument {
     pub(in crate::repository) fn get_offset(index_path: &Path, doc_id: u32) -> Result<u64, Error> {
         match BPlusTreeQuery::<u32, OffsetPointer>::try_new(index_path) {
             Ok(mut tree) => {
-                match tree.query(&doc_id) {
-                    Some(offset) => Ok(u64::from(offset)),
-                    None => Err(Error::new(ErrorKind::NotFound, format!("doc_id not found {doc_id}"))),
-                }
+                tree.query(&doc_id).map_or_else(|| Err(Error::new(ErrorKind::NotFound, format!("doc_id not found {doc_id}"))), |offset| Ok(u64::from(offset)))
             }
             Err(err) => Err(err)
         }
@@ -160,8 +157,8 @@ impl IndexedDocumentWriter {
             let size = IndexedDocument::read_content_size(&mut self.main_file)?;
             if size == encoded_bytes.len() {
                 // check if it is equal
-                let mut record_buffer = Vec::<u8>::with_capacity(size);
-                self.main_file.read_exact(&mut record_buffer)?;
+                let mut record_buffer = vec![0; size];
+                record_buffer.resize(size, 0); self.main_file.read_exact(&mut record_buffer)?;
                 if record_buffer == encoded_bytes {
                     return Ok(());
                 }
@@ -226,7 +223,7 @@ pub(in crate::repository) struct IndexedDocumentReader<T> {
 }
 
 impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
-    pub fn new(main_path: &Path, index_path: &Path) -> Result<IndexedDocumentReader<T>, Error> {
+    pub fn new(main_path: &Path, index_path: &Path) -> Result<Self, Error> {
         if main_path.exists() && index_path.exists() {
             let mut offsets = Vec::<OffsetPointer>::new();
             {
@@ -261,7 +258,7 @@ impl<T: serde::de::DeserializeOwned> IndexedDocumentReader<T> {
       &self.main_path
     }
 
-    pub fn has_error(&self) -> bool {
+    pub const fn has_error(&self) -> bool {
         self.failed
     }
 

@@ -24,7 +24,7 @@ fn datetime_to_instant(datetime: DateTime<FixedOffset>) -> Instant {
     Instant::now() + duration_until
 }
 
-pub(crate) async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
+pub async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
     match Schedule::from_str(expression) {
         Ok(schedule) => {
             let offset = *Local::now().offset();

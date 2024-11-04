@@ -7,7 +7,7 @@ use crate::model::playlist::PlaylistGroup;
 use crate::utils::file_utils;
 use crate::utils::file_utils::sanitize_filename;
 
-pub(crate) fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) {
+pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) {
     let mut new_tree = BTreeSet::new();
     pl.channels.iter().for_each(|chan| {
         let header = chan.header.borrow();
@@ -76,13 +76,10 @@ fn handle_watch_notification(cfg: &Config, added: &BTreeSet<String>, removed: &B
 }
 
 fn load_watch_tree(path: &Path) -> Option<BTreeSet<String>> {
-    match std::fs::read(path) {
-        Ok(encoded) => {
+    std::fs::read(path).map_or(None, |encoded| {
             let decoded: BTreeSet<String> = bincode::deserialize(&encoded[..]).unwrap();
             Some(decoded)
-        }
-        Err(_) => None,
-    }
+        })
 }
 
 fn save_watch_tree(path: &Path, tree: &BTreeSet<String>) -> std::io::Result<()> {

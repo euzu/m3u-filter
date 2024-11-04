@@ -28,16 +28,13 @@ fn time_correct(date_time: &str, correction: &TimeDelta) -> String {
     }
 
     // Parse the datetime string
-    match NaiveDateTime::parse_from_str(date_time_split[0], "%Y%m%d%H%M%S") {
-        Ok(native_dt) => {
+    NaiveDateTime::parse_from_str(date_time_split[0], "%Y%m%d%H%M%S").map_or_else(|_| date_time.to_string(), |native_dt| {
             let corrected_dt = native_dt + *correction;
             // Format the corrected datetime back to string
             let formatted_dt = corrected_dt.format("%Y%m%d%H%M%S").to_string();
             let result = format!("{} {}", formatted_dt, date_time_split[1]);
             result
-        }
-        Err(_) => date_time.to_string()
-    }
+        })
 }
 
 fn get_epg_path_for_target_of_type(target_name: &str, epg_path: PathBuf) -> Option<PathBuf> {
@@ -69,9 +66,7 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
 }
 
 fn parse_timeshift(time_shift: Option<&String>) -> Option<i32> {
-    match time_shift {
-        None => None,
-        Some(offset) => {
+    time_shift.and_then(|offset| {
             let sign_factor = if offset.starts_with('-') { -1 } else { 1 };
             let offset = offset.trim_start_matches(&['-', '+'][..]); // Remove the sign for parsing
 
@@ -104,8 +99,7 @@ fn parse_timeshift(time_shift: Option<&String>) -> Option<i32> {
             } else {
                 None
             }
-        }
-    }
+        })
 }
 
 async fn serve_epg(epg_path: &Path, req: &HttpRequest, user: &ProxyUserCredentials) -> HttpResponse {
@@ -203,7 +197,7 @@ async fn xmltv_api(
         r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)
 }
 
-pub(crate) fn xmltv_api_register(cfg: &mut web::ServiceConfig) {
+pub fn xmltv_api_register(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/xmltv.php").route(web::get().to(xmltv_api)))
         .service(web::resource("/epg").route(web::get().to(xmltv_api)));
 }

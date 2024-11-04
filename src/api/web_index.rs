@@ -69,7 +69,7 @@ async fn index(
     NamedFile::open(path)
 }
 
-pub(crate) fn index_register(web_dir_path: &Path) -> impl Fn(&mut web::ServiceConfig) + '_ {
+pub fn index_register(web_dir_path: &Path) -> impl Fn(&mut web::ServiceConfig) + '_ {
     return move |cfg: &mut web::ServiceConfig| {
         cfg.service(web::scope("/auth")
             .route("/token", web::post().to(token))

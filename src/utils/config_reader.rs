@@ -14,8 +14,8 @@ use crate::model::config::{Config, ConfigDto};
 use crate::model::mapping::Mappings;
 use crate::utils::{file_utils, multi_file_reader};
 
-pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
-    let mappings_file: String = args_mapping.unwrap_or(file_utils::get_default_mappings_path(cfg.t_config_path.as_str()));
+pub fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
+    let mappings_file: String = args_mapping.unwrap_or_else(|| file_utils::get_default_mappings_path(cfg.t_config_path.as_str()));
 
     match read_mapping(mappings_file.as_str()) {
         Ok(mappings) => {
@@ -29,8 +29,8 @@ pub(crate) fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> R
     }
 }
 
-pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
-    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or(file_utils::get_default_api_proxy_config_path(cfg.t_config_path.as_str()));
+pub fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
+    let api_proxy_config_file: String = args_api_proxy_config.unwrap_or_else(|| file_utils::get_default_api_proxy_config_path(cfg.t_config_path.as_str()));
     api_proxy_config_file.clone_into(&mut cfg.t_api_proxy_file_path);
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str(), true);
     match api_proxy_config {
@@ -44,7 +44,7 @@ pub(crate) fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: 
     }
 }
 
-pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &str) -> Result<Config, M3uFilterError> {
+pub fn read_config(config_path: &str, config_file: &str, sources_file: &str) -> Result<Config, M3uFilterError> {
     let files = vec![std::path::PathBuf::from(config_file), std::path::PathBuf::from(sources_file)];
     match multi_file_reader::MultiFileReader::new(&files) {
         Ok(file) => {
@@ -67,7 +67,7 @@ pub(crate) fn read_config(config_path: &str, config_file: &str, sources_file: &s
     }
 }
 
-pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterError> {
+pub fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterError> {
     let mapping_file = std::path::PathBuf::from(mapping_file);
     if let Ok(file) = file_utils::open_file(&mapping_file) {
         info!("Mapping file: {}", mapping_file.to_str().unwrap_or("?"));
@@ -86,9 +86,8 @@ pub(crate) fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFi
     Ok(None)
 }
 
-pub(crate) fn read_api_proxy(api_proxy_file: &str, resolve_var: bool) -> Option<ApiProxyConfig> {
-    match file_utils::open_file(&std::path::PathBuf::from(api_proxy_file)) {
-        Ok(file) => {
+pub fn read_api_proxy(api_proxy_file: &str, resolve_var: bool) -> Option<ApiProxyConfig> {
+    file_utils::open_file(&std::path::PathBuf::from(api_proxy_file)).map_or(None, |file| {
             let mapping: Result<ApiProxyConfig, _> = serde_yaml::from_reader(file);
             match mapping {
                 Ok(mut result) => {
@@ -107,9 +106,7 @@ pub(crate) fn read_api_proxy(api_proxy_file: &str, resolve_var: bool) -> Option<
                     None
                 }
             }
-        }
-        _ => None
-    }
+        })
 }
 
 fn write_config_file<T>(file_path: &str, backup_dir: &str, config: &T, default_name: &str) -> Result<(), M3uFilterError>
@@ -134,24 +131,21 @@ fn write_config_file<T>(file_path: &str, backup_dir: &str, config: &T, default_n
     }
 }
 
-pub(crate) fn save_api_proxy(file_path: &str, backup_dir: &str, config: &ApiProxyConfig) -> Result<(), M3uFilterError> {
+pub fn save_api_proxy(file_path: &str, backup_dir: &str, config: &ApiProxyConfig) -> Result<(), M3uFilterError> {
     write_config_file(file_path, backup_dir, config, "api-proxy.yml")
 }
 
-pub(crate) fn save_main_config(file_path: &str, backup_dir: &str, config: &ConfigDto) -> Result<(), M3uFilterError> {
+pub fn save_main_config(file_path: &str, backup_dir: &str, config: &ConfigDto) -> Result<(), M3uFilterError> {
     write_config_file(file_path, backup_dir, config, "config.yml")
 }
 
-pub(crate) fn resolve_env_var(value: &str) -> String {
+pub fn resolve_env_var(value: &str) -> String {
     if !value.trim().is_empty() {
         let pattern = Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap();
         if let Some(caps) = pattern.captures(value) {
             if let Some(var) = caps.name("var") {
                 let var_name = var.as_str();
-                return match env::var(var_name) {
-                    Ok(resolved_val) => resolved_val, // If environment variable found, replace with its value
-                    Err(_) => value.to_string()
-                };
+                return env::var(var_name).unwrap_or_else(|_| value.to_string());
             }
         }
     }

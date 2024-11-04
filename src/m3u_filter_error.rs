@@ -21,23 +21,23 @@ macro_rules! get_errors_notify_message {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) enum M3uFilterErrorKind {
+#[derive(Debug, PartialEq, Eq)]
+pub enum M3uFilterErrorKind {
     // do not send with messaging
     Info,
     Notify, // send with messaging
 }
 
 #[derive(Debug)]
-pub(crate) struct M3uFilterError {
+pub struct M3uFilterError {
     pub kind: M3uFilterErrorKind,
     pub message: String,
 
 }
 
 impl M3uFilterError {
-    pub fn new(kind: M3uFilterErrorKind, message: String) -> Self {
-        M3uFilterError {
+    pub const fn new(kind: M3uFilterErrorKind, message: String) -> Self {
+        Self {
             kind,
             message,
         }

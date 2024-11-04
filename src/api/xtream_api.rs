@@ -100,11 +100,11 @@ impl XtreamApiStreamContext {
 impl Display for XtreamApiStreamContext {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            XtreamApiStreamContext::LiveAlt => Self::LIVE_ALT,
-            XtreamApiStreamContext::Live => Self::LIVE,
-            XtreamApiStreamContext::Movie => Self::MOVIE,
-            XtreamApiStreamContext::Series => Self::SERIES,
-            XtreamApiStreamContext::Timeshift => Self::TIMESHIFT,
+            Self::LiveAlt => Self::LIVE_ALT,
+            Self::Live => Self::LIVE,
+            Self::Movie => Self::MOVIE,
+            Self::Series => Self::SERIES,
+            Self::Timeshift => Self::TIMESHIFT,
         })
     }
 }
@@ -118,7 +118,7 @@ struct XtreamApiStreamRequest<'a> {
 }
 
 impl<'a> XtreamApiStreamRequest<'a> {
-    pub fn from(context: XtreamApiStreamContext,
+    pub const fn from(context: XtreamApiStreamContext,
                 username: &'a str,
                 password: &'a str,
                 stream_id: &'a str,
@@ -133,7 +133,7 @@ impl<'a> XtreamApiStreamRequest<'a> {
     }
 }
 
-pub(crate) fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
+pub fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
     let filtered = json_utils::json_filter_file(file_path, filter);
     HttpResponse::Ok().json(filtered)
 }
@@ -181,13 +181,11 @@ fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizati
 }
 
 fn xtream_api_request_separate_number_and_rest(input: &str) -> (String, String) {
-    if let Some(dot_index) = input.find('.') {
+    input.find('.').map_or_else(|| (input.to_string(), String::new()), |dot_index| {
         let number_part = input[..dot_index].to_string();
         let rest = input[dot_index..].to_string();
         (number_part, rest)
-    } else {
-        (input.to_string(), String::new())
-    }
+    })
 }
 
 async fn xtream_player_api_stream(
@@ -443,10 +441,7 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
         return HttpResponse::BadRequest().finish();
     }
 
-    match serde_json::to_string(&doc) {
-        Ok(result) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(result),
-        Err(_) => HttpResponse::BadRequest().finish(),
-    }
+    serde_json::to_string(&doc).map_or_else(|_| HttpResponse::BadRequest().finish(), |result| HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(result))
 }
 
 async fn xtream_player_api(
@@ -559,7 +554,7 @@ async fn xtream_player_api_post(req: HttpRequest,
     xtream_player_api(&req, api_req.into_inner(), &app_state).await
 }
 
-pub(crate) fn xtream_api_register(cfg: &mut web::ServiceConfig) {
+pub fn xtream_api_register(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/player_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)))
         .service(web::resource("/panel_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)))
         .service(web::resource("/xtream").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)))

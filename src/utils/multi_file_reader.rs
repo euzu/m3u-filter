@@ -2,13 +2,13 @@ use std::fs::File;
 use std::io::{self, BufReader, ErrorKind, Read};
 use std::path::{PathBuf};
 
-pub(crate) struct MultiFileReader {
+pub struct MultiFileReader {
     files: Vec<File>,
     current_reader: Option<BufReader<File>>,
 }
 
 impl MultiFileReader {
-    pub(crate) fn new(paths: &Vec<PathBuf>) -> io::Result<Self> {
+    pub fn new(paths: &Vec<PathBuf>) -> io::Result<Self> {
         let mut files = Vec::new();
         for path in paths {
             match File::open(path) {

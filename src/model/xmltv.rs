@@ -5,16 +5,16 @@ use std::rc::Rc;
 use quick_xml::{Error, Writer};
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 
-pub(crate) const EPG_TAG_TV: &str = "tv";
-pub(crate) const EPG_TAG_PROGRAMME: &str = "programme";
-pub(crate) const EPG_TAG_CHANNEL: &str = "channel";
-pub(crate) const EPG_ATTRIB_ID: &str = "id";
-pub(crate) const EPG_ATTRIB_CHANNEL: &str = "channel";
+pub const EPG_TAG_TV: &str = "tv";
+pub const EPG_TAG_PROGRAMME: &str = "programme";
+pub const EPG_TAG_CHANNEL: &str = "channel";
+pub const EPG_ATTRIB_ID: &str = "id";
+pub const EPG_ATTRIB_CHANNEL: &str = "channel";
 
 // https://github.com/XMLTV/xmltv/blob/master/xmltv.dtd
 
 #[derive(Debug, Clone)]
-pub(crate) struct XmlTag {
+pub struct XmlTag {
     pub name: String,
     pub value: Option<String>,
     pub attributes: Option<Rc<HashMap<String, String>>>,
@@ -22,13 +22,8 @@ pub(crate) struct XmlTag {
 }
 
 impl XmlTag {
-    pub(crate) fn get_attribute_value(&self, attr_name: &str) -> Option<&String> {
-        match &self.attributes {
-            None => None,
-            Some(attr) => {
-                attr.get(attr_name)
-            }
-        }
+    pub fn get_attribute_value(&self, attr_name: &str) -> Option<&String> {
+        self.attributes.as_ref().and_then(|attr| attr.get(attr_name))
     }
 
     fn write_to<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<(), Error> {
@@ -49,13 +44,13 @@ impl XmlTag {
 
 
 #[derive(Debug, Clone)]
-pub(crate) struct Epg {
+pub struct Epg {
     pub attributes: Option<Rc<HashMap<String, String>>>,
     pub children: Vec<XmlTag>,
 }
 
 impl Epg {
-    pub(crate) fn write_to<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<(), quick_xml::Error> {
+    pub fn write_to<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<(), quick_xml::Error> {
         let mut elem = BytesStart::new("tv");
         if let Some(attribs) = self.attributes.as_ref() {
             attribs.iter().for_each(|(k, v)| elem.push_attribute((k.as_str(), v.as_str())));
@@ -69,6 +64,6 @@ impl Epg {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct TVGuide {
+pub struct TVGuide {
     pub file: PathBuf,
 }

@@ -7,7 +7,7 @@ use crate::repository::indexed_document::IndexedDocumentReader;
 use crate::repository::xtream_repository::{xtream_get_file_paths, xtream_get_storage_path};
 use crate::utils::file_lock_manager::FileReadGuard;
 
-pub(crate) struct XtreamPlaylistIterator {
+pub struct XtreamPlaylistIterator {
     reader: IndexedDocumentReader<XtreamPlaylistItem>,
     options: XtreamMappingOptions,
     category_id: u32,

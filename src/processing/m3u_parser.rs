@@ -103,7 +103,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, u
             if c.is_none() {
                 break;
             }
-            if let ',' = c.unwrap() {
+            if c.unwrap() == ',' {
                 plih.title = Rc::new(get_value(&mut it));
             } else {
                 let token = token_till(&mut it, '=', true);
@@ -154,18 +154,14 @@ fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, u
     plih
 }
 
-pub(crate) fn extract_id_from_url(url: &str) -> Option<String> {
+pub fn extract_id_from_url(url: &str) -> Option<String> {
     if let Some(filename) = url.split('/').last() {
-        return if let Some(index) = filename.rfind('.') {
-            Some(filename[..index].to_string())
-        } else {
-            Some(filename.to_string())
-        };
+        return filename.rfind('.').map_or_else(|| Some(filename.to_string()), |index| Some(filename[..index].to_string()));
     }
     None
 }
 
-pub(crate) fn consume_m3u<'a, I, F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigInput, lines: I, mut visit: F)
+pub fn consume_m3u<'a, I, F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigInput, lines: I, mut visit: F)
 where
     I: Iterator<Item=&'a str>,
 {
@@ -204,7 +200,7 @@ where
     }
 }
 
-pub(crate) fn parse_m3u<'a, I>(cfg: &Config, input: &ConfigInput, lines: I) -> Vec<PlaylistGroup>
+pub fn parse_m3u<'a, I>(cfg: &Config, input: &ConfigInput, lines: I) -> Vec<PlaylistGroup>
 where
     I: Iterator<Item=&'a str>,
 {
@@ -226,7 +222,7 @@ where
         }
     });
     let mut grp_id = 0;
-    let result: Vec<PlaylistGroup> = sort_order.drain(..).map(|channels| {
+    let result: Vec<PlaylistGroup> = sort_order.into_iter().map(|channels| {
         // create a group based on the first playlist item
         let channel = channels.first();
         let (cluster, group_title) = channel.map(|pli|

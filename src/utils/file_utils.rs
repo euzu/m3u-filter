@@ -1,5 +1,5 @@
 use std::fs;
-use std::fs::{File};
+use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -21,7 +21,7 @@ macro_rules! exit {
     }};
 }
 
-pub(crate) fn get_exe_path() -> PathBuf {
+pub fn get_exe_path() -> PathBuf {
     let default_path = std::path::PathBuf::from("./");
     let current_exe = std::env::current_exe();
     match current_exe {
@@ -45,7 +45,7 @@ fn get_default_path(file: &str) -> String {
     })
 }
 
-pub(crate) fn get_default_file_path(config_path: &str, file: &str) -> String {
+pub fn get_default_file_path(config_path: &str, file: &str) -> String {
     let path: PathBuf = PathBuf::from(config_path);
     let default_path = path.join(file);
     String::from(if default_path.exists() {
@@ -56,75 +56,62 @@ pub(crate) fn get_default_file_path(config_path: &str, file: &str) -> String {
 }
 
 #[inline]
-pub(crate) fn get_default_user_file_path(config_path: &str) -> String {
+pub fn get_default_user_file_path(config_path: &str) -> String {
     get_default_file_path(config_path, USER_FILE)
 }
 
 #[inline]
-pub(crate) fn get_default_config_path() -> String {
+pub fn get_default_config_path() -> String {
     get_default_path(CONFIG_PATH)
 }
 
 #[inline]
-pub(crate) fn get_default_config_file_path(config_path: &str) -> String {
+pub fn get_default_config_file_path(config_path: &str) -> String {
     get_default_file_path(config_path, CONFIG_FILE)
 }
 
 #[inline]
-pub(crate) fn get_default_sources_file_path(config_path: &str) -> String {
+pub fn get_default_sources_file_path(config_path: &str) -> String {
     get_default_file_path(config_path, SOURCE_FILE)
 }
 
 #[inline]
-pub(crate) fn get_default_mappings_path(config_path: &str) -> String {
+pub fn get_default_mappings_path(config_path: &str) -> String {
     get_default_file_path(config_path, MAPPING_FILE)
 }
 
 #[inline]
-pub(crate) fn get_default_api_proxy_config_path(config_path: &str) -> String {
+pub fn get_default_api_proxy_config_path(config_path: &str) -> String {
     get_default_file_path(config_path, API_PROXY_FILE)
 }
 
-pub(crate) fn get_working_path(wd: &String) -> String {
+pub fn get_working_path(wd: &String) -> String {
     let current_dir = std::env::current_dir().unwrap();
     if wd.is_empty() {
         String::from(current_dir.to_str().unwrap_or("."))
     } else {
         let work_path = std::path::PathBuf::from(wd);
         let _ = fs::create_dir_all(&work_path);
-        let wdpath = match fs::metadata(&work_path) {
-            Ok(md) => {
-                if md.is_dir() && !md.permissions().readonly() {
-                    match work_path.canonicalize() {
-                        Ok(ap) => Some(ap),
-                        Err(_) => None
-                    }
-                } else {
-                    error!("Path not found {:?}", &work_path);
-                    None
-                }
-            }
-            Err(_) => None,
-        };
-        let rp: PathBuf = match wdpath {
-            Some(d) => d,
-            None => current_dir.join(wd)
-        };
-        if let Ok(ap) = rp.canonicalize() {
-            String::from(ap.to_str().unwrap_or("./"))
+        let wdpath = fs::metadata(&work_path).map_or(None, |md| if md.is_dir() && !md.permissions().readonly() {
+            work_path.canonicalize().ok()
         } else {
+            error!("Path not found {:?}", &work_path);
+            None
+        });
+        let rp: PathBuf = wdpath.map_or_else(|| current_dir.join(wd), |d| d);
+        rp.canonicalize().map_or_else(|_| {
             error!("Path not found {:?}", &rp);
             String::from("./")
-        }
+        }, |ap| String::from(ap.to_str().unwrap_or("./")))
     }
 }
 
 #[inline]
-pub(crate) fn open_file(file_name: &Path) -> Result<File, std::io::Error> {
+pub fn open_file(file_name: &Path) -> Result<File, std::io::Error> {
     File::open(file_name)
 }
 
-pub(crate) fn persist_file(persist_file: Option<PathBuf>, text: &String) {
+pub fn persist_file(persist_file: Option<PathBuf>, text: &String) {
     if let Some(path_buf) = persist_file {
         let filename = &path_buf.to_str().unwrap_or("?");
         match File::create(&path_buf) {
@@ -137,33 +124,28 @@ pub(crate) fn persist_file(persist_file: Option<PathBuf>, text: &String) {
     }
 }
 
-pub(crate) fn prepare_persist_path(file_name: &str, date_prefix: &str) -> PathBuf {
+pub fn prepare_persist_path(file_name: &str, date_prefix: &str) -> PathBuf {
     let now = chrono::Local::now();
     let persist_filename = file_name.replace("{}", format!("{date_prefix}{}", now.format("%Y%m%d_%H%M%S").to_string().as_str()).as_str());
     std::path::PathBuf::from(persist_filename)
 }
 
-pub(crate) fn get_file_path(wd: &str, path: Option<PathBuf>) -> Option<PathBuf> {
-    match path {
-        Some(p) => {
-            if p.is_relative() {
+pub fn get_file_path(wd: &str, path: Option<PathBuf>) -> Option<PathBuf> {
+    path.map(|p| if p.is_relative() {
                 let pb = PathBuf::from(wd);
                 match pb.join(&p).absolutize() {
-                    Ok(os) => Some(PathBuf::from(os)),
+                    Ok(os) => PathBuf::from(os),
                     Err(e) => {
                         error!("path is not relative {:?}", e);
-                        Some(p)
+                        p
                     }
                 }
             } else {
-                Some(p)
-            }
-        }
-        None => None
-    }
+                p
+            })
 }
 
-pub(crate) fn add_prefix_to_filename(path: &Path, prefix: &str, ext: Option<&str>) -> PathBuf {
+pub fn add_prefix_to_filename(path: &Path, prefix: &str, ext: Option<&str>) -> PathBuf {
     let file_name = path.file_name().unwrap_or_default();
     let new_file_name = format!("{}{}", prefix, file_name.to_string_lossy());
     let result = path.with_file_name(new_file_name);
@@ -173,28 +155,28 @@ pub(crate) fn add_prefix_to_filename(path: &Path, prefix: &str, ext: Option<&str
     }
 }
 
-pub(crate) fn path_exists(file_path: &Path) -> bool {
+pub fn path_exists(file_path: &Path) -> bool {
     if let Ok(metadata) = fs::metadata(file_path) {
         return metadata.is_file();
     }
     false
 }
 
-pub(crate) fn check_write(res: &std::io::Result<()>) -> Result<(), std::io::Error> {
+pub fn check_write(res: &std::io::Result<()>) -> Result<(), std::io::Error> {
     match res {
         Ok(()) => Ok(()),
         Err(_) => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unable to write file")),
     }
 }
 
-pub(crate) fn append_extension(path: &Path, ext: &str) -> PathBuf {
+pub fn append_extension(path: &Path, ext: &str) -> PathBuf {
     let extension = path.extension().map(|ext| ext.to_str().unwrap_or(""));
     path.with_extension(format!("{}{ext}", &extension.unwrap_or_default()))
 }
 
 
 #[inline]
-pub(crate) fn sanitize_filename(file_name: &str) -> String {
+pub fn sanitize_filename(file_name: &str) -> String {
     file_name
         .chars()
         .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })

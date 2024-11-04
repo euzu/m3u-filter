@@ -1,6 +1,6 @@
 // other implementations like calculating text_distance on all titles took too much time
 // we keep it now as simple as possible and less memory intensive.
-pub (crate) fn get_title_group(text: &str) -> String {
+pub fn get_title_group(text: &str) -> String {
     let alphabetic_only: String = text.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).collect();
     let parts = alphabetic_only.split_whitespace();
     let mut combination = String::new();
@@ -13,7 +13,7 @@ pub (crate) fn get_title_group(text: &str) -> String {
     text.to_string()
 }
 
-pub(crate) trait Capitalize {
+pub trait Capitalize {
     fn capitalize(&self) -> String;
 }
 
@@ -21,10 +21,7 @@ pub(crate) trait Capitalize {
 impl Capitalize for &str {
     fn capitalize(&self) -> String {
         let mut chars = self.chars();
-        match chars.next() {
-            None => String::new(), // Handle empty string case
-            Some(first_char) => first_char.to_uppercase().collect::<String>() + chars.as_str(),
-        }
+        chars.next().map_or_else(String::new, |first_char| first_char.to_uppercase().collect::<String>() + chars.as_str())
     }
 }
 

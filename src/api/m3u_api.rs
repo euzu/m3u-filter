@@ -67,7 +67,7 @@ async fn m3u_api_stream(
     HttpResponse::BadRequest().finish()
 }
 
-pub(crate) fn m3u_api_register(cfg: &mut web::ServiceConfig) {
+pub fn m3u_api_register(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/get.php").route(web::get().to(m3u_api)))
         .service(web::resource("/get.php").route(web::post().to(m3u_api)))
         .service(web::resource("/apiget").route(web::get().to(m3u_api)))

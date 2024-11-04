@@ -9,7 +9,7 @@ pub(in crate::repository) const FILE_SUFFIX_INDEX: &str = "idx";
 
 const FILE_ID_MAPPING: &str = "id_mapping.db";
 
-pub(crate) fn hash_string(url: &str) -> [u8; 32] {
+pub fn hash_string(url: &str) -> [u8; 32] {
     let hash = blake3::hash(url.as_bytes());
     hash.into() // convert to hash array
 }
@@ -21,7 +21,7 @@ fn hex_encode(bytes: &[u8]) -> String {
     })
 }
 
-pub(crate) fn hash_string_as_hex(url: &str) -> String {
+pub fn hash_string_as_hex(url: &str) -> String {
     hex_encode(&hash_string(url))
 }
 
@@ -29,7 +29,7 @@ pub(in crate::repository) fn get_target_id_mapping_file(target_path: &Path) -> P
     target_path.join(PathBuf::from(FILE_ID_MAPPING))
 }
 
-pub(crate) fn ensure_target_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, M3uFilterError> {
+pub fn ensure_target_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, M3uFilterError> {
     if let Some(path) = get_target_storage_path(cfg, target_name) {
         if std::fs::create_dir_all(&path).is_err() {
             let msg = format!("Failed to save target data, can't create directory {}", &path.to_str().unwrap());
@@ -42,11 +42,11 @@ pub(crate) fn ensure_target_storage_path(cfg: &Config, target_name: &str) -> Res
     }
 }
 
-pub(crate) fn get_target_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
+pub fn get_target_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
     file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(' ', "_"))))
 }
 
-pub(crate) fn get_input_storage_path(input: &ConfigInput, working_dir: &str) -> std::io::Result<PathBuf> {
+pub fn get_input_storage_path(input: &ConfigInput, working_dir: &str) -> std::io::Result<PathBuf> {
     let name =  format!("input_{}", input.name.clone().unwrap_or_else(|| format!("{}", input.id)));
     let path = Path::new(working_dir).join(name);
 

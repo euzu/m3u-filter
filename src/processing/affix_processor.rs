@@ -1,22 +1,18 @@
-use log::{debug, Level, log_enabled};
-use crate::model::config::{AFFIX_FIELDS, ConfigInput, InputAffix};
+use crate::model::config::{ConfigInput, InputAffix, AFFIX_FIELDS};
 use crate::model::playlist::{FetchedPlaylist, FieldAccessor, PlaylistItem};
 use crate::valid_property;
+use log::{debug, log_enabled, Level};
 
 type AffixProcessor<'a> = Box<dyn Fn(&mut PlaylistItem) + 'a>;
 
 fn create_affix_processor(affix: &InputAffix, is_prefix: bool) -> AffixProcessor {
     Box::new(move |channel: &mut PlaylistItem| {
         let header = &mut channel.header.borrow_mut();
-        let value = if let Some(field_value) = header.get_field(affix.field.as_str()) {
-            if is_prefix {
-                format!("{}{}", &affix.value, field_value.as_str())
-            } else {
-                format!("{}{}", field_value.as_str(), &affix.value)
-            }
+        let value = header.get_field(affix.field.as_str()).map_or_else(|| String::from(&affix.value), |field_value| if is_prefix {
+            format!("{}{}", &affix.value, field_value.as_str())
         } else {
-            String::from(&affix.value)
-        };
+            format!("{}{}", field_value.as_str(), &affix.value)
+        });
         if log_enabled!(Level::Debug) {
             debug!("Applying input {}:  {}={}",  if is_prefix {"prefix"} else {"suffix"},  &affix.field, &value);
         }

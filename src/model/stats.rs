@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::model::config::InputType;
 
 #[derive(Debug, Clone)]
-pub(crate) struct PlaylistStats {
+pub struct PlaylistStats {
     pub group_count: usize,
     pub channel_count: usize,
 }
@@ -14,7 +14,7 @@ impl Display for PlaylistStats {
     }
 }
 
-pub(crate) fn format_elapsed_time(seconds: u64) -> String {
+pub fn format_elapsed_time(seconds: u64) -> String {
     if seconds < 60 {
         format!("{seconds} secs")
     } else {
@@ -25,7 +25,7 @@ pub(crate) fn format_elapsed_time(seconds: u64) -> String {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct InputStats {
+pub struct InputStats {
     pub name: String,
     pub input_type: InputType,
     pub error_count: usize,

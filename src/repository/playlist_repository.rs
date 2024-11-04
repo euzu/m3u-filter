@@ -9,7 +9,7 @@ use crate::repository::storage::{ensure_target_storage_path, get_target_id_mappi
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
 
-pub(crate) fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
+pub fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
                                target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
     let target_path = match ensure_target_storage_path(cfg, &target.name) {

@@ -17,14 +17,14 @@ use crate::repository::storage::hash_string;
 // https://siptv.eu/howto/playlist.html
 
 #[derive(Debug, Clone)]
-pub(crate) struct FetchedPlaylist<'a> { // Contains playlist for one input
+pub struct FetchedPlaylist<'a> { // Contains playlist for one input
     pub input: &'a ConfigInput,
     pub playlistgroups: Vec<PlaylistGroup>,
     pub epg: Option<TVGuide>,
 }
 
 impl FetchedPlaylist<'_> {
-    pub(crate) fn update_playlist(&mut self, plg: &PlaylistGroup) {
+    pub fn update_playlist(&mut self, plg: &PlaylistGroup) {
         for grp in &mut self.playlistgroups {
             if grp.id == plg.id {
                 plg.channels.iter().for_each(|item| grp.channels.push(item.clone()));
@@ -36,7 +36,7 @@ impl FetchedPlaylist<'_> {
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
 #[repr(u8)]
-pub(crate) enum XtreamCluster {
+pub enum XtreamCluster {
     #[default]
     Live = 1,
     Video = 2,
@@ -44,12 +44,11 @@ pub(crate) enum XtreamCluster {
 }
 
 impl XtreamCluster {
-
-    pub fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &str {
         match self {
-            XtreamCluster::Live => "Live",
-            XtreamCluster::Video => "Video",
-            XtreamCluster::Series => "Series",
+            Self::Live => "Live",
+            Self::Video => "Video",
+            Self::Series => "Series",
         }
     }
 }
@@ -64,9 +63,9 @@ impl TryFrom<PlaylistItemType> for XtreamCluster {
     type Error = String;
     fn try_from(item_type: PlaylistItemType) -> Result<Self, Self::Error> {
         match item_type {
-            PlaylistItemType::Live => Ok(XtreamCluster::Live),
-            PlaylistItemType::Video => Ok(XtreamCluster::Video),
-            PlaylistItemType::Series => Ok(XtreamCluster::Series),
+            PlaylistItemType::Live => Ok(Self::Live),
+            PlaylistItemType::Video => Ok(Self::Video),
+            PlaylistItemType::Series => Ok(Self::Series),
             _ => Err(format!("Cant convert {item_type}")),
         }
     }
@@ -74,7 +73,7 @@ impl TryFrom<PlaylistItemType> for XtreamCluster {
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
 #[repr(u8)]
-pub(crate) enum PlaylistItemType {
+pub enum PlaylistItemType {
     #[default]
     Live = 1,
     Video = 2,
@@ -87,9 +86,9 @@ pub(crate) enum PlaylistItemType {
 impl From<XtreamCluster> for PlaylistItemType {
     fn from(xtream_cluster: XtreamCluster) -> Self {
         match xtream_cluster {
-            XtreamCluster::Live => PlaylistItemType::Live,
-            XtreamCluster::Video => PlaylistItemType::Video,
-            XtreamCluster::Series => PlaylistItemType::SeriesInfo,
+            XtreamCluster::Live => Self::Live,
+            XtreamCluster::Video => Self::Video,
+            XtreamCluster::Series => Self::SeriesInfo,
         }
     }
 }
@@ -106,23 +105,23 @@ impl PlaylistItemType {
 impl Display for PlaylistItemType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            PlaylistItemType::Live => Self::LIVE,
-            PlaylistItemType::Video => Self::VIDEO,
-            PlaylistItemType::Series => Self::SERIES,
-            PlaylistItemType::SeriesInfo => Self::SERIES_INFO,
-            PlaylistItemType::SeriesEpisode => Self::SERIES_EPISODE,
-            PlaylistItemType::Catchup => Self::CATCHUP,
+            Self::Live => Self::LIVE,
+            Self::Video => Self::VIDEO,
+            Self::Series => Self::SERIES,
+            Self::SeriesInfo => Self::SERIES_INFO,
+            Self::SeriesEpisode => Self::SERIES_EPISODE,
+            Self::Catchup => Self::CATCHUP,
         })
     }
 }
 
-pub(crate) trait FieldAccessor {
+pub trait FieldAccessor {
     fn get_field(&self, field: &str) -> Option<Rc<String>>;
     fn set_field(&mut self, field: &str, value: &str) -> bool;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct PlaylistItemHeader {
+pub struct PlaylistItemHeader {
     pub uuid: Rc<[u8; 32]>, // calculated
     pub id: Rc<String>, // provider id
     pub virtual_id: u32, // virtual id
@@ -151,14 +150,14 @@ pub(crate) struct PlaylistItemHeader {
 }
 
 impl PlaylistItemHeader {
-    pub(crate) fn gen_uuid(&mut self) {
+    pub fn gen_uuid(&mut self) {
         self.uuid = Rc::new(hash_string(&self.url));
     }
-    pub(crate) fn get_uuid(&self) -> &Rc<[u8; 32]> {
+    pub const fn get_uuid(&self) -> &Rc<[u8; 32]> {
         &self.uuid
     }
 
-    pub(crate) fn get_provider_id(&mut self) -> Option<u32> {
+    pub fn get_provider_id(&mut self) -> Option<u32> {
         match self.id.parse::<u32>() {
             Ok(id) => Some(id),
             Err(_) => match extract_id_from_url(&self.url) {
@@ -222,7 +221,7 @@ macro_rules! generate_field_accessor_impl_for_playlist_item_header {
 generate_field_accessor_impl_for_playlist_item_header!(id, /*virtual_id,*/ name, chno, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, url;);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct M3uPlaylistItem {
+pub struct M3uPlaylistItem {
     pub virtual_id: u32,
     pub provider_id: Rc<String>,
     pub name: Rc<String>,
@@ -264,7 +263,7 @@ impl M3uPlaylistItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct XtreamPlaylistItem {
+pub struct XtreamPlaylistItem {
     pub virtual_id: u32,
     pub provider_id: u32,
     pub name: Rc<String>,
@@ -291,7 +290,7 @@ impl XtreamPlaylistItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PlaylistItem {
+pub struct PlaylistItem {
     pub header: RefCell<PlaylistItemHeader>,
 }
 
@@ -334,13 +333,7 @@ impl PlaylistItem {
                     url: Rc::clone(&header.url),
                     epg_channel_id: header.epg_channel_id.clone(),
                     xtream_cluster: header.xtream_cluster,
-                    additional_properties: match &header.additional_properties {
-                        None => None,
-                        Some(props) => match serde_json::to_string(props) {
-                            Ok(val) => Some(val),
-                            Err(_) => None
-                        }
-                    },
+                    additional_properties: header.additional_properties.as_ref().and_then(|props| serde_json::to_string(props).ok()),
                     item_type: header.item_type,
                     series_fetched: header.series_fetched,
                     category_id: header.category_id,
@@ -355,7 +348,7 @@ impl PlaylistItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PlaylistGroup {
+pub struct PlaylistGroup {
     pub id: u32,
     pub title: Rc<String>,
     pub channels: Vec<PlaylistItem>,
@@ -364,7 +357,7 @@ pub(crate) struct PlaylistGroup {
 }
 
 impl PlaylistGroup {
-    pub(crate) fn on_load(&mut self) {
+    pub fn on_load(&mut self) {
         self.channels.iter().for_each(|pl| pl.header.borrow_mut().gen_uuid());
     }
 }

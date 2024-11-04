@@ -38,7 +38,7 @@ fn create_xtream_series_info_url(url: &str, username: &str, password: &str, epis
     }
 }
 
-pub(crate) fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigInput) -> Result<Option<Vec<PlaylistItem>>, M3uFilterError> {
+pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigInput) -> Result<Option<Vec<PlaylistItem>>, M3uFilterError> {
     let url = input.url.as_str();
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
@@ -87,12 +87,12 @@ fn create_xtream_url(xtream_cluster: XtreamCluster, url: &str, username: &str, p
         Rc::clone(&stream.direct_source)
     }
 }
-pub(crate) fn parse_xtream(input: &ConfigInput,
+pub fn parse_xtream(input: &ConfigInput,
                            xtream_cluster: XtreamCluster,
                            categories: &Value,
                            streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match map_to_xtream_category(categories) {
-        Ok(mut xtream_categories) => {
+        Ok(xtream_categories) => {
             let input_id = input.id;
             let url = input.url.as_str();
             let username = input.username.as_ref().map_or("", |v| v);
@@ -101,7 +101,7 @@ pub(crate) fn parse_xtream(input: &ConfigInput,
             return match map_to_xtream_streams(xtream_cluster, streams) {
                 Ok(xtream_streams) => {
                     let group_map: HashMap::<Rc<String>, RefCell<XtreamCategory>> =
-                        xtream_categories.drain(..).map(|category|
+                        xtream_categories.into_iter().map(|category|
                             (Rc::clone(&category.category_id), RefCell::new(category))
                         ).collect();
 

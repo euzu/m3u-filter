@@ -14,7 +14,7 @@ use crate::repository::bplustree::BPlusTree;
 const EXPIRATION_DURATION: i64 = 86400;
 
 #[derive(Serialize, Deserialize, Clone)]
-pub(crate) struct VirtualIdRecord {
+pub struct VirtualIdRecord {
     pub virtual_id: u32,
     pub provider_id: u32,
     pub uuid: [u8; 32],
@@ -26,19 +26,19 @@ pub(crate) struct VirtualIdRecord {
 impl VirtualIdRecord {
     fn new(provider_id: u32, virtual_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32, uuid: [u8; 32]) -> Self {
         let last_updated = Local::now().timestamp();
-        VirtualIdRecord { virtual_id, provider_id, uuid, item_type, parent_virtual_id, last_updated }
+        Self { virtual_id, provider_id, uuid, item_type, parent_virtual_id, last_updated }
     }
 
-    pub(crate) fn is_expired(&self) -> bool {
+    pub fn is_expired(&self) -> bool {
         (Local::now().timestamp() - self.last_updated) > EXPIRATION_DURATION
     }
 
-    pub(crate) fn copy_update_timestamp(&self) -> Self {
+    pub fn copy_update_timestamp(&self) -> Self {
         Self::new(self.provider_id, self.virtual_id, self.item_type, self.parent_virtual_id, self.uuid)
     }
 }
 
-pub(crate) struct TargetIdMapping {
+pub struct TargetIdMapping {
     dirty: bool,
     virtual_id_counter: u32,
     by_virtual_id: BPlusTree<u32, VirtualIdRecord>,
@@ -47,11 +47,8 @@ pub(crate) struct TargetIdMapping {
 }
 
 impl TargetIdMapping {
-    pub(crate) fn new(path: &Path) -> Self {
-        let tree_virtual_id: BPlusTree<u32, VirtualIdRecord> = match BPlusTree::<u32, VirtualIdRecord>::load(path) {
-            Ok(tree) => tree,
-            _ => BPlusTree::<u32, VirtualIdRecord>::new()
-        };
+    pub fn new(path: &Path) -> Self {
+        let tree_virtual_id: BPlusTree<u32, VirtualIdRecord> = BPlusTree::<u32, VirtualIdRecord>::load(path).unwrap_or_else(|_| BPlusTree::<u32, VirtualIdRecord>::new());
         let mut tree_uuid = BTreeMap::new();
         let mut virtual_id_counter: u32 = 0;
         tree_virtual_id.traverse(|keys, values| {
@@ -65,7 +62,7 @@ impl TargetIdMapping {
                 tree_uuid.insert(v.uuid, v.virtual_id);
             }
         });
-        TargetIdMapping {
+        Self {
             dirty: false,
             virtual_id_counter,
             by_virtual_id: tree_virtual_id,
@@ -74,7 +71,7 @@ impl TargetIdMapping {
         }
     }
 
-    pub(crate) fn insert_entry(&mut self, uuid: [u8; 32], provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
+    pub fn insert_entry(&mut self, uuid: [u8; 32], provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
         match self.by_uuid.get(&uuid) {
             None => {
                 self.dirty = true;
@@ -87,7 +84,7 @@ impl TargetIdMapping {
         }
     }
 
-    pub(crate) fn persist(&mut self) -> Result<(), Error> {
+    pub fn persist(&mut self) -> Result<(), Error> {
         if self.dirty {
             self.by_virtual_id.store(&self.path)?;
         }

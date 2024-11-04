@@ -20,13 +20,13 @@ macro_rules! cant_write_result {
     }
 }
 
-pub(crate) fn m3u_get_file_paths(target_path: &Path) -> (PathBuf, PathBuf) {
+pub fn m3u_get_file_paths(target_path: &Path) -> (PathBuf, PathBuf) {
     let m3u_path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_DB}")));
     let index_path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_INDEX}")));
     (m3u_path, index_path)
 }
 
-pub(crate) fn m3u_get_epg_file_path(target_path: &Path) -> PathBuf {
+pub fn m3u_get_epg_file_path(target_path: &Path) -> PathBuf {
     let path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_DB}")));
     file_utils::add_prefix_to_filename(&path, "epg_", Some("xml"))
 }
@@ -37,10 +37,10 @@ fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlis
             match File::create(&m3u_filename) {
                 Ok(file) => {
                     let mut buf_writer = BufWriter::new(file);
-                    let _ = buf_writer.write("#EXTM3U\n".as_bytes());
+                    let _ = buf_writer.write(b"#EXTM3U\n");
                     for m3u in m3u_playlist {
                         let _ = buf_writer.write(m3u.to_m3u(&target.options, None).as_bytes());
-                        let _ = buf_writer.write("\n".as_bytes());
+                        let _ = buf_writer.write(b"\n");
                     }
                 }
                 Err(_) => {
@@ -51,7 +51,7 @@ fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlis
     }
 }
 
-pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path: &Path, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path: &Path, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         let (m3u_path, idx_path) = m3u_get_file_paths(target_path);
         let m3u_playlist = new_playlist.iter()
@@ -79,7 +79,7 @@ pub(crate) fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_pat
     Ok(())
 }
 
-pub(crate) fn m3u_load_rewrite_playlist(
+pub fn m3u_load_rewrite_playlist(
     cfg: &Config,
     target: &ConfigTarget,
     user: &ProxyUserCredentials,
@@ -88,7 +88,7 @@ pub(crate) fn m3u_load_rewrite_playlist(
 }
 
 
-pub(crate) fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
+pub fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
     if stream_id < 1 {
         return Err(Error::new(ErrorKind::Other, "id should start with 1"));
     }

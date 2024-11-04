@@ -106,7 +106,7 @@ macro_rules! download_info {
     }
 }
 
-pub(crate) async fn queue_download_file(
+pub async fn queue_download_file(
     req: web::Json<FileDownloadRequest>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
@@ -133,19 +133,15 @@ pub(crate) async fn queue_download_file(
     }
 }
 
-pub(crate) async fn download_file_info(
+pub async fn download_file_info(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let finished_list: &[Value] = &app_state.downloads.finished.write().unwrap().drain(..)
         .map(|fd| download_info!(fd)).collect::<Vec<Value>>();
 
-    match &*app_state.downloads.active.read().unwrap() {
-        None => HttpResponse::Ok().json(json!({
+    (*app_state.downloads.active.read().unwrap()).as_ref().map_or_else(|| HttpResponse::Ok().json(json!({
             "completed": true, "downloads": finished_list
-        })),
-        Some(file_download) =>
-            HttpResponse::Ok().json(json!({
+        })), |file_download| HttpResponse::Ok().json(json!({
             "completed": false, "downloads": finished_list, "active": download_info!(file_download)
-        }))
-    }
+        })))
 }

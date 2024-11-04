@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::repository::bplustree::BPlusTree;
 
-pub(crate) struct IdMapping<V>
+pub struct IdMapping<V>
 where
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
@@ -23,7 +23,7 @@ impl<V> IdMapping<V>
 where
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
-    pub(crate) fn new(path: &Path) -> Self {
+    pub fn new(path: &Path) -> Self {
         let tree: BPlusTree<u32, V> = match BPlusTree::<u32, V>::deserialize(&path) {
             Ok(tree) => tree,
             _ => BPlusTree::<u32, V>::new()
@@ -47,12 +47,12 @@ where
         }
     }
 
-    pub(crate) fn insert(&mut self, id: u32, value: V) {
+    pub fn insert(&mut self, id: u32, value: V) {
         self.dirty = true;
         self.tree.insert(id, value);
     }
 
-    pub(crate) fn persist(&mut self) -> Result<(), Error> {
+    pub fn persist(&mut self) -> Result<(), Error> {
         if self.dirty {
             self.tree.serialize(&self.path)?;
         }
@@ -60,11 +60,11 @@ where
         Ok(())
     }
 
-    pub(crate) fn max_id(&self) -> u32 {
+    pub fn max_id(&self) -> u32 {
         self.max_id
     }
 
-    pub(crate) fn query(&self, id: u32) -> Option<&V> {
+    pub fn query(&self, id: u32) -> Option<&V> {
         self.tree.query(&id)
     }
 }

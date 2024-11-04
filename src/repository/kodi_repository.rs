@@ -39,27 +39,21 @@ fn kodi_style_rename_year(name: &String, style: &KodiStyle) -> (String, Option<S
 }
 
 fn kodi_style_rename_season(name: &String, style: &KodiStyle) -> (String, Option<String>) {
-    match style.season.find(name) {
-        Some(m) => {
+    style.season.find(name).map_or_else(|| (String::from(name), Some(String::from("01"))), |m| {
             let s_season = &name[m.start()..m.end()];
             let season = Some(String::from(&s_season[1..]));
             let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
             (new_name, season)
-        }
-        _ => (String::from(name), Some(String::from("01"))),
-    }
+        })
 }
 
 fn kodi_style_rename_episode(name: &String, style: &KodiStyle) -> (String, Option<String>) {
-    match style.episode.find(name) {
-        Some(m) => {
+    style.episode.find(name).map_or_else(|| (String::from(name), None), |m| {
             let s_episode = &name[m.start()..m.end()];
             let episode = Some(String::from(&s_episode[1..]));
             let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
             (new_name, episode)
-        }
-        _ => (String::from(name), None),
-    }
+        })
 }
 
 fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
@@ -74,7 +68,7 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
 }
 
 
-pub(crate) fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
+pub fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write strm playlist failed: ".to_string()));

@@ -1,12 +1,12 @@
 use std::fs::File;
 use linereader::LineReader;
 
-pub(crate) struct FileReader  {
+pub struct FileReader  {
     reader: LineReader<File>,
 }
 
 impl FileReader {
-    pub(crate) fn new(file: File) -> Self {
+    pub fn new(file: File) -> Self {
         Self {
             reader: LineReader::new(file),
         }

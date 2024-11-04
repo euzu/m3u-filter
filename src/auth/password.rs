@@ -11,7 +11,7 @@ fn generate_salt(length: usize) -> String {
     salt
 }
 
-pub(crate) fn hash(password: &[u8]) -> Option<String> {
+pub fn hash(password: &[u8]) -> Option<String> {
     let salt = generate_salt(64);
     if !password.is_empty() {
         let config = argon2::Config::default();
@@ -22,15 +22,14 @@ pub(crate) fn hash(password: &[u8]) -> Option<String> {
     None
 }
 
-pub(crate) fn verify_password(hash: &str, password: &[u8]) -> bool {
+pub fn verify_password(hash: &str, password: &[u8]) -> bool {
     if let Ok(valid) = argon2::verify_encoded(hash, password) {
         return valid;
     }
     false
 }
 
-
-pub(crate) fn generate_password() -> std::io::Result<String> {
+pub fn generate_password() -> std::io::Result<String> {
     match rpassword::prompt_password("password> ") {
         Ok(pwd1) => {
             if pwd1.len() < 8 {
@@ -39,10 +38,7 @@ pub(crate) fn generate_password() -> std::io::Result<String> {
             match rpassword::prompt_password("retype password> ") {
                 Ok(pwd2) => {
                     if pwd1.eq(&pwd2) {
-                        match hash(pwd1.as_bytes()) {
-                            None => Err(std::io::Error::new(ErrorKind::Other, "Failed to generate hash")),
-                            Some(hash) => Ok(hash),
-                        }
+                        hash(pwd1.as_bytes()).map_or_else(|| Err(std::io::Error::new(ErrorKind::Other, "Failed to generate hash")), Ok)
                     } else {
                         Err(std::io::Error::new(ErrorKind::Other, "Passwords don't match"))
                     }

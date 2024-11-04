@@ -21,11 +21,11 @@ use crate::repository::xtream_repository::FILE_EPG;
 use crate::utils::compression_utils::{ENCODING_DEFLATE, ENCODING_GZIP, is_deflate, is_gzip};
 use crate::utils::file_utils::{get_file_path, persist_file};
 
-pub(crate) fn bytes_to_megabytes(bytes: u64) -> u64 {
+pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
 }
 
-pub(crate) async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
+pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
     if log_enabled!(Level::Debug) {
         debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
     }
@@ -65,18 +65,16 @@ pub(crate) async fn get_input_text_content_as_file(input: &ConfigInput, working_
             None => None
         };
 
-        if let Some(path) = result {
-            Ok(path)
-        } else {
+        result.map_or_else(|| {
             let msg = format!("cant read input url: {url_str:?}");
             error!("{}", msg);
             create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
-        }
+        }, Ok)
     }
 }
 
 
-pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
+pub async fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
     if log_enabled!(Level::Debug) {
         debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
     }
@@ -116,24 +114,22 @@ pub(crate) async fn get_input_text_content(input: &ConfigInput, working_dir: &St
             }
             None => None
         };
-        if let Some(content) = result {
-            Ok(content)
-        } else {
+        result.map_or_else(|| {
             let msg = format!("cant read input url: {url_str:?}");
             error!("{}", msg);
             create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
-        }
+        }, Ok)
     }
 }
 
-pub(crate) fn get_client_request(input: Option<&ConfigInput>, url: &Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
+pub fn get_client_request(input: Option<&ConfigInput>, url: &Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
     let mut request = reqwest::Client::new().get(url.clone());
     let headers = get_request_headers(input.map_or(&HashMap::new(), |i| &i.headers), custom_headers);
     request = request.headers(headers);
     request
 }
 
-pub(crate) fn get_request_headers(defined_headers: &HashMap<String, String>, custom_headers: Option<&HashMap<&str, &[u8]>>) -> HeaderMap {
+pub fn get_request_headers(defined_headers: &HashMap<String, String>, custom_headers: Option<&HashMap<&str, &[u8]>>) -> HeaderMap {
     let mut headers = HeaderMap::new();
     for (key, value) in defined_headers {
         headers.insert(
@@ -221,14 +217,7 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
             let is_success = response.status().is_success();
             if is_success {
                 let header_value = response.headers().get(CONTENT_ENCODING);
-                let mut encoding = if let Some(encoding_header) = header_value {
-                    match encoding_header.to_str() {
-                        Ok(value) => Some(value.to_string()),
-                        Err(_) => None,
-                    }
-                } else {
-                    None
-                };
+                let mut encoding = header_value.and_then(|encoding_header| encoding_header.to_str().map_or(None, |value| Some(value.to_string())));
                 match response.bytes().await {
                     Ok(bytes) => {
                         if bytes.len() >= 2 {
@@ -283,30 +272,21 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
     }
 }
 
-pub(crate) async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, working_dir: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, Error> {
+pub async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, working_dir: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         if url.scheme() == "file" {
-            if let Ok(file_path) = url.to_file_path() {
-                if file_path.exists() {
+            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {url}"))), |file_path| if file_path.exists() {
                     Ok(file_path)
                 } else {
                     Err(Error::new(ErrorKind::NotFound, format!("Unknown file {file_path:?}")))
-                }
-            } else {
-                Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {url}")))
-            }
+                })
         } else {
-            let file_path = match persist_filepath {
-                None => {
-                    match get_input_storage_path(input, working_dir) {
-                        Ok(download_path) => {
-                            Ok(download_path.join(FILE_EPG))
-                        }
-                        Err(err) => Err(err)
-                    }
+            let file_path =  persist_filepath.map_or_else(|| match get_input_storage_path(input, working_dir) {
+                Ok(download_path) => {
+                    Ok(download_path.join(FILE_EPG))
                 }
-                Some(path) => Ok(path),
-            };
+                Err(err) => Err(err)
+            }, Ok);
             match file_path {
                 Ok(persist_path) => get_remote_content_as_file(input, &url, &persist_path).await,
                 Err(err) => Err(err)
@@ -318,14 +298,10 @@ pub(crate) async fn download_text_content_as_file(input: &ConfigInput, url_str: 
 }
 
 
-pub(crate) async fn download_text_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
+pub async fn download_text_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         let result = if url.scheme() == "file" {
-            if let Ok(file_path) = url.to_file_path() {
-                get_local_file_content(&file_path)
-            } else {
-                Err(Error::new(ErrorKind::Other, format!("Unknown file {url}")))
-            }
+            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Other, format!("Unknown file {url}"))), |file_path| get_local_file_content(&file_path))
         } else {
             get_remote_content(input, &url).await
         };
@@ -358,14 +334,14 @@ async fn download_json_content(input: &ConfigInput, url: &str, persist_filepath:
     }
 }
 
-pub(crate) async fn get_input_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
+pub async fn get_input_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
     match download_json_content(input, url, persist_filepath).await {
         Ok(content) => Ok(content),
         Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {url}  => {}", e)
     }
 }
 //
-// pub(crate) fn get_base_url(url: &str) -> Option<String> {
+// pub fn get_base_url(url: &str) -> Option<String> {
 //     if let Some((scheme_end, rest)) = url.split_once("://") {
 //         let scheme = scheme_end;
 //         if let Some(authority_end) = rest.find('/') {

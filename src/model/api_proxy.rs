@@ -8,8 +8,8 @@ use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::utils::config_reader;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
-pub(crate) enum ProxyType {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
+pub enum ProxyType {
     #[serde(rename = "reverse")]
     Reverse,
     #[serde(rename = "redirect")]
@@ -51,7 +51,7 @@ impl FromStr for ProxyType {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ProxyUserCredentials {
+pub struct ProxyUserCredentials {
     pub username: String,
     pub password: String,
     pub token: Option<String>,
@@ -98,7 +98,7 @@ impl ProxyUserCredentials {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct TargetUser {
+pub struct TargetUser {
     pub target: String,
     pub credentials: Vec<ProxyUserCredentials>,
 }
@@ -119,7 +119,7 @@ fn default_as_443() -> String { "443".to_string() }
 fn default_as_1935() -> String { "1935".to_string() }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ApiProxyServerInfo {
+pub struct ApiProxyServerInfo {
     pub name: String,
     pub protocol: String,
     pub host: String,
@@ -171,7 +171,7 @@ impl ApiProxyServerInfo {
         true
     }
 
-    pub(crate) fn get_base_url(&self) -> String {
+    pub fn get_base_url(&self) -> String {
         if self.protocol.eq("http") {
             format!("http://{}:{}", self.host, self.http_port)
         } else {
@@ -181,7 +181,7 @@ impl ApiProxyServerInfo {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ApiProxyConfig {
+pub struct ApiProxyConfig {
     pub server: Vec<ApiProxyServerInfo>,
     pub user: Vec<TargetUser>,
 }

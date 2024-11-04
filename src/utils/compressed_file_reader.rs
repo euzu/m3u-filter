@@ -5,12 +5,12 @@ use flate2::bufread::{GzDecoder, ZlibDecoder};
 use crate::utils::compression_utils::{is_deflate, is_gzip};
 
 
-pub(crate) struct CompressedFileReader {
+pub struct CompressedFileReader {
     reader: BufReader<Box<dyn Read>>,
 }
 
 impl CompressedFileReader {
-    pub(crate) fn new(path: &Path) -> std::io::Result<Self> {
+    pub fn new(path: &Path) -> std::io::Result<Self> {
         let file = OpenOptions::new()
             .read(true)
             .open(path)?;

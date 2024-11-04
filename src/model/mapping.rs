@@ -4,21 +4,21 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
-
+use std::sync::{Arc};
+use std::sync::atomic::AtomicU32;
 use enum_iterator::Sequence;
-use log::{trace, debug, error};
+use log::{debug, error, trace};
 use regex::Regex;
 
-use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, valid_property};
-use crate::filter::{apply_templates_to_pattern, Filter, get_filter, PatternTemplate, prepare_templates, RegexWithCaptures, ValueProcessor};
+use crate::filter::{apply_templates_to_pattern, get_filter, prepare_templates, Filter, PatternTemplate, RegexWithCaptures, ValueProcessor};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{AFFIX_FIELDS, COUNTER_FIELDS, ItemField, MAPPER_ATTRIBUTE_FIELDS};
+use crate::model::config::{ItemField, AFFIX_FIELDS, COUNTER_FIELDS, MAPPER_ATTRIBUTE_FIELDS};
 use crate::model::playlist::{FieldAccessor, PlaylistItem};
 use crate::utils::string_utils::Capitalize;
+use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, valid_property};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct MappingTag {
+pub struct MappingTag {
     pub name: String,
     pub captures: Vec<String>,
     #[serde(default)]
@@ -30,8 +30,8 @@ pub(crate) struct MappingTag {
 }
 
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
-pub(crate) enum CounterModifier {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
+pub enum CounterModifier {
     #[serde(rename = "assign")]
     Assign,
     #[serde(rename = "suffix")]
@@ -79,7 +79,7 @@ impl FromStr for CounterModifier {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct MappingCounterDefinition {
+pub struct MappingCounterDefinition {
     pub filter: String,
     pub field: String,
     #[serde(default)]
@@ -91,16 +91,16 @@ pub(crate) struct MappingCounterDefinition {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct MappingCounter {
+pub struct MappingCounter {
     pub filter: Filter,
     pub field: String,
     pub concat: String,
     pub modifier: CounterModifier,
-    pub value: Arc<Mutex<u32>>,
+    pub value: Arc<AtomicU32>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq)]
-pub(crate) enum TransformModifier {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
+pub enum TransformModifier {
     #[serde(rename = "lowercase")]
     Lowercase,
     #[serde(rename = "uppercase")]
@@ -148,7 +148,7 @@ impl FromStr for TransformModifier {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct MapperTransform {
+pub struct MapperTransform {
     pub field: String,
     pub modifier: TransformModifier,
     pub pattern: Option<String>,
@@ -180,7 +180,7 @@ impl MapperTransform {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct Mapper {
+pub struct Mapper {
     pub filter: Option<String>,
     pub pattern: String,
     #[serde(default)]
@@ -194,9 +194,9 @@ pub(crate) struct Mapper {
     #[serde(default)]
     transform: Option<Vec<MapperTransform>>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub(crate) t_filter: Option<Filter>,
+    pub t_filter: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub(crate) t_pattern: Option<Filter>,
+    pub t_pattern: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
     t_tags: Vec<MappingTag>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -256,10 +256,7 @@ impl Mapper {
                     }
                     _ => self.t_filter = None
                 }
-                self.t_tags = match tags {
-                    Some(list) => list.clone(),
-                    _ => vec![]
-                };
+                self.t_tags = tags.map_or_else(std::vec::Vec::new, std::clone::Clone::clone);
                 self.t_tagre = Some(Regex::new("<tag:(.*?)>").unwrap());
                 self.t_attre = Some(Regex::new("<(.*?)>").unwrap());
                 Ok(())
@@ -269,7 +266,7 @@ impl Mapper {
     }
 }
 
-pub(crate) struct MappingValueProcessor<'a> {
+pub struct MappingValueProcessor<'a> {
     pub pli: RefCell<&'a PlaylistItem>,
     pub mapper: &'a Mapper,
 }
@@ -279,14 +276,14 @@ impl MappingValueProcessor<'_> {
         self.pli.borrow().header.borrow().get_field(key)
     }
 
-    fn set_property(&mut self, key: &str, value: &str) {
+    fn set_property(&self, key: &str, value: &str) {
         if !self.pli.borrow().header.borrow_mut().set_field(key, value) {
             error!("Cant set unknown field {} to {}", key, value);
         }
         trace!("Property {} set to {}", key, value);
     }
 
-    fn apply_attributes(&mut self, captured_names: &HashMap<&str, &str>) {
+    fn apply_attributes(&self, captured_names: &HashMap<&str, &str>) {
         let mapper = self.mapper;
         let attr_re = &mapper.t_attre.as_ref().unwrap();
         let attributes = &mapper.attributes;
@@ -303,7 +300,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_tags(&mut self, value: &String, captures: &HashMap<&str, &str>) -> Option<String> {
+    fn apply_tags(&self, value: &String, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
         let tag_captures = self.mapper.t_tagre.as_ref().unwrap().captures_iter(value)
             .filter(|caps| caps.len() > 1)
@@ -341,7 +338,7 @@ impl MappingValueProcessor<'_> {
         Some(new_value)
     }
 
-    fn apply_suffix(&mut self, captures: &HashMap<&str, &str>) {
+    fn apply_suffix(&self, captures: &HashMap<&str, &str>) {
         let mapper = self.mapper;
         let suffix = &mapper.suffix;
 
@@ -355,7 +352,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_prefix(&mut self, captures: &HashMap<&str, &str>) {
+    fn apply_prefix(&self, captures: &HashMap<&str, &str>) {
         let mapper = self.mapper;
         let prefix = &mapper.prefix;
         for (key, value) in prefix {
@@ -368,7 +365,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_assignments(&mut self) {
+    fn apply_assignments(&self) {
         let mapper = self.mapper;
         let assignments = &mapper.assignments;
         for (key, value) in assignments {
@@ -386,20 +383,16 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_transform(&mut self) {
+    fn apply_transform(&self) {
         let mapper = self.mapper;
         match &mapper.transform {
             None => {}
             Some(transform_list) => {
                 for transform in transform_list {
                     if let Some(prop_value) = self.get_property(&transform.field) {
-                        let value = if let Some(regex) = &transform.t_pattern {
-                            regex.replace_all(&prop_value, |caps: &regex::Captures| {
-                                Self::apply_transform_modifier(&transform.modifier, &caps[0])
-                            })
-                        } else {
-                            Cow::from(Self::apply_transform_modifier(&transform.modifier, prop_value.as_str()))
-                        };
+                        let value = transform.t_pattern.as_ref().map_or_else(|| Cow::from(Self::apply_transform_modifier(&transform.modifier, prop_value.as_str())), |regex| regex.replace_all(&prop_value, |caps: &regex::Captures| {
+                            Self::apply_transform_modifier(&transform.modifier, &caps[0])
+                        }));
                         self.set_property(&transform.field, &value);
                     }
                 }
@@ -415,16 +408,16 @@ impl ValueProcessor for MappingValueProcessor<'_> {
             rewc.re.captures_iter(value)
                 .filter(|caps| caps.len() > 1)
                 .for_each(|captures|
-                for capture_name in &rewc.captures {
-                    let match_opt = captures.name(capture_name.as_str());
-                    let capture_value = if match_opt.is_some() {
-                        match_opt.map_or("", |m| m.as_str())
-                    } else {
-                        ""
-                    };
-                    debug!("match {}: {}", capture_name, capture_value);
-                    captured_values.insert(capture_name.as_str(), capture_value);
-                }
+                    for capture_name in &rewc.captures {
+                        let match_opt = captures.name(capture_name.as_str());
+                        let capture_value = if match_opt.is_some() {
+                            match_opt.map_or("", |m| m.as_str())
+                        } else {
+                            ""
+                        };
+                        debug!("match {}: {}", capture_name, capture_value);
+                        captured_values.insert(capture_name.as_str(), capture_value);
+                    }
                 );
         }
         MappingValueProcessor::<'_>::apply_attributes(self, &captured_values);
@@ -437,7 +430,7 @@ impl ValueProcessor for MappingValueProcessor<'_> {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct Mapping {
+pub struct Mapping {
     pub id: String,
     #[serde(default)]
     pub match_as_ascii: bool,
@@ -468,7 +461,7 @@ impl Mapping {
                             field: def.field.clone(),
                             concat: def.concat.clone(),
                             modifier: def.modifier.clone(),
-                            value: Arc::new(Mutex::new(def.value)),
+                            value: Arc::new(AtomicU32::new(def.value)),
                         });
                     }
                     Err(e) => return Err(M3uFilterError::new(M3uFilterErrorKind::Info, e.to_string()))
@@ -482,7 +475,7 @@ impl Mapping {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct MappingDefinition {
+pub struct MappingDefinition {
     pub templates: Option<Vec<PatternTemplate>>,
     pub tags: Option<Vec<MappingTag>>,
     pub mapping: Vec<Mapping>,
@@ -499,14 +492,8 @@ impl MappingDefinition {
             }
         };
         for mapping in &mut self.mapping {
-            let template_list = match &self.templates {
-                Some(templ) => Some(templ),
-                _ => None
-            };
-            let tag_list = match &self.tags {
-                Some(t) => Some(t),
-                _ => None
-            };
+            let template_list = self.templates.as_ref();
+            let tag_list = self.tags.as_ref();
             handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, mapping.prepare(template_list, tag_list));
         }
         Ok(())
@@ -514,7 +501,7 @@ impl MappingDefinition {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct Mappings {
+pub struct Mappings {
     pub mappings: MappingDefinition,
 }
 

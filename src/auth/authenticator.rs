@@ -12,7 +12,7 @@ pub struct Claims {
     exp: i64,
 }
 
-pub(crate) fn create_jwt(web_auth_config: &WebAuthConfig) -> Result<String, std::io::Error> {
+pub fn create_jwt(web_auth_config: &WebAuthConfig) -> Result<String, std::io::Error> {
     let mut header = Header::new(Algorithm::HS256);
     header.typ = Some("JWT".to_string());
     let now = Local::now();
@@ -29,7 +29,7 @@ pub(crate) fn create_jwt(web_auth_config: &WebAuthConfig) -> Result<String, std:
     }
 }
 
-pub(crate) fn verify_token(bearer: Option<BearerAuth>, secret_key: &[u8]) -> bool {
+pub fn verify_token(bearer: Option<BearerAuth>, secret_key: &[u8]) -> bool {
     if let Some(auth) = bearer {
         let token = auth.token();
         let token_message = decode::<Claims>(token, &DecodingKey::from_secret(secret_key), &Validation::new(Algorithm::HS256));
@@ -40,7 +40,7 @@ pub(crate) fn verify_token(bearer: Option<BearerAuth>, secret_key: &[u8]) -> boo
     false
 }
 
-pub(crate) async fn validator(
+pub async fn validator(
     req: ServiceRequest,
     credentials: Option<BearerAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
@@ -53,7 +53,7 @@ pub(crate) async fn validator(
     }
 }
 
-// pub(crate) fn handle_unauthorized<B>(srvres: ServiceResponse<B>) -> actix_web::Result<ErrorHandlerResponse<B>> {
+// pub fn handle_unauthorized<B>(srvres: ServiceResponse<B>) -> actix_web::Result<ErrorHandlerResponse<B>> {
 //     let (req, _) = srvres.into_parts();
 //     let resp = HttpResponse::TemporaryRedirect().insert_header(("Location", "/auth/login")).finish();
 //     let result = ServiceResponse::new(req, resp)

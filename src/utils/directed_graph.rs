@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result};
 
 #[derive(Debug)]
-pub(crate) struct DirectedGraph<K>
+pub struct DirectedGraph<K>
 where
     K: Eq + std::hash::Hash + Clone + Display + Debug,
 {
@@ -13,19 +13,19 @@ impl<K> DirectedGraph<K>
 where
     K: Eq + std::hash::Hash + Clone + Display + Debug,
 {
-    pub(crate) fn new() -> Self {
-        DirectedGraph {
+    pub fn new() -> Self {
+        Self {
             adjacencies: HashMap::new(),
         }
     }
 
     // Add a node to the graph, ignore if it already exists
-    pub(crate) fn add_node(&mut self, node: &K) {
+    pub fn add_node(&mut self, node: &K) {
         self.adjacencies.entry(node.to_owned()).or_default();
     }
 
     // Add a directed edge to the graph, ignore if it already exists
-    pub(crate) fn add_edge(&mut self, from: &K, to: &K) {
+    pub fn add_edge(&mut self, from: &K, to: &K) {
         match self.adjacencies.entry(from.clone()) {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 let edges = entry.get_mut();
@@ -40,7 +40,7 @@ where
     }
 
     // Detect and return cycles in the graph
-    pub(crate) fn find_cycles(&self) -> Vec<Vec<K>> {
+    pub fn find_cycles(&self) -> Vec<Vec<K>> {
         let mut visited = HashSet::new();
         let mut recursion_stack = Vec::new();
         let mut cycles = Vec::new();
@@ -81,7 +81,7 @@ where
         recursion_stack.pop();
     }
 
-    pub(crate) fn has_cycle(&self) -> bool {
+    pub fn has_cycle(&self) -> bool {
         let mut visited = HashSet::new();
         let mut recursion_stack = HashSet::new();
 
@@ -118,7 +118,7 @@ where
     }
 
     // Return all dependencies as a NodeDependencies struct if no cyclic dependencies exist
-    pub(crate) fn get_dependencies(&self) -> Option<HashMap<K, Vec<K>>> {
+    pub fn get_dependencies(&self) -> Option<HashMap<K, Vec<K>>> {
         if self.has_cycle() {
             return None;
         }
@@ -137,7 +137,7 @@ where
 
 
     // Topological sort function
-    pub(crate) fn topological_sort(&self) -> Option<Vec<K>> {
+    pub fn topological_sort(&self) -> Option<Vec<K>> {
         let mut visited = HashSet::new();
         let mut temp_mark = HashSet::new();
         let mut result = Vec::new();

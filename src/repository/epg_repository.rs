@@ -42,7 +42,7 @@ fn epg_write_file(target: &ConfigTarget, epg: &Epg, path: &Path) -> Result<(), M
     Ok(())
 }
 
-pub(crate) fn epg_write(target: &ConfigTarget, cfg: &Config, target_path: &Path, epg: Option<&Epg>, output: &TargetOutput) -> Result<(), M3uFilterError> {
+pub fn epg_write(target: &ConfigTarget, cfg: &Config, target_path: &Path, epg: Option<&Epg>, output: &TargetOutput) -> Result<(), M3uFilterError> {
     if let Some(epg_data) = epg {
         match &output.target {
             TargetType::M3u => {

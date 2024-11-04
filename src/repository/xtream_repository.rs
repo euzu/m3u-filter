@@ -18,12 +18,12 @@ use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 
-pub(crate) static COL_CAT_LIVE: &str = "cat_live";
-pub(crate) static COL_CAT_SERIES: &str = "cat_series";
-pub(crate) static COL_CAT_VOD: &str = "cat_vod";
+pub static COL_CAT_LIVE: &str = "cat_live";
+pub static COL_CAT_SERIES: &str = "cat_series";
+pub static COL_CAT_VOD: &str = "cat_vod";
 const FILE_SERIES_EPISODES: &str = "series_episodes";
 const FILE_SERIES: &str = "series";
-pub(crate) const FILE_EPG: &str = "epg.xml";
+pub const FILE_EPG: &str = "epg.xml";
 const PATH_XTREAM: &str = "xtream";
 const TAG_CATEGORY_ID: &str = "category_id";
 const TAG_CATEGORY_NAME: &str = "category_name";
@@ -135,11 +135,11 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
     (max_id, result)
 }
 
-pub(crate) fn xtream_get_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
+pub fn xtream_get_storage_path(cfg: &Config, target_name: &str) -> Option<PathBuf> {
     get_target_storage_path(cfg, target_name).map(|target_path| target_path.join(PathBuf::from(PATH_XTREAM)))
 }
 
-pub(crate) fn xtream_get_epg_file_path(path: &Path) -> PathBuf {
+pub fn xtream_get_epg_file_path(path: &Path) -> PathBuf {
     path.join(FILE_EPG)
 }
 
@@ -149,11 +149,11 @@ fn xtream_get_file_paths_for_name(storage_path: &Path, name: &str) -> (PathBuf, 
     (xtream_path, index_path)
 }
 
-pub(crate) fn xtream_get_file_paths(storage_path: &Path, cluster: XtreamCluster) -> (PathBuf, PathBuf) {
+pub fn xtream_get_file_paths(storage_path: &Path, cluster: XtreamCluster) -> (PathBuf, PathBuf) {
     xtream_get_file_paths_for_name(storage_path, &cluster.as_str().to_lowercase())
 }
 
-pub(crate) fn xtream_get_file_paths_for_series(storage_path: &Path) -> (PathBuf, PathBuf) {
+pub fn xtream_get_file_paths_for_series(storage_path: &Path) -> (PathBuf, PathBuf) {
     xtream_get_file_paths_for_name(storage_path, FILE_SERIES)
 }
 
@@ -168,7 +168,7 @@ fn xtream_garbage_collect(config: &Config, target_name: &str) -> std::io::Result
     Ok(())
 }
 
-pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut [PlaylistGroup]) -> Result<(), M3uFilterError> {
     let path = ensure_xtream_storage_path(cfg, target.name.as_str())?;
     let mut errors = Vec::new();
     let mut cat_live_col = vec![];
@@ -259,7 +259,7 @@ pub(crate) fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlis
     Ok(())
 }
 
-pub(crate) fn xtream_get_collection_path(cfg: &Config, target_name: &str, collection_name: &str) -> Result<(Option<PathBuf>, Option<String>), Error> {
+pub fn xtream_get_collection_path(cfg: &Config, target_name: &str, collection_name: &str) -> Result<(Option<PathBuf>, Option<String>), Error> {
     if let Some(path) = xtream_get_storage_path(cfg, target_name) {
         let col_path = get_collection_path(&path, collection_name);
         if col_path.exists() {
@@ -292,7 +292,7 @@ macro_rules! try_cluster {
     };
 }
 
-pub(crate) fn xtream_get_item_for_stream_id(
+pub fn xtream_get_item_for_stream_id(
     virtual_id: u32,
     config: &Config,
     target: &ConfigTarget,
@@ -336,11 +336,11 @@ pub(crate) fn xtream_get_item_for_stream_id(
 }
 
 
-pub(crate) fn xtream_load_rewrite_playlist(cluster: XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<Box<dyn Iterator<Item=String>>, M3uFilterError> {
+pub fn xtream_load_rewrite_playlist(cluster: XtreamCluster, config: &Config, target: &ConfigTarget, category_id: u32) -> Result<Box<dyn Iterator<Item=String>>, M3uFilterError> {
     Ok(Box::new(XtreamPlaylistIterator::new(cluster, config, target, category_id)?))
 }
 
-pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
+pub fn xtream_write_series_info(config: &Config, target_name: &str,
                                        series_info_id: u32,
                                        content: &str) -> Result<(), Error> {
     let target_path = try_option_ok!(get_target_storage_path(config, target_name));
@@ -349,7 +349,7 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
 
     {
         let _file_lock = config.file_locks.write_lock(&info_path)?;
-        let mut writer = IndexedDocumentWriter::new_append(info_path.clone(), idx_path)?;
+        let mut writer = IndexedDocumentWriter::new_append(info_path, idx_path)?;
         writer
             .write_doc(series_info_id, content)
             .map_err(|_| Error::new(ErrorKind::Other, format!("failed to write xtream series info for target {target_name}")))?;
@@ -371,7 +371,7 @@ pub(crate) fn xtream_write_series_info(config: &Config, target_name: &str,
 }
 
 // Reads the series info entry if exists, otherwise error
-pub(crate) fn xtream_load_series_info(config: &Config, target_name: &str, series_id: u32) -> Option<String> {
+pub fn xtream_load_series_info(config: &Config, target_name: &str, series_id: u32) -> Option<String> {
     let target_path = get_target_storage_path(config, target_name)?;
     let storage_path = xtream_get_storage_path(config, target_name)?;
 
@@ -414,7 +414,7 @@ pub(crate) fn xtream_load_series_info(config: &Config, target_name: &str, series
     None
 }
 
-pub(crate) fn write_and_get_xtream_series_info(
+pub fn write_and_get_xtream_series_info(
     config: &Config,
     target: &ConfigTarget,
     pli_series_info: &XtreamPlaylistItem,

@@ -1,3 +1,4 @@
+#![allow(clippy::module_name_repetitions)]
 extern crate env_logger;
 extern crate pest;
 #[macro_use]
@@ -17,7 +18,6 @@ use crate::model::config::{Config, HealthcheckConfig, ProcessTargets, validate_t
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, file_utils};
-
 mod m3u_filter_error;
 mod model;
 mod filter;
@@ -81,14 +81,14 @@ fn main() {
     let default_log_level = std::env::var("M3U_FILTER_LOG").unwrap_or_else(|_| "info".to_string());
     init_logger(args.log_level.as_ref().unwrap_or(&default_log_level));
 
-    let config_path: String = args.config_path.unwrap_or(file_utils::get_default_config_path());
-    let config_file: String = args.config_file.unwrap_or(file_utils::get_default_config_file_path(&config_path));
+    let config_path: String = args.config_path.unwrap_or_else(file_utils::get_default_config_path);
+    let config_file: String = args.config_file.unwrap_or_else(|| file_utils::get_default_config_file_path(&config_path));
 
     if args.healthcheck {
         healthcheck(config_file.as_str());
     }
 
-    let sources_file: String = args.source_file.unwrap_or(file_utils::get_default_sources_file_path(&config_path));
+    let sources_file: String = args.source_file.unwrap_or_else(|| file_utils::get_default_sources_file_path(&config_path));
     let mut cfg = config_reader::read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
 
     if args.genpwd  {

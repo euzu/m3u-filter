@@ -15,7 +15,7 @@ use crate::model::playlist::{PlaylistItem, PlaylistItemType};
 use crate::utils::directed_graph::DirectedGraph;
 use crate::{create_m3u_filter_error_result, exit};
 
-pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<String> {
+pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<String> {
     let header = pli.header.borrow();
     let value = match field {
         ItemField::Group => &header.group,
@@ -27,7 +27,7 @@ pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<Strin
     Rc::clone(value)
 }
 
-pub(crate) fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: Rc<String>) {
+pub fn set_field_value(pli: &PlaylistItem, field: &ItemField, value: Rc<String>) {
     let header = &mut pli.header.borrow_mut();
     match field {
         ItemField::Group => header.group = value,
@@ -38,8 +38,8 @@ pub(crate) fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: 
     };
 }
 
-pub(crate) struct ValueProvider<'a> {
-    pub(crate) pli: RefCell<&'a PlaylistItem>,
+pub struct ValueProvider<'a> {
+    pub pli: RefCell<&'a PlaylistItem>,
 }
 
 impl<'a> ValueProvider<'a> {
@@ -49,11 +49,11 @@ impl<'a> ValueProvider<'a> {
     }
 }
 
-pub(crate) trait ValueProcessor {
+pub trait ValueProcessor {
     fn process(&mut self, field: &ItemField, value: &str, rewc: &RegexWithCaptures) -> bool;
 }
 
-pub(crate) struct MockValueProcessor {}
+pub struct MockValueProcessor {}
 
 impl ValueProcessor for MockValueProcessor {
     fn process(&mut self, _: &ItemField, _: &str, _: &RegexWithCaptures) -> bool {
@@ -62,13 +62,13 @@ impl ValueProcessor for MockValueProcessor {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct PatternTemplate {
+pub struct PatternTemplate {
     pub name: String,
     pub value: String,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RegexWithCaptures {
+pub struct RegexWithCaptures {
     pub restr: String,
     pub re: regex::Regex,
     pub captures: Vec<String>,
@@ -101,12 +101,12 @@ main = _{ SOI ~ stmt ~ EOI }
 struct FilterParser;
 
 #[derive(Debug, Clone)]
-pub(crate) enum UnaryOperator {
+pub enum UnaryOperator {
     Not
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum BinaryOperator {
+pub enum BinaryOperator {
     And,
     Or,
 }
@@ -119,14 +119,14 @@ impl BinaryOperator {
 impl std::fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", match *self {
-            BinaryOperator::Or => Self::OP_OR,
-            BinaryOperator::And => Self::OP_AND,
+            Self::Or => Self::OP_OR,
+            Self::And => Self::OP_AND,
         })
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum Filter {
+pub enum Filter {
     Group(Box<Filter>),
     FieldComparison(ItemField, RegexWithCaptures),
     TypeComparison(ItemField, PlaylistItemType),
@@ -137,7 +137,7 @@ pub(crate) enum Filter {
 impl Filter {
     pub fn filter(&self, provider: &ValueProvider, processor: &mut dyn ValueProcessor) -> bool {
         match self {
-            Filter::FieldComparison(field, rewc) => {
+            Self::FieldComparison(field, rewc) => {
                 let value = provider.call(field);
                 let is_match = rewc.re.is_match(value.as_str());
                 if log_enabled!(Level::Trace) {
@@ -152,11 +152,9 @@ impl Filter {
                 }
                 is_match
             }
-            Filter::TypeComparison(field, item_type) => {
+            Self::TypeComparison(field, item_type) => {
                 let value = provider.call(field);
-                match get_filter_item_type(value.as_str()) {
-                    None => false,
-                    Some(pli_type) => {
+                get_filter_item_type(value.as_str()).map_or(false, |pli_type| {
                         let is_match = pli_type.eq(item_type);
                         if log_enabled!(Level::Trace) {
                             if is_match {
@@ -166,18 +164,17 @@ impl Filter {
                             }
                         }
                         is_match
-                    }
-                }
+                    })
             }
-            Filter::Group(expr) => {
+            Self::Group(expr) => {
                 expr.filter(provider, processor)
             }
-            Filter::UnaryExpression(op, expr) => {
+            Self::UnaryExpression(op, expr) => {
                 match op {
                     UnaryOperator::Not => !expr.filter(provider, processor),
                 }
             }
-            Filter::BinaryExpression(left, op, right) => {
+            Self::BinaryExpression(left, op, right) => {
                 match op {
                     BinaryOperator::And => left.filter(provider, processor)
                         && right.filter(provider, processor),
@@ -199,10 +196,10 @@ impl Filter {
 impl std::fmt::Display for Filter {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Filter::FieldComparison(field, rewc) => {
+            Self::FieldComparison(field, rewc) => {
                 write!(f, "{} ~ \"{}\"", field, String::from(&rewc.restr))
             }
-            Filter::TypeComparison(field, item_type) => {
+            Self::TypeComparison(field, item_type) => {
                 write!(f, "{} = {}", field, match item_type {
                     PlaylistItemType::Live => Self::LIVE,
                     PlaylistItemType::Video => Self::VOD,
@@ -210,16 +207,16 @@ impl std::fmt::Display for Filter {
                     _ => Self::UNSUPPORTED
                 })
             }
-            Filter::Group(stmt) => {
+            Self::Group(stmt) => {
                 write!(f, "({stmt})")
             }
-            Filter::UnaryExpression(op, expr) => {
+            Self::UnaryExpression(op, expr) => {
                 let flt = match op {
                     UnaryOperator::Not => format!("NOT {expr}"),
                 };
                 write!(f, "{flt}")
             }
-            Filter::BinaryExpression(left, op, right) => {
+            Self::BinaryExpression(left, op, right) => {
                 write!(f, "{left} {op} {right}")
             }
         }
@@ -296,10 +293,7 @@ fn get_parser_type_comparison(expr: Pair<Rule>) -> Result<Filter, M3uFilterError
     let expr_inner = expr.into_inner();
     let text_item_type = expr_inner.as_str();
     let item_type = get_filter_item_type(text_item_type);
-    match item_type {
-        None => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse item type: {text_item_type}"),
-        Some(itype) => Ok(Filter::TypeComparison(ItemField::Type, itype))
-    }
+    item_type.map_or_else(|| create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse item type: {text_item_type}"), |itype| Ok(Filter::TypeComparison(ItemField::Type, itype)))
 }
 
 macro_rules! handle_expr {
@@ -388,7 +382,7 @@ fn get_parser_binary_op(expr: &Pair<Rule>) -> Result<BinaryOperator, M3uFilterEr
     }
 }
 
-pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -> Result<Filter, M3uFilterError> {
+pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -> Result<Filter, M3uFilterError> {
     let empty_list = Vec::new();
     let template_list: &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
     let source = apply_templates_to_pattern(filter_text, template_list);
@@ -441,12 +435,7 @@ pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTempla
                 return Err(M3uFilterError::new(M3uFilterErrorKind::Info, errors.join("\n")));
             }
 
-            match result {
-                Some(filter) => Ok(filter),
-                _ => {
-                    create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unable to parse filter: {}", &filter_text)
-                }
-            }
+            result.map_or_else(|| create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unable to parse filter: {}", &filter_text), Ok)
         }
         Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err)
     }
@@ -476,7 +465,7 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> Result<DirectedGr
     Ok(graph)
 }
 
-pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<PatternTemplate>, M3uFilterError> {
+pub fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<PatternTemplate>, M3uFilterError> {
     let graph = build_dependency_graph(templates)?;
     let mut template_values = HashMap::<String, String>::new();
     let mut template_map: HashMap<String, PatternTemplate> = templates.iter()
@@ -508,7 +497,7 @@ pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<
     Ok(template_map.into_values().collect())
 }
 
-pub(crate) fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternTemplate>) -> String {
+pub fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternTemplate>) -> String {
     let mut new_pattern = pattern.to_string();
     for template in templates {
         new_pattern = new_pattern.replace(format!("!{}!", &template.name).as_str(), &template.value);

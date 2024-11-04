@@ -8,17 +8,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use actix_rt::System;
-use log::{trace, debug, error, info, Level, log_enabled};
+use log::{debug, error, info, log_enabled, trace, Level};
 use std::time::Instant;
 
 use unidecode::unidecode;
 
-use crate::{Config, get_errors_notify_message, model::config};
-use crate::filter::{get_field_value, MockValueProcessor, set_field_value, ValueProvider};
+use crate::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::messaging::{MsgKind, send_message};
+use crate::messaging::{send_message, MsgKind};
 use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, InputType,
-                           ItemField, ProcessingOrder, ProcessTargets, SortOrder::{Asc, Desc}};
+                           ItemField, ProcessTargets, ProcessingOrder, SortOrder::{Asc, Desc}};
 use crate::model::mapping::{CounterModifier, Mapping, MappingValueProcessor};
 use crate::model::playlist::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, XtreamCluster};
 use crate::model::stats::{InputStats, PlaylistStats};
@@ -29,6 +28,7 @@ use crate::processing::xtream_processor::playlist_resolve_series;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
+use crate::{get_errors_notify_message, model::config, Config};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };
@@ -70,7 +70,13 @@ fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &Co
     let raw_value_b = get_field_value(b, &channel_sort.field);
     let value_a = if match_as_ascii { Rc::new(unidecode(&raw_value_a)) } else { raw_value_a };
     let value_b = if match_as_ascii { Rc::new(unidecode(&raw_value_b)) } else { raw_value_b };
-    if let Some(custom_order) = &channel_sort.sequence {
+    channel_sort.sequence.as_ref().map_or_else(|| {
+        let ordering = value_a.partial_cmp(&value_b).unwrap();
+        match channel_sort.order {
+            Asc => ordering,
+            Desc => ordering.reverse()
+        }
+    }, |custom_order| {
         // Check indices in the custom order vector
         let index_a = custom_order.iter().position(|s| s == value_a.as_ref());
         let index_b = custom_order.iter().position(|s| s == value_b.as_ref());
@@ -97,13 +103,7 @@ fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &Co
                 }
             }
         }
-    } else {
-        let ordering = value_a.partial_cmp(&value_b).unwrap();
-        match channel_sort.order {
-            Asc => ordering,
-            Desc => ordering.reverse()
-        }
-    }
+    })
 }
 
 fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
@@ -126,7 +126,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
     }
 }
 
-fn exec_rename(pli: &mut PlaylistItem, rename: &Option<Vec<config::ConfigRename>>) {
+fn exec_rename(pli: &PlaylistItem, rename: &Option<Vec<config::ConfigRename>>) {
     if let Some(renames) = rename {
         if !renames.is_empty() {
             let result = pli;
@@ -151,7 +151,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                 for g in playlist {
                     let mut grp = g.clone();
                     for r in renames {
-                        if let ItemField::Group = r.field {
+                        if matches!(r.field, ItemField::Group) {
                             let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
                             if log_enabled!(Level::Debug) {
                                 debug!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
@@ -211,7 +211,7 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
             let mut grp = playlist_group.clone();
             let mappings = target.t_mapping.as_ref().unwrap();
             mappings.iter().filter(|&mapping| !mapping.mapper.is_empty()).for_each(|mapping|
-            grp.channels = grp.channels.drain(..).map(|chan| map_channel(chan, mapping)).collect());
+                grp.channels = grp.channels.drain(..).map(|chan| map_channel(chan, mapping)).collect());
             grp
         }).collect();
 
@@ -249,7 +249,7 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
         for mapping in mappings {
             if let Some(counter_list) = &mapping.t_counter {
                 for counter in counter_list {
-                    let mut cntval = counter.value.lock().unwrap();
+                    let cntval = counter.value.load(core::sync::atomic::Ordering::Relaxed);
                     for plg in playlist {
                         for channel in &plg.channels {
                             let provider = ValueProvider { pli: RefCell::new(channel) };
@@ -257,10 +257,7 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
                                 let new_value = if counter.modifier == CounterModifier::Assign {
                                     cntval.to_string()
                                 } else {
-                                    let value = match channel.header.borrow_mut().get_field(&counter.field) {
-                                        Some(field_value) => field_value.to_string(),
-                                        None => String::new(),
-                                    };
+                                    let value = channel.header.borrow_mut().get_field(&counter.field).map_or_else(String::new, |field_value| field_value.to_string());
                                     if counter.modifier == CounterModifier::Suffix {
                                         format!("{value}{}{cntval}", counter.concat)
                                     } else {
@@ -268,7 +265,7 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
                                     }
                                 };
                                 channel.header.borrow_mut().set_field(&counter.field, new_value.as_str());
-                                *cntval += 1;
+                                counter.value.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
                             }
                         }
                     }
@@ -315,10 +312,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
             };
             errors.append(&mut error_list);
             errors.append(&mut tvguide_errors);
-            let input_name = match &input.name {
-                Some(name_val) => name_val.as_str(),
-                None => input.url.as_str(),
-            };
+            let input_name = input.name.as_ref().map_or(input.url.as_str(), |name_val| name_val.as_str());
             let group_count = playlistgroups.len();
             let channel_count = playlistgroups.iter()
                 .map(|group| group.channels.len())
@@ -375,7 +369,7 @@ fn create_input_stat(group_count: usize, channel_count: usize, error_count: usiz
             group_count: 0,
             channel_count: 0,
         },
-        secs_took
+        secs_took,
     }
 }
 
@@ -432,7 +426,7 @@ fn get_processing_pipe(target: &ConfigTarget) -> ProcessingPipe {
 }
 
 
-fn execute_pipe<'a>(target: &ConfigTarget, pipe: &ProcessingPipe, fpl: &mut FetchedPlaylist<'a>) -> FetchedPlaylist<'a> {
+fn execute_pipe<'a>(target: &ConfigTarget, pipe: &ProcessingPipe, fpl: &FetchedPlaylist<'a>) -> FetchedPlaylist<'a> {
     let mut new_fpl = FetchedPlaylist {
         input: fpl.input,
         playlistgroups: fpl.playlistgroups.clone(), // we need to clone, because of multiple target definitions, we cant change the initial playlist.
@@ -448,11 +442,11 @@ fn execute_pipe<'a>(target: &ConfigTarget, pipe: &ProcessingPipe, fpl: &mut Fetc
 
 // This method is needed, because of duplicate group names in different inputs.
 // We merge the same group names considering cluster together.
-fn flatten_groups(mut playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
+fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
     let mut sort_order: Vec<PlaylistGroup> = vec![];
     let mut idx: usize = 0;
     let mut group_map: HashMap<(Rc<String>, XtreamCluster), usize> = HashMap::new();
-    playlistgroups.drain(..).for_each(|group| {
+    for group in playlistgroups {
         let key = (Rc::clone(&group.title), group.xtream_cluster);
         match group_map.entry(key) {
             std::collections::hash_map::Entry::Vacant(v) => {
@@ -464,7 +458,7 @@ fn flatten_groups(mut playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> 
                 sort_order.get_mut(*o.get()).unwrap().channels.extend(group.channels);
             }
         };
-    });
+    }
     sort_order
 }
 
@@ -500,7 +494,7 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
 
     // each fetched playlist can have its own epgl url.
     // we need to process each input epg.
-    new_fetched_playlists.drain(..).for_each(|mut fp| {
+    for mut fp in new_fetched_playlists {
         // collect all epg_channel ids
         let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
             .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
@@ -516,7 +510,7 @@ async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
         } else if log_enabled!(Level::Debug) {
             debug!("channel ids are empty");
         }
-    });
+    }
 
     if new_playlist.is_empty() {
         info!("Playlist is empty: {}", &target.name);
@@ -545,7 +539,7 @@ fn process_watch(target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<Playlis
     }
 }
 
-pub(crate) async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+pub async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let (stats, errors) = process_sources(cfg.clone(), targets.clone()).await;
     let stats_msg = format!("{{\"stats\": {}}}", stats.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n"));
     // print stats

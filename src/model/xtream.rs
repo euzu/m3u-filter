@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::rc::Rc;
 
-use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
 use crate::model::config::ConfigTargetOptions;
@@ -50,10 +50,7 @@ where
 
         // (if it is any other string)
         MaybeNumber::NumberString(string) => {
-            match serde_json::from_str::<T>(string.as_str()) {
-                Ok(val) => Ok(Some(val)),
-                Err(_) => Ok(None)
-            }
+            serde_json::from_str::<T>(string.as_str()).map_or_else(|_| Ok(None), |val| Ok(Some(val)))
         }
     }
 }
@@ -107,7 +104,7 @@ where
 }
 
 #[derive(Deserialize, Default)]
-pub(crate) struct XtreamCategory {
+pub struct XtreamCategory {
     #[serde(deserialize_with = "deserialize_as_rc_string")]
     pub category_id: Rc<String>,
     #[serde(deserialize_with = "deserialize_as_rc_string")]
@@ -118,13 +115,13 @@ pub(crate) struct XtreamCategory {
 }
 
 impl XtreamCategory {
-    pub(crate) fn add(&mut self, item: PlaylistItem) {
+    pub fn add(&mut self, item: PlaylistItem) {
         self.channels.push(item);
     }
 }
 
 #[derive(Serialize, Deserialize)]
-pub(crate) struct XtreamStream {
+pub struct XtreamStream {
     #[serde(default, deserialize_with = "deserialize_as_rc_string")]
     pub name: Rc<String>,
     #[serde(default, deserialize_with = "deserialize_as_rc_string")]
@@ -217,11 +214,11 @@ macro_rules! add_i64_property_if_exists {
 }
 
 impl XtreamStream {
-    pub(crate) fn get_stream_id(&self) -> u32 {
-        self.stream_id.unwrap_or(self.series_id.unwrap_or(0))
+    pub fn get_stream_id(&self) -> u32 {
+        self.stream_id.unwrap_or_else(|| self.series_id.unwrap_or(0))
     }
 
-    pub(crate) fn get_additional_properties(&self) -> Option<Value> {
+    pub fn get_additional_properties(&self) -> Option<Value> {
         let mut result = Map::new();
         if let Some(bdpath) = self.backdrop_path.as_ref() {
             if !bdpath.is_empty() {
@@ -253,7 +250,7 @@ impl XtreamStream {
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct XtreamSeriesInfoSeason {
+pub struct XtreamSeriesInfoSeason {
     pub air_date: String,
     pub episode_count: u32,
     pub id: u32,
@@ -268,7 +265,7 @@ pub(crate) struct XtreamSeriesInfoSeason {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
-pub(crate) struct XtreamSeriesInfoInfo {
+pub struct XtreamSeriesInfoInfo {
     name: String,
     cover: String,
     plot: String,
@@ -286,7 +283,7 @@ pub(crate) struct XtreamSeriesInfoInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct XtreamSeriesInfoEpisodeInfo {
+pub struct XtreamSeriesInfoEpisodeInfo {
     pub tmdb_id: u32,
     pub releasedate: String,
     pub plot: String,
@@ -301,7 +298,7 @@ pub(crate) struct XtreamSeriesInfoEpisodeInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct XtreamSeriesInfoEpisode {
+pub struct XtreamSeriesInfoEpisode {
     pub id: String,
     pub episode_num: u32,
     pub title: String,
@@ -314,7 +311,7 @@ pub(crate) struct XtreamSeriesInfoEpisode {
 }
 
 // impl XtreamSeriesInfoEpisode {
-//     pub(crate) fn get_id(&self) -> u32 {
+//     pub fn get_id(&self) -> u32 {
 //         match self.id.parse::<u32>() {
 //             Ok(id) => id,
 //             Err(_) => {
@@ -326,7 +323,7 @@ pub(crate) struct XtreamSeriesInfoEpisode {
 // }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct XtreamSeriesInfo {
+pub struct XtreamSeriesInfo {
     pub seasons: Vec<XtreamSeriesInfoSeason>,
     pub info: XtreamSeriesInfoInfo,
     pub episodes: HashMap<String, Vec<XtreamSeriesInfoEpisode>>,
@@ -334,7 +331,7 @@ pub(crate) struct XtreamSeriesInfo {
 
 
 impl XtreamSeriesInfoEpisode {
-    pub(crate) fn get_additional_properties(&self, series_info: &XtreamSeriesInfo) -> Option<Value> {
+    pub fn get_additional_properties(&self, series_info: &XtreamSeriesInfo) -> Option<Value> {
         let mut result = Map::new();
         let bdpath = &series_info.info.backdrop_path;
         if !bdpath.is_empty() {
@@ -358,7 +355,7 @@ impl XtreamSeriesInfoEpisode {
     }
 }
 
-pub(crate) struct XtreamMappingOptions {
+pub struct XtreamMappingOptions {
     pub skip_live_direct_source: bool,
     pub skip_video_direct_source: bool,
     pub skip_series_direct_source: bool,
@@ -393,7 +390,7 @@ fn append_release_date(document: &mut serde_json::Map<String, Value>) {
             document.insert("release_date".to_string(), release_date.clone());
         }
         if !&has_release_date_2 {
-            document.insert("releaseDate".to_string(), release_date.clone());
+            document.insert("releaseDate".to_string(), release_date);
         }
     }
 }
@@ -423,7 +420,7 @@ fn append_prepared_series_properties(add_props: Option<&Map<String, Value>>, doc
     }
 }
 
-pub(crate) fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options: &XtreamMappingOptions) -> serde_json::Value {
+pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options: &XtreamMappingOptions) -> serde_json::Value {
     let stream_id_value = Value::Number(serde_json::Number::from(pli.virtual_id));
     let mut document = serde_json::Map::from_iter([
         ("category_id".to_string(), Value::String(format!("{}", &pli.category_id))),
@@ -444,10 +441,7 @@ pub(crate) fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options:
             }
             document.insert("thumbnail".to_string(), Value::String(pli.logo_small.as_ref().clone()));
             document.insert("custom_sid".to_string(), Value::String(String::new()));
-            document.insert("epg_channel_id".to_string(), match &pli.epg_channel_id {
-                None => Value::Null,
-                Some(epg_id) => Value::String(epg_id.as_ref().clone())
-            });
+            document.insert("epg_channel_id".to_string(), pli.epg_channel_id.as_ref().map_or(Value::Null, |epg_id| Value::String(epg_id.as_ref().clone())));
         }
         XtreamCluster::Video => {
             document.insert("stream_id".to_string(), stream_id_value);
@@ -463,15 +457,7 @@ pub(crate) fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options:
         }
     };
 
-    let props = match &pli.additional_properties {
-        None => None,
-        Some(add_props) => {
-            match serde_json::from_str::<Map<String, Value>>(add_props) {
-                Ok(p) => Some(p),
-                Err(_) => None,
-            }
-        }
-    };
+    let props = pli.additional_properties.as_ref().and_then(|add_props| serde_json::from_str::<Map<String, Value>>(add_props).ok());
 
     if let Some(ref add_props) = props {
         for (field_name, field_value) in add_props {

@@ -8,7 +8,7 @@ use crate::model::xmltv::{Epg, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_TV, EP
 use crate::utils::compressed_file_reader::CompressedFileReader;
 
 impl TVGuide {
-    pub(crate) fn filter(&self, channel_ids: &HashSet<Rc<String>>) -> Option<Epg> {
+    pub fn filter(&self, channel_ids: &HashSet<Rc<String>>) -> Option<Epg> {
         if channel_ids.is_empty() {
             return None;
         }
@@ -19,16 +19,10 @@ impl TVGuide {
                 let mut filter_tags = |tag: XmlTag| {
                     if match tag.name.as_str() {
                         EPG_TAG_CHANNEL => {
-                            match tag.get_attribute_value(EPG_ATTRIB_ID) {
-                                None => false,
-                                Some(val) => channel_ids.contains(val)
-                            }
+                            tag.get_attribute_value(EPG_ATTRIB_ID).map_or(false, |val| channel_ids.contains(val))
                         }
                         EPG_TAG_PROGRAMME => {
-                            match tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
-                                None => false,
-                                Some(val) => channel_ids.contains(val)
-                            }
+                            tag.get_attribute_value(EPG_ATTRIB_CHANNEL).map_or(false, |val| channel_ids.contains(val))
                         },
                         EPG_TAG_TV => {
                             tv_attributes.clone_from(&tag.attributes);
@@ -55,7 +49,7 @@ impl TVGuide {
     }
 }
 
-pub(crate) fn parse_tvguide<R, F>(content: R, callback: &mut F)
+pub fn parse_tvguide<R, F>(content: R, callback: &mut F)
 where
     R: std::io::BufRead,
     F: FnMut(XmlTag),
@@ -72,7 +66,7 @@ where
                 let attributes = e.attributes().filter_map(Result::ok)
                     .filter_map(|a| {
                         let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
-                        let value = String::from(a.unescape_value().unwrap().as_ref()).to_string();
+                        let value = String::from(a.unescape_value().unwrap().as_ref());
                         if value.is_empty() {
                             None
                         } else {
@@ -111,8 +105,7 @@ where
                             if let Some(old_tag) = stack.pop().map(|mut r| {
                                 let rc_tag = Rc::new(tag);
                                 r.children = Some(
-                                    r.children.map_or(vec![rc_tag.clone()],
-                                                      |mut c| {
+                                    r.children.map_or_else(|| vec![rc_tag.clone()], |mut c| {
                                                           c.push(rc_tag.clone());
                                                           c
                                                       }));
@@ -135,7 +128,7 @@ where
     }
 }
 
-pub(crate) fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
+pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
     if tv_guides.is_empty() {
         None
     } else {

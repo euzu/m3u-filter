@@ -1,6 +1,6 @@
-pub(crate) mod api_utils;
-pub(crate) mod api_model;
-pub(crate) mod main_api;
+pub mod api_utils;
+pub mod api_model;
+pub mod main_api;
 mod download_api;
 mod v1_api;
 mod xtream_api;

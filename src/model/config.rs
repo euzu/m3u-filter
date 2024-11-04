@@ -24,15 +24,15 @@ use crate::utils::{config_reader, file_utils};
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
 use crate::utils::file_lock_manager::FileLockManager;
 
-pub(crate) const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
+pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
     "logo_small", "parent_code", "audio_track",
     "time_shift", "rec", "url", "epg_channel_id", "epg_id"
 ];
 
 
-pub(crate) const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
-pub(crate) const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
+pub const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
+pub const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
 
 #[macro_export]
 macro_rules! valid_property {
@@ -84,7 +84,7 @@ macro_rules! handle_m3u_filter_error_result {
 
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
-pub(crate) enum TargetType {
+pub enum TargetType {
     #[serde(rename = "m3u")]
     M3u,
     #[serde(rename = "xtream")]
@@ -109,8 +109,8 @@ impl Display for TargetType {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Default)]
-pub(crate) enum ProcessingOrder {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
+pub enum ProcessingOrder {
     #[serde(rename = "frm")]
     #[default]
     Frm,
@@ -149,7 +149,7 @@ impl Display for ProcessingOrder {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
-pub(crate) enum ItemField {
+pub enum ItemField {
     #[serde(rename = "group")]
     Group,
     #[serde(rename = "name")]
@@ -183,7 +183,7 @@ impl Display for ItemField {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) enum FilterMode {
+pub enum FilterMode {
     #[serde(rename = "discard")]
     Discard,
     #[serde(rename = "include")]
@@ -191,7 +191,7 @@ pub(crate) enum FilterMode {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) enum SortOrder {
+pub enum SortOrder {
     #[serde(rename = "asc")]
     Asc,
     #[serde(rename = "desc")]
@@ -200,7 +200,7 @@ pub(crate) enum SortOrder {
 
 
 #[derive(Clone)]
-pub(crate) struct ProcessTargets {
+pub struct ProcessTargets {
     pub enabled: bool,
     pub inputs: Vec<u16>,
     pub targets: Vec<u16>,
@@ -217,12 +217,12 @@ impl ProcessTargets {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ConfigSortGroup {
+pub struct ConfigSortGroup {
     pub order: SortOrder,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ConfigSortChannel {
+pub struct ConfigSortChannel {
     pub field: ItemField,
     // channel field
     pub group_pattern: String,
@@ -234,7 +234,7 @@ pub(crate) struct ConfigSortChannel {
 }
 
 impl ConfigSortChannel {
-    pub(crate) fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         let re = regex::Regex::new(&self.group_pattern);
         if re.is_err() {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", &self.group_pattern);
@@ -245,7 +245,7 @@ impl ConfigSortChannel {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct ConfigSort {
+pub struct ConfigSort {
     #[serde(default)]
     pub match_as_ascii: bool,
     #[serde(default)]
@@ -255,7 +255,7 @@ pub(crate) struct ConfigSort {
 }
 
 impl ConfigSort {
-    pub(crate) fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if let Some(channels) = self.channels.as_mut() {
             handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, channels.iter_mut().map(ConfigSortChannel::prepare));
         }
@@ -264,7 +264,7 @@ impl ConfigSort {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ConfigRename {
+pub struct ConfigRename {
     pub field: ItemField,
     pub pattern: String,
     pub new_name: String,
@@ -285,7 +285,7 @@ impl ConfigRename {
 
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct ConfigTargetOptions {
+pub struct ConfigTargetOptions {
     #[serde(default)]
     pub ignore_logo: bool,
     #[serde(default)]
@@ -307,7 +307,7 @@ pub(crate) struct ConfigTargetOptions {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct TargetOutput {
+pub struct TargetOutput {
     #[serde(alias = "type")]
     pub target: TargetType,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -315,7 +315,7 @@ pub(crate) struct TargetOutput {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct ConfigTarget {
+pub struct ConfigTarget {
     #[serde(skip)]
     pub id: u16,
     #[serde(default = "default_as_true")]
@@ -347,7 +347,7 @@ pub(crate) struct ConfigTarget {
 
 
 impl ConfigTarget {
-    pub(crate) fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
         self.id = id;
         if self.output.is_empty() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Missing output format for {}", self.name)));
@@ -410,21 +410,21 @@ impl ConfigTarget {
         }
     }
 
-    pub(crate) fn filter(&self, provider: &ValueProvider) -> bool {
+    pub fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
         return self.t_filter.as_ref().unwrap().filter(provider, &mut processor);
     }
 
-    pub(crate) fn get_m3u_filename(&self) -> Option<&String> {
+    pub fn get_m3u_filename(&self) -> Option<&String> {
         for format in &self.output {
-            if let TargetType::M3u = format.target {
+            if format.target == TargetType::M3u {
                 return format.filename.as_ref();
             }
         }
         None
     }
 
-    pub(crate) fn has_output(&self, tt: &TargetType) -> bool {
+    pub fn has_output(&self, tt: &TargetType) -> bool {
         for format in &self.output {
             if tt.eq(&format.target) {
                 return true;
@@ -435,19 +435,19 @@ impl ConfigTarget {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ConfigSource {
+pub struct ConfigSource {
     pub inputs: Vec<ConfigInput>,
     pub targets: Vec<ConfigTarget>,
 }
 
 impl ConfigSource {
     #[allow(clippy::cast_possible_truncation)]
-    pub(crate) fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
+    pub fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
         Ok(index + (self.inputs.len() as u16))
     }
 
-    // pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
+    // pub fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
     //     for target in &self.targets {
     //         if target.name.eq(target_name) {
     //             let inputs = self.inputs.iter().filter(|&i| i.enabled).collect::<Vec<&ConfigInput>>();
@@ -461,13 +461,13 @@ impl ConfigSource {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct InputAffix {
+pub struct InputAffix {
     pub field: String,
     pub value: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Default)]
-pub(crate) enum InputType {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
+pub enum InputType {
     #[serde(rename = "m3u")]
     #[default]
     M3u,
@@ -483,8 +483,8 @@ impl InputType {
 impl Display for InputType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            InputType::M3u => Self::M3U,
-            InputType::Xtream => Self::XTREAM,
+            Self::M3u => Self::M3U,
+            Self::Xtream => Self::XTREAM,
         })
     }
 }
@@ -494,9 +494,9 @@ impl FromStr for InputType {
 
     fn from_str(s: &str) -> Result<Self, M3uFilterError> {
         if s.eq("m3u") {
-            Ok(InputType::M3u)
+            Ok(Self::M3u)
         } else if s.eq("xtream") {
-            Ok(InputType::Xtream)
+            Ok(Self::Xtream)
         } else {
             create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unkown InputType: {}", s)
         }
@@ -504,7 +504,7 @@ impl FromStr for InputType {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct ConfigInputOptions {
+pub struct ConfigInputOptions {
     #[serde(default)]
     pub xtream_skip_live: bool,
     #[serde(default)]
@@ -513,14 +513,14 @@ pub(crate) struct ConfigInputOptions {
     pub xtream_skip_series: bool,
 }
 
-pub(crate) struct InputUserInfo {
+pub struct InputUserInfo {
     pub base_url: String,
     pub username: String,
     pub password: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct ConfigInput {
+pub struct ConfigInput {
     #[serde(skip)]
     pub id: u16,
     #[serde(default, rename = "type")]
@@ -586,7 +586,7 @@ impl ConfigInput {
         Ok(())
     }
 
-    pub(crate) fn get_user_info(&self) -> Option<InputUserInfo> {
+    pub fn get_user_info(&self) -> Option<InputUserInfo> {
         if self.input_type == InputType::Xtream {
             if self.username.is_some() || self.password.is_some() {
                 return Some(InputUserInfo {
@@ -619,7 +619,7 @@ impl ConfigInput {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct ConfigApi {
+pub struct ConfigApi {
     pub host: String,
     pub port: u16,
     #[serde(default)]
@@ -635,18 +635,18 @@ impl ConfigApi {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct TelegramMessagingConfig {
+pub struct TelegramMessagingConfig {
     pub bot_token: String,
     pub chat_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct RestMessagingConfig {
+pub struct RestMessagingConfig {
     pub url: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct MessagingConfig {
+pub struct MessagingConfig {
     #[serde(default)]
     pub notify_on: Vec<MsgKind>,
     #[serde(default)]
@@ -656,7 +656,7 @@ pub(crate) struct MessagingConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct VideoDownloadConfig {
+pub struct VideoDownloadConfig {
     #[serde(default)]
     pub headers: HashMap<String, String>,
     #[serde(default)]
@@ -674,7 +674,7 @@ pub(crate) struct VideoDownloadConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct VideoConfig {
+pub struct VideoConfig {
     #[serde(default)]
     pub extensions: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -714,7 +714,7 @@ impl VideoConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct ConfigDto {
+pub struct ConfigDto {
     #[serde(default)]
     pub threads: u8,
     pub api: ConfigApi,
@@ -753,7 +753,7 @@ impl ConfigDto {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct WebAuthConfig {
+pub struct WebAuthConfig {
     #[serde(default = "default_as_true")]
     pub enabled: bool,
     pub issuer: String,
@@ -772,10 +772,7 @@ impl WebAuthConfig {
                 self.userfile = Some(config_reader::resolve_env_var(file));
             }
         }
-        let userfile_name = match &self.userfile {
-            None => file_utils::get_default_user_file_path(config_path),
-            Some(file) => file.to_owned()
-        };
+        let userfile_name = self.userfile.as_ref().map_or_else(|| file_utils::get_default_user_file_path(config_path), std::borrow::ToOwned::to_owned);
         self.userfile = Some(userfile_name.clone());
 
         let mut userfile_path = PathBuf::from(&userfile_name);
@@ -820,7 +817,7 @@ impl WebAuthConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct Config {
+pub struct Config {
     #[serde(default)]
     pub threads: u8,
     pub api: ConfigApi,
@@ -877,7 +874,7 @@ impl Config {
         }
     }
 
-    // pub(crate) fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
+    // pub fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
     //     for source in &self.sources {
     //         if let Some(cfg) = source.get_inputs_for_target(target_name) {
     //             return Some(cfg);
@@ -887,24 +884,14 @@ impl Config {
     // }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        match self.t_api_proxy.read().unwrap().as_ref() {
-            Some(api_proxy) => {
-                self._get_target_for_user(api_proxy.get_target_name(username, password))
-            }
-            _ => None
-        }
+        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self._get_target_for_user(api_proxy.get_target_name(username, password)))
     }
 
     pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        match self.t_api_proxy.read().unwrap().as_ref() {
-            Some(api_proxy) => {
-                self._get_target_for_user(api_proxy.get_target_name_by_token(token))
-            }
-            _ => None
-        }
+        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self._get_target_for_user(api_proxy.get_target_name_by_token(token)))
     }
 
-    pub(crate) fn get_input_by_id(&self, input_id: u16) -> Option<&ConfigInput> {
+    pub fn get_input_by_id(&self, input_id: u16) -> Option<&ConfigInput> {
         for source in &self.sources {
             for input in &source.inputs {
                 if input.id == input_id {
@@ -915,7 +902,7 @@ impl Config {
         None
     }
 
-    pub(crate) fn set_mappings(&mut self, mappings_cfg: &Mappings) {
+    pub fn set_mappings(&mut self, mappings_cfg: &Mappings) {
         for source in &mut self.sources {
             for target in &mut source.targets {
                 if let Some(mapping_ids) = &target.mapping {
@@ -1052,7 +1039,7 @@ impl Config {
 /// * `target_args` the program parameters given with `-target` parameter.
 /// * `sources` configured sources in config file
 ///
-pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> Result<ProcessTargets, M3uFilterError> {
+pub fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> Result<ProcessTargets, M3uFilterError> {
     let mut enabled = true;
     let mut inputs: Vec<u16> = vec![];
     let mut targets: Vec<u16> = vec![];
@@ -1096,6 +1083,6 @@ pub(crate) fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<
 
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct HealthcheckConfig {
+pub struct HealthcheckConfig {
     pub api: ConfigApi
 }

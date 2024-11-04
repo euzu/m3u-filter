@@ -40,7 +40,7 @@ async fn healthcheck() -> HttpResponse {
 }
 
 #[actix_web::main]
-pub(crate) async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> futures::io::Result<()> {
+pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> futures::io::Result<()> {
     let host = cfg.api.host.to_string();
     let port = cfg.api.port;
     let web_ui_enabled = cfg.web_ui_enabled;

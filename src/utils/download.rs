@@ -15,17 +15,14 @@ fn prepare_file_path(persist: Option<&String>, working_dir: &str, action: &str) 
         persist.map(|persist_path| file_utils::prepare_persist_path(persist_path.as_str(), action));
     if persist_file.is_some() {
         let file_path = file_utils::get_file_path(working_dir, persist_file);
-        debug!("persist to file:  {:?}", match &file_path {
-            Some(fp) => fp.display().to_string(),
-            _ => String::new()
-        });
+        debug!("persist to file:  {file_path:?}");
         file_path
     } else {
         None
     }
 }
 
-pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let url = input.url.clone();
     let persist_file_path = prepare_file_path(input.persist.as_ref(), working_dir, "");
     match request_utils::get_input_text_content(input, working_dir, &url, persist_file_path).await {
@@ -36,7 +33,7 @@ pub(crate) async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_
     }
 }
 
-pub(crate) async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
+pub async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
     let input = fpl.input;
     let mut result: Vec<PlaylistGroup> = vec![];
     for plg in &mut fpl.playlistgroups {
@@ -106,7 +103,7 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Video, "get_vod_categories", "get_vod_streams"),
     (XtreamCluster::Series, "get_series_categories", "get_series")];
 
-pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let mut playlist_groups: Vec<PlaylistGroup> = Vec::new();
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
@@ -154,7 +151,7 @@ pub(crate) async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) 
     (playlist_groups, errors)
 }
 
-pub(crate) async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Option<TVGuide>, Vec<M3uFilterError>) {
+pub async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Option<TVGuide>, Vec<M3uFilterError>) {
     match &input.epg_url {
         None => (None, vec![]),
         Some(url) => {

@@ -15,7 +15,7 @@ use crate::repository::storage::{hash_string_as_hex};
 
 /// File-Download information.
 #[derive(Clone)]
-pub(crate) struct FileDownload {
+pub struct FileDownload {
     /// uuid of the download for identification.
     pub uuid: String,
     /// `file_dir` is the directory where the download should be placed.
@@ -74,14 +74,14 @@ impl FileDownload {
     // "accept-ranges" => "0-1975828544"
     // "content-range" => "bytes 0-1975828543/1975828544"
 
-    pub fn new(req_url: &str, req_filename: &str, download_cfg: &VideoDownloadConfig) -> Option<FileDownload> {
+    pub fn new(req_url: &str, req_filename: &str, download_cfg: &VideoDownloadConfig) -> Option<Self> {
         match reqwest::Url::parse(req_url) {
             Ok(url) => {
                 let filename_re = download_cfg.t_re_filename.as_ref().unwrap();
                 let tmp_filename = filename_re.replace_all(&unidecode(req_filename)
                     .replace(' ', "_"), "")
                     .replace("__", "_")
-                    .replace("_-_", "-").to_string();
+                    .replace("_-_", "-");
                 let filename_path = Path::new(&tmp_filename);
                 let file_stem = filename_path.file_stem().and_then(OsStr::to_str).unwrap_or("").trim_matches(FILENAME_TRIM_PATTERNS);
                 let file_ext = filename_path.extension().and_then(OsStr::to_str).unwrap_or("");
@@ -100,7 +100,7 @@ impl FileDownload {
 
                 file_path.to_str()?;
 
-                Some(FileDownload {
+                Some(Self {
                     uuid: hash_string_as_hex(req_url),
                     file_dir,
                     file_path,
@@ -117,20 +117,20 @@ impl FileDownload {
 }
 
 
-pub(crate) struct DownloadQueue {
+pub struct DownloadQueue {
     pub queue: Arc<Mutex<VecDeque<FileDownload>>>,
     pub active: Arc<RwLock<Option<FileDownload>>>,
     pub finished: Arc<RwLock<Vec<FileDownload>>>,
 }
 
-pub(crate) struct AppState {
+pub struct AppState {
     pub config: Arc<Config>,
     pub targets: Arc<ProcessTargets>,
     pub downloads: Arc<DownloadQueue>,
 }
 
 #[derive(Serialize)]
-pub(crate) struct XtreamUserInfo {
+pub struct XtreamUserInfo {
     pub active_cons: String,
     pub allowed_output_formats: Vec<String>,
     //["ts"],
@@ -150,7 +150,7 @@ pub(crate) struct XtreamUserInfo {
 }
 
 #[derive(Serialize)]
-pub(crate) struct XtreamServerInfo {
+pub struct XtreamServerInfo {
     pub url: String,
     pub port: String,
     pub https_port: String,
@@ -163,15 +163,15 @@ pub(crate) struct XtreamServerInfo {
 }
 
 #[derive(Serialize)]
-pub(crate) struct XtreamAuthorizationResponse {
+pub struct XtreamAuthorizationResponse {
     pub user_info: XtreamUserInfo,
     pub server_info: XtreamServerInfo,
 }
 
 impl XtreamAuthorizationResponse {
-    pub(crate) fn new(server_info: &ApiProxyServerInfo, user: &ProxyUserCredentials) -> Self {
+    pub fn new(server_info: &ApiProxyServerInfo, user: &ProxyUserCredentials) -> Self {
         let now = Local::now();
-        XtreamAuthorizationResponse {
+        Self {
             user_info: XtreamUserInfo {
                 active_cons: "0".to_string(),
                 allowed_output_formats: Vec::from(["ts".to_string(), "m3u8".to_string(), "rtmp".to_string()]),
@@ -201,7 +201,7 @@ impl XtreamAuthorizationResponse {
 
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
-pub(crate) struct UserApiRequest {
+pub struct UserApiRequest {
     #[serde(default)]
     pub username: String,
     #[serde(default)]
@@ -231,7 +231,7 @@ pub(crate) struct UserApiRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct ServerInputConfig {
+pub struct ServerInputConfig {
     pub id: u16,
     pub input_type: InputType,
     pub url: String,
@@ -243,7 +243,7 @@ pub(crate) struct ServerInputConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct ServerTargetConfig {
+pub struct ServerTargetConfig {
     pub id: u16,
     pub enabled: bool,
     pub name: String,
@@ -259,13 +259,13 @@ pub(crate) struct ServerTargetConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct ServerSourceConfig {
+pub struct ServerSourceConfig {
     pub inputs: Vec<ServerInputConfig>,
     pub targets: Vec<ServerTargetConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct ServerConfig {
+pub struct ServerConfig {
     pub api: ConfigApi,
     pub threads: u8,
     pub working_dir: String,
@@ -279,25 +279,25 @@ pub(crate) struct ServerConfig {
 
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct PlaylistRequest {
+pub struct PlaylistRequest {
     pub url: Option<String>,
     pub input_id: Option<u16>,
 }
 
-impl From<web::Json<PlaylistRequest>> for PlaylistRequest {
-    fn from(req: web::Json<PlaylistRequest>) -> Self {
+impl From<web::Json<Self>> for PlaylistRequest {
+    fn from(req: web::Json<Self>) -> Self {
         req.clone()
     }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct FileDownloadRequest {
+pub struct FileDownloadRequest {
     pub url: String,
     pub filename: String,
 }
 
-impl From<web::Json<FileDownloadRequest>> for FileDownloadRequest {
-    fn from(req: web::Json<FileDownloadRequest>) -> Self {
+impl From<web::Json<Self>> for FileDownloadRequest {
+    fn from(req: web::Json<Self>) -> Self {
         req.clone()
     }
 }

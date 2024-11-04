@@ -15,7 +15,7 @@ use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, C
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, download};
 
-fn _save_config_api_proxy(backup_dir: &str, api_proxy: &mut ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
+fn _save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
         Ok(()) => {}
         Err(err) => {
@@ -220,7 +220,7 @@ async fn config(
     HttpResponse::Ok().json(result)
 }
 
-pub(crate) fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) {
+pub fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) {
     return move |cfg: &mut web::ServiceConfig| {
         cfg.service(web::scope("/api/v1")
             .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))

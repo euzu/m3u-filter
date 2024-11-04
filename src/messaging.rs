@@ -2,8 +2,8 @@ use log::{debug, error};
 use reqwest::header;
 use crate::model::config::{MessagingConfig};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub(crate) enum MsgKind {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub enum MsgKind {
     #[serde(rename = "info")]
     Info,
     #[serde(rename = "stats")]
@@ -18,7 +18,7 @@ fn is_enabled(kind: &MsgKind, cfg: &MessagingConfig) -> bool {
     cfg.notify_on.contains(kind)
 }
 
-pub(crate) fn send_message(kind: &MsgKind, cfg: &Option<MessagingConfig>, msg: &str) {
+pub fn send_message(kind: &MsgKind, cfg: &Option<MessagingConfig>, msg: &str) {
     if let Some(messaging) = cfg {
         if is_enabled(kind, messaging) {
             if let Some(telegram) = &messaging.telegram {
