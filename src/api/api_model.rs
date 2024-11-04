@@ -11,6 +11,7 @@ use unidecode::unidecode;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigApi, ConfigRename, ConfigSort, ConfigTargetOptions, InputType, MessagingConfig, ProcessTargets, TargetOutput, VideoConfig, VideoDownloadConfig};
 use crate::model::config::ProcessingOrder;
+use crate::repository::storage::{hash_string_as_hex};
 
 /// File-Download information.
 #[derive(Clone)]
@@ -100,7 +101,7 @@ impl FileDownload {
                 file_path.to_str()?;
 
                 Some(FileDownload {
-                    uuid: uuid::Uuid::new_v4().to_string(),
+                    uuid: hash_string_as_hex(req_url),
                     file_dir,
                     file_path,
                     filename,

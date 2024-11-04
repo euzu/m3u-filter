@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-
+use std::fmt::Write;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput};
 use crate::utils::file_utils;
@@ -12,6 +12,17 @@ const FILE_ID_MAPPING: &str = "id_mapping.db";
 pub(crate) fn hash_string(url: &str) -> [u8; 32] {
     let hash = blake3::hash(url.as_bytes());
     hash.into() // convert to hash array
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().fold(String::new(), |mut output, b| {
+        let _ = write!(output, "{b:02X}");
+        output
+    })
+}
+
+pub(crate) fn hash_string_as_hex(url: &str) -> String {
+    hex_encode(&hash_string(url))
 }
 
 pub(in crate::repository) fn get_target_id_mapping_file(target_path: &Path) -> PathBuf {
