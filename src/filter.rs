@@ -5,16 +5,15 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use enum_iterator::all;
-use log::{trace, debug, error, Level, log_enabled};
+use log::{debug, error, log_enabled, trace, Level};
 use pest::iterators::Pair;
 use pest::Parser;
-use petgraph::algo::toposort;
-use petgraph::graph::DiGraph;
 
-use crate::{create_m3u_filter_error_result, exit};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ItemField;
 use crate::model::playlist::{PlaylistItem, PlaylistItemType};
+use crate::utils::directed_graph::DirectedGraph;
+use crate::{create_m3u_filter_error_result, exit};
 
 pub(crate) fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<String> {
     let header = pli.header.borrow();
@@ -453,87 +452,60 @@ pub(crate) fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTempla
     }
 }
 
-type GraphDependency<'a> = (DiGraph<String, ()>, HashMap<usize, String>, HashMap<&'a String, Vec<String>>, bool);
-
-fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> GraphDependency {
+fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> Result<DirectedGraph<String>, M3uFilterError> {
     let regex = regex::Regex::new("!(.*?)!").unwrap();
-    let mut graph = DiGraph::new();
-    let mut node_ids = HashMap::new();
-    let mut node_names = HashMap::new();
-    let mut node_deps = HashMap::new();
-
-    let mut add_node = |di_graph: &mut DiGraph<_, _>, node_name: &String| if let Some(idx) = node_ids.get(node_name) {
-        *idx
-    } else {
-        let key = node_name.clone();
-        let index = di_graph.add_node(node_name.clone());
-        node_names.insert(index.index(), key.clone());
-        node_ids.insert(key, index);
-        index
-    };
-
+    let mut graph = DirectedGraph::<String>::new();
     for template in templates {
-        let node_index = add_node(&mut graph, &template.name);
-        let edges = regex.captures_iter(&template.value)
+        graph.add_node(&template.name);
+        regex.captures_iter(&template.value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| String::from(caps.as_str()))
-            .collect::<Vec<String>>();
-        let iter = edges.iter();
-        for edge in iter {
-            let edge_idx = add_node(&mut graph, edge);
-            graph.add_edge(edge_idx, node_index, ());
-        }
-        node_deps.insert(&template.name, edges);
+            .for_each(|e| {
+                graph.add_node(&e);
+                graph.add_edge(&template.name, &e);
+            });
     }
-    let cycles: Vec<Vec<String>> = petgraph::algo::tarjan_scc(&graph)
-        .into_iter()
-        .filter(|scc| scc.len() > 1)
-        .map(|scc| scc.iter().map(|&i| node_names.get(&i.index()).unwrap().clone()).collect())
-        .collect();
+    let cycles = graph.find_cycles();
     for cyclic in &cycles {
         error!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "));
     }
-
-    (graph, node_names, node_deps, !cycles.is_empty())
+    if !cycles.is_empty() {
+        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Cyclic dependencies in templates detected!");
+    }
+    Ok(graph)
 }
 
 pub(crate) fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<PatternTemplate>, M3uFilterError> {
-    let mut result: Vec<PatternTemplate> = templates.clone();
-    let (graph, node_map, node_deps, cyclic) = build_dependency_graph(templates);
-    if cyclic {
-        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Cyclic dependencies in templates detected!");
-    }
-    let mut dep_value_map: HashMap<&String, String> = templates.iter().map(|t| (&t.name, t.value.clone())).collect();
-    // Perform a topological sort to get a linear ordering of the nodes
-    let node_indices = toposort(&graph, None).unwrap();
-    let indices = node_indices.iter();
-    for node in indices {
-        // only nodes with dependencies
-        if graph.edges_directed(*node, petgraph::Incoming).count() > 0 {
-            let node_name = node_map.get(&node.index()).unwrap();
-            if let Some(deps) = node_deps.get(node_name) {
-                if log_enabled!(Level::Debug) {
-                    debug!("template {}  depends on [{}]", node_name, deps.join(", "));
+    let graph = build_dependency_graph(templates)?;
+    let mut template_values = HashMap::<String, String>::new();
+    let mut template_map: HashMap<String, PatternTemplate> = templates.iter()
+        .map(|item| {
+            template_values.insert(item.name.clone(), item.value.clone());
+            (item.name.clone(), item.clone())
+        })
+        .collect();
+
+    if let Some(dependencies) = graph.get_dependencies() {
+        if let Some(sorted) = graph.topological_sort() {
+            for template_name in sorted {
+                if let Some(depends_on) = dependencies.get(&template_name) {
+                    let mut templ_value = template_values.get(&template_name).unwrap().to_string();
+                    for dep_templ_name in depends_on {
+                        let dep_value = template_values.get(dep_templ_name).unwrap();
+                        templ_value = templ_value.replace(format!("!{dep_templ_name}!").as_str(), dep_value);
+                    }
+                    template_values.insert(template_name.clone(), templ_value);
                 }
-                let mut node_template = dep_value_map.get(node_name).unwrap().clone();
-                for dep_name in deps {
-                    let dep_template = dep_value_map.get(dep_name).unwrap().clone();
-                    let new_templ = node_template.replace(format!("!{dep_name}!").as_str(), &dep_template);
-                    node_template = new_templ;
-                }
-                dep_value_map.insert(node_name, String::from(&node_template));
-                let template = result.iter_mut().find(|t| node_name.eq(&t.name)).unwrap();
-                //let new_value = dep_value_map.get(&template.name).unwrap();
-                template.value = String::from(&node_template);
+            }
+
+            for (k, v) in template_values {
+                let template = template_map.get_mut(&k).unwrap();
+                template.value = v;
             }
         }
     }
-
-    if log_enabled!(Level::Debug) {
-        debug!("{:#?}", result);
-    }
-    Ok(result)
+    Ok(template_map.into_values().collect())
 }
 
 pub(crate) fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternTemplate>) -> String {

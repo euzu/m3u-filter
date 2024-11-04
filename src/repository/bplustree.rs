@@ -3,6 +3,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::Path;
+use std::mem::size_of;
 
 use flate2::Compression;
 use log::error;
