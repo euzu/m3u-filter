@@ -7,9 +7,9 @@ use std::time::Instant;
 
 use flate2::read::{GzDecoder, ZlibDecoder};
 use futures::StreamExt;
-use log::{debug, error, Level, log_enabled};
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use log::{debug, error, log_enabled, Level};
 use reqwest::header::CONTENT_ENCODING;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use url::Url;
 
 use crate::create_m3u_filter_error_result;
@@ -18,7 +18,7 @@ use crate::model::config::ConfigInput;
 use crate::model::stats::format_elapsed_time;
 use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::FILE_EPG;
-use crate::utils::compression_utils::{ENCODING_DEFLATE, ENCODING_GZIP, is_deflate, is_gzip};
+use crate::utils::compression_utils::{is_deflate, is_gzip, ENCODING_DEFLATE, ENCODING_GZIP};
 use crate::utils::file_utils::{get_file_path, persist_file};
 
 pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
@@ -123,18 +123,19 @@ pub async fn get_input_text_content(input: &ConfigInput, working_dir: &String, u
 }
 
 pub fn get_client_request(input: Option<&ConfigInput>, url: &Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
-    let mut request = reqwest::Client::new().get(url.clone());
-    let headers = get_request_headers(input.map_or(&HashMap::new(), |i| &i.headers), custom_headers);
-    request = request.headers(headers);
-    request
+    let request = reqwest::Client::new().get(url.clone());
+    let headers = get_request_headers(input.map(|i| &i.headers), custom_headers);
+    request.headers(headers)
 }
 
-pub fn get_request_headers(defined_headers: &HashMap<String, String>, custom_headers: Option<&HashMap<&str, &[u8]>>) -> HeaderMap {
+pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, custom_headers: Option<&HashMap<&str, &[u8]>>) -> HeaderMap {
     let mut headers = HeaderMap::new();
-    for (key, value) in defined_headers {
-        headers.insert(
-            HeaderName::from_bytes(key.as_bytes()).unwrap(),
-            HeaderValue::from_bytes(value.as_bytes()).unwrap());
+    if let Some(def_headers) = defined_headers {
+        for (key, value) in def_headers {
+            headers.insert(
+                HeaderName::from_bytes(key.as_bytes()).unwrap(),
+                HeaderValue::from_bytes(value.as_bytes()).unwrap());
+        }
     }
     if let Some(custom) = custom_headers {
         let header_keys: HashSet<String> = headers.keys().map(|k| k.as_str().to_lowercase()).collect();
@@ -254,7 +255,7 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
                                 Ok(decoded_content) => {
                                     debug!("Request took:{} {url}", format_elapsed_time(start_time.elapsed().as_secs()));
                                     Ok(decoded_content)
-                                },
+                                }
                                 Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
                             }
                         } else {
@@ -276,12 +277,12 @@ pub async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, w
     if let Ok(url) = url_str.parse::<url::Url>() {
         if url.scheme() == "file" {
             url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {url}"))), |file_path| if file_path.exists() {
-                    Ok(file_path)
-                } else {
-                    Err(Error::new(ErrorKind::NotFound, format!("Unknown file {file_path:?}")))
-                })
+                Ok(file_path)
+            } else {
+                Err(Error::new(ErrorKind::NotFound, format!("Unknown file {file_path:?}")))
+            })
         } else {
-            let file_path =  persist_filepath.map_or_else(|| match get_input_storage_path(input, working_dir) {
+            let file_path = persist_filepath.map_or_else(|| match get_input_storage_path(input, working_dir) {
                 Ok(download_path) => {
                     Ok(download_path.join(FILE_EPG))
                 }

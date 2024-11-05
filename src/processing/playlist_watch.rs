@@ -19,7 +19,7 @@ pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) 
     let watch_filename = sanitize_filename(&format!("{file_name}.bin"));
     match file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&watch_filename))) {
         Some(path) => {
-            let save_path = path.clone();
+            let save_path = path.as_path();
             let mut changed = false;
             if path.exists() {
                 if let Some(loaded_tree) = load_watch_tree(&path) {
@@ -38,10 +38,10 @@ pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) 
                 changed = true;
             }
             if changed {
-                match save_watch_tree(&save_path, &new_tree) {
+                match save_watch_tree(save_path, &new_tree) {
                     Ok(()) => {}
                     Err(err) => {
-                        error!("failed to write watch_file {}: {}", &save_path.to_str().unwrap_or_default(), err);
+                        error!("failed to write watch_file {}: {}", save_path.to_str().unwrap_or_default(), err);
                     }
                 }
             }

@@ -11,4 +11,3 @@
 
 ## Open topics
 - web ui should fetch series info when expanded
-- Each update can change the stream id which can be confusing for players which save the state with the streamid

@@ -46,9 +46,6 @@ pub struct InputStats {
 
 impl Display for InputStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match serde_json::to_string(&self) {
-            Ok(json_str) => write!(f, "{json_str}"),
-            Err(_) => Err(std::fmt::Error),
-        }
+        serde_json::to_string(&self).map_or(Err(std::fmt::Error), |json_str| write!(f, "{json_str}"))
     }
 }

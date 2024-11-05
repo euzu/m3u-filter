@@ -60,11 +60,8 @@ impl Default for FileLockManager {
 
 impl fmt::Debug for FileLockManager {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Acquire the lock to safely access the HashMap
-        let locks = self.locks.lock().unwrap();
-        let keys: Vec<_> = locks.keys().collect();
         f.debug_struct("FileLockManager")
-            .field("locks", &keys)
+            .field("locks", &self.locks.lock().unwrap().keys().collect::<Vec<_>>())
             .finish()
     }
 }

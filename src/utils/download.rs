@@ -93,7 +93,8 @@ fn get_skip_cluster(input: &ConfigInput) -> Vec<XtreamCluster> {
         }
     }
     if skip_cluster.len() == 3 {
-        info!("You have skipped all sections from xtream input {}", input.name.as_ref().unwrap_or(&input.id.to_string()));
+        let name = input.name.as_ref().map_or_else(|| input.id.to_string(), std::string::ToString::to_string);
+        info!("You have skipped all sections from xtream input {name}");
     }
     skip_cluster
 }

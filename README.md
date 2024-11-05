@@ -4,26 +4,25 @@
 
 ![m3u-filter_banner](https://github.com/user-attachments/assets/ea10bc02-eb2d-415f-828f-a14f9b57f5e8)
 
-**m3u-filter** is a simple application that can:
+**m3u-filter** is a versatile tool for processing playlists. Key capabilities include:
 
-- Filter, rename, map, and sort entries from a playlist, and save them in EXTM3U, XTREAM, or Kodi format.
+- Filtering, renaming, mapping, and sorting playlist entries and saving them in EXTM3U, XTREAM, or Kodi formats.
 - Process multiple input files and create multiple output files through target definitions.
 - Act as a simple Xtream or M3U server after processing entries.
 - Serve as a redirect or reverse proxy for Xtream.
 - Schedule updates in server mode.
-- Run as a CLI command to serve processed playlists via web servers like Nginx or Apache.
+- Running as a CLI tool to deliver playlists through web servers (e.g., Nginx, Apache).
 - Define multiple filtering targets to create several playlists from a large one.
-- Use regular expressions for matching.
-- Define filters with statements, e.g.: filter:
-  
-   `(Group ~ "^FR.*") AND NOT (Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~ ".*MOVIES.*")`
+- Using regular expressions for matching and defining templates for reusability.
 - DRY (Don't Repeat Yourself): Define templates and reuse them.
-- Send a Telegram bot or REST message when something goes wrong.
-- Monitor changes in groups and send notifications on detected changes.
+- Define filters with statements, e.g.: filter:
+   `(Group ~ "^FR.*") AND NOT (Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~ ".*MOVIES.*")`
+- Sending alerts via Telegram bot or REST when issues arise.
+- Monitoring group changes and sending notifications.
 
-If you have a playlist containing unwanted entries, you can create filters to include or exclude entries based on the playlist's header information. You can also rename or map entries using regular expressions.
-
-You can run m3u-filter as a command-line application to update your playlists (manually or as a cron job), or run it in server mode to open a web UI. From there, you can view the playlist contents, filter or search entries, and save filtered groups as a new playlist.
+If you need to exclude certain entries from a playlist, you can create filters using headers and apply regex-based renaming or mapping.
+Run `m3u-filter` as a CLI or in server mode for a web-based UI to manage playlist content and save filtered groups.
+From the Web-UI, you can view the playlist contents, filter or search entries.
 
 ![m3u-filter_function](https://github.com/user-attachments/assets/1b5ba462-712a-4f41-9140-8cca913ba5f4)
 

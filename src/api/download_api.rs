@@ -62,7 +62,7 @@ fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: &Arc<D
     let next_download = download_queue.as_ref().queue.lock().unwrap().pop_front();
     if next_download.is_some() {
         { *download_queue.as_ref().active.write().unwrap() = next_download; }
-        let headers = request_utils::get_request_headers(&download_cfg.headers, None);
+        let headers = request_utils::get_request_headers(Some(&download_cfg.headers), None);
         let dq = Arc::clone(download_queue);
         match reqwest::Client::builder().default_headers(headers).build() {
             Ok(client) => {
