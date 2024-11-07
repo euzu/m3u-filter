@@ -6,6 +6,7 @@ extern crate pest_derive;
 extern crate core;
 
 use std::fs::File;
+use std::path::PathBuf;
 use std::sync::Arc;
 use actix_rt::System;
 
@@ -99,6 +100,8 @@ fn main() {
         return;
     }
 
+    create_directories(&cfg);
+
     let targets = validate_targets(&args.target, &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
     info!("Version: {}", VERSION);
@@ -118,6 +121,31 @@ fn main() {
     } else {
         start_in_cli_mode(Arc::new(cfg), Arc::new(targets));
     }
+}
+
+fn create_directories(cfg: &Config) {
+    // Collect the paths into a vector.
+    let paths = [
+        Some(cfg.working_dir.clone()),
+        cfg.backup_dir.clone(),
+        cfg.video.as_ref().and_then(|v| v.download.as_ref()).and_then(|d| d.directory.clone())
+    ];
+
+    // Iterate over the paths, filter out `None` values, and process the `Some(path)` values.
+    paths.iter()
+        .filter_map(|opt| opt.as_ref()) // Get rid of the `Option`
+        .for_each(|dir| {
+            let path = PathBuf::from(dir);
+            if !path.exists() {
+                // Create the directory tree if it doesn't exist
+                let path_value = path.to_str().unwrap_or("?");
+                if let Err(e) = std::fs::create_dir_all(&path) {
+                    error!("Failed to create directory {path_value}: {e}");
+                } else {
+                    info!("Created directory: {path_value}");
+                }
+            }
+        });
 }
 
 fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {

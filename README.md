@@ -963,6 +963,7 @@ services:
       - "8901:8901"
     restart: unless-stopped
 ```
+This example is for the local image, the official can be found under `ghcr.io/euzu/m3u-filter:latest`
 
 If you want to use m3u-filter with docker-compose, there is a `--healthcheck` argument for healthchecks
 
