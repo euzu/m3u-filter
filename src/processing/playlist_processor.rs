@@ -29,6 +29,7 @@ use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
 use crate::{get_errors_notify_message, model::config, Config};
+use crate::utils::request_utils::mask_sensitive_info;
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };
@@ -312,7 +313,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
             };
             errors.append(&mut error_list);
             errors.append(&mut tvguide_errors);
-            let input_name = input.name.as_ref().map_or(input.url.as_str(), |name_val| name_val.as_str());
+            let input_name = input.name.as_ref().map_or_else(|| mask_sensitive_info(input.url.as_str()), std::string::ToString::to_string);
             let group_count = playlistgroups.len();
             let channel_count = playlistgroups.iter()
                 .map(|group| group.channels.len())
@@ -332,7 +333,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
             }
             let elapsed = start_time.elapsed().as_secs();
             stats.insert(input_id, create_input_stat(group_count, channel_count, error_list.len(),
-                                                     input.input_type.clone(), input_name, elapsed));
+                                                     input.input_type.clone(), &input_name, elapsed));
         }
     }
     if source_playlists.is_empty() {

@@ -8,6 +8,7 @@ use std::time::Instant;
 use flate2::read::{GzDecoder, ZlibDecoder};
 use futures::StreamExt;
 use log::{debug, error, log_enabled, Level};
+use regex::Regex;
 use reqwest::header::CONTENT_ENCODING;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use url::Url;
@@ -34,7 +35,7 @@ pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &s
         match download_text_content_as_file(input, url_str, working_dir, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
-                error!("cant download input url: {}  => {}", url_str, e);
+                error!("cant download input url: {}  => {}", mask_sensitive_info(url_str), mask_sensitive_info(e.to_string().as_str()));
                 create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
             }
         }
@@ -83,7 +84,7 @@ pub async fn get_input_text_content(input: &ConfigInput, working_dir: &String, u
         match download_text_content(input, url_str, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
-                error!("cant download input url: {}  => {}", url_str, e);
+                error!("cant download input url: {}  => {}", mask_sensitive_info(url_str), mask_sensitive_info(e.to_string().as_str()));
                 create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
             }
         }
@@ -253,7 +254,7 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
                         if decode_buffer.is_empty() {
                             match String::from_utf8(bytes.to_vec()) {
                                 Ok(decoded_content) => {
-                                    debug!("Request took:{} {url}", format_elapsed_time(start_time.elapsed().as_secs()));
+                                    debug!("Request took:{} {}", format_elapsed_time(start_time.elapsed().as_secs()), mask_sensitive_info(url.to_string().as_str()));
                                     Ok(decoded_content)
                                 }
                                 Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
@@ -276,7 +277,7 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
 pub async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, working_dir: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         if url.scheme() == "file" {
-            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {url}"))), |file_path| if file_path.exists() {
+            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {}", mask_sensitive_info(url_str)))), |file_path| if file_path.exists() {
                 Ok(file_path)
             } else {
                 Err(Error::new(ErrorKind::NotFound, format!("Unknown file {file_path:?}")))
@@ -302,7 +303,7 @@ pub async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, w
 pub async fn download_text_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         let result = if url.scheme() == "file" {
-            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Other, format!("Unknown file {url}"))), |file_path| get_local_file_content(&file_path))
+            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Other, format!("Unknown file {}", mask_sensitive_info(url_str)))), |file_path| get_local_file_content(&file_path))
         } else {
             get_remote_content(input, &url).await
         };
@@ -322,7 +323,7 @@ pub async fn download_text_content(input: &ConfigInput, url_str: &str, persist_f
 
 async fn download_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, Error> {
     if log_enabled!(Level::Debug) {
-        debug!("downloading json content from {url}");
+        debug!("downloading json content from {}", mask_sensitive_info(url));
     }
     match download_text_content(input, url, persist_filepath).await {
         Ok(content) => {
@@ -338,7 +339,7 @@ async fn download_json_content(input: &ConfigInput, url: &str, persist_filepath:
 pub async fn get_input_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
     match download_json_content(input, url, persist_filepath).await {
         Ok(content) => Ok(content),
-        Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {url}  => {}", e)
+        Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", mask_sensitive_info(url), mask_sensitive_info(e.to_string().as_str()))
     }
 }
 //
@@ -353,3 +354,17 @@ pub async fn get_input_json_content(input: &ConfigInput, url: &str, persist_file
 //     }
 //     None
 // }
+
+
+pub fn mask_sensitive_info(query: &str) -> String {
+    let re_username = Regex::new(r"(username=)[^&]*").unwrap();
+    let re_password = Regex::new(r"(password=)[^&]*").unwrap();
+    let re_token = Regex::new(r"(token=)[^&]*").unwrap();
+
+    // Replace with "***"
+    let masked_query = re_username.replace_all(query, "$1***");
+    let masked_query = re_password.replace_all(&masked_query, "$1***");
+    let masked_query = re_token.replace_all(&masked_query, "$1***");
+
+    masked_query.to_string()
+}
