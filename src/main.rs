@@ -184,6 +184,7 @@ fn init_logger(log_level: &str) {
         // Set the log level based on the parsed value
         log_builder.filter_level(get_log_level(log_level));
     }
+    log_builder.filter_module("actix_web::middleware::logger", LevelFilter::Error);
     log_builder.init();
     info!("Log Level {}", get_log_level(log_level));
 }

@@ -213,6 +213,20 @@ macro_rules! add_i64_property_if_exists {
     }
 }
 
+macro_rules! add_to_doc_str_property_if_not_exists {
+    ($document:expr, $prop_name:expr, $prop_value:expr) => {
+          match $document.get($prop_name) {
+            None => {
+                $document.insert(String::from($prop_name), $prop_value);
+            }
+            Some(value) => { if Value::is_null(value) {
+                $document.insert(String::from($prop_name), $prop_value);
+            }}
+          }
+    }
+}
+
+
 impl XtreamStream {
     pub fn get_stream_id(&self) -> u32 {
         self.stream_id.unwrap_or_else(|| self.series_id.unwrap_or(0))
@@ -468,9 +482,13 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options: &Xtrea
     match pli.xtream_cluster {
         XtreamCluster::Live => {
             append_mandatory_fields(&mut document, LIVE_STREAM_FIELDS);
+            add_to_doc_str_property_if_not_exists!(document, "stream_type", Value::String(String::from("live")));
+            add_to_doc_str_property_if_not_exists!(document, "added", Value::String(chrono::Utc::now().timestamp().to_string()));
         }
         XtreamCluster::Video => {
             append_mandatory_fields(&mut document, VIDEO_STREAM_FIELDS);
+            add_to_doc_str_property_if_not_exists!(document, "stream_type", Value::String(String::from("movie")));
+            add_to_doc_str_property_if_not_exists!(document, "added", Value::String(chrono::Utc::now().timestamp().to_string()));
         }
         XtreamCluster::Series => {
             append_prepared_series_properties(props.as_ref(), &mut document);

@@ -8,6 +8,7 @@ use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::config::TargetType;
 use crate::repository::m3u_repository::{m3u_get_file_paths, m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
 use crate::repository::storage::get_target_storage_path;
+use crate::utils::request_utils::mask_sensitive_info;
 
 async fn m3u_api(
     api_req: web::Query<UserApiRequest>,
@@ -26,7 +27,7 @@ async fn m3u_api(
                         .streaming(content_stream)
                 }
                 Err(err) => {
-                    error!("{err}");
+                    error!("{}", mask_sensitive_info(err.to_string().as_str()));
                     HttpResponse::NoContent().finish()
                 }
             }
@@ -53,7 +54,7 @@ async fn m3u_api_stream(
                                 return stream_response(m3u_item.url.as_str(), &req, None).await;
                             }
                             Err(err) => {
-                                error!("Failed to get m3u url: {}", err);
+                                error!("Failed to get m3u url: {}", mask_sensitive_info(err.to_string().as_str()));
                             }
                         }
                     }

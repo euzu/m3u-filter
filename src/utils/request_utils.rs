@@ -28,7 +28,7 @@ pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
 
 pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
     if log_enabled!(Level::Debug) {
-        debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
+        debug!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
     }
 
     if url_str.parse::<url::Url>().is_ok() {
@@ -67,7 +67,7 @@ pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &s
         };
 
         result.map_or_else(|| {
-            let msg = format!("cant read input url: {url_str:?}");
+            let msg = format!("cant read input url: {}", mask_sensitive_info(url_str));
             error!("{}", msg);
             create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
         }, Ok)
@@ -77,7 +77,7 @@ pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &s
 
 pub async fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
     if log_enabled!(Level::Debug) {
-        debug!("getting input text content working_dir: {}, url: {}", working_dir, url_str);
+        debug!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
     }
 
     if url_str.parse::<url::Url>().is_ok() {
@@ -116,7 +116,7 @@ pub async fn get_input_text_content(input: &ConfigInput, working_dir: &String, u
             None => None
         };
         result.map_or_else(|| {
-            let msg = format!("cant read input url: {url_str:?}");
+            let msg = format!("cant read input url: {}", mask_sensitive_info(url_str));
             error!("{}", msg);
             create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
         }, Ok)
@@ -295,7 +295,7 @@ pub async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, w
             }
         }
     } else {
-        Err(std::io::Error::new(ErrorKind::Unsupported, format!("Malformed URL {url_str}")))
+        Err(std::io::Error::new(ErrorKind::Unsupported, format!("Malformed URL {}", mask_sensitive_info(url_str))))
     }
 }
 
@@ -317,7 +317,7 @@ pub async fn download_text_content(input: &ConfigInput, url_str: &str, persist_f
             Err(err) => Err(err)
         }
     } else {
-        Err(std::io::Error::new(ErrorKind::Other, format!("Malformed URL {url_str}")))
+        Err(std::io::Error::new(ErrorKind::Other, format!("Malformed URL {}", mask_sensitive_info(url_str))))
     }
 }
 

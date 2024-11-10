@@ -98,7 +98,7 @@ pub fn parse_xtream(input: &ConfigInput,
             let username = input.username.as_ref().map_or("", |v| v);
             let password = input.password.as_ref().map_or("", |v| v);
 
-            return match map_to_xtream_streams(xtream_cluster, streams) {
+            match map_to_xtream_streams(xtream_cluster, streams) {
                 Ok(xtream_streams) => {
                     let group_map: HashMap::<Rc<String>, RefCell<XtreamCategory>> =
                         xtream_categories.into_iter().map(|category|
@@ -142,7 +142,7 @@ pub fn parse_xtream(input: &ConfigInput,
                     }).collect()))
                 }
                 Err(err) => Err(err)
-            };
+            }
         }
         Err(err) => Err(err)
     }

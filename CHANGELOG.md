@@ -1,6 +1,9 @@
 # Changelog
 # 2.0.8 (2024-11-xx)
 - The configured directories `data`, `backup` and `video-download` are created when configured and do not exist.
+- set "actix_web::middleware::logger" to level `error`
+- masking sensitive information in log
+- hls support (m3u8 url, ignores proxy type, always redirect)
 
 # 2.0.7 (2024-11-05)
 - EPG is now first downloaded to disk instead of directly into memory, then processed using a SAX parser (slower but reduces memory usage from up to 2GB).

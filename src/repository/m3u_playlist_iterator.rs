@@ -2,7 +2,7 @@ use crate::api::api_utils::get_user_server_info;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, ConfigTargetOptions};
-use crate::model::playlist::M3uPlaylistItem;
+use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType};
 use crate::repository::indexed_document::IndexedDocumentReader;
 use crate::repository::m3u_repository::m3u_get_file_paths;
 use crate::repository::storage::ensure_target_storage_path;
@@ -60,12 +60,18 @@ impl Iterator for M3uPlaylistIterator {
         }
 
         self.reader.next().map(|m3u_pli| {
-            match self.proxy_type {
-                ProxyType::Reverse => {
-                    m3u_pli.to_m3u(&self.target_options, Some(format!("{}/{}", &self.base_url, m3u_pli.virtual_id).as_str()))
-                }
-                ProxyType::Redirect => {
+            // TODO hls and unknown reverse proxy
+            match m3u_pli.item_type {
+                PlaylistItemType::LiveUnknown | PlaylistItemType::LiveHls => {
                     m3u_pli.to_m3u(&self.target_options, None)
+                }
+                _ => match self.proxy_type {
+                    ProxyType::Reverse => {
+                        m3u_pli.to_m3u(&self.target_options, Some(format!("{}/{}", &self.base_url, m3u_pli.virtual_id).as_str()))
+                    }
+                    ProxyType::Redirect => {
+                        m3u_pli.to_m3u(&self.target_options, None)
+                    }
                 }
             }
         })

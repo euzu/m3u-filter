@@ -6,7 +6,7 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
@@ -81,6 +81,8 @@ pub enum PlaylistItemType {
     SeriesInfo = 4, //  xtream series info fetched for series description
     SeriesEpisode = 5, // from SeriesInfo parsed episodes
     Catchup = 6,
+    LiveUnknown = 7, // No Provider id
+    LiveHls = 8, // m3u8 entry
 }
 
 impl From<XtreamCluster> for PlaylistItemType {
@@ -105,7 +107,7 @@ impl PlaylistItemType {
 impl Display for PlaylistItemType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Self::Live => Self::LIVE,
+            Self::Live | Self::LiveHls | Self::LiveUnknown => Self::LIVE,
             Self::Video => Self::VIDEO,
             Self::Series => Self::SERIES,
             Self::SeriesInfo => Self::SERIES_INFO,
@@ -237,6 +239,7 @@ pub struct M3uPlaylistItem {
     pub url: Rc<String>,
     pub epg_channel_id: Option<Rc<String>>,
     pub input_id: u16,
+    pub item_type: PlaylistItemType,
 }
 
 impl M3uPlaylistItem {
@@ -313,37 +316,37 @@ impl PlaylistItem {
             url: Rc::clone(&header.url),
             epg_channel_id: header.epg_channel_id.clone(),
             input_id: header.input_id,
+            item_type: header.item_type,
         }
     }
 
     pub fn to_xtream(&self) -> Result<XtreamPlaylistItem, M3uFilterError> {
         let header = self.header.borrow();
-        match header.id.parse::<u32>() {
-            Ok(provider_id) => {
-                Ok(XtreamPlaylistItem {
-                    virtual_id: header.virtual_id,
-                    provider_id,
-                    name: Rc::clone(&header.name),
-                    logo: Rc::clone(&header.logo),
-                    logo_small: Rc::clone(&header.logo_small),
-                    group: Rc::clone(&header.group),
-                    title: Rc::clone(&header.title),
-                    parent_code: Rc::clone(&header.parent_code),
-                    rec: Rc::clone(&header.rec),
-                    url: Rc::clone(&header.url),
-                    epg_channel_id: header.epg_channel_id.clone(),
-                    xtream_cluster: header.xtream_cluster,
-                    additional_properties: header.additional_properties.as_ref().and_then(|props| serde_json::to_string(props).ok()),
-                    item_type: header.item_type,
-                    series_fetched: header.series_fetched,
-                    category_id: header.category_id,
-                    input_id: header.input_id,
-                })
-            }
-            Err(_) => {
-                Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("cant parse provider stream id: {}", header.id)))
-            }
-        }
+        let provider_id = header.id.parse::<u32>().unwrap_or_default();
+        Ok(XtreamPlaylistItem {
+            virtual_id: header.virtual_id,
+            provider_id,
+            name: Rc::clone(&header.name),
+            logo: Rc::clone(&header.logo),
+            logo_small: Rc::clone(&header.logo_small),
+            group: Rc::clone(&header.group),
+            title: Rc::clone(&header.title),
+            parent_code: Rc::clone(&header.parent_code),
+            rec: Rc::clone(&header.rec),
+            url: Rc::clone(&header.url),
+            epg_channel_id: header.epg_channel_id.clone(),
+            xtream_cluster: header.xtream_cluster,
+            additional_properties: header.additional_properties.as_ref().and_then(|props| serde_json::to_string(props).ok()),
+            item_type: header.item_type,
+            series_fetched: header.series_fetched,
+            category_id: header.category_id,
+            input_id: header.input_id,
+        })
+        // }
+        // Err(_) => {
+        //     Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("cant parse provider stream id: {}", header.id)))
+        // }
+        // }
     }
 }
 

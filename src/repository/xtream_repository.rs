@@ -201,20 +201,29 @@ pub fn xtream_write_playlist(target: &ConfigTarget, cfg: &Config, playlist: &mut
 
             for pli in plg.channels.drain(..) {
                 let mut header = pli.header.borrow_mut();
-                // we skip resolved series, because this is only necessary when writing m3u files
-                let col = if header.item_type == PlaylistItemType::Series {
-                    None
-                } else if header.get_provider_id().is_some() {
-                    header.category_id = *cat_id;
-                    Some(match header.xtream_cluster {
-                        XtreamCluster::Live => &mut live_col,
-                        XtreamCluster::Series => &mut series_col,
-                        XtreamCluster::Video => &mut vod_col,
-                    })
-                } else {
-                    let title = header.title.as_str();
-                    errors.push(format!("Channel does not have an id: {title}"));
-                    None
+                let col = match header.item_type {
+                    PlaylistItemType::Series => {
+                        // we skip resolved series, because this is only necessary when writing m3u files
+                        None
+                    },
+                    PlaylistItemType::LiveUnknown | PlaylistItemType::LiveHls => {
+                        header.category_id = *cat_id;
+                        Some(&mut live_col)
+                    },
+                    _ => {
+                        if header.get_provider_id().is_some() {
+                            header.category_id = *cat_id;
+                            Some(match header.xtream_cluster {
+                                XtreamCluster::Live => &mut live_col,
+                                XtreamCluster::Series => &mut series_col,
+                                XtreamCluster::Video => &mut vod_col,
+                            })
+                        } else {
+                            let title = header.title.as_str();
+                            errors.push(format!("Channel does not have an id: {title}"));
+                            None
+                        }
+                    }
                 };
                 drop(header);
                 if let Some(pl) = col {

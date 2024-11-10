@@ -8,6 +8,7 @@ use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, ConfigInput};
 use crate::utils::request_utils;
+use crate::utils::request_utils::mask_sensitive_info;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
@@ -50,7 +51,7 @@ pub fn get_user_server_info(cfg: &Config, user: &ProxyUserCredentials) -> ApiPro
 
 pub async fn stream_response(stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
     let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
-    debug!("Try to open stream {}", stream_url);
+    debug!("Try to open stream {}", mask_sensitive_info(stream_url));
     if let Ok(url) = Url::parse(stream_url) {
         let client = request_utils::get_client_request(input, &url, Some(&req_headers));
         match client.send().await {
@@ -62,14 +63,14 @@ pub async fn stream_response(stream_url: &str, req: &HttpRequest, input: Option<
                     });
                     return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
                 }
-                debug!("Failed to open stream got status {} for {}", response.status(), stream_url);
+                debug!("Failed to open stream got status {} for {}", response.status(), mask_sensitive_info(stream_url));
             }
             Err(err) => {
-                error!("Received failure from server {}:  {}", stream_url, err);
+                error!("Received failure from server {}:  {}", mask_sensitive_info(stream_url), err);
             }
         }
     } else {
-        error!("Url is malformed {}", &stream_url);
+        error!("Url is malformed {}", mask_sensitive_info(stream_url));
     }
     HttpResponse::BadRequest().finish()
 }

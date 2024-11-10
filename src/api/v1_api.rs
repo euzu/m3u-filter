@@ -14,6 +14,7 @@ use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCrede
 use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, validate_targets};
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, download};
+use crate::utils::request_utils::mask_sensitive_info;
 
 fn _save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
@@ -104,7 +105,7 @@ async fn playlist_update(
             HttpResponse::Ok().finish()
         }
         Err(err) => {
-            error!("Failed playlist update {}", err.to_string());
+            error!("Failed playlist update {}", mask_sensitive_info(err.to_string().as_str()));
             HttpResponse::BadRequest().json(json!({"error": err.to_string()}))
         }
     }

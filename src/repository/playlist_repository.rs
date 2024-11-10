@@ -1,6 +1,7 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, TargetType};
-use crate::model::playlist::PlaylistGroup;
+use crate::model::playlist::PlaylistItemType::LiveUnknown;
+use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
 use crate::model::xmltv::Epg;
 use crate::repository::epg_repository::epg_write;
 use crate::repository::kodi_repository::kodi_write_strm_playlist;
@@ -10,7 +11,7 @@ use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
 
 pub fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
-                               target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
+                        target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
     let target_path = match ensure_target_storage_path(cfg, &target.name) {
         Ok(path) => path,
@@ -32,16 +33,13 @@ pub fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     for group in playlist.iter_mut() {
         for channel in &group.channels {
             let mut header = channel.header.borrow_mut();
-            if let Some(provider_id) = header.get_provider_id() {
-                let uuid = header.get_uuid();
-                let item_type = header.item_type;
-                header.virtual_id = target_id_mapping.insert_entry(**uuid, provider_id, item_type, 0);
-            } else {
-                errors.push(M3uFilterError::new(
-                    M3uFilterErrorKind::Info,
-                    format!("Playlist item has no provider id: {}", &header.title),
-                ));
+            let provider_id = header.get_provider_id().unwrap_or_default();
+            if provider_id == 0 {
+                header.item_type = if header.url.ends_with(".m3u8") { PlaylistItemType::LiveHls } else { LiveUnknown };
             }
+            let uuid = header.get_uuid();
+            let item_type = header.item_type;
+            header.virtual_id = target_id_mapping.insert_entry(**uuid, provider_id, item_type, 0);
         }
     }
 
@@ -71,5 +69,4 @@ pub fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     }
 
     if errors.is_empty() { Ok(()) } else { Err(errors) }
-
 }

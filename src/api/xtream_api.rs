@@ -25,6 +25,7 @@ use crate::repository::storage::{get_target_storage_path, hash_string};
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository;
 use crate::utils::{json_utils, request_utils};
+use crate::utils::request_utils::mask_sensitive_info;
 
 const ACTION_GET_SERIES_INFO: &str = "get_series_info";
 const ACTION_GET_VOD_INFO: &str = "get_vod_info";
@@ -160,7 +161,7 @@ fn get_xtream_player_api_info_url(input: &ConfigInput, cluster: XtreamCluster, s
     get_xtream_player_api_action_url(input, action).map(|action_url| format!("{action_url}&{stream_id_field}={stream_id}"))
 }
 
-fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_path: &str) -> Option<String> {
+fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_path: &str, fallback_url: &str) -> Option<String> {
     let ctx_path = if context.is_empty() { String::new() } else { format!("{context}/") };
     if let Some(user_info) = input.get_user_info() {
         Some(format!("{}/{}{}/{}/{}",
@@ -170,6 +171,8 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_p
                      &user_info.password,
                      action_path
         ))
+    } else if !fallback_url.is_empty() {
+        Some(String::from(fallback_url))
     } else {
         None
     }
@@ -205,13 +208,22 @@ async fn xtream_player_api_stream(
     let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
+    match pli.item_type {
+        PlaylistItemType::LiveUnknown  | PlaylistItemType::LiveHls => {
+            let stream_url = pli.url.to_string();
+            debug!("Redirecting stream request to {stream_url}");
+            return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
+        }
+        _ => {}
+    }
+
     let query_path = if stream_req.action_path.is_empty() {
         format!("{}{stream_ext}", pli.provider_id)
     } else {
         format!("{}/{}{stream_ext}", stream_req.action_path, pli.provider_id)
     };
 
-    let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), &query_path), true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
+    let stream_url =  try_option_bad_request!(get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()), true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
     if user.proxy == ProxyType::Redirect {
         debug!("Redirecting stream request to {stream_url}");
@@ -329,7 +341,7 @@ async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &C
         };
     }
 
-    Err(Error::new(std::io::ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}",
+    Err(Error::new(ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}",
                                                       target.name.replace(' ', "_").as_str(), &cluster, pli.virtual_id)))
 }
 
@@ -384,7 +396,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                     return match request_utils::download_text_content(input, info_url.as_str(), None).await {
                         Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
                         Err(err) => {
-                            error!("Failed to download epg {}", err.to_string());
+                            error!("Failed to download epg {}", mask_sensitive_info(err.to_string().as_str()));
                             HttpResponse::NoContent().finish()
                         }
                     };
@@ -401,7 +413,7 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
         ACTION_GET_LIVE_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_LIVE),
         ACTION_GET_VOD_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_VOD),
         ACTION_GET_SERIES_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_SERIES),
-        _ => Err(std::io::Error::new(ErrorKind::Other, ""))
+        _ => Err(Error::new(ErrorKind::Other, ""))
     } {
         if let Some(file_path) = path {
             let category_id = category_id.trim();
