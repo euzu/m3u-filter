@@ -6,7 +6,6 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
@@ -320,10 +319,10 @@ impl PlaylistItem {
         }
     }
 
-    pub fn to_xtream(&self) -> Result<XtreamPlaylistItem, M3uFilterError> {
+    pub fn to_xtream(&self) -> XtreamPlaylistItem {
         let header = self.header.borrow();
         let provider_id = header.id.parse::<u32>().unwrap_or_default();
-        Ok(XtreamPlaylistItem {
+        XtreamPlaylistItem {
             virtual_id: header.virtual_id,
             provider_id,
             name: Rc::clone(&header.name),
@@ -341,12 +340,7 @@ impl PlaylistItem {
             series_fetched: header.series_fetched,
             category_id: header.category_id,
             input_id: header.input_id,
-        })
-        // }
-        // Err(_) => {
-        //     Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("cant parse provider stream id: {}", header.id)))
-        // }
-        // }
+        }
     }
 }
 

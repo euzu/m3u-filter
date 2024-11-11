@@ -3,6 +3,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use std::time::Instant;
 
 use flate2::read::{GzDecoder, ZlibDecoder};
@@ -355,16 +356,15 @@ pub async fn get_input_json_content(input: &ConfigInput, url: &str, persist_file
 //     None
 // }
 
+static USERNAME_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(username=)[^&]*").unwrap());
+static PASSWORD_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(password=)[^&]*").unwrap());
+static TOKEN_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(token=)[^&]*").unwrap());
 
 pub fn mask_sensitive_info(query: &str) -> String {
-    let re_username = Regex::new(r"(username=)[^&]*").unwrap();
-    let re_password = Regex::new(r"(password=)[^&]*").unwrap();
-    let re_token = Regex::new(r"(token=)[^&]*").unwrap();
-
     // Replace with "***"
-    let masked_query = re_username.replace_all(query, "$1***");
-    let masked_query = re_password.replace_all(&masked_query, "$1***");
-    let masked_query = re_token.replace_all(&masked_query, "$1***");
+    let masked_query = USERNAME_REGEX.replace_all(query, "$1***");
+    let masked_query = PASSWORD_REGEX.replace_all(&masked_query, "$1***");
+    let masked_query = TOKEN_REGEX.replace_all(&masked_query, "$1***");
 
     masked_query.to_string()
 }

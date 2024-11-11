@@ -1,7 +1,7 @@
 use std::env;
 use std::fs::File;
 use std::path::PathBuf;
-
+use std::sync::LazyLock;
 use chrono::Local;
 use log::{debug, error, info, warn};
 use regex::Regex;
@@ -139,10 +139,11 @@ pub fn save_main_config(file_path: &str, backup_dir: &str, config: &ConfigDto) -
     write_config_file(file_path, backup_dir, config, "config.yml")
 }
 
+static ENV_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap());
+
 pub fn resolve_env_var(value: &str) -> String {
     if !value.trim().is_empty() {
-        let pattern = Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap();
-        if let Some(caps) = pattern.captures(value) {
+        if let Some(caps) = ENV_REGEX.captures(value) {
             if let Some(var) = caps.name("var") {
                 let var_name = var.as_str();
                 return env::var(var_name).unwrap_or_else(|_| value.to_string());

@@ -442,11 +442,11 @@ pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -
 }
 
 fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> Result<DirectedGraph<String>, M3uFilterError> {
-    let regex = regex::Regex::new("!(.*?)!").unwrap();
     let mut graph = DirectedGraph::<String>::new();
+    let re_template= regex::Regex::new("!(.*?)!").unwrap();
     for template in templates {
         graph.add_node(&template.name);
-        regex.captures_iter(&template.value)
+        re_template.captures_iter(&template.value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| String::from(caps.as_str()))

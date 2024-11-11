@@ -79,13 +79,9 @@ fn write_playlists_to_file(cfg: &Config, storage_path: &Path, collections: Vec<(
             match IndexedDocumentWriter::new(xtream_path.clone(), idx_path) {
                 Ok(mut writer) => {
                     for item in playlist {
-                        match item.to_xtream() {
-                            Ok(xtream) => {
-                                match writer.write_doc(item.header.borrow().virtual_id, &xtream) {
-                                    Ok(()) => {}
-                                    Err(err) => return Err(cant_write_result!(&xtream_path, err))
-                                }
-                            }
+                        let xtream = item.to_xtream();
+                        match writer.write_doc(item.header.borrow().virtual_id, &xtream) {
+                            Ok(()) => {}
                             Err(err) => return Err(cant_write_result!(&xtream_path, err))
                         }
                     }
