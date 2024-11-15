@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use log::{debug, error};
-use path_absolutize::Absolutize;
+use path_clean::PathClean;
 
 const USER_FILE: &str = "user.txt";
 const CONFIG_PATH: &str = "config";
@@ -132,17 +132,11 @@ pub fn prepare_persist_path(file_name: &str, date_prefix: &str) -> PathBuf {
 
 pub fn get_file_path(wd: &str, path: Option<PathBuf>) -> Option<PathBuf> {
     path.map(|p| if p.is_relative() {
-                let pb = PathBuf::from(wd);
-                match pb.join(&p).absolutize() {
-                    Ok(os) => PathBuf::from(os),
-                    Err(e) => {
-                        error!("path is not relative {:?}", e);
-                        p
-                    }
-                }
-            } else {
-                p
-            })
+        let pb = PathBuf::from(wd);
+        pb.join(&p).clean()
+    } else {
+        p
+    })
 }
 
 pub fn add_prefix_to_filename(path: &Path, prefix: &str, ext: Option<&str>) -> PathBuf {

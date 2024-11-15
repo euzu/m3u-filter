@@ -10,7 +10,7 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use log::{debug, error, warn};
-use path_absolutize::Absolutize;
+use path_clean::PathClean;
 use url::{Url};
 use crate::auth::user::UserCredential;
 
@@ -920,9 +920,13 @@ impl Config {
     }
 
     pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
-        self.working_dir = file_utils::get_working_path(&self.working_dir);
+        let work_dir = if resolve_var { &config_reader::resolve_env_var(&self.working_dir) } else { &self.working_dir };
+        self.working_dir = file_utils::get_working_path(work_dir);
         if self.backup_dir.is_none() {
             self.backup_dir = Some(PathBuf::from(&self.working_dir).join(".backup").into_os_string().to_string_lossy().to_string());
+        } else {
+            let backup_dir = if resolve_var { &config_reader::resolve_env_var(self.backup_dir.as_ref().unwrap()) } else { self.backup_dir.as_ref().unwrap() };
+            self.backup_dir = Some(backup_dir.to_string());
         }
         let backupdir = PathBuf::from(self.backup_dir.as_ref().unwrap());
         if !backupdir.exists() {
@@ -932,7 +936,7 @@ impl Config {
             }
         }
         self.api.prepare();
-        self.prepare_api_web_root();
+        self.prepare_api_web_root(resolve_var);
         if let Some(templates) = &mut self.templates {
             match prepare_templates(templates) {
                 Ok(tmplts) => {
@@ -1003,29 +1007,24 @@ impl Config {
         Ok(())
     }
 
-    fn prepare_api_web_root(&mut self) {
+    fn prepare_api_web_root(&mut self, resolve_var: bool) {
         if !self.api.web_root.is_empty() {
+            let web_root = if resolve_var { config_reader::resolve_env_var(&self.api.web_root) } else { self.api.web_root.clone() };
+            self.api.web_root = web_root.to_string();
             let wrpb = std::path::PathBuf::from(&self.api.web_root);
             if wrpb.is_relative() {
-                let mut wrpb2 = std::path::PathBuf::from(&self.working_dir).join(&self.api.web_root);
+                let mut wrpb2 = std::path::PathBuf::from(&self.working_dir).join(&web_root);
                 if !wrpb2.exists() {
-                    wrpb2 = file_utils::get_exe_path().join(&self.api.web_root);
+                    wrpb2 = file_utils::get_exe_path().join(&web_root);
                 }
                 if !wrpb2.exists() {
                     let cwd = std::env::current_dir();
                     if let Ok(cwd_path) = cwd {
-                        wrpb2 = cwd_path.join(&self.api.web_root);
+                        wrpb2 = cwd_path.join(&web_root);
                     }
                 }
                 if wrpb2.exists() {
-                    match wrpb2.absolutize() {
-                        Ok(os) => self.api.web_root = String::from(os.to_str().unwrap()),
-                        Err(e) => {
-                            error!("failed to absolutize web_root {:?}", e);
-                        }
-                    }
-                    // } else {
-                    //     error!("web_root directory does not exists {:?}", wrpb2)
+                    self.api.web_root = String::from(wrpb2.clean().to_str().unwrap_or_default());
                 }
             }
         }
