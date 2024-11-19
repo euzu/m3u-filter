@@ -222,7 +222,7 @@ async fn config(
 }
 
 pub fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) {
-    return move |cfg: &mut web::ServiceConfig| {
+    move |cfg: &mut web::ServiceConfig| {
         cfg.service(web::scope("/api/v1")
             .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))
             .route("/config", web::get().to(config))
@@ -233,5 +233,5 @@ pub fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfi
             .route("/playlist/update", web::post().to(playlist_update))
             .route("/file/download", web::post().to(download_api::queue_download_file))
             .route("/file/download/info", web::get().to(download_api::download_file_info)));
-    };
+    }
 }
