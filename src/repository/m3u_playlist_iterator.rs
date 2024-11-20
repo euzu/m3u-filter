@@ -62,7 +62,7 @@ impl Iterator for M3uPlaylistIterator {
         self.reader.next().map(|m3u_pli| {
             // TODO hls and unknown reverse proxy
             match m3u_pli.item_type {
-                PlaylistItemType::LiveUnknown | PlaylistItemType::LiveHls => {
+                PlaylistItemType::LiveHls => {
                     m3u_pli.to_m3u(&self.target_options, None)
                 }
                 _ => match self.proxy_type {

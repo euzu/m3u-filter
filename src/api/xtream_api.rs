@@ -209,7 +209,7 @@ async fn xtream_player_api_stream(
     let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
     match pli.item_type {
-        PlaylistItemType::LiveUnknown  | PlaylistItemType::LiveHls => {
+        PlaylistItemType::LiveHls => {
             let stream_url = pli.url.to_string();
             debug!("Redirecting stream request to {stream_url}");
             return HttpResponse::Found().insert_header(("Location", stream_url)).finish();

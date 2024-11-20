@@ -172,11 +172,10 @@ impl ApiProxyServerInfo {
     }
 
     pub fn get_base_url(&self) -> String {
-        if self.protocol.eq("http") {
-            format!("http://{}:{}", self.host, self.http_port)
-        } else {
-            format!("https://{}:{}", self.host, self.https_port)
+        if self.http_port.is_empty() {
+            return format!("{}://{}", self.protocol, self.host)
         }
+        format!("{}://{}:{}", self.protocol, self.host, self.http_port)
     }
 }
 

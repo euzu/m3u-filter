@@ -567,7 +567,7 @@ impl ConfigInput {
         }
         match self.input_type {
             InputType::M3u => {
-                if self.username.is_none() || self.password.is_none() {
+                if self.username.is_some() || self.password.is_some() {
                     debug!("for input type m3u: username and password are ignored");
                 }
             }
