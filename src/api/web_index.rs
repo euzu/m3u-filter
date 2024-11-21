@@ -21,6 +21,9 @@ async fn token(
     match &app_state.config.web_auth {
         None => no_web_auth_token(),
         Some(web_auth) => {
+            if !web_auth.enabled {
+                return no_web_auth_token();
+            }
             let username = req.username.as_str();
             let password = req.password.as_str();
 
@@ -50,6 +53,9 @@ async fn token_refresh(
             no_web_auth_token()
         },
         Some(web_auth) => {
+            if !web_auth.enabled {
+                return no_web_auth_token();
+            }
             let secret_key = web_auth.secret.as_ref();
             if verify_token(credentials, secret_key) {
                 if let Ok(token) = create_jwt(app_state.config.web_auth.as_ref().unwrap()) {
