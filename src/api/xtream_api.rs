@@ -461,7 +461,8 @@ async fn xtream_player_api(
     api_req: UserApiRequest,
     app_state: &web::Data<AppState>,
 ) -> HttpResponse {
-    if let Some((user, target)) = get_user_target(&api_req, app_state) {
+    let user_target = get_user_target(&api_req, app_state);
+    if let Some((user, target)) =  user_target {
         if !target.has_output(&TargetType::Xtream) {
             return HttpResponse::Ok().json(get_user_info(&user, &app_state.config));
         }
@@ -532,7 +533,13 @@ async fn xtream_player_api(
             }
         }
     } else {
-        debug!("{}", if api_req.action.is_empty() { "Paremeter action is empty!" } else { "cant find user!" });
+        if user_target.is_none() {
+            debug!("Cant find user!");
+        } else if api_req.action.is_empty() {
+            debug!("Paremeter action is empty!");
+        } else {
+            debug!("Bad request!" );
+        }
         HttpResponse::BadRequest().finish()
     }
 }
@@ -567,8 +574,8 @@ async fn xtream_player_api_post(req: HttpRequest,
 }
 
 pub fn xtream_api_register(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/player_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)))
-        .service(web::resource("/panel_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_get)))
+    cfg.service(web::resource("/player_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)))
+        .service(web::resource("/panel_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)))
         .service(web::resource("/xtream").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)))
         .service(web::resource("/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream_alt)))
         .service(web::resource("/live/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream)))
