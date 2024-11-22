@@ -11,9 +11,7 @@ use crate::repository::storage::get_target_storage_path;
 use crate::utils::request_utils::mask_sensitive_info;
 
 async fn m3u_api(
-    api_req: web::Query<UserApiRequest>,
-    //_api_req: web::Query<HashMap<String, String>>,
-    _req: HttpRequest,
+    api_req: UserApiRequest,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     match get_user_target(&api_req, &app_state) {
@@ -34,6 +32,18 @@ async fn m3u_api(
         }
         None => HttpResponse::BadRequest().finish(),
     }
+}
+
+async fn m3u_api_get(    api_req: web::Query<UserApiRequest>,
+                         app_state: web::Data<AppState>,
+) -> HttpResponse {
+    m3u_api(api_req.into_inner(), app_state).await
+}
+async fn m3u_api_post(
+    api_req: web::Form<UserApiRequest>,
+    app_state: web::Data<AppState>,
+) -> HttpResponse {
+    m3u_api(api_req.into_inner(), app_state).await
 }
 
 async fn m3u_api_stream(
@@ -69,9 +79,9 @@ async fn m3u_api_stream(
 }
 
 pub fn m3u_api_register(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/get.php").route(web::get().to(m3u_api)))
-        .service(web::resource("/get.php").route(web::post().to(m3u_api)))
-        .service(web::resource("/apiget").route(web::get().to(m3u_api)))
-        .service(web::resource("/m3u").route(web::get().to(m3u_api)))
+    cfg.service(web::resource("/get.php").route(web::get().to(m3u_api_get)).route(web::post().to(m3u_api_post)))
+        .service(web::resource("/get.php").route(web::post().to(m3u_api_get)).route(web::post().to(m3u_api_post)))
+        .service(web::resource("/apiget").route(web::get().to(m3u_api_get)).route(web::post().to(m3u_api_post)))
+        .service(web::resource("/m3u").route(web::get().to(m3u_api_get)).route(web::post().to(m3u_api_post)))
         .service(web::resource("/m3u-stream/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream)));
 }

@@ -199,5 +199,6 @@ async fn xmltv_api(
 
 pub fn xmltv_api_register(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/xmltv.php").route(web::get().to(xmltv_api)))
+        .service(web::resource("/update/epg.php").route(web::get().to(xmltv_api)))
         .service(web::resource("/epg").route(web::get().to(xmltv_api)));
 }
