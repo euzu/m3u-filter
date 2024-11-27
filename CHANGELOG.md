@@ -1,5 +1,5 @@
 # Changelog
-# 2.0.8 (2024-11-xx)
+# 2.0.8 (2024-11-27)
 - The configured directories `data`, `backup` and `video-download` are created when configured and do not exist.
 - set "actix_web::middleware::logger" to level `error`
 - masking sensitive information in log

@@ -114,6 +114,8 @@ impl TargetUser {
     }
 }
 
+fn default_as_80() -> String { "80".to_string() }
+
 fn default_as_443() -> String { "443".to_string() }
 
 fn default_as_1935() -> String { "1935".to_string() }
@@ -123,6 +125,7 @@ pub struct ApiProxyServerInfo {
     pub name: String,
     pub protocol: String,
     pub host: String,
+    #[serde(default = "default_as_80")]
     pub http_port: String,
     #[serde(default = "default_as_443")]
     pub https_port: String,

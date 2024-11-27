@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
+set -o pipefail
 
 if ! command -v cargo-set-version &> /dev/null
 then

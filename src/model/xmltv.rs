@@ -38,7 +38,7 @@ impl XmlTag {
                 child.write_to(writer)?;
             }
         }
-        writer.write_event(Event::End(BytesEnd::new(self.name.as_str())))
+        Ok(writer.write_event(Event::End(BytesEnd::new(self.name.as_str())))?)
     }
 }
 
@@ -59,7 +59,7 @@ impl Epg {
         for child in &self.children {
             child.write_to(writer)?;
         }
-        writer.write_event(Event::End(BytesEnd::new("tv")))
+        Ok(writer.write_event(Event::End(BytesEnd::new("tv")))?)
     }
 }
 
