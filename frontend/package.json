@@ -2,7 +2,7 @@
   "name": "m3u-filter",
   "description": "m3u-filter",
   "author": "euzu",
-  "version": "2.0.8",
+  "version": "2.0.9",
   "private": true,
   "homepage": "./",
   "scripts": {
@@ -10,7 +10,7 @@
     "react-build": "react-scripts build",
     "react-test": "react-scripts test --env=jsdom",
     "react-eject": "react-scripts eject",
-    "build": "cross-env REACT_APP_STAGE=production PUBLIC_URL= yarn react-build",
+    "build": "cross-env GENERATE_SOURCEMAP=false REACT_APP_STAGE=production PUBLIC_URL= yarn react-build",
     "start": "yarn react-start",
     "lint": "eslint --config eslintrc.json src/** --no-error-on-unmatched-pattern --quiet",
     "upgr": "yarn upgrade-interactive --latest",
