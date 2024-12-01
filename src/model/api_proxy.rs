@@ -29,10 +29,14 @@ impl ProxyType {
 
 impl Display for ProxyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Self::Reverse => Self::REVERSE,
-            Self::Redirect => Self::REDIRECT
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Reverse => Self::REVERSE,
+                Self::Redirect => Self::REDIRECT,
+            }
+        )
     }
 }
 
@@ -62,11 +66,10 @@ pub struct ProxyUserCredentials {
 }
 
 impl ProxyUserCredentials {
-
     pub fn prepare(&mut self, resolve_var: bool) {
         if resolve_var {
-            self.username =  config_reader::resolve_env_var(&self.username);
-            self.password =  config_reader::resolve_env_var(&self.password);
+            self.username = config_reader::resolve_env_var(&self.username);
+            self.password = config_reader::resolve_env_var(&self.password);
             if let Some(tkn) = &self.token {
                 self.token = Some(config_reader::resolve_env_var(tkn));
             }
@@ -104,21 +107,35 @@ pub struct TargetUser {
 }
 
 impl TargetUser {
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(&ProxyUserCredentials, &str)> {
-        self.credentials.iter().find(|c| c.matches(username, password))
+    pub fn get_target_name(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Option<(&ProxyUserCredentials, &str)> {
+        self.credentials
+            .iter()
+            .find(|c| c.matches(username, password))
             .map(|credentials| (credentials, self.target.as_str()))
     }
     pub fn get_target_name_by_token(&self, token: &str) -> Option<(&ProxyUserCredentials, &str)> {
-        self.credentials.iter().find(|c| c.matches_token(token))
+        self.credentials
+            .iter()
+            .find(|c| c.matches_token(token))
             .map(|credentials| (credentials, self.target.as_str()))
     }
 }
 
-fn default_as_80() -> String { "80".to_string() }
+fn default_as_80() -> String {
+    "80".to_string()
+}
 
-fn default_as_443() -> String { "443".to_string() }
+fn default_as_443() -> String {
+    "443".to_string()
+}
 
-fn default_as_1935() -> String { "1935".to_string() }
+fn default_as_1935() -> String {
+    "1935".to_string()
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApiProxyServerInfo {
@@ -175,10 +192,17 @@ impl ApiProxyServerInfo {
     }
 
     pub fn get_base_url(&self) -> String {
-        if self.http_port.is_empty() {
-            return format!("{}://{}", self.protocol, self.host)
+        let port = if self.protocol == "https" {
+            &self.https_port
+        } else {
+            &self.http_port
+        };
+        let base_url = format!("{}://{}", self.protocol, self.host);
+        if port.is_empty() {
+            base_url
+        } else {
+            format!("{}:{}", base_url, port)
         }
-        format!("{}://{}:{}", self.protocol, self.host, self.http_port)
     }
 }
 
@@ -201,7 +225,10 @@ impl ApiProxyConfig {
                 if server.name.trim().is_empty() {
                     errors.push("Server info name is empty ".to_owned());
                 } else if name_set.contains(server.name.as_str()) {
-                    errors.push(format!("Non unique server info name found {}", &server.name));
+                    errors.push(format!(
+                        "Non unique server info name found {}",
+                        &server.name
+                    ));
                 } else {
                     name_set.insert(server.name.clone());
                 }
@@ -226,8 +253,15 @@ impl ApiProxyConfig {
                 }
 
                 if let Some(server_info_name) = &user.server {
-                    if !&self.server.iter().any(|server_info| server_info.name.eq(server_info_name)) {
-                        errors.push(format!("No server info with name {} found for user {}", server_info_name, &user.username));
+                    if !&self
+                        .server
+                        .iter()
+                        .any(|server_info| server_info.name.eq(server_info_name))
+                    {
+                        errors.push(format!(
+                            "No server info with name {} found for user {}",
+                            server_info_name, &user.username
+                        ));
                     }
                 }
             }
@@ -235,13 +269,22 @@ impl ApiProxyConfig {
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(M3uFilterError::new(M3uFilterErrorKind::Info, errors.join("\n")))
+            Err(M3uFilterError::new(
+                M3uFilterErrorKind::Info,
+                errors.join("\n"),
+            ))
         }
     }
 
-    pub fn get_target_name(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, String)> {
+    pub fn get_target_name(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Option<(ProxyUserCredentials, String)> {
         for target_user in &self.user {
-            if let Some((credentials, target_name)) = target_user.get_target_name(username, password) {
+            if let Some((credentials, target_name)) =
+                target_user.get_target_name(username, password)
+            {
                 return Some((credentials.clone(), target_name.to_string()));
             };
         }
