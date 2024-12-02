@@ -73,14 +73,14 @@ impl M3uPlaylistIterator {
                 | PlaylistItemType::SeriesInfo
                 | PlaylistItemType::SeriesEpisode => "series",
             };
-            format!("{}/{stream_type}/{}/{}/{}",
+            format!("{}/m3u-stream/{stream_type}/{}/{}/{}",
                 &self.base_url,
                 &self.username,
                 &self.password,
                 m3u_pli.virtual_id
             )
         } else {
-            format!("{}/{}/{}/{}",
+            format!("{}/m3u-stream/{}/{}/{}",
                 &self.base_url, &self.username, &self.password, m3u_pli.virtual_id
             )
         }
