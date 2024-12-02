@@ -208,13 +208,10 @@ async fn xtream_player_api_stream(
     let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
-    match pli.item_type {
-        PlaylistItemType::LiveHls => {
-            let stream_url = pli.url.to_string();
-            debug!("Redirecting stream request to {stream_url}");
-            return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
-        }
-        _ => {}
+    if pli.item_type == PlaylistItemType::LiveHls {
+        let stream_url = pli.url.to_string();
+        debug!("Redirecting stream request to {stream_url}");
+        return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
     }
 
     let query_path = if stream_req.action_path.is_empty() {

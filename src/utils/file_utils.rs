@@ -28,7 +28,7 @@ pub fn get_exe_path() -> PathBuf {
         Ok(exe) => {
             match fs::read_link(&exe) {
                 Ok(f) => f.parent().map_or(default_path, std::path::Path::to_path_buf),
-                Err(_) => return exe.parent().map_or(default_path, std::path::Path::to_path_buf)
+                Err(_) => exe.parent().map_or(default_path, std::path::Path::to_path_buf)
             }
         }
         Err(_) => default_path

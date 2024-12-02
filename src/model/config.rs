@@ -283,7 +283,6 @@ impl ConfigRename {
     }
 }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct ConfigTargetOptions {
     #[serde(default)]
@@ -304,6 +303,8 @@ pub struct ConfigTargetOptions {
     pub xtream_resolve_series: bool,
     #[serde(default = "default_as_two_u16")]
     pub xtream_resolve_series_delay: u16,
+    #[serde(default)]
+    pub m3u_use_type_url: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -412,7 +413,7 @@ impl ConfigTarget {
 
     pub fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
-        return self.t_filter.as_ref().unwrap().filter(provider, &mut processor);
+        self.t_filter.as_ref().unwrap().filter(provider, &mut processor)
     }
 
     pub fn get_m3u_filename(&self) -> Option<&String> {
@@ -858,7 +859,7 @@ impl Config {
         self.t_api_proxy = Arc::new(RwLock::new(api_proxy));
     }
 
-    fn _get_target_for_user(&self, user_target: Option<(ProxyUserCredentials, String)>) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
+    fn intern_get_target_for_user(&self, user_target: Option<(ProxyUserCredentials, String)>) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
         match user_target {
             Some((user, target_name)) => {
                 for source in &self.sources {
@@ -884,11 +885,11 @@ impl Config {
     // }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self._get_target_for_user(api_proxy.get_target_name(username, password)))
+        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(username, password)))
     }
 
     pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self._get_target_for_user(api_proxy.get_target_name_by_token(token)))
+        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name_by_token(token)))
     }
 
     pub fn get_input_by_id(&self, input_id: u16) -> Option<&ConfigInput> {
@@ -1038,7 +1039,7 @@ impl Config {
 /// * `target_args` the program parameters given with `-target` parameter.
 /// * `sources` configured sources in config file
 ///
-pub fn validate_targets(target_args: &Option<Vec<String>>, sources: &Vec<ConfigSource>) -> Result<ProcessTargets, M3uFilterError> {
+pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigSource>) -> Result<ProcessTargets, M3uFilterError> {
     let mut enabled = true;
     let mut inputs: Vec<u16> = vec![];
     let mut targets: Vec<u16> = vec![];

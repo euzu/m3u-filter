@@ -242,9 +242,9 @@ pub struct M3uPlaylistItem {
 }
 
 impl M3uPlaylistItem {
-    pub fn to_m3u(&self, target_options: &Option<ConfigTargetOptions>, url: Option<&str>) -> String {
+    pub fn to_m3u(&self, target_options: Option<&ConfigTargetOptions>, url: Option<&str>) -> String {
         let options = target_options.as_ref();
-        let ignore_logo = options.map_or(false, |o| o.ignore_logo);
+        let ignore_logo = options.is_some_and(|o| o.ignore_logo);
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",
                                self.epg_channel_id.as_ref().map_or("", |o| o.as_ref()),
                                self.name, self.group);
@@ -260,7 +260,7 @@ impl M3uPlaylistItem {
             (time_shift, "timeshift"),
             (rec, "tvg-rec"););
 
-        format!("{},{}\n{}", line, self.title, if url.is_none() { self.url.as_str() } else { url.unwrap() })
+        format!("{},{}\n{}", line, self.title, url.unwrap_or_else(|| self.url.as_str()))
     }
 }
 

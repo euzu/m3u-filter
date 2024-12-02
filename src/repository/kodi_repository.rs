@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::Write;
+use std::sync::LazyLock;
 use chrono::Datelike;
 use log::error;
 use crate::create_m3u_filter_error_result;
@@ -16,9 +17,9 @@ struct KodiStyle {
 }
 
 fn sanitize_for_filename(text: &str, underscore_whitespace: bool) -> String {
-    return text.chars().filter(|c| c.is_alphanumeric() || c.is_whitespace())
+    text.chars().filter(|c| c.is_alphanumeric() || c.is_whitespace())
         .map(|c| if underscore_whitespace { if c.is_whitespace() { '_' } else { c } } else { c })
-        .collect::<String>();
+        .collect::<String>()
 }
 
 fn kodi_style_rename_year(name: &String, style: &KodiStyle) -> (String, Option<String>) {
@@ -67,15 +68,22 @@ fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
     String::from(name)
 }
 
+static KODY_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
+    season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
+    episode: regex::Regex::new(r"[Ee]\d\d").unwrap(),
+    year: regex::Regex::new(r"\d\d\d\d").unwrap(),
+    whitespace: regex::Regex::new(r"\s+").unwrap(),
+});
 
-pub fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: &Option<String>) -> Result<(), M3uFilterError> {
+
+pub fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&String>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write strm playlist failed: ".to_string()));
         }
-        let underscore_whitespace = target.options.as_ref().map_or(false, |o| o.underscore_whitespace);
-        let cleanup = target.options.as_ref().map_or(false, |o| o.cleanup);
-        let kodi_style = target.options.as_ref().map_or(false, |o| o.kodi_style);
+        let underscore_whitespace = target.options.as_ref().is_some_and(|o| o.underscore_whitespace);
+        let cleanup = target.options.as_ref().is_some_and(|o| o.cleanup);
+        let kodi_style = target.options.as_ref().is_some_and(|o| o.kodi_style);
 
         if let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) {
             if cleanup {
@@ -95,13 +103,7 @@ pub fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlis
                     };
                     let mut kodi_file_name = sanitize_for_filename(&header.title, underscore_whitespace);
                     if kodi_style {
-                        let style = KodiStyle {
-                            season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
-                            episode: regex::Regex::new(r"[Ee]\d\d").unwrap(),
-                            year: regex::Regex::new(r"\d\d\d\d").unwrap(),
-                            whitespace: regex::Regex::new(r"\s+").unwrap(),
-                        };
-                        kodi_file_name = kodi_style_rename(&kodi_file_name, &style);
+                        kodi_file_name = kodi_style_rename(&kodi_file_name, &KODY_STYLE);
                     }
                     let file_path = dir_path.join(format!("{kodi_file_name}.strm"));
                     match File::create(&file_path) {

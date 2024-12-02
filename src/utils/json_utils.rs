@@ -72,7 +72,7 @@ pub fn json_filter_file(file_path: &Path, filter: &HashMap<&str, &str>) -> Vec<s
     for entry in json_iter_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
         if let Some(item) = entry.as_object() {
             if filter.iter().all(|(&key, &value)| {
-                item.get(key).map_or(false, |field_value| match field_value {
+                item.get(key).is_some_and(|field_value| match field_value {
                         Value::String(s) => s == value,
                         Value::Number(n) => value.parse::<i64>().ok() == n.as_i64(),
                         _ => false,

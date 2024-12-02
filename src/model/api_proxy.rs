@@ -201,7 +201,7 @@ impl ApiProxyServerInfo {
         if port.is_empty() {
             base_url
         } else {
-            format!("{}:{}", base_url, port)
+            format!("{base_url}:{port}")
         }
     }
 }

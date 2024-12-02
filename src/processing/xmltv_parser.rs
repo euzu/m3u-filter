@@ -19,10 +19,10 @@ impl TVGuide {
                 let mut filter_tags = |tag: XmlTag| {
                     if match tag.name.as_str() {
                         EPG_TAG_CHANNEL => {
-                            tag.get_attribute_value(EPG_ATTRIB_ID).map_or(false, |val| channel_ids.contains(val))
+                            tag.get_attribute_value(EPG_ATTRIB_ID).is_some_and(|val| channel_ids.contains(val))
                         }
                         EPG_TAG_PROGRAMME => {
-                            tag.get_attribute_value(EPG_ATTRIB_CHANNEL).map_or(false, |val| channel_ids.contains(val))
+                            tag.get_attribute_value(EPG_ATTRIB_CHANNEL).is_some_and(|val| channel_ids.contains(val))
                         },
                         EPG_TAG_TV => {
                             tv_attributes.clone_from(&tag.attributes);

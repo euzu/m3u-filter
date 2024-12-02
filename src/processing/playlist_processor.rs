@@ -127,7 +127,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
     }
 }
 
-fn exec_rename(pli: &PlaylistItem, rename: &Option<Vec<config::ConfigRename>>) {
+fn exec_rename(pli: &PlaylistItem, rename: Option<&Vec<config::ConfigRename>>) {
     if let Some(renames) = rename {
         if !renames.is_empty() {
             let result = pli;
@@ -161,7 +161,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                         }
                     }
 
-                    grp.channels.iter_mut().for_each(|pli| exec_rename(pli, &target.rename));
+                    grp.channels.iter_mut().for_each(|pli| exec_rename(pli, target.rename.as_ref()));
                     new_playlist.push(grp);
                 }
                 return Some(new_playlist);
@@ -463,7 +463,7 @@ fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
     sort_order
 }
 
-async fn process_playlist<'a>(playlists: &mut [FetchedPlaylist<'a>],
+async fn process_playlist(playlists: &mut [FetchedPlaylist<'_>],
                               target: &ConfigTarget,
                               cfg: &Config,
                               stats: &mut HashMap<u16, InputStats>,
@@ -546,7 +546,7 @@ pub async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     // print stats
     info!("{}", stats_msg);
     // send stats
-    send_message(&MsgKind::Stats, &cfg.messaging, stats_msg.as_str());
+    send_message(&MsgKind::Stats, cfg.messaging.as_ref(), stats_msg.as_str());
     // log errors
     for err in &errors {
         error!("{}", err.message);
@@ -554,6 +554,6 @@ pub async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
         let error_msg = format!("{{\"errors\": \"{}\"}}", message.as_str());
-        send_message(&MsgKind::Error, &cfg.messaging, error_msg.as_str());
+        send_message(&MsgKind::Error, cfg.messaging.as_ref(), error_msg.as_str());
     }
 }

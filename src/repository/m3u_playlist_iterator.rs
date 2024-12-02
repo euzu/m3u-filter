@@ -11,6 +11,8 @@ use crate::utils::file_lock_manager::FileReadGuard;
 pub struct M3uPlaylistIterator {
     reader: IndexedDocumentReader<M3uPlaylistItem>,
     base_url: String,
+    username: String,
+    password: String,
     target_options: Option<ConfigTargetOptions>,
     proxy_type: ProxyType,
     _file_lock: FileReadGuard,
@@ -26,27 +28,62 @@ impl M3uPlaylistIterator {
         let target_path = ensure_target_storage_path(cfg, target.name.as_str())?;
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
 
-        let file_lock = cfg.file_locks.read_lock(&m3u_path).map_err(|err|
-            M3uFilterError::new(M3uFilterErrorKind::Info, format!("Could not lock document {m3u_path:?}: {err}"))
-        )?;
+        let file_lock = cfg.file_locks.read_lock(&m3u_path).map_err(|err| {
+            M3uFilterError::new(
+                M3uFilterErrorKind::Info,
+                format!("Could not lock document {m3u_path:?}: {err}"),
+            )
+        })?;
 
-        let reader = IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path, &idx_path).map_err(|err|
-            M3uFilterError::new(M3uFilterErrorKind::Info, format!("Could not deserialize file {m3u_path:?} - {err}")))?;
+        let reader =
+            IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path, &idx_path).map_err(|err| {
+                M3uFilterError::new(
+                    M3uFilterErrorKind::Info,
+                    format!("Could not deserialize file {m3u_path:?} - {err}"),
+                )
+            })?;
 
         let server_info = get_user_server_info(cfg, user);
-        let base_url = format!(
-            "{}/m3u-stream/{}/{}",
-            server_info.get_base_url(), user.username, user.password
-        );
-
+        // let base_url = format!(
+        //     "{}/m3u-stream/{}/{}",
+        //     server_info.get_base_url(), user.username, user.password
+        // );
+        //
         Ok(Self {
             reader,
-            base_url,
+            base_url: server_info.get_base_url(),
+            username: user.username.to_string(),
+            password: user.password.to_string(),
             target_options: target.options.clone(),
             proxy_type: user.proxy.clone(),
-            _file_lock: file_lock, // Speichern des Locks in der Struct
+            _file_lock: file_lock, // Save lock inside struct
             started: false,
         })
+    }
+
+    fn get_stream_url(&self, m3u_pli: &M3uPlaylistItem, typed: bool) -> String {
+        if typed {
+            let stream_type = match m3u_pli.item_type {
+                PlaylistItemType::Live
+                | PlaylistItemType::Catchup
+                | PlaylistItemType::LiveUnknown
+                | PlaylistItemType::LiveHls => "live",
+                PlaylistItemType::Video => "movie",
+                PlaylistItemType::Series
+                | PlaylistItemType::SeriesInfo
+                | PlaylistItemType::SeriesEpisode => "series",
+            };
+            format!("{}/{stream_type}/{}/{}/{}",
+                &self.base_url,
+                &self.username,
+                &self.password,
+                m3u_pli.virtual_id
+            )
+        } else {
+            format!("{}/{}/{}/{}",
+                &self.base_url, &self.username, &self.password, m3u_pli.virtual_id
+            )
+        }
     }
 }
 
@@ -62,17 +99,20 @@ impl Iterator for M3uPlaylistIterator {
         self.reader.next().map(|m3u_pli| {
             // TODO hls and unknown reverse proxy
             match m3u_pli.item_type {
-                PlaylistItemType::LiveHls => {
-                    m3u_pli.to_m3u(&self.target_options, None)
-                }
+                PlaylistItemType::LiveHls => m3u_pli.to_m3u(self.target_options.as_ref(), None),
                 _ => match self.proxy_type {
-                    ProxyType::Reverse => {
-                        m3u_pli.to_m3u(&self.target_options, Some(format!("{}/{}", &self.base_url, m3u_pli.virtual_id).as_str()))
-                    }
-                    ProxyType::Redirect => {
-                        m3u_pli.to_m3u(&self.target_options, None)
-                    }
-                }
+                    ProxyType::Reverse => m3u_pli.to_m3u(
+                        self.target_options.as_ref(),
+                        Some(
+                            self.get_stream_url(
+                                &m3u_pli,
+                                self.target_options.as_ref().unwrap().m3u_use_type_url,
+                            )
+                            .as_str(),
+                        ),
+                    ),
+                    ProxyType::Redirect => m3u_pli.to_m3u(self.target_options.as_ref(), None),
+                },
             }
         })
     }

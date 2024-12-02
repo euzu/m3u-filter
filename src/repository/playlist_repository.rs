@@ -47,7 +47,7 @@ pub fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
         let result = match output.target {
             TargetType::M3u => m3u_write_playlist(target, cfg, &target_path, playlist),
             TargetType::Xtream => xtream_write_playlist(target, cfg, playlist),
-            TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, &output.filename),
+            TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, output.filename.as_ref()),
         };
 
         if let Err(err) = result {

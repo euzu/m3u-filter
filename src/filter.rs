@@ -42,7 +42,7 @@ pub struct ValueProvider<'a> {
     pub pli: RefCell<&'a PlaylistItem>,
 }
 
-impl<'a> ValueProvider<'a> {
+impl ValueProvider<'_> {
     fn call(&self, field: &ItemField) -> Rc<String> {
         let pli = *self.pli.borrow();
         get_field_value(pli, field)
@@ -154,7 +154,7 @@ impl Filter {
             }
             Self::TypeComparison(field, item_type) => {
                 let value = provider.call(field);
-                get_filter_item_type(value.as_str()).map_or(false, |pli_type| {
+                get_filter_item_type(value.as_str()).is_some_and(|pli_type| {
                         let is_match = pli_type.eq(item_type);
                         if log_enabled!(Level::Trace) {
                             if is_match {

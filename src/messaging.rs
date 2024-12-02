@@ -18,7 +18,7 @@ fn is_enabled(kind: &MsgKind, cfg: &MessagingConfig) -> bool {
     cfg.notify_on.contains(kind)
 }
 
-pub fn send_message(kind: &MsgKind, cfg: &Option<MessagingConfig>, msg: &str) {
+pub fn send_message(kind: &MsgKind, cfg: Option<&MessagingConfig>, msg: &str) {
     if let Some(messaging) = cfg {
         if is_enabled(kind, messaging) {
             if let Some(telegram) = &messaging.telegram {

@@ -16,7 +16,7 @@ use crate::processing::playlist_processor;
 use crate::utils::{config_reader, download};
 use crate::utils::request_utils::mask_sensitive_info;
 
-fn _save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
+fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
         Ok(()) => {}
         Err(err) => {
@@ -27,7 +27,7 @@ fn _save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_pat
     None
 }
 
-fn _save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Option<M3uFilterError> {
+fn intern_save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Option<M3uFilterError> {
     match config_reader::save_main_config(file_path, backup_dir, cfg) {
         Ok(()) => {}
         Err(err) => {
@@ -47,7 +47,7 @@ async fn save_config_api_proxy_user(
     if let Some(api_proxy) = app_state.config.t_api_proxy.write().unwrap().as_mut() {
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         api_proxy.user = users;
-        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
+        if let Some(err) = intern_save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
         api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.prepare(true));
@@ -63,7 +63,7 @@ async fn save_config_main(
     if cfg.is_valid() {
         let file_path = app_state.config.t_config_file_path.as_str();
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
-        if let Some(err) = _save_config_main(file_path, backup_dir, &cfg) {
+        if let Some(err) = intern_save_config_main(file_path, backup_dir, &cfg) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
         HttpResponse::Ok().finish()
@@ -85,7 +85,7 @@ async fn save_config_api_proxy_config(
     if let Some(api_proxy) = app_state.config.t_api_proxy.write().unwrap().as_mut() {
         api_proxy.server = req_api_proxy;
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
-        if let Some(err) = _save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
+        if let Some(err) = intern_save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
             return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
         }
     }
@@ -98,7 +98,7 @@ async fn playlist_update(
 ) -> HttpResponse {
     let targets = req.0;
     let user_targets = if targets.is_empty() { None } else { Some(targets) };
-    let process_targets = validate_targets(&user_targets, &app_state.config.sources);
+    let process_targets = validate_targets(user_targets.as_ref(), &app_state.config.sources);
     match process_targets {
         Ok(valid_targets) => {
             actix_rt::spawn(playlist_processor::exec_processing(Arc::clone(&app_state.config), Arc::new(valid_targets)));

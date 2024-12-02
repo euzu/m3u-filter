@@ -83,5 +83,8 @@ pub fn m3u_api_register(cfg: &mut web::ServiceConfig) {
         .service(web::resource("/get.php").route(web::post().to(m3u_api_get)).route(web::post().to(m3u_api_post)))
         .service(web::resource("/apiget").route(web::get().to(m3u_api_get)).route(web::post().to(m3u_api_post)))
         .service(web::resource("/m3u").route(web::get().to(m3u_api_get)).route(web::post().to(m3u_api_post)))
+        .service(web::resource("/m3u-stream/live/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream)))
+        .service(web::resource("/m3u-stream/movie/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream)))
+        .service(web::resource("/m3u-stream/series/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream)))
         .service(web::resource("/m3u-stream/{username}/{password}/{stream_id}").route(web::get().to(m3u_api_stream)));
 }

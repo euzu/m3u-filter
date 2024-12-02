@@ -19,11 +19,15 @@ Content-Type: application/json
 ### m3u playlist
 GET http://localhost:8901/m3u?username=xt&password=xt
 
-### m3u playlist
+### m3u playlist - form auth
 POST http://localhost:8901/player_api.php
 Content-Type: application/x-www-form-urlencoded
 
 username=xt&password=xt
+
+### m3u playlist reverse
+GET http://localhost:8901/m3u?username=xtream&password=xtream.secret
+
 
 ### xtream live_categories
 GET http://localhost:8901/player_api.php?action=get_live_categories&username=xt&password=xt

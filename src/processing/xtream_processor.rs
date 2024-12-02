@@ -4,7 +4,7 @@ use crate::model::playlist::FetchedPlaylist;
 use crate::processing::playlist_processor::ProcessingPipe;
 use crate::utils::download;
 
-pub async fn playlist_resolve_series<'a>(target: &ConfigTarget, errors: &mut Vec<M3uFilterError>,
+pub async fn playlist_resolve_series(target: &ConfigTarget, errors: &mut Vec<M3uFilterError>,
                                      pipe: &ProcessingPipe,
                                      fpl: &mut FetchedPlaylist<'_>,
                                      new_fpl: &mut FetchedPlaylist<'_>) {

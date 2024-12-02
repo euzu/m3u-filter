@@ -33,7 +33,7 @@ pub async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &S
     }
 }
 
-pub async fn get_xtream_playlist_series<'a>(fpl: &mut FetchedPlaylist<'a>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
+pub async fn get_xtream_playlist_series(fpl: &mut FetchedPlaylist<'_>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
     let input = fpl.input;
     let mut result: Vec<PlaylistGroup> = vec![];
     for plg in &mut fpl.playlistgroups {

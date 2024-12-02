@@ -358,24 +358,6 @@ Each format has 2 properties
 `type` is _mandatory_  for `m3u`, `strm` and `xtream`.  
 `filename` is _mandatory_ if type is `strm`. if type is `m3u` the plain m3u file is written but it is not used by `m3u-filter`.
 
-`strm` output has additional options
-- `underscore_whitespace`
-- `cleanup`
-- `kodi_style`.
-
-`xtream` output has additional options
-- `xtream_skip_live_direct_source`  if true the direct_source property from provider for live is ignored
-- `xtream_skip_video_direct_source`  if true the direct_source property from provider for movies is ignored
-- `xtream_skip_series_direct_source`  if true the direct_source property from provider for series is ignored
-
-`m3u` output has additional options
-Because xtream api delivers only the metadata to series, we need to fetch the series and resolve them. But be aware,
-each series info entry needs to be fetched one by one. 
-- `xtream_resolve_series` if is set to `true` and you have xtream input and m3u output, the series are fetched and resolved.
-This can cause a lot of requests to the provider. Be cautious when using this option.  
-- `xtream_resolve_series_delay` to avoid a provider ban you can set the seconds between series_info_request's. Default is 2 seconds.
-But be aware that the more series entries there are, the longer the process takes. 
-
 ```yaml
 output:
   - type: m3u
@@ -387,17 +369,30 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 `processing_order: frm` (valid values are: frm, fmr, rfm, rmf, mfr, mrf. default is frm)
 
 ### 2.2.2.4 `options`
-- ignore_logo `true` or `false`
-- underscore_whitespace `true` or `false`
-- cleanup `true` or `false`
-- kodi_style `true` or `false`
+Target options are:
 
-`underscore_whitespace`, `cleanup` and `kodi_style` are only valid for `strm` output.
+- `ingore_logo` logo attributes are ignored to avoid caching logo files on devices.
 
-- `ingore_log` logo attributes are ignored to avoid caching logo files on devices.
+`strm` output has additional options
 - `underscore_whitespace` replaces all whitespaces with `_` in the path.
 - `cleanup` deletes the directory given at `filename`.
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
+
+`m3u` output has additional options
+- `m3u_use_type_url`, default false, if true adds the stream type `live`, `movie`, `series` to the url of the stream in reverse proxy mode.
+
+`xtream` output has additional options
+- `xtream_skip_live_direct_source`  if true the direct_source property from provider for live is ignored
+- `xtream_skip_video_direct_source`  if true the direct_source property from provider for movies is ignored
+- `xtream_skip_series_direct_source`  if true the direct_source property from provider for series is ignored
+
+Because xtream api delivers only the metadata to series, we need to fetch the series and resolve them. But be aware,
+each series info entry needs to be fetched one by one.
+- `xtream_resolve_series` if is set to `true` and you have xtream input and m3u output, the series are fetched and resolved.
+  This can cause a lot of requests to the provider. Be cautious when using this option.
+- `xtream_resolve_series_delay` to avoid a provider ban you can set the seconds between series_info_request's. Default is 2 seconds.
+  But be aware that the more series entries there are, the longer the process takes.
+
 
 ### 2.2.2.5 `filter`
 The filter is a string with a filter statement.

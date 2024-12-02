@@ -39,7 +39,7 @@ fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlis
                     let mut buf_writer = BufWriter::new(file);
                     let _ = buf_writer.write(b"#EXTM3U\n");
                     for m3u in m3u_playlist {
-                        let _ = buf_writer.write(m3u.to_m3u(&target.options, None).as_bytes());
+                        let _ = buf_writer.write(m3u.to_m3u(target.options.as_ref(), None).as_bytes());
                         let _ = buf_writer.write(b"\n");
                     }
                 }
