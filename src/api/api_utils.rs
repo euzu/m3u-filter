@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path};
 use actix_web::http::header::{CACHE_CONTROL, HeaderValue};
 use actix_web::{HttpRequest, HttpResponse, web};
-use log::{debug, error};
+use log::{debug, error, log_enabled, Level};
 use url::Url;
 use crate::api::api_model::{AppState, UserApiRequest};
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials};
@@ -51,7 +51,9 @@ pub fn get_user_server_info(cfg: &Config, user: &ProxyUserCredentials) -> ApiPro
 
 pub async fn stream_response(stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
     let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
-    debug!("Try to open stream {}", mask_sensitive_info(stream_url));
+    if log_enabled!(Level::Debug) {
+        debug!("Try to open stream {}", mask_sensitive_info(stream_url));
+    }
     if let Ok(url) = Url::parse(stream_url) {
         let client = request_utils::get_client_request(input, &url, Some(&req_headers));
         match client.send().await {
@@ -63,7 +65,9 @@ pub async fn stream_response(stream_url: &str, req: &HttpRequest, input: Option<
                     });
                     return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
                 }
-                debug!("Failed to open stream got status {} for {}", response.status(), mask_sensitive_info(stream_url));
+                if log_enabled!(Level::Debug) {
+                    debug!("Failed to open stream got status {} for {}", response.status(), mask_sensitive_info(stream_url));
+                }
             }
             Err(err) => {
                 error!("Received failure from server {}:  {}", mask_sensitive_info(stream_url), err);

@@ -1,5 +1,5 @@
 use actix_web::{HttpRequest, HttpResponse, web};
-use log::{error};
+use log::{debug, error};
 use futures::{stream};
 use bytes::Bytes;
 
@@ -64,7 +64,7 @@ async fn m3u_api_stream(
                             Ok(m3u_item) => {
                                 if user.proxy == ProxyType::Redirect {
                                     let stream_url = m3u_item.url;
-                                    // debug!("Redirecting stream request to {stream_url}");
+                                    debug!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
                                     return HttpResponse::Found().insert_header(("Location", stream_url.to_string())).finish();
                                 }
                                 return stream_response(m3u_item.url.as_str(), &req, None).await;

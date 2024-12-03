@@ -10,7 +10,7 @@ use actix_web::{HttpRequest, HttpResponse, web};
 use bytes::Bytes;
 use futures::Stream;
 use futures::stream::{self, StreamExt};
-use log::{debug, error};
+use log::{debug, error, log_enabled, Level};
 use serde_json::{Map, Value};
 
 use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse};
@@ -210,7 +210,9 @@ async fn xtream_player_api_stream(
 
     if pli.item_type == PlaylistItemType::LiveHls {
         let stream_url = pli.url.to_string();
-        // debug!("Redirecting stream request to {stream_url}");
+        if log_enabled!(Level::Debug) {
+            debug!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
+        }
         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
     }
 
@@ -220,13 +222,17 @@ async fn xtream_player_api_stream(
         format!("{}/{}{stream_ext}", stream_req.action_path, pli.provider_id)
     };
 
-    let stream_url =  try_option_bad_request!(get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()), true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
-
     if user.proxy == ProxyType::Redirect {
-        // debug!("Redirecting stream request to {stream_url}");
-        return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
+        if log_enabled!(Level::Debug) {
+            debug!("Redirecting stream request to {}", mask_sensitive_info(&pli.url));
+        }
+        return HttpResponse::Found().insert_header(("Location", mask_sensitive_info(pli.url.as_str()))).finish();
     }
 
+    let stream_url =  try_option_bad_request!(get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()), true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
+    if log_enabled!(Level::Debug) {
+        debug!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
+    }
     stream_response(&stream_url, req, Some(input)).await
 }
 

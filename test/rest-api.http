@@ -29,6 +29,9 @@ username=xt&password=xt
 GET http://localhost:8901/m3u?username=xtream&password=xtream.secret
 
 
+### xtream login
+GET http://localhost:8901/player_api.php?username=xt&password=xt
+
 ### xtream live_categories
 GET http://localhost:8901/player_api.php?action=get_live_categories&username=xt&password=xt
 
