@@ -11,11 +11,11 @@ use crate::repository::m3u_repository::{m3u_get_file_paths, m3u_get_item_for_str
 use crate::repository::storage::get_target_storage_path;
 use crate::utils::request_utils::mask_sensitive_info;
 
-async fn m3u_api(
-    api_req: UserApiRequest,
-    app_state: web::Data<AppState>,
+fn m3u_api(
+    api_req: &UserApiRequest,
+    app_state: &AppState,
 ) -> HttpResponse {
-    match get_user_target(&api_req, &app_state) {
+    match get_user_target(api_req, app_state) {
         Some((user, target)) => {
             match m3u_load_rewrite_playlist(&app_state.config, target, &user) {
                 Ok(m3u_iter) => {
@@ -38,13 +38,13 @@ async fn m3u_api(
 async fn m3u_api_get(    api_req: web::Query<UserApiRequest>,
                          app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    m3u_api(api_req.into_inner(), app_state).await
+    m3u_api(&api_req.into_inner(), &app_state)
 }
 async fn m3u_api_post(
     api_req: web::Form<UserApiRequest>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    m3u_api(api_req.into_inner(), app_state).await
+    m3u_api(&api_req.into_inner(), &app_state)
 }
 
 async fn m3u_api_stream(

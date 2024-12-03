@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path};
 use actix_web::http::header::{CACHE_CONTROL, HeaderValue};
-use actix_web::{HttpRequest, HttpResponse, web};
+use actix_web::{HttpRequest, HttpResponse};
 use log::{debug, error, log_enabled, Level};
 use url::Url;
 use crate::api::api_model::{AppState, UserApiRequest};
@@ -24,7 +24,7 @@ pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mi
 }
 
 pub fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a UserApiRequest,
-                                                 app_state: &'a web::Data<AppState>) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
+                                                 app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() && !password.is_empty() {
         app_state.config.get_target_for_user(username, password)
     } else {
@@ -37,7 +37,7 @@ pub fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_re
     }
 }
 
-pub fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a web::Data<AppState>) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
+pub fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     let username = api_req.username.as_str().trim();
     let password = api_req.password.as_str().trim();
     get_user_target_by_credentials(username, password, api_req, app_state)
