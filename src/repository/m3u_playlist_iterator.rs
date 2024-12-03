@@ -14,6 +14,8 @@ pub struct M3uPlaylistIterator {
     username: String,
     password: String,
     target_options: Option<ConfigTargetOptions>,
+    mask_redirect_url: bool,
+    include_type_in_url: bool,
     proxy_type: ProxyType,
     _file_lock: FileReadGuard,
     started: bool,
@@ -43,18 +45,19 @@ impl M3uPlaylistIterator {
                 )
             })?;
 
+        let target_options = target.options.as_ref();
+        let include_type_in_url = target_options.map_or(false, |opts| opts.m3u_include_type_in_url);
+        let mask_redirect_url = target_options.map_or(false, |opts| opts.m3u_mask_redirect_url);
+
         let server_info = get_user_server_info(cfg, user);
-        // let base_url = format!(
-        //     "{}/m3u-stream/{}/{}",
-        //     server_info.get_base_url(), user.username, user.password
-        // );
-        //
         Ok(Self {
             reader,
             base_url: server_info.get_base_url(),
             username: user.username.to_string(),
             password: user.password.to_string(),
             target_options: target.options.clone(),
+            include_type_in_url,
+            mask_redirect_url,
             proxy_type: user.proxy.clone(),
             _file_lock: file_lock, // Save lock inside struct
             started: false,
@@ -74,14 +77,14 @@ impl M3uPlaylistIterator {
                 | PlaylistItemType::SeriesEpisode => "series",
             };
             format!("{}/m3u-stream/{stream_type}/{}/{}/{}",
-                &self.base_url,
-                &self.username,
-                &self.password,
-                m3u_pli.virtual_id
+                    &self.base_url,
+                    &self.username,
+                    &self.password,
+                    m3u_pli.virtual_id
             )
         } else {
             format!("{}/m3u-stream/{}/{}/{}",
-                &self.base_url, &self.username, &self.password, m3u_pli.virtual_id
+                    &self.base_url, &self.username, &self.password, m3u_pli.virtual_id
             )
         }
     }
@@ -96,24 +99,27 @@ impl Iterator for M3uPlaylistIterator {
             return Some("#EXTM3U".to_string());
         }
 
+        // TODO hls and unknown reverse proxy
         self.reader.next().map(|m3u_pli| {
-            // TODO hls and unknown reverse proxy
-            match m3u_pli.item_type {
-                PlaylistItemType::LiveHls => m3u_pli.to_m3u(self.target_options.as_ref(), None),
-                _ => match self.proxy_type {
-                    ProxyType::Reverse => m3u_pli.to_m3u(
-                        self.target_options.as_ref(),
-                        Some(
-                            self.get_stream_url(
-                                &m3u_pli,
-                                self.target_options.as_ref().unwrap().m3u_use_type_url,
-                            )
-                            .as_str(),
-                        ),
-                    ),
-                    ProxyType::Redirect => m3u_pli.to_m3u(self.target_options.as_ref(), None),
-                },
-            }
+            let stream_url = match m3u_pli.item_type {
+                PlaylistItemType::LiveHls => None,
+                _ => match &self.proxy_type {
+                    ProxyType::Reverse => Some(self.get_stream_url(
+                        &m3u_pli,
+                        self.include_type_in_url,
+                    )),
+                    ProxyType::Redirect => if self.mask_redirect_url {
+                        Some(self.get_stream_url(
+                            &m3u_pli,
+                            self.include_type_in_url,
+                        ))
+                    } else {
+                        None
+                    }
+                }
+            };
+            let target_options = self.target_options.as_ref();
+            m3u_pli.to_m3u(target_options, stream_url.as_deref())
         })
     }
 }

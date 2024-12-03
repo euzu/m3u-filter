@@ -1,6 +1,7 @@
 # Changelog
 # 2.0.10 (2024-12-xx)
-- added Target Output Option `m3u_use_type_url`, default false. This adds `live`, `movie`, `series` to the url of the stream in reverse proxy mode. 
+- added Target Output Option `m3u_include_type_in_url`, default false. This adds `live`, `movie`, `series` to the url of the stream in reverse proxy mode.
+- added Target Output Option `m3u_mask_redirect_url`, default false. The urls are pointed to m3u-filter in redirect mode. In stream request a redirect response is send. Usefully if you want to track calls in redirect mode.  
 
 # 2.0.9 (2024-12-01)
 - Fixed api proxy server url bug

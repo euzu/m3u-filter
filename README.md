@@ -379,7 +379,8 @@ Target options are:
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 
 `m3u` output has additional options
-- `m3u_use_type_url`, default false, if true adds the stream type `live`, `movie`, `series` to the url of the stream in reverse proxy mode.
+- `m3u_include_type_in_url`, default false, if true adds the stream type `live`, `movie`, `series` to the url of the stream.
+- `m3u_mask_redirect_url`, default false, if true uses urls from `api_proxy.yml` for user in proxy mode `redirect`.
 
 `xtream` output has additional options
 - `xtream_skip_live_direct_source`  if true the direct_source property from provider for live is ignored

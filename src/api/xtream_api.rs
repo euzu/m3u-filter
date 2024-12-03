@@ -210,7 +210,7 @@ async fn xtream_player_api_stream(
 
     if pli.item_type == PlaylistItemType::LiveHls {
         let stream_url = pli.url.to_string();
-        debug!("Redirecting stream request to {stream_url}");
+        // debug!("Redirecting stream request to {stream_url}");
         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
     }
 
@@ -223,7 +223,7 @@ async fn xtream_player_api_stream(
     let stream_url =  try_option_bad_request!(get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()), true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
     if user.proxy == ProxyType::Redirect {
-        debug!("Redirecting stream request to {stream_url}");
+        // debug!("Redirecting stream request to {stream_url}");
         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
     }
 
