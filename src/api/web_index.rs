@@ -4,8 +4,7 @@ use std::path::{Path, PathBuf};
 use actix_files::NamedFile;
 use actix_web::{HttpRequest, HttpResponse, web};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
-
-use crate::api::api_model::AppState;
+use crate::api::model::app_state::AppState;
 use crate::auth::authenticator::{create_jwt, verify_token};
 use crate::auth::password::verify_password;
 use crate::auth::user::UserCredential;

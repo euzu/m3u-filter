@@ -10,8 +10,9 @@ use quick_xml::events::{BytesStart, Event};
 use std::io::{BufReader};
 use chrono::{Duration, NaiveDateTime, TimeDelta};
 
-use crate::api::api_model::{AppState, UserApiRequest};
 use crate::api::api_utils::{get_user_target, serve_file};
+use crate::api::model::app_state::AppState;
+use crate::api::model::request::UserApiRequest;
 use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::config::TargetType;

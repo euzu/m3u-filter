@@ -4,8 +4,9 @@ use core::cmp::Ordering;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::thread;
+use async_std::sync::{Mutex};
 
 use actix_rt::System;
 use log::{debug, error, info, log_enabled, trace, Level};
@@ -391,11 +392,11 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
         if process_parallel {
             let handles = &mut handle_list;
             let process = move || {
-                let (mut res_stats, mut res_errors) = System::new().block_on(async {
-                    process_source(cfg, index, usr_trgts).await
+                System::new().block_on(async {
+                    let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
+                    shared_errors.lock().await.append(&mut res_errors);
+                    shared_stats.lock().await.append(&mut res_stats);
                 });
-                shared_errors.lock().unwrap().append(&mut res_errors);
-                shared_stats.lock().unwrap().append(&mut res_stats);
             };
             handles.push(thread::spawn(process));
             if handles.len() >= thread_num as usize {
@@ -403,14 +404,14 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
             }
         } else {
             let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
-            shared_errors.lock().unwrap().append(&mut res_errors);
-            shared_stats.lock().unwrap().append(&mut res_stats);
+            shared_errors.lock().await.append(&mut res_errors);
+            shared_stats.lock().await.append(&mut res_stats);
         }
     }
     for handle in handle_list {
         let _ = handle.join();
     }
-    (Arc::try_unwrap(stats).unwrap().into_inner().unwrap(), Arc::try_unwrap(errors).unwrap().into_inner().unwrap())
+    (Arc::try_unwrap(stats).unwrap().into_inner(), Arc::try_unwrap(errors).unwrap().into_inner())
 }
 
 pub type ProcessingPipe = Vec<fn(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>>>;
@@ -521,7 +522,7 @@ async fn process_playlist(playlists: &mut [FetchedPlaylist<'_>],
         sort_playlist(target, &mut flat_new_playlist);
         map_playlist_counter(target, &flat_new_playlist);
         process_watch(target, cfg, &flat_new_playlist);
-        persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg)
+        persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg).await
     }
 }
 

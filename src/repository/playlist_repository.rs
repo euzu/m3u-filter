@@ -10,7 +10,7 @@ use crate::repository::storage::{ensure_target_storage_path, get_target_id_mappi
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
 
-pub fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
+pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
                         target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
     let target_path = match ensure_target_storage_path(cfg, &target.name) {
@@ -19,7 +19,7 @@ pub fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     };
 
     let target_id_mapping_file = get_target_id_mapping_file(&target_path);
-    let _file_lock = match cfg.file_locks.write_lock(&target_id_mapping_file) {
+    let _file_lock = match cfg.file_locks.write_lock(&target_id_mapping_file).await {
         Ok(lock) => lock,
         Err(err) => {
             errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
@@ -45,8 +45,8 @@ pub fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
 
     for output in &target.output {
         let result = match output.target {
-            TargetType::M3u => m3u_write_playlist(target, cfg, &target_path, playlist),
-            TargetType::Xtream => xtream_write_playlist(target, cfg, playlist),
+            TargetType::M3u => m3u_write_playlist(target, cfg, &target_path, playlist).await,
+            TargetType::Xtream => xtream_write_playlist(target, cfg, playlist).await,
             TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, output.filename.as_ref()),
         };
 

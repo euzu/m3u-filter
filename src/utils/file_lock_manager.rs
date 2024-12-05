@@ -1,7 +1,8 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc};
 use std::{fmt, io};
 use std::path::{Path, PathBuf};
+use async_std::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Clone)]
 pub struct FileLockManager {
@@ -16,30 +17,28 @@ impl FileLockManager {
     }
 
     // Acquires a read lock for the specified file and returns a FileReadGuard.
-    pub fn read_lock(&self, path: &Path) -> io::Result<FileReadGuard> {
-        let file_lock = self.get_or_create_lock(path)?;
-        let guard = file_lock.read().map_err(|_| {
-            io::Error::new(io::ErrorKind::Other, "Failed to acquire read lock")
+    pub async fn read_lock(&self, path: &Path) -> io::Result<FileReadGuard> {
+        let file_lock = self.get_or_create_lock(path).await.map_err(|_| {
+            io::Error::new(io::ErrorKind::Other, "Failed to acquire write lock")
         })?;
+        let guard = file_lock.read().await;
         // Clone the Arc to avoid moving `file_lock` out, as it is still borrowed by `guard`
         Ok(FileReadGuard::new(Arc::clone(&file_lock), guard))
     }
 
     // Acquires a write lock for the specified file and returns a FileWriteGuard.
-    pub fn write_lock(&self, path: &Path) -> io::Result<FileWriteGuard> {
-        let file_lock = self.get_or_create_lock(path)?;
-        let guard = file_lock.write().map_err(|_| {
+    pub async fn write_lock(&self, path: &Path) -> io::Result<FileWriteGuard> {
+        let file_lock = self.get_or_create_lock(path).await.map_err(|_| {
             io::Error::new(io::ErrorKind::Other, "Failed to acquire write lock")
         })?;
+        let guard = file_lock.write().await;
         // Clone the Arc to avoid moving `file_lock` out, as it is still borrowed by `guard`
         Ok(FileWriteGuard::new(Arc::clone(&file_lock), guard))
     }
 
     // Helper function: retrieves or creates a lock for a file.
-    fn get_or_create_lock(&self, path: &Path) -> io::Result<Arc<RwLock<()>>> {
-        let mut locks = self.locks.lock().map_err(|_| {
-            io::Error::new(io::ErrorKind::Other, "Failed to acquire lock on lock manager")
-        })?;
+   async fn get_or_create_lock(&self, path: &Path) -> io::Result<Arc<RwLock<()>>> {
+        let mut locks = self.locks.lock().await;
 
         if let Some(lock) = locks.get(path) {
             return Ok(lock.clone());
@@ -61,7 +60,7 @@ impl Default for FileLockManager {
 impl fmt::Debug for FileLockManager {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FileLockManager")
-            .field("locks", &self.locks.lock().unwrap().keys().collect::<Vec<_>>())
+            // .field("locks", &self.locks.lock().await.keys().collect::<Vec<_>>())
             .finish()
     }
 }

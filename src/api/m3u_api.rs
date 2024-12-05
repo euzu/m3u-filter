@@ -4,20 +4,21 @@ use futures::{stream};
 use bytes::Bytes;
 
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, stream_response};
-use crate::api::api_model::{AppState, UserApiRequest};
+use crate::api::model::app_state::AppState;
+use crate::api::model::request::UserApiRequest;
 use crate::model::api_proxy::ProxyType;
 use crate::model::config::TargetType;
 use crate::repository::m3u_repository::{m3u_get_file_paths, m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
 use crate::repository::storage::get_target_storage_path;
 use crate::utils::request_utils::mask_sensitive_info;
 
-fn m3u_api(
+async fn m3u_api(
     api_req: &UserApiRequest,
     app_state: &AppState,
 ) -> HttpResponse {
     match get_user_target(api_req, app_state) {
         Some((user, target)) => {
-            match m3u_load_rewrite_playlist(&app_state.config, target, &user) {
+            match m3u_load_rewrite_playlist(&app_state.config, target, &user).await {
                 Ok(m3u_iter) => {
                     // Convert the iterator into a stream of `Bytes`
                     let content_stream = stream::iter(m3u_iter.map(|line| Ok::<Bytes, String>(Bytes::from(format!("{line}\n")))));
@@ -38,13 +39,13 @@ fn m3u_api(
 async fn m3u_api_get(    api_req: web::Query<UserApiRequest>,
                          app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    m3u_api(&api_req.into_inner(), &app_state)
+    m3u_api(&api_req.into_inner(), &app_state).await
 }
 async fn m3u_api_post(
     api_req: web::Form<UserApiRequest>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    m3u_api(&api_req.into_inner(), &app_state)
+    m3u_api(&api_req.into_inner(), &app_state).await
 }
 
 async fn m3u_api_stream(
@@ -60,14 +61,14 @@ async fn m3u_api_stream(
                 match get_target_storage_path(&app_state.config, target.name.as_str()) {
                     Some(target_path) => {
                         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
-                        match m3u_get_item_for_stream_id(&app_state.config, m3u_stream_id, &m3u_path, &idx_path) {
+                        match m3u_get_item_for_stream_id(&app_state.config, m3u_stream_id, &m3u_path, &idx_path).await  {
                             Ok(m3u_item) => {
                                 if user.proxy == ProxyType::Redirect {
                                     let stream_url = m3u_item.url;
                                     debug!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
                                     return HttpResponse::Found().insert_header(("Location", stream_url.to_string())).finish();
                                 }
-                                return stream_response(m3u_item.url.as_str(), &req, None).await;
+                                return stream_response(&app_state, m3u_item.url.as_str(), &req, None).await;
                             }
                             Err(err) => {
                                 error!("Failed to get m3u url: {}", mask_sensitive_info(err.to_string().as_str()));

@@ -4,7 +4,7 @@ use actix_web::web::Data;
 use chrono::{DateTime, FixedOffset, Local};
 use cron::Schedule;
 use log::error;
-use crate::api::api_model::AppState;
+use crate::api::model::app_state::AppState;
 use crate::exit;
 use crate::processing::playlist_processor::exec_processing;
 

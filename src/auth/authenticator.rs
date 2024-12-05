@@ -2,8 +2,8 @@ use actix_web::{dev::ServiceRequest, Error, web};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use chrono::{Local, Duration};
 use jsonwebtoken::{Algorithm, DecodingKey, encode, decode, EncodingKey, Header, Validation};
-use crate::api::api_model::AppState;
 use crate::model::config::WebAuthConfig;
+use crate::api::model::app_state::AppState;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Claims {

@@ -22,7 +22,7 @@ pub struct M3uPlaylistIterator {
 }
 
 impl M3uPlaylistIterator {
-    pub fn new(
+    pub async fn new(
         cfg: &Config,
         target: &ConfigTarget,
         user: &ProxyUserCredentials,
@@ -30,7 +30,7 @@ impl M3uPlaylistIterator {
         let target_path = ensure_target_storage_path(cfg, target.name.as_str())?;
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
 
-        let file_lock = cfg.file_locks.read_lock(&m3u_path).map_err(|err| {
+        let file_lock = cfg.file_locks.read_lock(&m3u_path).await.map_err(|err| {
             M3uFilterError::new(
                 M3uFilterErrorKind::Info,
                 format!("Could not lock document {m3u_path:?}: {err}"),

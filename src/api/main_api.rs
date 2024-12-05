@@ -1,15 +1,16 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, RwLock};
-
+use std::sync::{Arc};
 use actix_cors::Cors;
-use actix_web::{App, HttpResponse, HttpServer, web};
-use actix_web::middleware::{Logger};
+use actix_web::middleware::Logger;
+use actix_web::{web, App, HttpResponse, HttpServer};
+use async_std::sync::{RwLock, Mutex};
 use log::info;
 
-use crate::api::api_model::{AppState, DownloadQueue};
 use crate::api::m3u_api::m3u_api_register;
+use crate::api::model::app_state::AppState;
+use crate::api::model::download::DownloadQueue;
 use crate::api::scheduler::start_scheduler;
 use crate::api::v1_api::v1_api_register;
 use crate::api::web_index::index_register;
@@ -32,10 +33,10 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
 
 async fn healthcheck() -> HttpResponse {
     let ts = chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    HttpResponse::Ok().json( Healthcheck {
+    HttpResponse::Ok().json(Healthcheck {
         status: "ok".to_string(),
         version: VERSION.to_string(),
-        time: ts
+        time: ts,
     })
 }
 
@@ -59,6 +60,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
             active: Arc::from(RwLock::new(None)),
             finished: Arc::from(RwLock::new(Vec::new())),
         }),
+        shared_streams: Arc::new(Mutex::new(HashMap::new())),
     });
 
     // Scheduler
