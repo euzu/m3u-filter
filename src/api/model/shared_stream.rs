@@ -1,22 +1,23 @@
-use futures::stream::{Stream};
+use bytes::Bytes;
+use futures::channel::oneshot::{channel, Receiver, Sender};
+use futures::stream::Stream;
+use futures::StreamExt;
+use std::sync::atomic::AtomicU32;
+use std::sync::Arc;
 use std::{
     error::Error as StdError,
     pin::Pin,
     task::{Context, Poll},
 };
-use std::sync::atomic::AtomicU32;
-use bytes::Bytes;
-use futures::channel::oneshot::{channel, Receiver, Sender};
-use futures::StreamExt;
 
 pub struct NotifyStream<S> {
     stream: S,
     tx: Option<Sender<()>>,
 }
 
-impl<S, E> NotifyStream<S>
+impl<S, T, E> NotifyStream<S>
 where
-    S: Stream<Item = Result<Bytes, E>>
+    S: Stream<Item=Result<T, E>>,
 {
     pub fn new(stream: S) -> (Self, Receiver<()>) {
         let (send, recv) = channel();
@@ -27,8 +28,9 @@ where
     }
 }
 
-impl<S, E> Stream for NotifyStream<S> where
-    S: Stream<Item = Result<Bytes, E>> + Unpin,
+impl<S, T, E> Stream for NotifyStream<S>
+where
+    S: Stream<Item=Result<T, E>> + Unpin,
     E: Into<Box<dyn StdError>> + 'static,
 {
     type Item = S::Item;
@@ -61,49 +63,7 @@ impl<S, E> Stream for NotifyStream<S> where
 }
 
 pub struct SharedStream {
-    pub data_stream: Pin<Box<dyn Stream<Item = Result<Bytes, reqwest::Error>>>>,
+    pub data_stream: Arc<tokio::sync::broadcast::Sender<Bytes>>,
     pub client_count: AtomicU32,
 }
-
-//
-// async fn stream_handler(
-//     state: web::Data<SharedState>,
-//     _req: HttpRequest,
-// ) -> impl Responder {
-//     let mut shared_state = state.lock().unwrap();
-//
-//     // Check if a shared resource already exists
-//     if let Some(resource) = shared_state.as_mut() {
-//         // Increment client count
-//         resource.client_count += 1;
-//
-//         // Create a stream for this client
-//         let client_stream = resource.data_stream.clone();
-//         return HttpResponse::Ok().streaming(client_stream);
-//     }
-//
-//     // If no shared resource, create one
-//     let data_stream = crate::api::model::shared_stream::create_data_stream(); // Replace with your actual stream logic
-//     let boxed_stream = Box::pin(data_stream);
-//
-//     *shared_state = Some(SharedStream {
-//         data_stream: boxed_stream.clone(),
-//         client_count: 1,
-//     });
-//
-//     // Respond with the stream for this client
-//     HttpResponse::Ok().streaming(boxed_stream)
-// }
-//
-//
-// async fn cleanup_on_disconnect(state: web::Data<SharedState>) {
-//     let mut shared_state = state.lock().unwrap();
-//     if let Some(resource) = shared_state.as_mut() {
-//         resource.client_count -= 1;
-//         if resource.client_count == 0 {
-//             // Drop the shared resource if no clients are left
-//             *shared_state = None;
-//         }
-//     }
-// }
 

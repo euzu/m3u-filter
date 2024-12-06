@@ -7,10 +7,15 @@ use crate::utils::request_utils;
 use crate::utils::request_utils::mask_sensitive_info;
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
+use async_std::prelude::Stream;
+use async_std::stream::StreamExt;
+use bytes::Bytes;
 use log::{debug, error, log_enabled, Level};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::AtomicU32;
+use std::sync::Arc;
+use tokio_stream::wrappers::BroadcastStream;
 use url::Url;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
@@ -52,60 +57,86 @@ pub fn get_user_server_info(cfg: &Config, user: &ProxyUserCredentials) -> ApiPro
     server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), std::clone::Clone::clone)
 }
 
+async fn create_notify_stream(app_state: &AppState, stream_url: &str) -> Option<NotifyStream<BroadcastStream<Bytes>>> {
+    let notify_stream_url = stream_url.to_string();
+    let shared_streams_map = app_state.shared_streams.clone();
+    let shared_streams = shared_streams_map.lock().await;
+    if let Some(shared_stream) = shared_streams.get(&notify_stream_url) {
+        let rx = shared_stream.data_stream.subscribe();
+        drop(shared_streams);
+        let (stream, notify) = NotifyStream::new(tokio_stream::wrappers::BroadcastStream::new(rx));
+        actix_rt::spawn(async move {
+            let _ = notify.await;
+            let mut shared_streams = shared_streams_map.lock().await;
+            if let Some(shared_stream) = shared_streams.get(&notify_stream_url) {
+                let cur_count = shared_stream.client_count.fetch_sub(1u32, std::sync::atomic::Ordering::SeqCst);
+                if cur_count == 1 {
+                    shared_streams.remove(&notify_stream_url);
+                }
+            }
+        });
+        return Some(stream);
+    }
+    drop(shared_streams);
+    None
+}
+
+async fn create_shared_stream<S, E>(app_state: &AppState, bytes_stream: S, stream_url: &str)
+where
+    S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
+{
+    let (tx, _) = tokio::sync::broadcast::channel(1);
+    let sender = Arc::new(tx);
+    let _ = app_state.shared_streams.lock().await.insert(
+        stream_url.to_string(),
+        SharedStream {
+            data_stream: sender.clone(),
+            client_count: AtomicU32::new(1),
+        },
+    );
+    let mut source_stream = Box::pin(bytes_stream);
+    actix_rt::spawn(async move {
+        while let Some(Ok(item)) = source_stream.next().await {
+            if sender.send(item).is_err() {
+                // ignore
+            }
+        }
+    });
+}
+
 pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>, share_stream: bool) -> HttpResponse {
     let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
     if log_enabled!(Level::Debug) {
         debug!("Try to open stream {}", mask_sensitive_info(stream_url));
     }
     if share_stream {
-        if let shared_streams = app_state.shared_streams.lock().await {
-            if let Some(shared_stream) = shared_streams.get(stream_url) {
-                shared_stream.client_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            }
+        let shared_streams = app_state.shared_streams.lock().await;
+        if let Some(shared_stream) = shared_streams.get(stream_url) {
+            shared_stream.client_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
     }
-
 
     if let Ok(url) = Url::parse(stream_url) {
         let client = request_utils::get_client_request(input, &url, Some(&req_headers));
         match client.send().await {
             Ok(response) => {
-                if response.status().is_success() {
+                let status = response.status();
+                if status.is_success() {
                     let mut response_builder = HttpResponse::Ok();
                     response.headers().iter().for_each(|(k, v)| {
                         response_builder.insert_header((k.as_str(), v.as_ref()));
                     });
-                    let stream = if share_stream {
-                        let byte_stream = Box::pin(response.bytes_stream());
-                        let cloned_byte_stream = Box::pin(byte_stream.clone());
-                        let _ = app_state.shared_streams.lock().await.insert(stream_url.to_string(),
-                                                                             SharedStream {
-                                                                                 data_stream: byte_stream,
-                                                                                 client_count: AtomicU32::new(0),
-                                                                             },
-                        );
-                        let (stream, notify) = NotifyStream::new(cloned_byte_stream);
-                        let notify_stream_url = stream_url.to_string();
-                        actix_rt::spawn(async move {
-                            let _ = notify.await;
-                            debug!("connection closed {notify_stream_url}");
-                            if let mut shared_streams = app_state.shared_streams.lock().await {
-                                if let Some(shared_stream) = shared_streams.get(stream_url) {
-                                    let cur_count = shared_stream.client_count.fetch_sub(1u32, std::sync::atomic::Ordering::SeqCst);
-                                    if cur_count == 1 {
-                                        shared_streams.remove(stream_url);
-                                    }
-                                }
-                            }
-                        });
-                        stream
+                    if share_stream {
+                        create_shared_stream(app_state, response.bytes_stream(), stream_url).await;
+                        if let Some(stream) = create_notify_stream(app_state, stream_url).await {
+                            return response_builder.body(actix_web::body::BodyStream::new(stream));
+                        }
                     } else {
-                        response.bytes_stream()
-                    };
-                    return response_builder.body(actix_web::body::BodyStream::new(stream));
+                        return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
+                    }
                 }
                 if log_enabled!(Level::Debug) {
-                    debug!("Failed to open stream got status {} for {}", response.status(), mask_sensitive_info(stream_url));
+                    debug!("Failed to open stream got status {} for {}", status, mask_sensitive_info(stream_url));
                 }
             }
             Err(err) => {

@@ -68,7 +68,8 @@ async fn m3u_api_stream(
                                     debug!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
                                     return HttpResponse::Found().insert_header(("Location", stream_url.to_string())).finish();
                                 }
-                                return stream_response(&app_state, m3u_item.url.as_str(), &req, None).await;
+                                let share_live_streams = target.options.as_ref().map_or(false, |opt| opt.share_live_stream);
+                                return stream_response(&app_state, m3u_item.url.as_str(), &req, None, share_live_streams).await;
                             }
                             Err(err) => {
                                 error!("Failed to get m3u url: {}", mask_sensitive_info(err.to_string().as_str()));
