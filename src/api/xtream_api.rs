@@ -235,7 +235,7 @@ async fn xtream_player_api_stream(
     if log_enabled!(Level::Debug) {
         debug!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
     }
-    let share_live_streams = target.options.as_ref().map_or(false, |opt| opt.share_live_stream);
+    let share_live_streams = target.options.as_ref().map_or(false, |opt| opt.share_live_streams);
     stream_response(app_state, &stream_url, req, Some(input), share_live_streams).await
 }
 

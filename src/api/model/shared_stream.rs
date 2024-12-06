@@ -9,6 +9,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use std::collections::HashMap;
 
 pub struct NotifyStream<S> {
     stream: S,
@@ -65,5 +66,6 @@ where
 pub struct SharedStream {
     pub data_stream: Arc<tokio::sync::broadcast::Sender<Bytes>>,
     pub client_count: AtomicU32,
+    pub header: HashMap<String, Vec<u8>>,
 }
 

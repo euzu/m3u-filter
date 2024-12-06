@@ -308,7 +308,7 @@ pub struct ConfigTargetOptions {
     #[serde(default)]
     pub m3u_mask_redirect_url: bool,
     #[serde(default)]
-    pub share_live_stream: bool,
+    pub share_live_streams: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
