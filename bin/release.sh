@@ -25,18 +25,21 @@ declare -A DIRS=(
     [LINUX]=m3u-filter_${VERSION}_linux_x86_64
     [WINDOWS]=m3u-filter_${VERSION}_windows_x86_64
     [RASPI]=m3u-filter_${VERSION}_armv7_raspi
+    [RASPI4]=m3u-filter_${VERSION}_aarch64_raspi
 )
 
 declare -A ARCS=(
     [LINUX]=${DIRS[LINUX]}.tgz
     [WINDOWS]=${DIRS[WINDOWS]}.zip
     [RASPI]=${DIRS[RASPI]}.tgz
+    [RASPI4]=${DIRS[RASPI4]}.tgz
 )
 
 declare -A BINARIES=(
     [LINUX]=x86_64-unknown-linux-musl/release/m3u-filter
     [WINDOWS]=x86_64-pc-windows-gnu/release/m3u-filter.exe
     [RASPI]=armv7-unknown-linux-musleabihf/release/m3u-filter
+    [RASPI4]=aarch64-unknown-linux-musl/release/m3u-filter
 )
 
 # Build binaries

@@ -3,7 +3,7 @@ set -euo pipefail
 
 source "${HOME}/.ghcr.io"
 
-PLATFORM=x86_64-unknown-linux-musl
+PLATFORM=aarch64-unknown-linux-musl
 
 # Check if the binary exists
 if [ ! -f "./target/${PLATFORM}/release/m3u-filter" ]; then
@@ -32,16 +32,11 @@ fi
 
 echo "Building Docker images for version ${VERSION}"
 
-SCRATCH_IMAGE_NAME=m3u-filter
-ALPINE_IMAGE_NAME=m3u-filter-alpine
+SCRATCH_IMAGE_NAME=m3u-filter-aarch64
 
 # Build scratch image and tag as "latest"
 docker build -f Dockerfile-manual -t ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" --target scratch-final .
 docker tag ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
-
-# Build alpine image and tag as "latest"
-docker build -f Dockerfile-manual -t ghcr.io/euzu/${ALPINE_IMAGE_NAME}:"${VERSION}" --target alpine-final .
-docker tag ghcr.io/euzu/${ALPINE_IMAGE_NAME}:"${VERSION}" ghcr.io/euzu/${ALPINE_IMAGE_NAME}:latest
 
 echo "Logging into GitHub Container Registry..."
 docker login ghcr.io -u euzu -p "${GHCR_IO_TOKEN}"
@@ -49,10 +44,6 @@ docker login ghcr.io -u euzu -p "${GHCR_IO_TOKEN}"
 # Push scratch
 docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}"
 docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
-
-# Push alpine
-docker push ghcr.io/euzu/${ALPINE_IMAGE_NAME}:"${VERSION}"
-docker push ghcr.io/euzu/${ALPINE_IMAGE_NAME}:latest
 
 # Clean up
 echo "Cleaning up build artifacts..."
