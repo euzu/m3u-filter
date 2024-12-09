@@ -1,4 +1,8 @@
 # Changelog
+# Changelog
+# 2.0.11 (2024-12-xx)
+- no error log for xtream api when content is skipped with options `xtream_skip_[live|vod|series]`
+
 # 2.0.10 (2024-12-03)
 - added Target Output Option `m3u_include_type_in_url`, default false. This adds `live`, `movie`, `series` to the url of the stream in reverse proxy mode.
 - added Target Output Option `m3u_mask_redirect_url`, default false. The urls are pointed to m3u-filter in redirect mode. In stream request a redirect response is send. Usefully if you want to track calls in redirect mode.
