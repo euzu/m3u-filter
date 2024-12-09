@@ -10,13 +10,14 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use futures::Stream;
-use log::{debug, error, log_enabled, warn, Level};
+use log::{debug, error, warn, Level};
 use serde_json::{Map, Value};
 
 use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, is_stream_share_enabled, serve_file, stream_response};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
+use crate::debug_if_enabled;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::TargetType;
@@ -212,9 +213,7 @@ async fn xtream_player_api_stream(
 
     if pli.item_type == PlaylistItemType::LiveHls {
         let stream_url = pli.url.to_string();
-        if log_enabled!(Level::Debug) {
-            debug!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
-        }
+        debug_if_enabled!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
     }
 
@@ -225,16 +224,12 @@ async fn xtream_player_api_stream(
     };
 
     if user.proxy == ProxyType::Redirect {
-        if log_enabled!(Level::Debug) {
-            debug!("Redirecting stream request to {}", mask_sensitive_info(&pli.url));
-        }
+        debug_if_enabled!("Redirecting stream request to {}", mask_sensitive_info(&pli.url));
         return HttpResponse::Found().insert_header(("Location", mask_sensitive_info(pli.url.as_str()))).finish();
     }
 
     let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()), true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
-    if log_enabled!(Level::Debug) {
-        debug!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
-    }
+    debug_if_enabled!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
     let share_live_streams = is_stream_share_enabled(pli.item_type, target);
     stream_response(app_state, &stream_url, req, Some(input), share_live_streams).await
 }

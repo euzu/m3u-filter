@@ -1,7 +1,7 @@
 use crate::model::config::{ConfigInput, InputAffix, AFFIX_FIELDS};
 use crate::model::playlist::{FetchedPlaylist, FieldAccessor, PlaylistItem};
-use crate::valid_property;
-use log::{debug, log_enabled, Level};
+use crate::{debug_if_enabled, valid_property};
+use log::{Level};
 
 type AffixProcessor<'a> = Box<dyn Fn(&mut PlaylistItem) + 'a>;
 
@@ -13,9 +13,7 @@ fn create_affix_processor(affix: &InputAffix, is_prefix: bool) -> AffixProcessor
         } else {
             format!("{}{}", field_value.as_str(), &affix.value)
         });
-        if log_enabled!(Level::Debug) {
-            debug!("Applying input {}:  {}={}",  if is_prefix {"prefix"} else {"suffix"},  &affix.field, &value);
-        }
+        debug_if_enabled!("Applying input {}:  {}={}",  if is_prefix {"prefix"} else {"suffix"},  &affix.field, &value);
         header.set_field(&affix.field, value.as_str());
     })
 }

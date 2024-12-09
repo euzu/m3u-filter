@@ -12,7 +12,7 @@ use async_std::prelude::Stream;
 use async_std::stream::StreamExt;
 use bytes::Bytes;
 use chrono::Utc;
-use log::{debug, error, log_enabled, Level};
+use log::{debug, error, Level};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -20,6 +20,7 @@ use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use url::Url;
+use crate::debug_if_enabled;
 use crate::model::playlist::PlaylistItemType;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
@@ -121,9 +122,7 @@ async fn create_shared_stream<S, E>(
                     }
                     actix_web::rt::time::sleep(Duration::from_millis(20)).await;
                 } else {
-                    if log_enabled!(Level::Debug) {
-                        debug!("No active subscribers. Closing stream {}", mask_sensitive_info(&streaming_url));
-                    }
+                    debug_if_enabled!("No active subscribers. Closing stream {}", mask_sensitive_info(&streaming_url));
                     // Cleanup for removing unused shared streams
                     let mut shared_streams = shared_streams_map.lock().await;
                     shared_streams.remove(&streaming_url);
@@ -136,9 +135,7 @@ async fn create_shared_stream<S, E>(
 
 pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>, share_stream: bool) -> HttpResponse {
     let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
-    if log_enabled!(Level::Debug) {
-        debug!("Try to open stream {}", mask_sensitive_info(stream_url));
-    }
+    debug_if_enabled!("Try to open stream {}", mask_sensitive_info(stream_url));
     if share_stream {
         if let Some(value) = shared_stream_response(app_state, stream_url).await {
             return value;
@@ -171,9 +168,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
                         return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
                     }
                 }
-                if log_enabled!(Level::Debug) {
-                    debug!("Failed to open stream got status {} for {}", status, mask_sensitive_info(stream_url));
-                }
+                debug_if_enabled!("Failed to open stream got status {} for {}", status, mask_sensitive_info(stream_url));
             }
             Err(err) => {
                 error!("Received failure from server {}:  {}", mask_sensitive_info(stream_url), err);
@@ -187,9 +182,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
 
 async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
     if let Some(stream) = create_notify_stream(app_state, stream_url).await {
-        if log_enabled!(Level::Debug) {
-            debug!("Using shared channel {}", mask_sensitive_info(stream_url));
-        }
+        debug_if_enabled!("Using shared channel {}", mask_sensitive_info(stream_url));
         // return HttpResponse::Ok().body(actix_web::body::BodyStream::new(stream));
         if let Some(shared_stream) = app_state.shared_streams.lock().await.get(stream_url) {
             let mut response_builder = HttpResponse::Ok();

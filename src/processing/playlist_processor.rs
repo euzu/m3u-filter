@@ -1,12 +1,13 @@
 extern crate unidecode;
 
+use crate::debug_if_enabled;
+use async_std::sync::Mutex;
 use core::cmp::Ordering;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::thread;
-use async_std::sync::{Mutex};
 
 use actix_rt::System;
 use log::{debug, error, info, log_enabled, trace, Level};
@@ -29,8 +30,8 @@ use crate::processing::xtream_processor::playlist_resolve_series;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
-use crate::{get_errors_notify_message, model::config, Config};
 use crate::utils::request_utils::mask_sensitive_info;
+use crate::{get_errors_notify_message, model::config, Config};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };
@@ -135,9 +136,7 @@ fn exec_rename(pli: &PlaylistItem, rename: Option<&Vec<config::ConfigRename>>) {
             for r in renames {
                 let value = get_field_value(result, &r.field);
                 let cap = r.re.as_ref().unwrap().replace_all(value.as_str(), &r.new_name);
-                if log_enabled!(Level::Debug) {
-                    debug!("Renamed {}={} to {}", &r.field, value, cap);
-                }
+                debug_if_enabled!("Renamed {}={} to {}", &r.field, value, cap);
                 let value = cap.into_owned();
                 set_field_value(result, &r.field, Rc::new(value));
             }
@@ -155,9 +154,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                     for r in renames {
                         if matches!(r.field, ItemField::Group) {
                             let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
-                            if log_enabled!(Level::Debug) {
-                                debug!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
-                            }
+                            debug_if_enabled!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
                             grp.title = Rc::new(cap.into_owned());
                         }
                     }
@@ -338,14 +335,10 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         }
     }
     if source_playlists.is_empty() {
-        if log_enabled!(Level::Debug) {
-            debug!("Source at index {source_idx} is empty");
-        }
+        debug!("Source at index {source_idx} is empty");
         errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Source at {source_idx} is empty")));
     } else {
-        if log_enabled!(Level::Debug) {
-            debug!("Source has {} groups", source_playlists.iter().map(|fpl| fpl.playlistgroups.len()).sum::<usize>());
-        }
+        debug_if_enabled!("Source has {} groups", source_playlists.iter().map(|fpl| fpl.playlistgroups.len()).sum::<usize>());
         for target in &source.targets {
             if is_target_enabled(target, &user_targets) {
                 match process_playlist(&mut source_playlists, target, &cfg, &mut stats, &mut errors).await {
@@ -465,14 +458,12 @@ fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
 }
 
 async fn process_playlist(playlists: &mut [FetchedPlaylist<'_>],
-                              target: &ConfigTarget,
-                              cfg: &Config,
-                              stats: &mut HashMap<u16, InputStats>,
-                              errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
+                          target: &ConfigTarget,
+                          cfg: &Config,
+                          stats: &mut HashMap<u16, InputStats>,
+                          errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
     let pipe = get_processing_pipe(target);
-    if log_enabled!(Level::Debug) {
-        debug!("Processing order is {}", &target.processing_order);
-    }
+    debug_if_enabled!("Processing order is {}", &target.processing_order);
 
     let mut new_fetched_playlists: Vec<FetchedPlaylist> = vec![];
     for fpl in playlists.iter_mut() {
@@ -502,15 +493,13 @@ async fn process_playlist(playlists: &mut [FetchedPlaylist<'_>],
             .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
 
         new_playlist.append(&mut fp.playlistgroups);
-        if !epg_channel_ids.is_empty() {
-            if let Some(tv_guide) = fp.epg {
-                debug!("found epg information for {}", &target.name);
-                if let Some(epg) = tv_guide.filter(&epg_channel_ids) {
-                    new_epg.push(epg);
-                }
+        if epg_channel_ids.is_empty() {
+            debug_if_enabled!("channel ids are empty");
+        } else if let Some(tv_guide) = fp.epg {
+            debug!("found epg information for {}", &target.name);
+            if let Some(epg) = tv_guide.filter(&epg_channel_ids) {
+                new_epg.push(epg);
             }
-        } else if log_enabled!(Level::Debug) {
-            debug!("channel ids are empty");
         }
     }
 
