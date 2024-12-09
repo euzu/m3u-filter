@@ -20,6 +20,7 @@ use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use url::Url;
+use crate::model::playlist::PlaylistItemType;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
@@ -203,4 +204,8 @@ async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Optio
         }
     }
     None
+}
+
+pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarget) -> bool {
+    item_type == PlaylistItemType::Live && target.options.as_ref().map_or(false, |opt| opt.share_live_streams)
 }

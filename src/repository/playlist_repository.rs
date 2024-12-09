@@ -11,7 +11,7 @@ use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
 
 pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
-                        target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
+                              target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
     let mut errors = vec![];
     let target_path = match ensure_target_storage_path(cfg, &target.name) {
         Ok(path) => path,
@@ -19,6 +19,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     };
 
     let target_id_mapping_file = get_target_id_mapping_file(&target_path);
+
     let _file_lock = match cfg.file_locks.write_lock(&target_id_mapping_file).await {
         Ok(lock) => lock,
         Err(err) => {
