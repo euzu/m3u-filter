@@ -46,8 +46,8 @@ impl M3uPlaylistIterator {
             })?;
 
         let target_options = target.options.as_ref();
-        let include_type_in_url = target_options.map_or(false, |opts| opts.m3u_include_type_in_url);
-        let mask_redirect_url = target_options.map_or(false, |opts| opts.m3u_mask_redirect_url);
+        let include_type_in_url = target_options.is_some_and( |opts| opts.m3u_include_type_in_url);
+        let mask_redirect_url = target_options.is_some_and(|opts| opts.m3u_mask_redirect_url);
 
         let server_info = get_user_server_info(cfg, user);
         Ok(Self {

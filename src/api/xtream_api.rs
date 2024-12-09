@@ -10,7 +10,7 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use futures::Stream;
-use log::{debug, error, log_enabled, Level};
+use log::{debug, error, log_enabled, warn, Level};
 use serde_json::{Map, Value};
 
 use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, serve_file, stream_response};
@@ -410,7 +410,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
             }
         }
     }
-    error!("Cant find short epg with id: {target_name}/{stream_id}");
+    warn!("Cant find short epg with id: {target_name}/{stream_id}");
     HttpResponse::NoContent().finish()
 }
 
@@ -462,6 +462,25 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     serde_json::to_string(&doc).map_or_else(|_| HttpResponse::BadRequest().finish(), |result| HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(result))
 }
 
+macro_rules! skip_response_if_flag_set {
+    ($flag:expr, $stmt:expr) => {
+        if $flag {
+            return HttpResponse::NoContent().finish();
+        }
+        return $stmt;
+    };
+}
+
+macro_rules! skip_flag_optional {
+    ($flag:expr, $stmt:expr) => {
+        if $flag {
+            None
+        } else {
+            Some($stmt)
+        }
+    };
+}
+
 async fn xtream_player_api(
     req: &HttpRequest,
     api_req: UserApiRequest,
@@ -478,16 +497,22 @@ async fn xtream_player_api(
             return HttpResponse::Ok().json(get_user_info(&user, &app_state.config));
         }
 
+        // Process specific playlist actions
+        let (skip_live, skip_vod, skip_series) = if let Some(inputs) = app_state.config.get_inputs_for_target(&target.name) {
+            inputs.iter().fold((true, true, true), |acc, i| {
+                let (l, v, s) = acc;
+                i.options.as_ref().map_or((false, false, false), |o| (l && o.xtream_skip_live, v && o.xtream_skip_vod, s && o.xtream_skip_series))
+            })
+        } else {
+            (false, false, false)
+        };
+
         match action {
             ACTION_GET_SERIES_INFO => {
-                return xtream_get_stream_info_response(
-                    app_state, &user, target, api_req.series_id.trim(), XtreamCluster::Series,
-                ).await;
+                skip_response_if_flag_set!(skip_series, xtream_get_stream_info_response(app_state, &user, target, api_req.series_id.trim(), XtreamCluster::Series).await);
             }
             ACTION_GET_VOD_INFO => {
-                return xtream_get_stream_info_response(
-                    app_state, &user, target, api_req.vod_id.trim(), XtreamCluster::Video,
-                ).await;
+                skip_response_if_flag_set!(skip_vod,  xtream_get_stream_info_response(app_state, &user, target, api_req.vod_id.trim(), XtreamCluster::Video).await);
             }
             ACTION_GET_EPG | ACTION_GET_SHORT_EPG => {
                 return xtream_get_short_epg(
@@ -495,9 +520,7 @@ async fn xtream_player_api(
                 ).await;
             }
             ACTION_GET_CATCHUP_TABLE => {
-                return xtream_get_catchup_response(
-                    app_state, target, api_req.stream_id.trim(), api_req.start.trim(), api_req.end.trim(),
-                ).await;
+                skip_response_if_flag_set!(skip_live, xtream_get_catchup_response(app_state, target, api_req.stream_id.trim(), api_req.start.trim(), api_req.end.trim()).await);
             }
             _ => {}
         }
@@ -509,32 +532,35 @@ async fn xtream_player_api(
             return response;
         }
 
-        // Process specific playlist actions
         let category_id = api_req.category_id.trim().parse::<u32>().unwrap_or(0);
         let result = match action {
-            ACTION_GET_LIVE_STREAMS => xtream_repository::xtream_load_rewrite_playlist(
-                XtreamCluster::Live, &app_state.config, target, category_id,
-            ).await,
-            ACTION_GET_VOD_STREAMS => xtream_repository::xtream_load_rewrite_playlist(
-                XtreamCluster::Video, &app_state.config, target, category_id,
-            ).await,
-            ACTION_GET_SERIES => xtream_repository::xtream_load_rewrite_playlist(
-                XtreamCluster::Series, &app_state.config, target, category_id,
-            ).await,
-            _ => Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Cant find action: {action} for target: {}", &target.name),
+            ACTION_GET_LIVE_STREAMS =>
+                skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id).await),
+            ACTION_GET_VOD_STREAMS =>
+                skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id).await),
+            ACTION_GET_SERIES =>
+                skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id).await),
+            _ => Some(Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Cant find action: {action} for target: {}", &target.name))
             )),
         };
 
         match result {
-            Ok(xtream_iter) => {
-                // Convert the iterator into a stream of `Bytes`
-                let content_stream = xtream_create_content_stream(xtream_iter);
-                HttpResponse::Ok()
-                    .content_type(mime::APPLICATION_JSON)
-                    .streaming(content_stream)
+            Some(result_iter) => {
+                match result_iter {
+                    Ok(xtream_iter) => {
+                        // Convert the iterator into a stream of `Bytes`
+                        let content_stream = xtream_create_content_stream(xtream_iter);
+                        HttpResponse::Ok()
+                            .content_type(mime::APPLICATION_JSON)
+                            .streaming(content_stream)
+                    }
+                    Err(err) => {
+                        error!("Failed response for xtream target: {} action: {} error: {}", &target.name, action, err);
+                        HttpResponse::NoContent().finish()
+                    }
+                }
             }
-            Err(err) => {
-                error!("Failed response for xtream target: {} action: {} error: {}", &target.name, action, err);
+            None => {
                 HttpResponse::NoContent().finish()
             }
         }
@@ -552,16 +578,17 @@ async fn xtream_player_api(
 
 fn xtream_create_content_stream(xtream_iter: impl Iterator<Item=String>) -> impl Stream<Item=Result<Bytes, String>> {
     let mut first_item = true;
+    stream::once(async { Ok::<Bytes, String>(Bytes::from("[")) }).chain(
     stream::iter(xtream_iter.map(move |line| {
         let line = if first_item {
             first_item = false;
-            format!("[{line}")
+            line
         } else {
             format!(",{line}")
         };
         Ok::<Bytes, String>(Bytes::from(line))
     }))
-        .chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) }))
+    .chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
 }
 
 
