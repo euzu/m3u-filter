@@ -9,20 +9,20 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
+use crate::auth::user::UserCredential;
 use log::{debug, error, warn};
 use path_clean::PathClean;
-use url::{Url};
-use crate::auth::user::UserCredential;
+use url::Url;
 
-use crate::filter::{Filter, get_filter, MockValueProcessor, PatternTemplate, prepare_templates, ValueProvider};
+use crate::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::utils::{config_reader, file_utils};
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
 use crate::utils::file_lock_manager::FileLockManager;
+use crate::utils::{config_reader, file_utils};
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
@@ -450,17 +450,17 @@ impl ConfigSource {
         Ok(index + (self.inputs.len() as u16))
     }
 
-    // pub fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
-    //     for target in &self.targets {
-    //         if target.name.eq(target_name) {
-    //             let inputs = self.inputs.iter().filter(|&i| i.enabled).collect::<Vec<&ConfigInput>>();
-    //             if !inputs.is_empty() {
-    //                 return Some(inputs);
-    //             }
-    //         }
-    //     }
-    //     None
-    // }
+    pub fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
+        for target in &self.targets {
+            if target.name.eq(target_name) {
+                let inputs = self.inputs.iter().filter(|&i| i.enabled).collect::<Vec<&ConfigInput>>();
+                if !inputs.is_empty() {
+                    return Some(inputs);
+                }
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -585,7 +585,7 @@ impl ConfigInput {
                 self.persist = None;
             }
         }
-        
+
         Ok(())
     }
 
@@ -853,7 +853,7 @@ pub struct Config {
     #[serde(skip_serializing, skip_deserializing)]
     pub t_api_proxy_file_path: String,
     #[serde(skip)]
-    pub file_locks : Arc<FileLockManager>
+    pub file_locks: Arc<FileLockManager>,
 }
 
 impl Config {
@@ -877,14 +877,14 @@ impl Config {
         }
     }
 
-    // pub fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
-    //     for source in &self.sources {
-    //         if let Some(cfg) = source.get_inputs_for_target(target_name) {
-    //             return Some(cfg);
-    //         }
-    //     }
-    //     None
-    // }
+    pub fn get_inputs_for_target(&self, target_name: &str) -> Option<Vec<&ConfigInput>> {
+        for source in &self.sources {
+            if let Some(cfg) = source.get_inputs_for_target(target_name) {
+                return Some(cfg);
+            }
+        }
+        None
+    }
 
     pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
         self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(username, password)))
@@ -1086,5 +1086,5 @@ pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigS
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HealthcheckConfig {
-    pub api: ConfigApi
+    pub api: ConfigApi,
 }
