@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::path::PathBuf;
-use std::thread::sleep;
 use log::{debug, info};
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput};
@@ -62,7 +61,7 @@ pub async fn get_xtream_playlist_series(fpl: &mut FetchedPlaylist<'_>, errors: &
                     Err(err) => errors.push(err)
                 };
                 if resolve_delay > 0 {
-                    sleep(std::time::Duration::new(u64::from(resolve_delay), 0)); // 2 seconds between
+                    actix_web::rt::time::sleep(std::time::Duration::new(u64::from(resolve_delay), 0)).await;
                 }
             }
         }

@@ -31,7 +31,7 @@ pub async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
             loop {
                 let mut upcoming = schedule.upcoming(offset).take(1);
                 if let Some(datetime) = upcoming.next() {
-                    actix_rt::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
+                    actix_web::rt::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
                     exec_processing(data.config.clone(), data.targets.clone()).await;
                 }
             }
@@ -63,7 +63,7 @@ mod tests {
                 loop {
                     let mut upcoming = schedule.upcoming(offset).take(1);
                     if let Some(datetime) = upcoming.next() {
-                        actix_rt::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
+                        actix_web::rt::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
                         run_me();
                     }
                     if runs.load(Ordering::Relaxed) == 6 {
