@@ -15,8 +15,7 @@ pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) 
         new_tree.insert(title);
     });
 
-    let file_name = format!("watch_{target_name}_{}", &pl.title);
-    let watch_filename = sanitize_filename(&format!("{file_name}.bin"));
+    let watch_filename = format!("{}/{}.bin", sanitize_filename(target_name), sanitize_filename(&pl.title));
     match file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&watch_filename))) {
         Some(path) => {
             let save_path = path.as_path();

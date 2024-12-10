@@ -7,7 +7,7 @@ use chrono::Local;
 use log::error;
 use serde::{Deserialize, Serialize};
 
-use crate::model::playlist::PlaylistItemType;
+use crate::model::playlist::{PlaylistItemType, UUIDType};
 use crate::repository::bplustree::BPlusTree;
 
 // TODO make configurable
@@ -17,14 +17,14 @@ const EXPIRATION_DURATION: i64 = 86400;
 pub struct VirtualIdRecord {
     pub virtual_id: u32,
     pub provider_id: u32,
-    pub uuid: [u8; 32],
+    pub uuid: UUIDType,
     pub item_type: PlaylistItemType,
     pub parent_virtual_id: u32, // only for series to hold series info id.
     pub last_updated: i64,
 }
 
 impl VirtualIdRecord {
-    fn new(provider_id: u32, virtual_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32, uuid: [u8; 32]) -> Self {
+    fn new(provider_id: u32, virtual_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32, uuid: UUIDType) -> Self {
         let last_updated = Local::now().timestamp();
         Self { virtual_id, provider_id, uuid, item_type, parent_virtual_id, last_updated }
     }
@@ -42,7 +42,7 @@ pub struct TargetIdMapping {
     dirty: bool,
     virtual_id_counter: u32,
     by_virtual_id: BPlusTree<u32, VirtualIdRecord>,
-    by_uuid: BTreeMap<[u8; 32], u32>,
+    by_uuid: BTreeMap<UUIDType, u32>,
     path: PathBuf,
 }
 
@@ -71,7 +71,7 @@ impl TargetIdMapping {
         }
     }
 
-    pub fn insert_entry(&mut self, uuid: [u8; 32], provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
+    pub fn insert_entry(&mut self, uuid: UUIDType, provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
         match self.by_uuid.get(&uuid) {
             None => {
                 self.dirty = true;

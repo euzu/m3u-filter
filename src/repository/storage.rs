@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::fmt::Write;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput};
+use crate::model::playlist::UUIDType;
 use crate::utils::file_utils;
 
 pub(in crate::repository) const FILE_SUFFIX_DB: &str = "db";
@@ -9,11 +10,13 @@ pub(in crate::repository) const FILE_SUFFIX_INDEX: &str = "idx";
 
 const FILE_ID_MAPPING: &str = "id_mapping.db";
 
-pub fn hash_string(url: &str) -> [u8; 32] {
-    let hash = blake3::hash(url.as_bytes());
-    hash.into() // convert to hash array
+/// generates a hash from a string
+#[inline]
+pub fn hash_string(url: &str) -> UUIDType {
+    blake3::hash(url.as_bytes()).into()
 }
 
+#[inline]
 fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().fold(String::new(), |mut output, b| {
         let _ = write!(output, "{b:02X}");

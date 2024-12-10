@@ -9,6 +9,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::model::xtream::{XtreamCategory, XtreamSeriesInfo, XtreamSeriesInfoEpisode, XtreamStream};
+use crate::repository::storage::hash_string;
 
 fn map_to_xtream_category(categories: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(categories.to_owned()) {
@@ -45,15 +46,18 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigI
 
     match serde_json::from_value::<XtreamSeriesInfo>(info.to_owned()) {
         Ok(series_info) => {
-            let result: Vec<PlaylistItem> = series_info.episodes.values().flatten().map(|episode|
+            let result: Vec<PlaylistItem> = series_info.episodes.values().flatten().map(|episode| {
+
+                let episode_url = create_xtream_series_info_url(url, username, password, episode);
                 PlaylistItem {
                     header: RefCell::new(PlaylistItemHeader {
                         id: Rc::new(episode.id.to_string()),
+                        uuid: Rc::new(hash_string(&episode_url)),
                         name: Rc::new(episode.title.clone()),
                         logo: Rc::new(episode.info.movie_image.clone()),
                         group: Rc::new(group_title.to_string()),
                         title: Rc::new(episode.title.clone()),
-                        url: create_xtream_series_info_url(url, username, password, episode),
+                        url: episode_url,
                         item_type: PlaylistItemType::Series,
                         xtream_cluster: XtreamCluster::Series,
                         additional_properties: episode.get_additional_properties(&series_info),
@@ -61,7 +65,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigI
                         input_id: input.id,
                         ..Default::default()
                     })
-                }).collect();
+                }}).collect();
             if result.is_empty() { Ok(None) } else { Ok(Some(result)) }
         }
         Err(err) => {
@@ -109,14 +113,16 @@ pub fn parse_xtream(input: &ConfigInput,
                         if let Some(group) = group_map.get(&stream.category_id) {
                             let mut grp = group.borrow_mut();
                             let category_name = &grp.category_name;
+                            let stream_url = create_xtream_url(xtream_cluster, url, username, password, &stream);
                             let item = PlaylistItem {
                                 header: RefCell::new(PlaylistItemHeader {
                                     id: Rc::new(stream.get_stream_id().to_string()),
+                                    uuid: Rc::new(hash_string(&stream_url)),
                                     name: Rc::clone(&stream.name),
                                     logo: Rc::clone(&stream.stream_icon),
                                     group: Rc::clone(category_name),
                                     title: Rc::clone(&stream.name),
-                                    url: create_xtream_url(xtream_cluster, url, username, password, &stream),
+                                    url: stream_url,
                                     epg_channel_id: stream.epg_channel_id.clone(),
                                     item_type: PlaylistItemType::from(xtream_cluster),
                                     xtream_cluster,

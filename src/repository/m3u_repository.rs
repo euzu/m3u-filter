@@ -94,6 +94,6 @@ pub async  fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path:
     }
     {
         let _file_lock = cfg.file_locks.read_lock(m3u_path).await?;
-        IndexedDocumentReader::<M3uPlaylistItem>::read_indexed_item(m3u_path, idx_path, stream_id)
+        IndexedDocumentReader::<u32, M3uPlaylistItem>::read_indexed_item(m3u_path, idx_path, &stream_id)
     }
 }

@@ -1,13 +1,21 @@
-use std::cmp::Ordering;
-use std::path::PathBuf;
-use log::{debug, info};
 use crate::m3u_filter_error::M3uFilterError;
-use crate::model::config::{Config, ConfigInput};
-use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
+use crate::model::config::{Config, ConfigInput, ConfigTarget};
+use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, UUIDType, XtreamCluster};
 use crate::model::xmltv::TVGuide;
-use crate::processing::{m3u_parser, xtream_parser};
 use crate::processing::xtream_parser::parse_xtream_series_info;
+use crate::processing::{m3u_parser, xtream_parser};
+use crate::repository::xtream_repository;
 use crate::utils::{file_utils, request_utils};
+use log::{debug, info};
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::io::{Error, ErrorKind};
+use std::path::PathBuf;
+use std::rc::Rc;
+
+const ACTION_GET_SERIES_INFO: &str = "get_series_info";
+const ACTION_GET_VOD_INFO: &str = "get_vod_info";
+const ACTION_GET_LIVE_INFO: &str = "get_live_info";
 
 fn prepare_file_path(persist: Option<&String>, working_dir: &str, action: &str) -> Option<PathBuf> {
     let persist_file: Option<PathBuf> =
@@ -32,7 +40,7 @@ pub async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &S
     }
 }
 
-pub async fn get_xtream_playlist_series(fpl: &mut FetchedPlaylist<'_>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
+pub async fn get_xtream_playlist_series(fpl: &mut FetchedPlaylist<'_>, process_uuids: HashSet<Rc<UUIDType>>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
     let input = fpl.input;
     let mut result: Vec<PlaylistGroup> = vec![];
     for plg in &mut fpl.playlistgroups {
@@ -40,7 +48,7 @@ pub async fn get_xtream_playlist_series(fpl: &mut FetchedPlaylist<'_>, errors: &
         for pli in &plg.channels {
             let (fetch_series, series_info_url) = {
                 let mut header = pli.header.borrow_mut();
-                let fetch_series = !header.series_fetched && header.item_type == PlaylistItemType::SeriesInfo;
+                let fetch_series = !header.series_fetched && header.item_type == PlaylistItemType::SeriesInfo && process_uuids.contains(header.get_uuid());
                 if fetch_series {
                     header.series_fetched = true;
                 }
@@ -76,6 +84,61 @@ pub async fn get_xtream_playlist_series(fpl: &mut FetchedPlaylist<'_>, errors: &
         }
     }
     result
+}
+
+
+pub fn get_xtream_player_api_action_url(input: &ConfigInput, action: &str) -> Option<String> {
+    if let Some(user_info) = input.get_user_info() {
+        Some(format!("{}/player_api.php?username={}&password={}&action={}",
+                     &user_info.base_url,
+                     &user_info.username,
+                     &user_info.password,
+                     action
+        ))
+    } else {
+        None
+    }
+}
+
+pub fn get_xtream_player_api_info_url(input: &ConfigInput, cluster: XtreamCluster, stream_id: u32) -> Option<String> {
+    let (action, stream_id_field) = match cluster {
+        XtreamCluster::Live => (ACTION_GET_LIVE_INFO, "live_id"),
+        XtreamCluster::Video => (ACTION_GET_VOD_INFO, "vod_id"),
+        XtreamCluster::Series => (ACTION_GET_SERIES_INFO, "series_id"),
+    };
+    get_xtream_player_api_action_url(input, action).map(|action_url| format!("{action_url}&{stream_id_field}={stream_id}"))
+}
+
+
+pub async fn get_xtream_stream_info_content(info_url: &str, input: &ConfigInput) -> Result<String, Error> {
+    request_utils::download_text_content(input, info_url, None).await
+}
+
+pub async fn get_xtream_stream_info<P>(config: &Config, input: &ConfigInput, target: &ConfigTarget,
+                                       pli: &P, info_url: &str, cluster: XtreamCluster) -> Result<String, Error>
+where
+    P: PlaylistEntry,
+{
+    if cluster == XtreamCluster::Series {
+        if let Some(content) = xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()).await {
+            return Ok(content);
+        }
+    } else if cluster == XtreamCluster::Video {
+        if let Some(content) = xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id()).await {
+            return Ok(content);
+        }
+    }
+
+    if let Ok(content) = get_xtream_stream_info_content(info_url, input).await {
+        return match cluster {
+            XtreamCluster::Live => Ok(content),
+            XtreamCluster::Video => xtream_repository::write_and_get_xtream_vod_info(config, target, pli, &content).await,
+            XtreamCluster::Series => xtream_repository::write_and_get_xtream_series_info(config, target, pli, &content).await,
+        };
+    }
+
+    Err(Error::new(ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}",
+                                             target.name.replace(' ', "_").as_str(), &cluster, pli.get_virtual_id())))
 }
 
 fn get_skip_cluster(input: &ConfigInput) -> Vec<XtreamCluster> {
@@ -135,10 +198,10 @@ pub async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec
                         }
                         Err(err) => errors.push(err)
                     }
-                },
+                }
                 (Err(err1), Err(err2)) => {
                     errors.extend([err1, err2]);
-                },
+                }
                 (_, Err(err)) | (Err(err), _) => errors.push(err),
             }
         }

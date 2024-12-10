@@ -15,6 +15,13 @@ use crate::repository::storage::hash_string;
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
+pub trait PlaylistEntry {
+    fn get_virtual_id(&self) -> u32;
+    fn get_provider_id(&self) -> Option<u32>;
+    fn get_category_id(&self) -> Option<u32>;
+    fn get_provider_url(&self) -> Rc<String>;
+}
+
 #[derive(Debug, Clone)]
 pub struct FetchedPlaylist<'a> { // Contains playlist for one input
     pub input: &'a ConfigInput,
@@ -121,9 +128,11 @@ pub trait FieldAccessor {
     fn set_field(&mut self, field: &str, value: &str) -> bool;
 }
 
+pub type UUIDType = [u8;32];
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PlaylistItemHeader {
-    pub uuid: Rc<[u8; 32]>, // calculated
+    pub uuid: Rc<UUIDType>, // calculated
     pub id: Rc<String>, // provider id
     pub virtual_id: u32, // virtual id
     pub name: Rc<String>,
@@ -154,7 +163,7 @@ impl PlaylistItemHeader {
     pub fn gen_uuid(&mut self) {
         self.uuid = Rc::new(hash_string(&self.url));
     }
-    pub const fn get_uuid(&self) -> &Rc<[u8; 32]> {
+    pub const fn get_uuid(&self) -> &Rc<UUIDType> {
         &self.uuid
     }
 
@@ -264,6 +273,36 @@ impl M3uPlaylistItem {
     }
 }
 
+impl PlaylistEntry for M3uPlaylistItem {
+    #[inline]
+    fn get_virtual_id(&self) -> u32 {
+        self.virtual_id
+    }
+
+    fn get_provider_id(&self) -> Option<u32> {
+        match self.provider_id.parse::<u32>() {
+            Ok(id) => Some(id),
+            Err(_) => match extract_id_from_url(&self.url) {
+                Some(id) => match id.parse::<u32>() {
+                    Ok(newid) => {
+                        Some(newid)
+                    }
+                    Err(_) => None,
+                },
+                None => None,
+            }
+        }
+    }
+    #[inline]
+    fn get_category_id(&self) -> Option<u32> {
+        None
+    }
+    #[inline]
+    fn get_provider_url(&self) -> Rc<String> {
+        Rc::clone(&self.url)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamPlaylistItem {
     pub virtual_id: u32,
@@ -289,6 +328,27 @@ impl XtreamPlaylistItem {
     pub fn to_doc(&self, options: &XtreamMappingOptions) -> Value {
         xtream_playlistitem_to_document(self, options)
     }
+}
+
+impl PlaylistEntry for XtreamPlaylistItem {
+    #[inline]
+    fn get_virtual_id(&self) -> u32 {
+        self.virtual_id
+    }
+    #[inline]
+    fn get_provider_id(&self) -> Option<u32> {
+        Some(self.provider_id)
+    }
+    #[inline]
+    fn get_category_id(&self) -> Option<u32> {
+        None
+    }
+    #[inline]
+    fn get_provider_url(&self) -> Rc<String> {
+        Rc::clone(&self.url)
+    }
+
+
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -344,6 +404,39 @@ impl PlaylistItem {
     }
 }
 
+impl PlaylistEntry for PlaylistItem {
+    #[inline]
+    fn get_virtual_id(&self) -> u32 {
+        self.header.borrow().virtual_id
+    }
+
+    fn get_provider_id(&self) -> Option<u32> {
+        let header = self.header.borrow();
+        match header.id.parse::<u32>() {
+            Ok(id) => Some(id),
+            Err(_) => match extract_id_from_url(&header.url) {
+                Some(id) => match id.parse::<u32>() {
+                    Ok(newid) => {
+                        Some(newid)
+                    }
+                    Err(_) => None,
+                },
+                None => None,
+            }
+        }
+    }
+
+    #[inline]
+    fn get_category_id(&self) -> Option<u32> {
+        None
+    }
+    #[inline]
+    fn get_provider_url(&self) -> Rc<String> {
+        Rc::clone(&self.header.borrow().url)
+    }
+
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistGroup {
     pub id: u32,
@@ -354,6 +447,7 @@ pub struct PlaylistGroup {
 }
 
 impl PlaylistGroup {
+    #[inline]
     pub fn on_load(&mut self) {
         self.channels.iter().for_each(|pl| pl.header.borrow_mut().gen_uuid());
     }

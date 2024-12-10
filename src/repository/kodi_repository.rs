@@ -75,6 +75,10 @@ static KODY_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
     whitespace: regex::Regex::new(r"\s+").unwrap(),
 });
 
+fn _get_tmdb_id(_virtual_id: u32) -> Option<String> {
+    // TODO
+  None
+}
 
 pub fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&String>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {

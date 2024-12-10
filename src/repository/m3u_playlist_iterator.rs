@@ -11,7 +11,7 @@ use crate::utils::file_lock_manager::FileReadGuard;
 pub const M3U_STREAM_PATH: &str = "m3u-stream";
 
 pub struct M3uPlaylistIterator {
-    reader: IndexedDocumentReader<M3uPlaylistItem>,
+    reader: IndexedDocumentReader<u32, M3uPlaylistItem>,
     base_url: String,
     username: String,
     password: String,
@@ -40,7 +40,7 @@ impl M3uPlaylistIterator {
         })?;
 
         let reader =
-            IndexedDocumentReader::<M3uPlaylistItem>::new(&m3u_path, &idx_path).map_err(|err| {
+            IndexedDocumentReader::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path).map_err(|err| {
                 M3uFilterError::new(
                     M3uFilterErrorKind::Info,
                     format!("Could not deserialize file {m3u_path:?} - {err}"),

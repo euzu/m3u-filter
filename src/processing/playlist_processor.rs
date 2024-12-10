@@ -26,7 +26,7 @@ use crate::model::stats::{InputStats, PlaylistStats};
 use crate::processing::affix_processor::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
 use crate::processing::xmltv_parser::flatten_tvguide;
-use crate::processing::xtream_processor::playlist_resolve_series;
+use crate::processing::xtream_processor::{playlist_resolve_series, playlist_resolve_movies};
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
@@ -465,29 +465,30 @@ async fn process_playlist(playlists: &mut [FetchedPlaylist<'_>],
     let pipe = get_processing_pipe(target);
     debug_if_enabled!("Processing order is {}", &target.processing_order);
 
-    let mut new_fetched_playlists: Vec<FetchedPlaylist> = vec![];
-    for fpl in playlists.iter_mut() {
-        let mut new_fpl = execute_pipe(target, &pipe, fpl);
-        playlist_resolve_series(target, errors, &pipe, fpl, &mut new_fpl).await;
+    let mut processed_fetched_playlists: Vec<FetchedPlaylist> = vec![];
+    for provider_fpl in playlists.iter_mut() {
+        let mut processed_fpl = execute_pipe(target, &pipe, provider_fpl);
+        playlist_resolve_series(target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
+        playlist_resolve_movies(cfg, target, errors, &processed_fpl).await;
         // stats
-        let input_stats = stats.get_mut(&new_fpl.input.id);
+        let input_stats = stats.get_mut(&processed_fpl.input.id);
         if let Some(stat) = input_stats {
-            stat.processed_stats.group_count = new_fpl.playlistgroups.len();
-            stat.processed_stats.channel_count = new_fpl.playlistgroups.iter()
+            stat.processed_stats.group_count = processed_fpl.playlistgroups.len();
+            stat.processed_stats.channel_count = processed_fpl.playlistgroups.iter()
                 .map(|group| group.channels.len())
                 .sum();
         }
-        new_fetched_playlists.push(new_fpl);
+        processed_fetched_playlists.push(processed_fpl);
     }
 
-    apply_affixes(&mut new_fetched_playlists);
+    apply_affixes(&mut processed_fetched_playlists);
 
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
 
     // each fetched playlist can have its own epgl url.
     // we need to process each input epg.
-    for mut fp in new_fetched_playlists {
+    for mut fp in processed_fetched_playlists {
         // collect all epg_channel ids
         let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
             .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
