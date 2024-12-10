@@ -51,7 +51,7 @@ fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlis
     }
 }
 
-pub fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path: &Path, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub async fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path: &Path, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         let (m3u_path, idx_path) = m3u_get_file_paths(target_path);
         let m3u_playlist = new_playlist.iter()
@@ -61,7 +61,7 @@ pub fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path: &Pat
 
         persist_m3u_playlist_as_text(target, cfg, &m3u_playlist);
         {
-            let _file_lock = cfg.file_locks.write_lock(&m3u_path).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}")))?;
+            let _file_lock = cfg.file_locks.write_lock(&m3u_path).await.map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}")))?;
             match IndexedDocumentWriter::new(m3u_path.clone(), idx_path) {
                 Ok(mut writer) => {
                     for m3u in m3u_playlist {
@@ -79,21 +79,21 @@ pub fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path: &Pat
     Ok(())
 }
 
-pub fn m3u_load_rewrite_playlist(
+pub async fn m3u_load_rewrite_playlist(
     cfg: &Config,
     target: &ConfigTarget,
     user: &ProxyUserCredentials,
 ) -> Result<Box<dyn Iterator<Item = String>>, M3uFilterError> {
-    Ok(Box::new(M3uPlaylistIterator::new(cfg, target, user)?))
+    Ok(Box::new(M3uPlaylistIterator::new(cfg, target, user).await?))
 }
 
 
-pub fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
+pub async  fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
     if stream_id < 1 {
         return Err(Error::new(ErrorKind::Other, "id should start with 1"));
     }
     {
-        let _file_lock = cfg.file_locks.read_lock(m3u_path)?;
+        let _file_lock = cfg.file_locks.read_lock(m3u_path).await?;
         IndexedDocumentReader::<M3uPlaylistItem>::read_indexed_item(m3u_path, idx_path, stream_id)
     }
 }

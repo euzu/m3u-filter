@@ -371,7 +371,8 @@ The processing order (Filter, Rename and Map) can be configured for each target 
 ### 2.2.2.4 `options`
 Target options are:
 
-- `ingore_logo` logo attributes are ignored to avoid caching logo files on devices.
+- `ignore_logo` logo attributes are ignored to avoid caching logo files on devices.
+- `share_live_streams` to share live stream connections  in reverse proxy mode.
 
 `strm` output has additional options
 - `underscore_whitespace` replaces all whitespaces with `_` in the path.

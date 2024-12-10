@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 use enum_iterator::Sequence;
-
+use log::debug;
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::utils::config_reader;
@@ -288,6 +288,7 @@ impl ApiProxyConfig {
                 return Some((credentials.clone(), target_name.to_string()));
             };
         }
+        debug!("Could not find any target for user {username}");
         None
     }
 

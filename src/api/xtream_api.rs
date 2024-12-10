@@ -10,11 +10,14 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use futures::Stream;
-use log::{debug, error, log_enabled, warn, Level};
+use log::{debug, error, warn, Level};
 use serde_json::{Map, Value};
 
-use crate::api::api_model::{AppState, UserApiRequest, XtreamAuthorizationResponse};
-use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, serve_file, stream_response};
+use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, is_stream_share_enabled, serve_file, stream_response};
+use crate::api::model::app_state::AppState;
+use crate::api::model::request::UserApiRequest;
+use crate::api::model::xtream::XtreamAuthorizationResponse;
+use crate::debug_if_enabled;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::TargetType;
@@ -205,14 +208,12 @@ async fn xtream_player_api_stream(
     }
     let (action_stream_id, stream_ext) = xtream_api_request_separate_number_and_rest(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
-    let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
+    let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
     if pli.item_type == PlaylistItemType::LiveHls {
         let stream_url = pli.url.to_string();
-        if log_enabled!(Level::Debug) {
-            debug!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
-        }
+        debug_if_enabled!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
     }
 
@@ -223,84 +224,60 @@ async fn xtream_player_api_stream(
     };
 
     if user.proxy == ProxyType::Redirect {
-        if log_enabled!(Level::Debug) {
-            debug!("Redirecting stream request to {}", mask_sensitive_info(&pli.url));
-        }
+        debug_if_enabled!("Redirecting stream request to {}", mask_sensitive_info(&pli.url));
         return HttpResponse::Found().insert_header(("Location", mask_sensitive_info(pli.url.as_str()))).finish();
     }
 
     let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()), true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
-    if log_enabled!(Level::Debug) {
-        debug!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
+    debug_if_enabled!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
+    let share_live_streams = is_stream_share_enabled(pli.item_type, target);
+    stream_response(app_state, &stream_url, req, Some(input), share_live_streams).await
+}
+
+macro_rules! create_xtream_player_api_stream {
+    ($fn_name:ident, $context:expr) => {
+        async fn $fn_name(
+            req: HttpRequest,
+            api_req: web::Query<UserApiRequest>,
+            path: web::Path<(String, String, String)>,
+            app_state: web::Data<AppState>,
+        ) -> HttpResponse {
+            let (username, password, stream_id) = path.into_inner();
+            xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from($context, &username, &password, &stream_id, "")).await
+        }
     }
-    stream_response(&stream_url, req, Some(input)).await
 }
 
+create_xtream_player_api_stream!(xtream_player_api_live_stream, XtreamApiStreamContext::Live);
+create_xtream_player_api_stream!(xtream_player_api_live_stream_alt, XtreamApiStreamContext::LiveAlt);
+create_xtream_player_api_stream!(xtream_player_api_series_stream, XtreamApiStreamContext::Series);
+create_xtream_player_api_stream!(xtream_player_api_movie_stream, XtreamApiStreamContext::Movie);
 
-async fn xtream_player_api_live_stream(
-    req: HttpRequest,
-    api_req: web::Query<UserApiRequest>,
-    path: web::Path<(String, String, String)>,
-    app_state: web::Data<AppState>,
-) -> HttpResponse {
-    let (username, password, stream_id) = path.into_inner();
-    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Live, &username, &password, &stream_id, "")).await
-}
-
-async fn xtream_player_api_live_stream_alt(
-    req: HttpRequest,
-    api_req: web::Query<UserApiRequest>,
-    path: web::Path<(String, String, String)>,
-    app_state: web::Data<AppState>,
-) -> HttpResponse {
-    let (username, password, stream_id) = path.into_inner();
-    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::LiveAlt, &username, &password, &stream_id, "")).await
-}
-
-async fn xtream_player_api_series_stream(
-    req: HttpRequest,
-    api_req: web::Query<UserApiRequest>,
-    path: web::Path<(String, String, String)>,
-    app_state: web::Data<AppState>,
-) -> HttpResponse {
-    let (username, password, stream_id) = path.into_inner();
-    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Series, &username, &password, &stream_id, "")).await
-}
-
-async fn xtream_player_api_movie_stream(
-    req: HttpRequest,
-    api_req: web::Query<UserApiRequest>,
-    path: web::Path<(String, String, String)>,
-    app_state: web::Data<AppState>,
-) -> HttpResponse {
-    let (username, password, stream_id) = path.into_inner();
-    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Movie, &username, &password, &stream_id, "")).await
+fn get_non_empty<'a>(first: &'a str, second: &'a str, third: &'a str) -> &'a str {
+    if !first.is_empty() {
+        first
+    } else if !second.is_empty() {
+        second
+    } else {
+        third
+    }
 }
 
 async fn xtream_player_api_timeshift_stream(
     req: HttpRequest,
-    api_req: web::Query<UserApiRequest>,
+    api_query_req: web::Query<UserApiRequest>,
+    api_form_req: web::Form<UserApiRequest>,
     path: web::Path<(String, String, String, String, String)>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    let (username, password, duration, start, stream_id) = path.into_inner();
+    let (path_username, path_password, path_duration, path_start, path_stream_id) = path.into_inner();
+    let username = get_non_empty(&path_username, &api_query_req.username, &api_form_req.username);
+    let password = get_non_empty(&path_password, &api_query_req.password, &api_form_req.password);
+    let stream_id = get_non_empty(&path_stream_id, &api_query_req.stream, &api_form_req.stream);
+    let duration = get_non_empty(&path_duration, &api_query_req.duration, &api_form_req.duration);
+    let start = get_non_empty(&path_start, &api_query_req.start, &api_form_req.start);
     let action_path = format!("{duration}/{start}");
-    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, &username, &password, &stream_id, &action_path)).await
-}
-
-
-async fn xtream_player_api_streaming_timeshift(
-    req: HttpRequest,
-    api_req: web::Query<UserApiRequest>,
-    app_state: web::Data<AppState>,
-) -> HttpResponse {
-    let username = &api_req.username;
-    let password = &api_req.password;
-    let stream_id = &api_req.stream;
-    let duration = &api_req.duration;
-    let start = &api_req.start;
-    let action_path = format!("{duration}/{start}");
-    xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, username, password, stream_id, &action_path)).await
+    xtream_player_api_stream(&req, &api_query_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, username, password, stream_id, &action_path)).await
 }
 
 fn get_xtream_vod_info(target: &ConfigTarget, pli: &XtreamPlaylistItem, content: &str) -> Result<String, Error> {
@@ -331,7 +308,7 @@ async fn xtream_get_stream_info_content(info_url: &str, input: &ConfigInput) -> 
 async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &ConfigTarget,
                                 pli: &XtreamPlaylistItem, info_url: &str, cluster: XtreamCluster) -> Result<String, Error> {
     if cluster == XtreamCluster::Series {
-        if let Some(content) = xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.virtual_id) {
+        if let Some(content) = xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.virtual_id).await {
             return Ok(content);
         }
     }
@@ -340,7 +317,7 @@ async fn xtream_get_stream_info(config: &Config, input: &ConfigInput, target: &C
         return match cluster {
             XtreamCluster::Live => Ok(content),
             XtreamCluster::Video => get_xtream_vod_info(target, pli, &content),
-            XtreamCluster::Series => xtream_repository::write_and_get_xtream_series_info(config, target, pli, &content),
+            XtreamCluster::Series => xtream_repository::write_and_get_xtream_series_info(config, target, pli, &content).await,
         };
     }
 
@@ -356,7 +333,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
         Err(_) => return HttpResponse::BadRequest().finish()
     };
 
-    if let Ok(pli) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(cluster)) {
+    if let Ok(pli) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(cluster)).await {
         let input_id = pli.input_id;
         if let Some(input) = app_state.config.get_input_by_id(input_id) {
             if let Some(info_url) = get_xtream_player_api_info_url(input, cluster, pli.provider_id) {
@@ -384,7 +361,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
             Err(_) => return HttpResponse::BadRequest().finish()
         };
 
-        if let Ok(pli) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None) {
+        if let Ok(pli) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await {
             let input_id: u16 = pli.input_id;
             if let Some(input) = app_state.config.get_input_by_id(input_id) {
                 if let Some(action_url) = get_xtream_player_api_action_url(input, ACTION_GET_SHORT_EPG) {
@@ -434,7 +411,7 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
 
 async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget, stream_id: &str, start: &str, end: &str) -> HttpResponse {
     let virtual_id: u32 = try_result_bad_request!(FromStr::from_str(stream_id));
-    let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)));
+    let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)).await);
     let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id));
     let info_url = try_option_bad_request!(get_xtream_player_api_action_url(input, ACTION_GET_CATCHUP_TABLE).map(|action_url| format!("{action_url}&{TAG_STREAM_ID}={}&start={start}&end={end}", pli.provider_id)));
     let content = try_result_bad_request!(xtream_get_stream_info_content(info_url.as_str(), input).await);
@@ -532,11 +509,11 @@ async fn xtream_player_api(
         let category_id = api_req.category_id.trim().parse::<u32>().unwrap_or(0);
         let result = match action {
             ACTION_GET_LIVE_STREAMS =>
-                skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id)),
+                skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id).await),
             ACTION_GET_VOD_STREAMS =>
-                skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id)),
+                skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id).await),
             ACTION_GET_SERIES =>
-                skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id)),
+                skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id).await),
             _ => Some(Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Cant find action: {action} for target: {}", &target.name))
             )),
         };
@@ -576,16 +553,16 @@ async fn xtream_player_api(
 fn xtream_create_content_stream(xtream_iter: impl Iterator<Item=String>) -> impl Stream<Item=Result<Bytes, String>> {
     let mut first_item = true;
     stream::once(async { Ok::<Bytes, String>(Bytes::from("[")) }).chain(
-    stream::iter(xtream_iter.map(move |line| {
-        let line = if first_item {
-            first_item = false;
-            line
-        } else {
-            format!(",{line}")
-        };
-        Ok::<Bytes, String>(Bytes::from(line))
-    }))
-    .chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
+        stream::iter(xtream_iter.map(move |line| {
+            let line = if first_item {
+                first_item = false;
+                line
+            } else {
+                format!(",{line}")
+            };
+            Ok::<Bytes, String>(Bytes::from(line))
+        }))
+            .chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
 }
 
 
@@ -603,17 +580,41 @@ async fn xtream_player_api_post(req: HttpRequest,
     xtream_player_api(&req, api_req.into_inner(), &app_state).await
 }
 
+macro_rules! register_xtream_api {
+    ($cfg:expr, [$($path:expr),*]) => {{
+       $(
+            $cfg.service(web::resource($path).route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)));
+        )*
+    }};
+}
+
+macro_rules! register_xtream_api_stream {
+     ($cfg:expr, [$(($path:expr, $fn_name:ident)),*]) => {{
+       $(
+            $cfg.service(web::resource(format!("{}/{{username}}/{{password}}/{{stream_id}}", $path)).route(web::get().to($fn_name)));
+        )*
+    }};
+}
+
+macro_rules! register_xtream_api_timeshift {
+     ($cfg:expr, [$($path:expr),*]) => {{
+       $(
+            $cfg.service(web::resource($path).route(web::get().to(xtream_player_api_timeshift_stream)).route(web::post().to(xtream_player_api_timeshift_stream)));
+        )*
+    }};
+}
+
 pub fn xtream_api_register(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/player_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)))
-        .service(web::resource("/panel_api.php").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)))
-        .service(web::resource("/xtream").route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)))
-        .service(web::resource("/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream_alt)))
-        .service(web::resource("/live/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_live_stream)))
-        .service(web::resource("/movie/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_movie_stream)))
-        .service(web::resource("/series/{username}/{password}/{stream_id}").route(web::get().to(xtream_player_api_series_stream)))
-        .service(web::resource("/timeshift/{username}/{password}/{duration}/{start}/{stream_id}").route(web::get().to(xtream_player_api_timeshift_stream)))
-        .service(web::resource("/timeshift.php").route(web::get().to(xtream_player_api_streaming_timeshift)))
-        .service(web::resource("/streaming/timeshift.php").route(web::get().to(xtream_player_api_streaming_timeshift)));
+    register_xtream_api!(cfg, ["/player_api.php", "/panel_api.php", "/xtream"]);
+    register_xtream_api_stream!(cfg, [
+        ("", xtream_player_api_live_stream_alt),
+        ("/live", xtream_player_api_live_stream),
+        ("/movie", xtream_player_api_movie_stream),
+        ("/series", xtream_player_api_series_stream)]);
+    register_xtream_api_timeshift!(cfg, [
+        "/timeshift/{username}/{password}/{duration}/{start}/{stream_id}",
+       "/timeshift.php",
+       "/streaming/timeshift.php"]);
     /* TODO
     cfg.service(web::resource("/hlsr/{token}/{username}/{password}/{channel}/{hash}/{chunk}").route(web::get().to(xtream_player_api_hlsr_stream)));
     cfg.service(web::resource("/hls/{token}/{chunk}").route(web::get().to(xtream_player_api_hls_stream)));

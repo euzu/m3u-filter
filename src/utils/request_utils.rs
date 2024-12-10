@@ -14,7 +14,6 @@ use reqwest::header::CONTENT_ENCODING;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use url::Url;
 
-use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
 use crate::model::stats::format_elapsed_time;
@@ -22,16 +21,14 @@ use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::FILE_EPG;
 use crate::utils::compression_utils::{is_deflate, is_gzip, ENCODING_DEFLATE, ENCODING_GZIP};
 use crate::utils::file_utils::{get_file_path, persist_file};
+use crate::{create_m3u_filter_error_result, debug_if_enabled};
 
 pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
 }
 
 pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
-    if log_enabled!(Level::Debug) {
-        debug!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
-    }
-
+    debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
     if url_str.parse::<url::Url>().is_ok() {
         match download_text_content_as_file(input, url_str, working_dir, persist_filepath).await {
             Ok(content) => Ok(content),
@@ -77,9 +74,7 @@ pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &s
 
 
 pub async fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
-    if log_enabled!(Level::Debug) {
-        debug!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
-    }
+    debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
 
     if url_str.parse::<url::Url>().is_ok() {
         match download_text_content(input, url_str, persist_filepath).await {
@@ -143,12 +138,12 @@ pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, cu
         let header_keys: HashSet<String> = headers.keys().map(|k| k.as_str().to_lowercase()).collect();
         for (key, value) in custom {
             let key_lc = key.to_lowercase();
-            if !("host" == key_lc || header_keys.contains(key_lc.as_str())) {
+            if "host" == key_lc || header_keys.contains(key_lc.as_str()) {
+                debug_if_enabled!("Ignoring request header {}={}", key_lc, String::from_utf8_lossy(value));
+            } else {
                 headers.insert(
                     HeaderName::from_bytes(key.as_bytes()).unwrap(),
                     HeaderValue::from_bytes(value).unwrap());
-            } else if log_enabled!(Level::Debug) {
-                debug!("Ignoring request header {}={}", key_lc, String::from_utf8_lossy(value));
             }
         }
     }
@@ -323,9 +318,7 @@ pub async fn download_text_content(input: &ConfigInput, url_str: &str, persist_f
 }
 
 async fn download_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, Error> {
-    if log_enabled!(Level::Debug) {
-        debug!("downloading json content from {}", mask_sensitive_info(url));
-    }
+    debug_if_enabled!("downloading json content from {}", mask_sensitive_info(url));
     match download_text_content(input, url, persist_filepath).await {
         Ok(content) => {
             match serde_json::from_str::<serde_json::Value>(&content) {

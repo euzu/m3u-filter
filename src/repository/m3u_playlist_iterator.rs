@@ -8,6 +8,8 @@ use crate::repository::m3u_repository::m3u_get_file_paths;
 use crate::repository::storage::ensure_target_storage_path;
 use crate::utils::file_lock_manager::FileReadGuard;
 
+pub const M3U_STREAM_PATH: &str = "m3u-stream";
+
 pub struct M3uPlaylistIterator {
     reader: IndexedDocumentReader<M3uPlaylistItem>,
     base_url: String,
@@ -22,7 +24,7 @@ pub struct M3uPlaylistIterator {
 }
 
 impl M3uPlaylistIterator {
-    pub fn new(
+    pub async fn new(
         cfg: &Config,
         target: &ConfigTarget,
         user: &ProxyUserCredentials,
@@ -30,7 +32,7 @@ impl M3uPlaylistIterator {
         let target_path = ensure_target_storage_path(cfg, target.name.as_str())?;
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
 
-        let file_lock = cfg.file_locks.read_lock(&m3u_path).map_err(|err| {
+        let file_lock = cfg.file_locks.read_lock(&m3u_path).await.map_err(|err| {
             M3uFilterError::new(
                 M3uFilterErrorKind::Info,
                 format!("Could not lock document {m3u_path:?}: {err}"),
@@ -76,14 +78,14 @@ impl M3uPlaylistIterator {
                 | PlaylistItemType::SeriesInfo
                 | PlaylistItemType::SeriesEpisode => "series",
             };
-            format!("{}/m3u-stream/{stream_type}/{}/{}/{}",
+            format!("{}/{M3U_STREAM_PATH}/{stream_type}/{}/{}/{}",
                     &self.base_url,
                     &self.username,
                     &self.password,
                     m3u_pli.virtual_id
             )
         } else {
-            format!("{}/m3u-stream/{}/{}/{}",
+            format!("{}/{M3U_STREAM_PATH}/{}/{}/{}",
                     &self.base_url, &self.username, &self.password, m3u_pli.virtual_id
             )
         }

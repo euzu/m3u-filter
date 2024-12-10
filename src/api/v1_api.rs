@@ -1,20 +1,22 @@
 use std::sync::Arc;
 
-use actix_web::{HttpResponse, web};
 use actix_web::middleware::Condition;
+use actix_web::{web, HttpResponse};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use log::error;
 use serde_json::json;
 
-use crate::api::api_model::{AppState, PlaylistRequest, ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::api::download_api;
+use crate::api::model::app_state::AppState;
+use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
+use crate::api::model::request::PlaylistRequest;
 use crate::auth::authenticator::validator;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, TargetUser};
-use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, validate_targets};
+use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
 use crate::processing::playlist_processor;
-use crate::utils::{config_reader, download};
 use crate::utils::request_utils::mask_sensitive_info;
+use crate::utils::{config_reader, download};
 
 fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
@@ -155,7 +157,7 @@ async fn playlist(
         let url = req.url.as_deref().unwrap_or("");
         let input = create_config_input_for_url(url);
         get_playlist(Some(&input), &app_state.config).await
-    }
+    };
 }
 
 async fn config(

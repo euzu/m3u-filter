@@ -50,3 +50,6 @@ flate2 = "1"
 time = "0.3"
 blake3 = "1.5"
 bytes = "1.8.0"
+async-std = "1.13"
+tokio-stream = { version = "0.1", features = ["sync"] }
+tokio = "1.41"

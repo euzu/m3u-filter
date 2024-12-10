@@ -15,7 +15,7 @@ pub struct XtreamPlaylistIterator {
 }
 
 impl XtreamPlaylistIterator {
-    pub fn new(
+    pub async fn new(
         cluster: XtreamCluster,
         config: &Config,
         target: &ConfigTarget,
@@ -23,7 +23,7 @@ impl XtreamPlaylistIterator {
     ) -> Result<Self, M3uFilterError> {
         if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
             let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
-            let file_lock = config.file_locks.read_lock(&xtream_path).map_err(|err|
+            let file_lock = config.file_locks.read_lock(&xtream_path).await.map_err(|err|
             M3uFilterError::new(M3uFilterErrorKind::Info, format!("Could not lock document {xtream_path:?}: {err}"))
             )?;
 

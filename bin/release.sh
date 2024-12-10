@@ -42,6 +42,8 @@ declare -A BINARIES=(
     [RASPI4]=aarch64-unknown-linux-musl/release/m3u-filter
 )
 
+WORKING_DIR=$(pwd)
+
 # Build binaries
 ./bin/build_lin_static.sh
 ./bin/build_raspi.sh
@@ -80,6 +82,8 @@ mv "${ARCS[@]}" checksum.txt "$RELEASE_DIR"
 
 # Clean up build directories
 rm -rf "${DIRS[@]}"
+
+cd "${WORKING_DIR}";
 
 # Commit and tag release
 git add .
