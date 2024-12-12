@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind};
+use std::io::{BufReader, Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 
 use log::error;
 use serde_json::{json, Map, Value};
 
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
+use crate::model::config::{Config, ConfigInput, ConfigTarget};
+use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, UUIDType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
-use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentReader, IndexedDocumentWriter, IndexedDocumentQuery, IndexedDocumentUpdate};
-use crate::repository::storage::{get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
+use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentQuery, IndexedDocumentReader, IndexedDocumentUpdate, IndexedDocumentWriter};
+use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
@@ -569,4 +569,39 @@ where
     xtream_write_series_info(config, target.name.as_str(), virtual_id, &result).await.ok();
 
     Ok(result)
+}
+
+pub async fn xtream_update_input_vod_info_file(cfg: &Config, input: &ConfigInput, temp_file: &File) -> Result<(), M3uFilterError> {
+    match get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_info_file_paths(&storage_path, XtreamCluster::Video)) {
+        Ok(Some((info_path, idx_path))) => {
+            match cfg.file_locks.write_lock(&info_path).await {
+                Ok(_file_lock) => {
+                    let mut reader = BufReader::new(temp_file);
+                    match IndexedDocumentWriter::<UUIDType>::new_append(info_path, idx_path) {
+                        Ok(mut writer) => {
+                            let mut uuid_bytes = [0u8; 32];
+                            let mut length_bytes = [0u8; 4];
+                            loop {
+                                if reader.read_exact(&mut uuid_bytes).is_err() {
+                                    break; // End of file
+                                }
+                                reader.read_exact(&mut length_bytes).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read temporary vod info {err}")))?;
+                                let length = u32::from_le_bytes(length_bytes) as usize;
+                                let mut buffer = vec![0u8; length];
+                                reader.read_exact(&mut buffer).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read temporary vod info {err}")))?;
+                                if let Ok(content) = String::from_utf8(buffer) {
+                                    let _ = writer.write_doc(uuid_bytes, &content);
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create create indexed document writer for vod info {err}"))),
+                    }
+                }
+                Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}"))),
+            }
+        }
+        Ok(None) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create storage path for input {}", &input.name.as_ref().map_or("?", |v| v)))),
+        Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create storage path for input {err}"))),
+    }
 }

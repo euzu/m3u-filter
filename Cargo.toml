@@ -53,3 +53,4 @@ bytes = "1.8.0"
 async-std = "1.13"
 tokio-stream = { version = "0.1", features = ["sync"] }
 tokio = "1.41"
+tempfile = "3.14"

@@ -2,8 +2,8 @@ use std::array::TryFromSliceError;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
-use std::path::Path;
 use std::mem::size_of;
+use std::path::Path;
 
 use flate2::Compression;
 use log::error;
@@ -228,10 +228,10 @@ where
         if self.is_leaf {
             let values_encoded = bincode_serialize(&self.values)?;
             let use_compression = values_encoded.len() + LEN_SIZE + FLAG_SIZE > BLOCK_SIZE;
-            let compression_byte = if use_compression {1u8.to_le_bytes()} else {0u8.to_le_bytes()};
+            let compression_byte = if use_compression { 1u8.to_le_bytes() } else { 0u8.to_le_bytes() };
             buffer_slice[write_pos..=write_pos].copy_from_slice(&compression_byte);
             write_pos += FLAG_SIZE;
-            let content_bytes =  if use_compression {
+            let content_bytes = if use_compression {
                 let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), Compression::fast());
                 encoder.write_all(&values_encoded)?;
                 encoder.finish()?
@@ -372,7 +372,7 @@ where
     }
 
     pub fn insert(&mut self, key: K, value: V) {
-        self.dirty= true;
+        self.dirty = true;
         if self.root.keys.is_empty() {
             self.root.keys.push(key);
             self.root.values.push(value);
@@ -429,7 +429,7 @@ where
     }
 }
 
-fn query_tree<K, V, R: Read+Seek>(file: &mut R, key: &K) -> Option<V>
+fn query_tree<K, V, R: Read + Seek>(file: &mut R, key: &K) -> Option<V>
 where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
@@ -456,6 +456,32 @@ where
     }
 }
 
+fn traverse_tree<K, V, R: Read + Seek, F>(file: &mut R, offset: u64, callback: &mut F)
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+    F: FnMut(&Vec<K>, &Vec<V>),
+{
+    let current_offset = offset;
+    let mut buffer = vec![0u8; BLOCK_SIZE];
+
+    match BPlusTreeNode::<K, V>::deserialize_from_block(file, &mut buffer, current_offset, false) {
+        Ok((node, pointers)) => {
+            if node.is_leaf {
+                callback(&node.keys, &node.values);
+            } else if let Some(child_pointers) = pointers {
+                for &child_offset in &child_pointers {
+                    traverse_tree(file, child_offset, callback);
+                }
+            }
+            // if it's a leaf we return.
+        }
+        Err(err) => {
+            error!("Failed to read tree node at offset {current_offset}: {err}");
+        }
+    }
+}
+
 pub struct BPlusTreeQuery<K, V> {
     file: BufReader<File>,
     _marker_k: PhantomData<K>,
@@ -467,8 +493,8 @@ where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
-    pub fn try_new(filepath: &Path) -> io::Result<Self> {
-        let file = is_file_valid(File::open(filepath)?)?;
+    pub fn try_from_file(file: File) -> io::Result<Self> {
+        let file = is_file_valid(file)?;
         Ok(Self {
             file: BufReader::new(file),
             _marker_k: PhantomData,
@@ -476,8 +502,20 @@ where
         })
     }
 
+
+    pub fn try_new(filepath: &Path) -> io::Result<Self> {
+        Self::try_from_file(File::open(filepath)?)
+    }
+
     pub fn query(&mut self, key: &K) -> Option<V> {
         query_tree(&mut self.file, key)
+    }
+
+    pub fn traverse<F>(&mut self, mut visit: F)
+    where
+        F: FnMut(&Vec<K>, &Vec<V>),
+    {
+        traverse_tree(&mut self.file, 0, &mut visit);
     }
 }
 
@@ -522,7 +560,7 @@ where
     pub fn update(&mut self, key: &K, value: V) -> io::Result<u64> {
         let mut offset = 0;
         let mut buffer = vec![0u8; BLOCK_SIZE];
-        let mut reader =  BufReader::new(&mut self.file);
+        let mut reader = BufReader::new(&mut self.file);
         loop {
             match BPlusTreeNode::<K, V>::deserialize_from_block(&mut reader, &mut buffer, offset, false) {
                 Ok((mut node, pointers)) => {
@@ -639,6 +677,28 @@ mod tests {
     }
 
     #[test]
+    fn traverse_test() -> io::Result<()> {
+        let mut tree = BPlusTree::<u32, Record>::new();
+        for i in 0u32..=500 {
+            tree.insert(i, Record {
+                id: i,
+                data: format!("Entry {i}"),
+            });
+        }
+        let filepath = PathBuf::from("/tmp/tree.bin");
+        // Serialize the tree to a file
+        tree.store(&filepath)?;
+
+        let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::try_new(&filepath)?;
+
+        // Traverse the tree
+        tree_query.traverse(|keys, values| {
+            println!("Node: {:?} {:?}", keys, values);
+        });
+        Ok(())
+    }
+
+    #[test]
     fn insert_dulplicate_test() -> io::Result<()> {
         let mut tree = BPlusTree::<u32, Record>::new();
         for i in 0u32..=500 {
@@ -659,7 +719,6 @@ mod tests {
                 assert!(format!("Entry {}", k + 1).eq(&v.data), "Wrong entry")
             });
         });
-
 
         Ok(())
     }
