@@ -397,15 +397,15 @@ each series info entry needs to be fetched one by one and the provider can ban y
 
 The `kodi` format for movies can contain the `tmdb-id` (_optional_). Because xtream api delivers the data only on request,
 we need to fetch this info for each movie entry. But be aware the provider can ban you if you are doing request too frequently.
-- `xtream_resolve_movies` if is set to `true` and you have xtream input, the movies info are fetched and stored.
+- `xtream_resolve_video` if is set to `true` and you have xtream input, the movies info are fetched and stored.
   This can cause a lot of requests to the provider. Be cautious when using this option.
-- `xtream_resolve_movies_delay` to avoid a provider ban you can set the seconds between vod_info_request's. Default is 2 seconds.
+- `xtream_resolve_video_delay` to avoid a provider ban you can set the seconds between vod_info_request's. Default is 2 seconds.
   But be aware that the more series entries there are, the longer the process takes.
 Unlike `series info` `movie info` is only fetched once for each movie. If the data is stored locally there will be no update.
 
-There is a difference for `xtream_resolve_movies` and `xtream_resolve_series`.
+There is a difference for `xtream_resolve_video` and `xtream_resolve_series`.
 `xtream_resolve_series` works only when input: `xtream` and output: `m3u`.
-`xtream_resolve_movies` works only when input: `xtream`.
+`xtream_resolve_video` works only when input: `xtream`.
 
 ### 2.2.2.5 `filter`
 The filter is a string with a filter statement.

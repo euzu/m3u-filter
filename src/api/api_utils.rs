@@ -200,5 +200,5 @@ async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Optio
 }
 
 pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarget) -> bool {
-    item_type == PlaylistItemType::Live && target.options.as_ref().map_or(false, |opt| opt.share_live_streams)
+    item_type == PlaylistItemType::Live && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
 }

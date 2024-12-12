@@ -6,7 +6,6 @@ use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::{xtream_get_info_file_paths, xtream_update_input_vod_info_file};
 use crate::repository::IndexedDocumentQuery;
 use crate::utils::download;
-use crate::utils::download::get_xtream_stream_info_content;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Write};
@@ -53,7 +52,7 @@ async fn playlist_resolve_movies_process_playlist_item(pli: &PlaylistItem, input
     let mut result = None;
     let provider_id = pli.get_provider_id().unwrap_or(0);
     if let Some(info_url) = download::get_xtream_player_api_info_url(input, XtreamCluster::Video, provider_id) {
-        result = match get_xtream_stream_info_content(&info_url, input).await {
+        result = match download::get_xtream_stream_info_content(&info_url, input).await {
             Ok(content) => Some(content),
             Err(err) => {
                 errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}")));
@@ -67,7 +66,7 @@ async fn playlist_resolve_movies_process_playlist_item(pli: &PlaylistItem, input
     result
 }
 
-fn write_content_to_file(writer: &mut BufWriter<&File>, uuid: &[u8;32], content: &str) -> std::io::Result<()> {
+fn write_vod_info_content_to_file(writer: &mut BufWriter<&File>, uuid: &[u8;32], content: &str) -> std::io::Result<()> {
     let length = u32::try_from(content.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
     if length > 0 {
         writer.write_all(uuid)?;
@@ -77,11 +76,10 @@ fn write_content_to_file(writer: &mut BufWriter<&File>, uuid: &[u8;32], content:
     Ok(())
 }
 
-
 fn get_resolve_movies_options(target: &ConfigTarget, fpl: &FetchedPlaylist) -> (bool, u16) {
     let (resolve_movies, resolve_delay) =
         if let Some(options) = &target.options {
-            (options.xtream_resolve_movies && fpl.input.input_type == InputType::Xtream, options.xtream_resolve_movies_delay)
+            (options.xtream_resolve_video && fpl.input.input_type == InputType::Xtream, options.xtream_resolve_video_delay)
         } else {
             (false, 0)
         };
@@ -118,7 +116,7 @@ pub async fn playlist_resolve_movies(cfg: &Config, target: &ConfigTarget, errors
         if !processed_vod_ids.contains(pli.header.borrow().get_uuid().as_ref()) {
             if let Some(content) = playlist_resolve_movies_process_playlist_item(pli, fpl.input, errors, resolve_delay).await {
                 processed_vod_ids.insert(*pli.header.borrow().uuid);
-                if let Err(err) = write_content_to_file(&mut writer, &pli.header.borrow().uuid, &content) {
+                if let Err(err) = write_vod_info_content_to_file(&mut writer, &pli.header.borrow().uuid, &content) {
                     errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve movies, could not write to temporary file {err}")));
                     return;
                 }
