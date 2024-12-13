@@ -707,10 +707,7 @@ pub async fn xtream_write_series_info(
                     .await
                     .map_err(|err| {
                         error!("Could not lock document {:?}: {}", info_path, err);
-                        Error::new(
-                            ErrorKind::Other,
-                            format!("Document Reader error for target {target_name}"),
-                        )
+                        Error::new(ErrorKind::Other,format!("Document Reader error for target {target_name}"))
                     })
                     .ok()?;
                 return match IndexedDocumentReader::<u32, String>::read_indexed_item(
@@ -718,10 +715,8 @@ pub async fn xtream_write_series_info(
                 ) {
                     Ok(content) => Some(content),
                     Err(err) => {
-                        error!(
-                        "Failed to read vod info for id {vod_id} for {target_name}: {}",
-                        err
-                    );
+                        // this is not an error, it means the info is not indexed
+                        // error!("Failed to read vod info for id {vod_id} for {target_name}: {}",err);
                         None
                     }
                 };

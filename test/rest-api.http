@@ -38,6 +38,15 @@ GET http://localhost:8901/player_api.php?action=get_live_categories&username=xt&
 ### xtream live_streams
 GET http://localhost:8901/player_api.php?action=get_live_streams&username=xt&password=xt&category_id=102
 
+### xtream vod_categories
+GET http://localhost:8901/player_api.php?action=get_vod_categories&username=xt&password=xt
+
+### xtream vod info
+GET http://localhost:8901/player_api.php?action=get_vod_streams&category_id=3&username=xt&password=xt
+
+### xtream vod info
+GET http://localhost:8901/player_api.php?action=get_vod_info&vod_id=2&username=xt&password=xt
+
 ### xtream series_categories
 GET http://localhost:8901/player_api.php?action=get_series_categories&username=xt&password=xt
 
