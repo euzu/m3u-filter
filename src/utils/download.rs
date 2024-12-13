@@ -4,7 +4,8 @@ use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistGroup, Play
 use crate::model::xmltv::TVGuide;
 use crate::processing::xtream_parser::parse_xtream_series_info;
 use crate::processing::{m3u_parser, xtream_parser};
-use crate::repository::{xtream_repository};
+use crate::repository::xtream_repository::xtream_get_input_vod_info;
+use crate::repository::xtream_repository;
 use crate::utils::{file_utils, request_utils};
 use log::{debug, info};
 use std::cmp::Ordering;
@@ -12,7 +13,6 @@ use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::rc::Rc;
-use crate::repository::xtream_repository::xtream_get_input_vod_info;
 
 const ACTION_GET_SERIES_INFO: &str = "get_series_info";
 const ACTION_GET_VOD_INFO: &str = "get_vod_info";
@@ -130,9 +130,11 @@ where
         }
         let resolve_movies = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_video);
         if resolve_movies {
-           if let Some(content) = xtream_get_input_vod_info(config, input, &pli.get_uuid()).await {
-                return xtream_repository::write_and_get_xtream_vod_info(config, target, pli, &content).await;
-           }
+            if let Some(provider_id) = pli.get_provider_id() {
+                if let Some(content) = xtream_get_input_vod_info(config, input, provider_id).await {
+                    return xtream_repository::write_and_get_xtream_vod_info(config, target, pli, &content).await;
+                }
+            }
         }
     }
 

@@ -1,13 +1,18 @@
-use std::fs::File;
-use std::io::Write;
-use std::sync::LazyLock;
-use chrono::Datelike;
-use log::error;
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::PlaylistGroup;
+use crate::model::playlist::{PlaylistGroup};
+use crate::repository::bplustree::BPlusTree;
+use crate::repository::storage::get_input_storage_path;
+use crate::repository::xtream_repository::xtream_get_vod_tmdb_file_path;
+use crate::utils::file_lock_manager::FileReadGuard;
 use crate::utils::file_utils;
+use chrono::Datelike;
+use log::error;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
+use std::sync::LazyLock;
 
 struct KodiStyle {
     year: regex::Regex,
@@ -41,20 +46,20 @@ fn kodi_style_rename_year(name: &String, style: &KodiStyle) -> (String, Option<S
 
 fn kodi_style_rename_season(name: &String, style: &KodiStyle) -> (String, Option<String>) {
     style.season.find(name).map_or_else(|| (String::from(name), Some(String::from("01"))), |m| {
-            let s_season = &name[m.start()..m.end()];
-            let season = Some(String::from(&s_season[1..]));
-            let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
-            (new_name, season)
-        })
+        let s_season = &name[m.start()..m.end()];
+        let season = Some(String::from(&s_season[1..]));
+        let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
+        (new_name, season)
+    })
 }
 
 fn kodi_style_rename_episode(name: &String, style: &KodiStyle) -> (String, Option<String>) {
     style.episode.find(name).map_or_else(|| (String::from(name), None), |m| {
-            let s_episode = &name[m.start()..m.end()];
-            let episode = Some(String::from(&s_episode[1..]));
-            let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
-            (new_name, episode)
-        })
+        let s_episode = &name[m.start()..m.end()];
+        let episode = Some(String::from(&s_episode[1..]));
+        let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
+        (new_name, episode)
+    })
 }
 
 fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
@@ -75,12 +80,42 @@ static KODY_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
     whitespace: regex::Regex::new(r"\s+").unwrap(),
 });
 
-fn _get_tmdb_id(_virtual_id: u32) -> Option<String> {
-    // TODO
-  None
+type InputTmdbIndexMap = HashMap<u16, Option<(FileReadGuard, BPlusTree<u32, u32>)>>;
+async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
+                     input_indexes: &mut InputTmdbIndexMap) -> Option<u32> {
+    match provider_id {
+        None => None,
+        Some(pid) => {
+            match input_indexes.entry(input_id) {
+                std::collections::hash_map::Entry::Occupied(entry) => {
+                    if let Some((_, tree)) = entry.get() {
+                        tree.query(&pid).copied()
+                    } else {
+                        None
+                    }
+                }
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    if let Some(input) = cfg.get_input_by_id(input_id) {
+                        if let Ok(tmdb_path) = get_input_storage_path(input, &cfg.working_dir)
+                            .map(|storage_path| xtream_get_vod_tmdb_file_path(&storage_path)) {
+                            if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
+                                if let Ok(tree) = BPlusTree::<u32, u32>::load(&tmdb_path) {
+                                    let tmdb_id = tree.query(&pid).copied();
+                                    entry.insert(Some((file_lock, tree)));
+                                    return tmdb_id;
+                                }
+                            };
+                        };
+                    }
+                    entry.insert(None);
+                    None
+                }
+            }
+        }
+    }
 }
 
-pub fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&String>) -> Result<(), M3uFilterError> {
+pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&String>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write strm playlist failed: ".to_string()));
@@ -97,8 +132,19 @@ pub fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlis
                 error!("cant create directory: {:?}", &path);
                 return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
             };
+
+            let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
+
             for pg in new_playlist {
                 for pli in &pg.channels {
+                    let provider_id = pli.header.borrow_mut().get_provider_id();
+                    let input_id = pli.header.borrow().input_id;
+                    let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes).await;
+                    let additional_info = match tmdb_id {
+                        None => {String::new()}
+                        Some(id) => {format!(" {{tmdb={id}}}")}
+                    };
+
                     let header = &pli.header.borrow();
                     let dir_path = path.join(sanitize_for_filename(&header.group, underscore_whitespace));
                     if let Err(e) = std::fs::create_dir_all(&dir_path) {
@@ -109,7 +155,7 @@ pub fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlis
                     if kodi_style {
                         kodi_file_name = kodi_style_rename(&kodi_file_name, &KODY_STYLE);
                     }
-                    let file_path = dir_path.join(format!("{kodi_file_name}.strm"));
+                    let file_path = dir_path.join(format!("{kodi_file_name}{additional_info}.strm"));
                     match File::create(&file_path) {
                         Ok(mut strm_file) => {
                             match file_utils::check_write(&strm_file.write_all(header.url.as_bytes())) {

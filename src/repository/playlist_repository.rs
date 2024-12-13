@@ -48,7 +48,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
         let result = match output.target {
             TargetType::M3u => m3u_write_playlist(target, cfg, &target_path, playlist).await,
             TargetType::Xtream => xtream_write_playlist(target, cfg, playlist).await,
-            TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, output.filename.as_ref()),
+            TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, output.filename.as_ref()).await,
         };
 
         if let Err(err) = result {

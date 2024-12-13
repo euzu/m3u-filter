@@ -16,7 +16,6 @@ use crate::repository::storage::hash_string;
 // https://siptv.eu/howto/playlist.html
 
 pub trait PlaylistEntry {
-    fn get_uuid(&self) ->  Rc<[u8;32]>;
     fn get_virtual_id(&self) -> u32;
     fn get_provider_id(&self) -> Option<u32>;
     fn get_category_id(&self) -> Option<u32>;
@@ -233,7 +232,6 @@ generate_field_accessor_impl_for_playlist_item_header!(id, /*virtual_id,*/ name,
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct M3uPlaylistItem {
-    pub uuid: Rc<UUIDType>,
     pub virtual_id: u32,
     pub provider_id: Rc<String>,
     pub name: Rc<String>,
@@ -276,9 +274,6 @@ impl M3uPlaylistItem {
 }
 
 impl PlaylistEntry for M3uPlaylistItem {
-    fn get_uuid(&self) -> Rc<[u8; 32]> {
-        Rc::clone(&self.uuid)
-    }
 
     #[inline]
     fn get_virtual_id(&self) -> u32 {
@@ -311,7 +306,6 @@ impl PlaylistEntry for M3uPlaylistItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamPlaylistItem {
-    pub uuid: Rc<UUIDType>,
     pub virtual_id: u32,
     pub provider_id: u32,
     pub name: Rc<String>,
@@ -338,9 +332,6 @@ impl XtreamPlaylistItem {
 }
 
 impl PlaylistEntry for XtreamPlaylistItem {
-    fn get_uuid(&self) -> Rc<[u8; 32]> {
-        Rc::clone(&self.uuid)
-    }
 
     #[inline]
     fn get_virtual_id(&self) -> u32 {
@@ -371,7 +362,6 @@ impl PlaylistItem {
     pub fn to_m3u(&self) -> M3uPlaylistItem {
         let header = self.header.borrow();
         M3uPlaylistItem {
-            uuid: Rc::clone(&header.uuid),
             virtual_id: header.virtual_id,
             provider_id: Rc::clone(&header.id),
             name: Rc::clone(&header.name),
@@ -395,7 +385,6 @@ impl PlaylistItem {
         let header = self.header.borrow();
         let provider_id = header.id.parse::<u32>().unwrap_or_default();
         XtreamPlaylistItem {
-            uuid: Rc::clone(&header.uuid),
             virtual_id: header.virtual_id,
             provider_id,
             name: Rc::clone(&header.name),
@@ -418,10 +407,6 @@ impl PlaylistItem {
 }
 
 impl PlaylistEntry for PlaylistItem {
-    #[inline]
-    fn get_uuid(&self) -> Rc<[u8; 32]> {
-        Rc::clone(self.header.borrow().get_uuid())
-    }
 
     #[inline]
     fn get_virtual_id(&self) -> u32 {

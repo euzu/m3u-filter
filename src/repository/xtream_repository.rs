@@ -9,7 +9,7 @@ use serde_json::{json, Map, Value};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{
-    PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, UUIDType, XtreamCluster,
+    PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster,
     XtreamPlaylistItem,
 };
 use crate::model::xtream::XtreamMappingOptions;
@@ -855,14 +855,14 @@ pub async fn xtream_write_series_info(
     pub async fn xtream_get_input_vod_info(
         cfg: &Config,
         input: &ConfigInput,
-        uuid: &UUIDType,
+        provider_id: u32,
     ) -> Option<String> {
         if let Ok(Some((info_path, idx_path))) = get_input_storage_path(input, &cfg.working_dir)
             .map(|storage_path| xtream_get_info_file_paths(&storage_path, XtreamCluster::Video))
         {
             if let Ok(_file_lock) = cfg.file_locks.read_lock(&info_path).await {
-                if let Ok(content) = IndexedDocumentReader::<UUIDType, String>::read_indexed_item(
-                    &info_path, &idx_path, uuid,
+                if let Ok(content) = IndexedDocumentReader::<u32, String>::read_indexed_item(
+                    &info_path, &idx_path, &provider_id,
                 ) {
                     return Some(content);
                 }
