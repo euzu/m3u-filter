@@ -26,7 +26,7 @@ use crate::model::stats::{InputStats, PlaylistStats};
 use crate::processing::affix_processor::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
 use crate::processing::xmltv_parser::flatten_tvguide;
-use crate::processing::xtream_processor::{playlist_resolve_series, playlist_resolve_movies};
+use crate::processing::xtream_processor::{playlist_resolve_series, playlist_resolve_vod};
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
@@ -469,7 +469,7 @@ async fn process_playlist(playlists: &mut [FetchedPlaylist<'_>],
     for provider_fpl in playlists.iter_mut() {
         let mut processed_fpl = execute_pipe(target, &pipe, provider_fpl);
         playlist_resolve_series(target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
-        playlist_resolve_movies(cfg, target, errors, &processed_fpl).await;
+        playlist_resolve_vod(cfg, target, errors, &processed_fpl).await;
         // stats
         let input_stats = stats.get_mut(&processed_fpl.input.id);
         if let Some(stat) = input_stats {

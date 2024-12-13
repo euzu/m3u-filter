@@ -693,6 +693,7 @@ mod tests {
 
         // Traverse the tree
         tree_query.traverse(|keys, values| {
+            // TODO real test
             println!("Node: {:?} {:?}", keys, values);
         });
         Ok(())
