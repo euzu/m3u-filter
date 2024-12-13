@@ -73,7 +73,7 @@ pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &s
 }
 
 
-pub async fn get_input_text_content(input: &ConfigInput, working_dir: &String, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
+pub async fn get_input_text_content(input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
     debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
 
     if url_str.parse::<url::Url>().is_ok() {

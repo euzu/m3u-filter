@@ -85,7 +85,7 @@ pub fn get_default_api_proxy_config_path(config_path: &str) -> String {
     get_default_file_path(config_path, API_PROXY_FILE)
 }
 
-pub fn get_working_path(wd: &String) -> String {
+pub fn get_working_path(wd: &str) -> String {
     let current_dir = std::env::current_dir().unwrap();
     if wd.is_empty() {
         String::from(current_dir.to_str().unwrap_or("."))
@@ -111,7 +111,7 @@ pub fn open_file(file_name: &Path) -> Result<File, std::io::Error> {
     File::open(file_name)
 }
 
-pub fn persist_file(persist_file: Option<PathBuf>, text: &String) {
+pub fn persist_file(persist_file: Option<PathBuf>, text: &str) {
     if let Some(path_buf) = persist_file {
         let filename = &path_buf.to_str().unwrap_or("?");
         match File::create(&path_buf) {

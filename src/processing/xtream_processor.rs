@@ -4,7 +4,7 @@ use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistItem, Playl
 use crate::processing::playlist_processor::ProcessingPipe;
 use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::{xtream_get_info_file_paths, xtream_update_input_vod_info_file, xtream_update_input_vod_tmdb_file};
-use crate::repository::IndexedDocumentQuery;
+use crate::repository::IndexedDocumentIndex;
 use crate::utils::download;
 use serde_json::{Map, Value};
 use std::collections::HashSet;
@@ -152,11 +152,13 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
     // we cant write to the indexed-document directly because of the write lock and time-consuming operation.
     // All readers would be waiting for the lock and the app would be unresponsive.
     // We collect the content into a temp file and write it once we collected everything.
-    let Some((temp_file_info, temp_file_tmdb)) = create_resolve_vod_info_temp_files(errors) else { return };
+    let Some((mut temp_file_info, mut temp_file_tmdb)) = create_resolve_vod_info_temp_files(errors) else { return };
 
     let mut processed_vod_ids = read_processed_vod_info_ids(cfg, errors, fpl).await;
     let mut info_writer = BufWriter::new(&temp_file_info);
     let mut tmdb_writer = BufWriter::new(&temp_file_tmdb);
+    let mut info_updated = false;
+    let mut tmdb_updated = false;
     for pli in fpl.playlistgroups.iter().flat_map(|plg| &plg.channels) {
         let a = pli.header.borrow_mut().get_provider_id().as_ref().map_or(false, |pid| processed_vod_ids.contains(pid));
         if !a {
@@ -166,32 +168,37 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
                         errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve vod, could not write to temporary file {err}")));
                         return;
                     }
+                    info_updated = true;
                     processed_vod_ids.insert(provider_id);
                     if tmdb_id > 0 {
                         if let Err(err) = write_vod_info_tmdb_to_temp_file(&mut tmdb_writer, provider_id, tmdb_id) {
                             errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve vod tmdb, could not write to temporary file {err}")));
                             return;
                         }
+                        tmdb_updated = true;
                     }
-                    // TODO create tmdb_id index for kodi export
                 }
             }
         }
     }
-    if let Err(err) = info_writer.flush() {
-        errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve vod, could not write to temporary file {err}")));
+    if info_updated {
+        if let Err(err) = info_writer.flush() {
+            errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve vod, could not write to temporary file {err}")));
+        }
+        drop(info_writer);
+        if let Err(err) = xtream_update_input_vod_info_file(cfg, fpl.input, &mut temp_file_info).await {
+            errors.push(err);
+        }
     }
-    if let Err(err) = tmdb_writer.flush() {
-        errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve vod tmdb, could not write to temporary file {err}")));
+    if tmdb_updated {
+        if let Err(err) = tmdb_writer.flush() {
+            errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve vod tmdb, could not write to temporary file {err}")));
+        }
+        drop(tmdb_writer);
+        if let Err(err) = xtream_update_input_vod_tmdb_file(cfg, fpl.input, &mut temp_file_tmdb).await {
+            errors.push(err);
+        }
     }
-
-    if let Err(err) = xtream_update_input_vod_info_file(cfg, fpl.input, &temp_file_info).await {
-        errors.push(err);
-    }
-    if let Err(err) = xtream_update_input_vod_tmdb_file(cfg, fpl.input, &temp_file_tmdb).await {
-        errors.push(err);
-    }
-
 }
 
 async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) -> HashSet<u32> {
@@ -201,7 +208,7 @@ async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterErr
             Ok(Some((file_path, idx_path))) => {
                 match cfg.file_locks.read_lock(&file_path).await {
                     Ok(file_lock) => {
-                        if let Ok(mut info_id_mapping) = IndexedDocumentQuery::<u32, String>::try_new(&idx_path) {
+                        if let Ok(info_id_mapping) = IndexedDocumentIndex::<u32>::load(&idx_path) {
                             info_id_mapping.traverse(|keys, _| {
                                 for doc_id in keys { processed_vod_ids.insert(*doc_id); }
                             });

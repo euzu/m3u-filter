@@ -533,15 +533,15 @@ fn process_watch(target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<Playlis
 
 pub async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let (stats, errors) = process_sources(cfg.clone(), targets.clone()).await;
+    // log errors
+    for err in &errors {
+        error!("{}", err.message);
+    }
     let stats_msg = format!("{{\"stats\": {}}}", stats.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n"));
     // print stats
     info!("{}", stats_msg);
     // send stats
     send_message(&MsgKind::Stats, cfg.messaging.as_ref(), stats_msg.as_str());
-    // log errors
-    for err in &errors {
-        error!("{}", err.message);
-    }
     // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
         let error_msg = format!("{{\"errors\": \"{}\"}}", message.as_str());

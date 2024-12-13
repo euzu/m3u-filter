@@ -300,7 +300,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_tags(&self, value: &String, captures: &HashMap<&str, &str>) -> Option<String> {
+    fn apply_tags(&self, value: &str, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
         let tag_captures = self.mapper.t_tagre.as_ref().unwrap().captures_iter(value)
             .filter(|caps| caps.len() > 1)
@@ -510,7 +510,7 @@ impl Mappings {
         self.mappings.prepare()
     }
 
-    pub fn get_mapping(&self, mapping_id: &String) -> Option<Mapping> {
+    pub fn get_mapping(&self, mapping_id: &str) -> Option<Mapping> {
         for mapping in &self.mappings.mapping {
             if mapping.id.eq(mapping_id) {
                 return Some(mapping.clone());

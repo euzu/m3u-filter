@@ -1,7 +1,7 @@
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::{PlaylistGroup};
+use crate::model::playlist::PlaylistGroup;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::xtream_get_vod_tmdb_file_path;
@@ -27,7 +27,7 @@ fn sanitize_for_filename(text: &str, underscore_whitespace: bool) -> String {
         .collect::<String>()
 }
 
-fn kodi_style_rename_year(name: &String, style: &KodiStyle) -> (String, Option<String>) {
+fn kodi_style_rename_year(name: &str, style: &KodiStyle) -> (String, Option<String>) {
     let current_date = chrono::Utc::now();
     let cur_year = current_date.year();
     match style.year.find(name) {
@@ -44,7 +44,7 @@ fn kodi_style_rename_year(name: &String, style: &KodiStyle) -> (String, Option<S
     }
 }
 
-fn kodi_style_rename_season(name: &String, style: &KodiStyle) -> (String, Option<String>) {
+fn kodi_style_rename_season(name: &str, style: &KodiStyle) -> (String, Option<String>) {
     style.season.find(name).map_or_else(|| (String::from(name), Some(String::from("01"))), |m| {
         let s_season = &name[m.start()..m.end()];
         let season = Some(String::from(&s_season[1..]));
@@ -53,7 +53,7 @@ fn kodi_style_rename_season(name: &String, style: &KodiStyle) -> (String, Option
     })
 }
 
-fn kodi_style_rename_episode(name: &String, style: &KodiStyle) -> (String, Option<String>) {
+fn kodi_style_rename_episode(name: &str, style: &KodiStyle) -> (String, Option<String>) {
     style.episode.find(name).map_or_else(|| (String::from(name), None), |m| {
         let s_episode = &name[m.start()..m.end()];
         let episode = Some(String::from(&s_episode[1..]));
@@ -62,15 +62,26 @@ fn kodi_style_rename_episode(name: &String, style: &KodiStyle) -> (String, Optio
     })
 }
 
-fn kodi_style_rename(name: &String, style: &KodiStyle) -> String {
+fn kodi_style_rename(name: &str, style: &KodiStyle) -> (Vec<String>, String) {
     let (work_name_1, year) = kodi_style_rename_year(name, style);
     let (work_name_2, season) = kodi_style_rename_season(&work_name_1, style);
     let (work_name_3, episode) = kodi_style_rename_episode(&work_name_2, style);
-    if year.is_some() && season.is_some() && episode.is_some() {
-        let formatted = format!("{} ({}) S{}E{}", work_name_3, year.unwrap(), season.unwrap(), episode.unwrap());
-        return String::from(style.whitespace.replace_all(formatted.as_str(), " ").as_ref());
+    let mut filename = work_name_3;
+    let mut filedir = vec![String::from(style.whitespace.replace_all(filename.as_str(), " "))];
+    if year.is_some() || season.is_some() {
+        if year.is_some() {
+            filename = format!("{filename} ({})", year.unwrap());
+            filedir = vec![String::from(style.whitespace.replace_all(filename.as_str(), " "))];
+        }
+        if season.is_some() && episode.is_some() {
+            let season_value = season.unwrap();
+            filedir.push(format!("Season {season_value}"));
+            filename = format!("{filename} S{season_value}E{}", episode.unwrap());
+        }
+        return (filedir, String::from(style.whitespace.replace_all(filename.as_str(), " ")));
     }
-    String::from(name)
+    let new_name = String::from(style.whitespace.replace_all(name, " "));
+    (vec![new_name.clone()], new_name)
 }
 
 static KODY_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
@@ -115,7 +126,7 @@ async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
     }
 }
 
-pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&String>) -> Result<(), M3uFilterError> {
+pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&str>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write strm playlist failed: ".to_string()));
@@ -137,24 +148,28 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
 
             for pg in new_playlist {
                 for pli in &pg.channels {
-                    let provider_id = pli.header.borrow_mut().get_provider_id();
-                    let input_id = pli.header.borrow().input_id;
-                    let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes).await;
-                    let additional_info = match tmdb_id {
-                        None => {String::new()}
-                        Some(id) => {format!(" {{tmdb={id}}}")}
-                    };
+                    let header = &mut pli.header.borrow_mut();
+                    let mut dir_path = path.join(sanitize_for_filename(&header.group, underscore_whitespace));
+                    let mut kodi_file_name = sanitize_for_filename(&header.title, underscore_whitespace);
+                    let mut additional_info = String::new();
+                    if kodi_style {
+                        let provider_id = header.get_provider_id();
+                        let input_id = header.input_id;
+                        let (kodi_file_dir_name, file_name) = kodi_style_rename(&kodi_file_name, &KODY_STYLE);
+                        kodi_file_name = file_name;
+                        kodi_file_dir_name.iter().for_each(|p| dir_path = dir_path.join(p));
 
-                    let header = &pli.header.borrow();
-                    let dir_path = path.join(sanitize_for_filename(&header.group, underscore_whitespace));
+                        let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes).await;
+                        additional_info = match tmdb_id {
+                            None => { String::new() }
+                            Some(id) => { format!(" {{tmdb={id}}}") }
+                        };
+
+                    }
                     if let Err(e) = std::fs::create_dir_all(&dir_path) {
-                        error!("cant create directory: {:?}", &path);
+                        error!("cant create directory: {:?}", &dir_path);
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
                     };
-                    let mut kodi_file_name = sanitize_for_filename(&header.title, underscore_whitespace);
-                    if kodi_style {
-                        kodi_file_name = kodi_style_rename(&kodi_file_name, &KODY_STYLE);
-                    }
                     let file_path = dir_path.join(format!("{kodi_file_name}{additional_info}.strm"));
                     match File::create(&file_path) {
                         Ok(mut strm_file) => {

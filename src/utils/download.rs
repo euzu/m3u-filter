@@ -18,9 +18,9 @@ const ACTION_GET_SERIES_INFO: &str = "get_series_info";
 const ACTION_GET_VOD_INFO: &str = "get_vod_info";
 const ACTION_GET_LIVE_INFO: &str = "get_live_info";
 
-fn prepare_file_path(persist: Option<&String>, working_dir: &str, action: &str) -> Option<PathBuf> {
+fn prepare_file_path(persist: Option<&str>, working_dir: &str, action: &str) -> Option<PathBuf> {
     let persist_file: Option<PathBuf> =
-        persist.map(|persist_path| file_utils::prepare_persist_path(persist_path.as_str(), action));
+        persist.map(|persist_path| file_utils::prepare_persist_path(persist_path, action));
     if persist_file.is_some() {
         let file_path = file_utils::get_file_path(working_dir, persist_file);
         debug!("persist to file:  {file_path:?}");
@@ -30,9 +30,9 @@ fn prepare_file_path(persist: Option<&String>, working_dir: &str, action: &str) 
     }
 }
 
-pub async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &String) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let url = input.url.clone();
-    let persist_file_path = prepare_file_path(input.persist.as_ref(), working_dir, "");
+    let persist_file_path = prepare_file_path(input.persist.as_ref().map(|x| x.as_str()), working_dir, "");
     match request_utils::get_input_text_content(input, working_dir, &url, persist_file_path).await {
         Ok(text) => {
             (m3u_parser::parse_m3u(cfg, input, text.lines()), vec![])
@@ -188,8 +188,8 @@ pub async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec
         if !skip_cluster.contains(xtream_cluster) {
             let category_url = format!("{base_url}&action={category}");
             let stream_url = format!("{base_url}&action={stream}");
-            let category_file_path = prepare_file_path(input.persist.as_ref(), working_dir, format!("{category}_").as_str());
-            let stream_file_path = prepare_file_path(input.persist.as_ref(), working_dir, format!("{stream}_").as_str());
+            let category_file_path = prepare_file_path(input.persist.as_ref().map(|x| x.as_str()), working_dir, format!("{category}_").as_str());
+            let stream_file_path = prepare_file_path(input.persist.as_ref().map(|x| x.as_str()), working_dir, format!("{stream}_").as_str());
 
             match futures::join!(
                 request_utils::get_input_json_content(input, category_url.as_str(), category_file_path),
@@ -228,7 +228,7 @@ pub async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &str) ->
         None => (None, vec![]),
         Some(url) => {
             debug!("Getting epg file path for url: {}", url);
-            let persist_file_path = prepare_file_path(input.persist.as_ref(), working_dir, "")
+            let persist_file_path = prepare_file_path(input.persist.as_ref().map(|x| x.as_str()), working_dir, "")
                 .map(|path| file_utils::add_prefix_to_filename(&path, "epg_", Some("xml")));
 
             match request_utils::get_input_text_content_as_file(input, working_dir, url, persist_file_path).await {

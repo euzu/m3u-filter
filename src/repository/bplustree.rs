@@ -455,32 +455,32 @@ where
         };
     }
 }
-
-fn traverse_tree<K, V, R: Read + Seek, F>(file: &mut R, offset: u64, callback: &mut F)
-where
-    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
-    V: Serialize + for<'de> Deserialize<'de> + Clone,
-    F: FnMut(&Vec<K>, &Vec<V>),
-{
-    let current_offset = offset;
-    let mut buffer = vec![0u8; BLOCK_SIZE];
-
-    match BPlusTreeNode::<K, V>::deserialize_from_block(file, &mut buffer, current_offset, false) {
-        Ok((node, pointers)) => {
-            if node.is_leaf {
-                callback(&node.keys, &node.values);
-            } else if let Some(child_pointers) = pointers {
-                for &child_offset in &child_pointers {
-                    traverse_tree(file, child_offset, callback);
-                }
-            }
-            // if it's a leaf we return.
-        }
-        Err(err) => {
-            error!("Failed to read tree node at offset {current_offset}: {err}");
-        }
-    }
-}
+//
+// fn traverse_tree<K, V, R: Read + Seek, F>(file: &mut R, offset: u64, callback: &mut F)
+// where
+//     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+//     V: Serialize + for<'de> Deserialize<'de> + Clone,
+//     F: FnMut(&Vec<K>, &Vec<V>),
+// {
+//     let current_offset = offset;
+//     let mut buffer = vec![0u8; BLOCK_SIZE];
+//
+//     match BPlusTreeNode::<K, V>::deserialize_from_block(file, &mut buffer, current_offset, false) {
+//         Ok((node, pointers)) => {
+//             if node.is_leaf {
+//                 callback(&node.keys, &node.values);
+//             } else if let Some(child_pointers) = pointers {
+//                 for &child_offset in &child_pointers {
+//                     traverse_tree(file, child_offset, callback);
+//                 }
+//             }
+//             // if it's a leaf we return.
+//         }
+//         Err(err) => {
+//             error!("Failed to read tree node at offset {current_offset}: {err}");
+//         }
+//     }
+// }
 
 /// `BPlusTreeQuery` can be used to query the `BPlusTree` on-disk.
 /// If you intend to do frequent queries then use `BPlusTree` instead which loads the tree into memory.
@@ -513,12 +513,12 @@ where
         query_tree(&mut self.file, key)
     }
 
-    pub fn traverse<F>(&mut self, mut visit: F)
-    where
-        F: FnMut(&Vec<K>, &Vec<V>),
-    {
-        traverse_tree(&mut self.file, 0, &mut visit);
-    }
+    // pub fn traverse<F>(&mut self, mut visit: F)
+    // where
+    //     F: FnMut(&Vec<K>, &Vec<V>),
+    // {
+    //     traverse_tree(&mut self.file, 0, &mut visit);
+    // }
 }
 
 pub struct BPlusTreeUpdate<K, V> {
@@ -678,28 +678,28 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn traverse_test() -> io::Result<()> {
-        let mut tree = BPlusTree::<u32, Record>::new();
-        for i in 0u32..=500 {
-            tree.insert(i, Record {
-                id: i,
-                data: format!("Entry {i}"),
-            });
-        }
-        let filepath = PathBuf::from("/tmp/tree.bin");
-        // Serialize the tree to a file
-        tree.store(&filepath)?;
-
-        let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::try_new(&filepath)?;
-
-        // Traverse the tree
-        tree_query.traverse(|keys, values| {
-            // TODO real test
-            println!("Node: {:?} {:?}", keys, values);
-        });
-        Ok(())
-    }
+    // #[test]
+    // fn traverse_test() -> io::Result<()> {
+    //     let mut tree = BPlusTree::<u32, Record>::new();
+    //     for i in 0u32..=500 {
+    //         tree.insert(i, Record {
+    //             id: i,
+    //             data: format!("Entry {i}"),
+    //         });
+    //     }
+    //     let filepath = PathBuf::from("/tmp/tree.bin");
+    //     // Serialize the tree to a file
+    //     tree.store(&filepath)?;
+    //
+    //     let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::try_new(&filepath)?;
+    //
+    //     // Traverse the tree
+    //     tree_query.traverse(|keys, values| {
+    //         // TODO real test
+    //         println!("Node: {:?} {:?}", keys, values);
+    //     });
+    //     Ok(())
+    // }
 
     #[test]
     fn insert_dulplicate_test() -> io::Result<()> {

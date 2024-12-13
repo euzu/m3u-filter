@@ -1,3 +1,4 @@
+use std::io::{Seek, SeekFrom};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
@@ -104,7 +105,7 @@ pub fn xtream_get_vod_tmdb_file_path(storage_path: &Path) -> PathBuf {
 async fn write_playlists_to_file(
     cfg: &Config,
     storage_path: &Path,
-    collections: Vec<(XtreamCluster, &mut [PlaylistItem])>,
+    collections: Vec<(XtreamCluster, &mut [&PlaylistItem])>,
 ) -> Result<(), M3uFilterError> {
     for (cluster, playlist) in collections {
         let (xtream_path, idx_path) = xtream_get_file_paths(storage_path, cluster);
@@ -247,7 +248,7 @@ pub async fn xtream_write_playlist(
               TAG_PARENT_ID: 0
             }));
 
-            for pli in plg.channels.drain(..) {
+            for pli in &plg.channels {
                 let mut header = pli.header.borrow_mut();
                 let col = match header.item_type {
                     PlaylistItemType::Series => {
@@ -874,7 +875,7 @@ pub async fn xtream_write_series_info(
     pub async fn xtream_update_input_vod_info_file(
         cfg: &Config,
         input: &ConfigInput,
-        temp_file: &File,
+        temp_file: &mut File,
     ) -> Result<(), M3uFilterError> {
         match get_input_storage_path(input, &cfg.working_dir)
             .map(|storage_path| xtream_get_info_file_paths(&storage_path, XtreamCluster::Video))
@@ -882,6 +883,7 @@ pub async fn xtream_write_series_info(
             Ok(Some((info_path, idx_path))) => {
                 match cfg.file_locks.write_lock(&info_path).await {
                     Ok(_file_lock) => {
+                        temp_file.seek(SeekFrom::Start(0)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read vod info {err}")))?;
                         let mut reader = BufReader::new(temp_file);
                         match IndexedDocumentWriter::<u32>::new_append(info_path, idx_path) {
                             Ok(mut writer) => {
@@ -917,7 +919,7 @@ pub async fn xtream_write_series_info(
     pub async fn xtream_update_input_vod_tmdb_file(
         cfg: &Config,
         input: &ConfigInput,
-        temp_file: &File,
+        temp_file: &mut File,
     ) -> Result<(), M3uFilterError> {
         match get_input_storage_path(input, &cfg.working_dir)
             .map(|storage_path| xtream_get_vod_tmdb_file_path(&storage_path))
@@ -925,6 +927,7 @@ pub async fn xtream_write_series_info(
             Ok(tmdb_path) => {
                 match cfg.file_locks.write_lock(&tmdb_path).await {
                     Ok(_file_lock) => {
+                        temp_file.seek(SeekFrom::Start(0)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read vod tmdb info {err}")))?;
                         let mut reader = BufReader::new(temp_file);
                         let mut provider_id_bytes = [0u8; 4];
                         let mut tmdb_id_bytes = [0u8; 4];

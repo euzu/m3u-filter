@@ -4,10 +4,10 @@ use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use log::error;
-use serde::{Deserialize, Serialize};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 use crate::utils::file_utils;
+use log::error;
+use serde::{Deserialize, Serialize};
 
 const BLOCK_SIZE: usize = 4096;
 const LEN_SIZE: usize = 4;
@@ -41,7 +41,8 @@ impl IndexedDocument {
 
 
     pub(in crate::repository) fn get_offset<K>(index_path: &Path, doc_id: &K) -> Result<u64, Error>
-    where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
+    where
+        K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
     {
         match BPlusTreeQuery::<K, OffsetPointer>::try_new(index_path) {
             Ok(mut tree) => {
@@ -70,7 +71,8 @@ impl IndexedDocument {
  * index file is a bplustree
  */
 pub(in crate::repository) struct IndexedDocumentWriter<K>
-where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
 {
     main_path: PathBuf,
     index_path: PathBuf,
@@ -81,8 +83,9 @@ where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
     fragmented: bool,
 }
 
-impl <K> IndexedDocumentWriter<K>
-where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
+impl<K> IndexedDocumentWriter<K>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
 {
     fn new_with_mode(main_path: PathBuf, index_path: PathBuf, append: bool) -> Result<Self, Error> {
         let append_mode = append && main_path.exists();
@@ -147,8 +150,16 @@ where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
     pub fn store(&mut self) -> std::io::Result<()> {
         if self.dirty {
             self.dirty = false;
-            self.main_file.flush()?;
-            self.index_tree.store(&self.index_path).map(|_| ())
+            match self.index_tree.store(&self.index_path) {
+                Ok(written_bytes) => {
+                    if written_bytes > 0 {
+                        self.main_file.flush()
+                    } else {
+                        Ok(())
+                    }
+                }
+                Err(err) => { Err(err) }
+            }
         } else {
             Ok(())
         }
@@ -166,7 +177,8 @@ where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
             if size == encoded_bytes.len() {
                 // check if it is equal
                 let mut record_buffer = vec![0; size];
-                record_buffer.resize(size, 0); self.main_file.read_exact(&mut record_buffer)?;
+                record_buffer.resize(size, 0);
+                self.main_file.read_exact(&mut record_buffer)?;
                 if record_buffer == encoded_bytes {
                     return Ok(());
                 }
@@ -208,8 +220,9 @@ where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
     }
 }
 
-impl <K> Drop for IndexedDocumentWriter<K>
-where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
+impl<K> Drop for IndexedDocumentWriter<K>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
 {
     fn drop(&mut self) {
         let _ = self.store();
@@ -234,7 +247,8 @@ pub(in crate::repository) struct IndexedDocumentReader<K, T> {
 }
 
 impl<K, T: serde::de::DeserializeOwned> IndexedDocumentReader<K, T>
-where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
 {
     pub fn new(main_path: &Path, index_path: &Path) -> Result<Self, Error> {
         if main_path.exists() && index_path.exists() {
@@ -269,7 +283,7 @@ where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
 
 
     pub fn get_path(&self) -> &Path {
-      &self.main_path
+        &self.main_path
     }
 
     pub const fn has_error(&self) -> bool {
@@ -323,7 +337,8 @@ where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
 }
 
 impl<K, T: serde::de::DeserializeOwned> Iterator for IndexedDocumentReader<K, T>
-where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
 {
     type Item = T;
 
@@ -351,8 +366,9 @@ pub(in crate::repository) struct IndexedDocumentGarbageCollector<K> {
     index_tree: BPlusTree<K, OffsetPointer>,
 }
 
-impl <K> IndexedDocumentGarbageCollector<K>
-where K: Ord + Serialize + for<'de> Deserialize<'de> + Clone
+impl<K> IndexedDocumentGarbageCollector<K>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
 {
     pub fn new(main_path: PathBuf, index_path: PathBuf) -> Result<Self, Error> {
         if main_path.exists() && index_path.exists() {
@@ -528,3 +544,4 @@ mod tests {
 
 pub type IndexedDocumentQuery<K, V> = BPlusTreeQuery<K, V>;
 pub type IndexedDocumentUpdate<K, V> = BPlusTreeUpdate<K, V>;
+pub type IndexedDocumentIndex<K> = BPlusTree<K, OffsetPointer>;

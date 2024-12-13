@@ -2,7 +2,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use actix_web::{HttpRequest, HttpResponse, web, http::header};
-use log::{info};
+use log::{error, info};
 use quick_xml::{Reader, Writer};
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -151,7 +151,7 @@ fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> HttpResponse
                             elem.push_attribute(attr);
                         }
                         Err(e) => {
-                            println!("Error parsing attribute: {e}");
+                            error!("Error parsing attribute: {e}");
                         }
                     }
                 }
@@ -165,7 +165,7 @@ fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> HttpResponse
                 xml_writer.write_event(event).expect("Failed to write event");
             }
             Err(e) => {
-                println!("Error: {e}");
+                error!("Error: {e}");
                 break;
             }
         }
