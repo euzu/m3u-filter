@@ -1,19 +1,10 @@
-@import "~react-tagsinput/react-tagsinput.css";
-
-.react-tagsinput {
-  background-color: inherit !important;
-  border: none !important;
-
-  &-tag {
-    background-color: var(--checkbox-checked-background-color) !important;
-    color: var(--text-color) !important;
-    border: 1px solid var(--border-light-color) !important;
-
-  }
-  &-remove {
-    color: var(--text-color) !important;
-    &:hover {
-      color: var(--tab-active-color) !important;
-    }
-  }
+.rti--container {
+  --rti-bg: inherit !important;
+  --rti-border: none !important;
+  --rti-tag: var(--checkbox-checked-background-color) !important;
+  --rti-tag-color: var(--text-color) !important;
+  --rti-tag-border: var(--border-light-color) !important;
+  --rti-tag-remove: var(--text-color) !important;
+  --rti-tag-remove-hover: var(--tab-active-color) !important;
+  max-width: 660px;
 }

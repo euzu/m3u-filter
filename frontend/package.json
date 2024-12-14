@@ -21,7 +21,7 @@
     "notistack": "3.0.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-tagsinput": "3.20.3",
+    "react-tag-input-component": "latest",
     "rxjs": "7.8.1"
   },
   "devDependencies": {
@@ -30,7 +30,6 @@
     "@types/file-saver": "2.0.7",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
-    "@types/react-tagsinput": "3.20.6",
     "@types/video.js": "7.3.58",
     "@typescript-eslint/eslint-plugin": "8.15.0",
     "@typescript-eslint/parser": "8.15.0",
