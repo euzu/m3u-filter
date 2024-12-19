@@ -5,6 +5,7 @@
   "version": "2.0.10",
   "private": true,
   "homepage": "./",
+  "license": "MIT",
   "scripts": {
     "react-start": "react-scripts start",
     "react-build": "react-scripts build",
@@ -21,7 +22,7 @@
     "notistack": "3.0.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-tag-input-component": "latest",
+    "react-tag-input-component": "2.0.2",
     "rxjs": "7.8.1"
   },
   "devDependencies": {

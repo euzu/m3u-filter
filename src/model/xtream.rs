@@ -298,7 +298,7 @@ pub struct XtreamSeriesInfoInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoEpisodeInfo {
-    pub tmdb_id: u32,
+    pub tmdb_id: Option<u32>,
     pub releasedate: String,
     pub plot: String,
     pub duration_secs: u32,

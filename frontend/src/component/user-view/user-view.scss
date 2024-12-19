@@ -6,19 +6,22 @@
 }
 
 .user {
-  @include preferences.prefsRoot();
-  @include preferences.prefsToolbar();
+  & {
+    min-height: 400px;
+    max-height: 480px;
 
-  min-height: 400px;
-  max-height: 480px;
+    @include preferences.prefsRoot();
+    @include preferences.prefsToolbar();
+  }
 
   &__content {
-    display: flex;
-    flex-flow: column;
-    flex: 1 1 auto;
-    justify-content: flex-start;
-    overflow: hidden;
-
+    & {
+      display: flex;
+      flex-flow: column;
+      flex: 1 1 auto;
+      justify-content: flex-start;
+      overflow: hidden;
+    }
     label {
       font-weight: bold;
 
@@ -43,31 +46,37 @@
   }
 
   &__target {
-    display: flex;
-    flex-flow: column;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    background-color: var(--background-color);
-    gap: 12px;
+    & {
+      display: flex;
+      flex-flow: column;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      background-color: var(--background-color);
+      gap: 12px;
+    }
 
     &-target {
-      font-size: 1.2rem;
-      align-items: center;
-      display: flex;
-      flex-flow: row;
-      padding: 8px;
+      & {
+        font-size: 1.2rem;
+        align-items: center;
+        display: flex;
+        flex-flow: row;
+        padding: 8px;
+      }
 
       label {
         flex: 1 1 0;
       }
 
       &-toolbar {
-        flex: 0 0 auto;
+        & {
+          flex: 0 0 auto;
+          padding-right: 8px;
+        }
         button {
           @include common.iconButton();
         }
-        padding-right: 8px;
       }
     }
 
@@ -99,22 +108,26 @@
       }
 
       &-col {
-        display: table-cell;
-        width: auto;
-        vertical-align: bottom;
-        padding-left: 4px;
-        padding-right: 4px;
+        & {
+          display: table-cell;
+          width: auto;
+          vertical-align: bottom;
+          padding-left: 4px;
+          padding-right: 4px;
+        }
         input {
           border: none !important;
           height: 2rem;
         }
 
         &-toolbar {
-          display: flex;
-          flex-flow: row;
-          align-items: flex-end;
-          justify-content: flex-end;
-          padding-left: 4px;
+          & {
+            display: flex;
+            flex-flow: row;
+            align-items: flex-end;
+            justify-content: flex-end;
+            padding-left: 4px;
+          }
           span {
             padding: 4px;
             transform: scale(0.7) translateY(5px);

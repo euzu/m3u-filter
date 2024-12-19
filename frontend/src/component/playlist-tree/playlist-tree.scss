@@ -21,14 +21,14 @@
   }
 
   .tree-group {
-    .tree-group-header {
+    &__header {
       display: flex;
       flex-flow: row;
       align-items: center;
       height: 1.3rem;
       white-space: nowrap;
 
-      .tree-group-header-content {
+      &-content {
         display: flex;
         flex-flow: row;
         align-items: center;
@@ -39,14 +39,14 @@
         accent-color: var(--checkbox-checked-background-color);
       }
 
-      .tree-group-count {
+      &__count {
         margin-left: 10px;
         color: var(--tree-count-color);
       }
     }
 
-    .tree-group-childs {
-      .tree-channel {
+    &__childs {
+      .tree-group__channel {
         display: flex;
         flex-flow: row;
         align-items: center;
@@ -54,7 +54,7 @@
         height: 1.3rem;
         gap: 3px;
 
-        .tree-channel-tools {
+        &-tools {
           display: flex;
           flex-flow: row;
           align-items: center;
@@ -62,14 +62,14 @@
 
         }
 
-        .tree-channel-content {
+        &-content {
           display: flex;
           flex-flow: row;
           align-items: center;
           white-space: nowrap;
         }
 
-        .tree-channel-nr {
+        &-nr {
           min-width: 2rem;
           font-size: 1rem;
           margin-right: 8px;
@@ -83,14 +83,14 @@
       }
     }
 
-    .tree-group-header-content, .tree-channel-content {
+    &__header-content, &__channel-content {
       cursor: pointer;
 
       &:hover {
         background-color: var(--tree-hover-background-color);
         color: var(--tree-hover-color);
 
-        .tree-group-count {
+        .tree-group__count {
           color: var(--tree-hover-color);
         }
       }

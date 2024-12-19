@@ -118,8 +118,8 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     }, [videoExtensions]);
 
     const renderEntry = useCallback((entry: PlaylistItem, index: number): React.ReactNode => {
-        return <div key={entry.id} className={'tree-channel'}>
-            <div className={'tree-channel-tools'}>
+        return <div key={entry.id} className={'tree-group__channel'}>
+            <div className={'tree-group__channel-tools'}>
                 <div className={'tool-button'} data-item={entry.id} onClick={handleClipboardUrl}>
                     {getIconByName('LinkRounded')}
                 </div>
@@ -139,26 +139,26 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                     </>
                 }
             </div>
-            <div className={'tree-channel-content'}>
-                <div className={'tree-channel-nr'}>{index + 1}</div>
+            <div className={'tree-group__channel-content'}>
+                <div className={'tree-group__channel-nr'}>{index + 1}</div>
                 {entry.header.name}</div>
         </div>
     }, [handleClipboardUrl, handlePlayUrl, handleDownloadUrl, isVideoFile, handleWebSearch, serverConfig]);
 
     const renderGroup = useCallback((group: PlaylistGroup): React.ReactNode => {
         return <div className={'tree-group'} key={group.id}>
-            <div className={'tree-group-header'}>
+            <div className={'tree-group__header'}>
                 <div className={'tree-expander'} data-group={group.id}
                      onClick={handleExpand}>{getIconByName(expanded.current[group.id] ?
                     'ExpandMore' : 'ChevronRight')}</div>
-                <div className={'tree-group-header-content'}>
+                <div className={'tree-group__header-content'}>
                     <input type={"checkbox"} onChange={handleChange} data-group={group.id}/>
                     {group.title}
-                    <div className={'tree-group-count'}>({group.channels.length})</div>
+                    <div className={'tree-group__count'}>({group.channels.length})</div>
                 </div>
             </div>
             {expanded.current[group.id] && (
-                <div className={'tree-group-childs'}>
+                <div className={'tree-group__childs'}>
                     {group.channels.map(renderEntry)}
                 </div>)}
         </div>;

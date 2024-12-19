@@ -14,11 +14,3 @@ root.render(
         </ServiceProvider>
     </SnackbarProvider>
 );
-
-// ReactDOM.render(
-//     <SnackbarProvider maxSnack={3} autoHideDuration={1500}>
-//         <ServiceProvider>
-//             <App/>
-//         </ServiceProvider>
-//     </SnackbarProvider>
-//     , document.getElementById('root'));

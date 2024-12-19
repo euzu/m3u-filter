@@ -1,5 +1,6 @@
 use std::io::{Seek, SeekFrom};
 use std::collections::HashMap;
+use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
@@ -714,7 +715,7 @@ pub async fn xtream_write_series_info(
                     &info_path, &idx_path, &vod_id,
                 ) {
                     Ok(content) => Some(content),
-                    Err(err) => {
+                    Err(_err) => {
                         // this is not an error, it means the info is not indexed
                         // error!("Failed to read vod info for id {vod_id} for {target_name}: {}",err);
                         None
@@ -867,19 +868,20 @@ pub async fn xtream_write_series_info(
         None
     }
 
-    pub async fn xtream_update_input_vod_info_file(
+    pub async fn xtream_update_input_info_file(
         cfg: &Config,
         input: &ConfigInput,
-        temp_file: &mut File,
+        wal_file: &mut File,
+        cluster: XtreamCluster
     ) -> Result<(), M3uFilterError> {
         match get_input_storage_path(input, &cfg.working_dir)
-            .map(|storage_path| xtream_get_info_file_paths(&storage_path, XtreamCluster::Video))
+            .map(|storage_path| xtream_get_info_file_paths(&storage_path, cluster))
         {
             Ok(Some((info_path, idx_path))) => {
                 match cfg.file_locks.write_lock(&info_path).await {
                     Ok(_file_lock) => {
-                        temp_file.seek(SeekFrom::Start(0)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read vod info {err}")))?;
-                        let mut reader = BufReader::new(temp_file);
+                        wal_file.seek(SeekFrom::Start(0)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read {cluster} info {err}")))?;
+                        let mut reader = BufReader::new(wal_file);
                         match IndexedDocumentWriter::<u32>::new_append(info_path, idx_path) {
                             Ok(mut writer) => {
                                 let mut provider_id_bytes = [0u8; 4];
@@ -889,18 +891,21 @@ pub async fn xtream_write_series_info(
                                         break; // End of file
                                     }
                                     let provider_id = u32::from_le_bytes(provider_id_bytes);
-                                    reader.read_exact(&mut length_bytes).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read temporary vod info {err}")))?;
+                                    reader.read_exact(&mut length_bytes).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read temporary {cluster} info {err}")))?;
                                     let length = u32::from_le_bytes(length_bytes) as usize;
                                     let mut buffer = vec![0u8; length];
-                                    reader.read_exact(&mut buffer).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read temporary vod info {err}")))?;
+                                    reader.read_exact(&mut buffer).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read temporary {cluster} info {err}")))?;
                                     if let Ok(content) = String::from_utf8(buffer) {
                                         let _ = writer.write_doc(provider_id, &content);
                                     }
                                 }
-                                writer.store().map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not store vod info {err}")))?;
+                                writer.store().map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not store {cluster} info {err}")))?;
+                                if let Err(err) = fs::remove_file(wal_file) {
+                                    error!("Failed to delete WAL file for {cluster}");
+                                }
                                 Ok(())
                             }
-                            Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create create indexed document writer for vod info {err}"))),
+                            Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create create indexed document writer for {cluster} info {err}"))),
                         }
                     }
                     Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}"))),

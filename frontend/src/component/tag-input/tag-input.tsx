@@ -6,10 +6,11 @@ interface TagInputProps {
   name: string;
   values: string[];
   onChange: (name: string, values: string[]) => void;
+  placeHolder?: string;
 }
 
 export default function TagInput(props: TagInputProps) {
-  const { name, values, onChange } = props;
+  const { name, values, onChange, placeHolder } = props;
 
   const handleTagsChange = (newTags: string[]) => {
     onChange(name, newTags);
@@ -21,7 +22,7 @@ export default function TagInput(props: TagInputProps) {
         value={values}
         onChange={handleTagsChange}
         name={name}
-        placeHolder="Add tags..."
+        placeHolder={placeHolder ?? "Add tags..."}
       />
     </div>
   );

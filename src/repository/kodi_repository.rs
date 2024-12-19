@@ -155,8 +155,8 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                     if kodi_style {
                         let provider_id = header.get_provider_id();
                         let input_id = header.input_id;
-                        let (kodi_file_dir_name, file_name) = kodi_style_rename(&kodi_file_name, &KODY_STYLE);
-                        kodi_file_name = file_name;
+                        let (kodi_file_dir_name, kodi_style_filename) = kodi_style_rename(&kodi_file_name, &KODY_STYLE);
+                        kodi_file_name = kodi_style_filename;
                         kodi_file_dir_name.iter().for_each(|p| dir_path = dir_path.join(p));
 
                         let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes).await;
@@ -164,7 +164,6 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                             None => { String::new() }
                             Some(id) => { format!(" {{tmdb={id}}}") }
                         };
-
                     }
                     if let Err(e) = std::fs::create_dir_all(&dir_path) {
                         error!("cant create directory: {:?}", &dir_path);

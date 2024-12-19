@@ -70,7 +70,7 @@ export default function FormView(props: FormViewProps) {
             case FormFieldType.MAP:
                 return <div className="form-view__map-editor"><MapEditor onChange={handleChange} name={field.name} values={data?.[field.name]}></MapEditor></div>
             case FormFieldType.TAGS:
-                return <TagInput onChange={handleChange} name={field.name} values={data?.[field.name] || []}></TagInput>
+                return <TagInput placeHolder={''} onChange={handleChange} name={field.name} values={data?.[field.name] || []}></TagInput>
             case FormFieldType.NUMBER:
             case FormFieldType.TEXT:
             default:

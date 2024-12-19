@@ -5,3 +5,5 @@ pub mod xmltv_parser;
 mod playlist_watch;
 mod xtream_processor;
 mod affix_processor;
+mod xtream_processor_vod;
+mod xtream_processor_series;
