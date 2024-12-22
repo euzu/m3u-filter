@@ -469,7 +469,7 @@ async fn process_playlist(playlists: &mut [FetchedPlaylist<'_>],
     let mut processed_fetched_playlists: Vec<FetchedPlaylist> = vec![];
     for provider_fpl in playlists.iter_mut() {
         let mut processed_fpl = execute_pipe(target, &pipe, provider_fpl);
-        playlist_resolve_series(target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
+        playlist_resolve_series(cfg, target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
         playlist_resolve_vod(cfg, target, errors, &processed_fpl).await;
         // stats
         let input_stats = stats.get_mut(&processed_fpl.input.id);

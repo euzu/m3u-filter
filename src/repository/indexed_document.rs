@@ -334,6 +334,17 @@ where
         }
         Err(Error::new(ErrorKind::Other, format!("Failed to read item for id {:?} - {}", doc_id, main_path.to_str().unwrap())))
     }
+
+    pub(in crate::repository) fn read_indexed_item_at_offset(main_file: &mut File, offset: u64, doc_id: &K) -> Result<T, Error> {
+        main_file.seek(SeekFrom::Start(offset))?;
+        let buf_size = IndexedDocument::read_content_size(main_file)?;
+        let mut buffer: Vec<u8> = vec![0; buf_size];
+        main_file.read_exact(&mut buffer)?;
+        if let Ok(item) = bincode::deserialize::<T>(&buffer) {
+            return Ok(item);
+        }
+        Err(Error::new(ErrorKind::Other, format!("Failed to read item for id {:?}", doc_id)))
+    }
 }
 
 impl<K, T: serde::de::DeserializeOwned> Iterator for IndexedDocumentReader<K, T>

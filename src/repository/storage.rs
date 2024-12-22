@@ -52,7 +52,6 @@ pub fn get_target_storage_path(cfg: &Config, target_name: &str) -> Option<PathBu
 pub fn get_input_storage_path(input: &ConfigInput, working_dir: &str) -> std::io::Result<PathBuf> {
     let name =  format!("input_{}", input.name.clone().unwrap_or_else(|| format!("{}", input.id)));
     let path = Path::new(working_dir).join(name);
-
     // Create the directory and return the path or propagate the error
     std::fs::create_dir_all(&path).map(|()| path)
 }

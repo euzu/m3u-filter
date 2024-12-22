@@ -1,7 +1,7 @@
 use crate::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::PlaylistGroup;
+use crate::model::playlist::{PlaylistGroup, XtreamCluster};
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
 use crate::utils::file_lock_manager::FileReadGuard;
@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::sync::LazyLock;
+use crate::repository::xtream_repository::xtream_get_record_file_path;
 
 struct KodiStyle {
     year: regex::Regex,
@@ -92,7 +93,7 @@ static KODY_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
 
 type InputTmdbIndexMap = HashMap<u16, Option<(FileReadGuard, BPlusTree<u32, u32>)>>;
 async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
-                     input_indexes: &mut InputTmdbIndexMap) -> Option<u32> {
+                     input_indexes: &mut InputTmdbIndexMap, cluster: XtreamCluster) -> Option<u32> {
     match provider_id {
         None => None,
         Some(pid) => {
@@ -106,7 +107,7 @@ async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
                 }
                 std::collections::hash_map::Entry::Vacant(entry) => {
                     if let Some(input) = cfg.get_input_by_id(input_id) {
-                        if let Ok(tmdb_path) = get_input_storage_path(input, &cfg.working_dir)
+                        if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
                             .map(|storage_path| xtream_get_record_file_path(&storage_path, cluster)) {
                             if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
                                 if let Ok(tree) = BPlusTree::<u32, u32>::load(&tmdb_path) {
@@ -158,7 +159,7 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                         kodi_file_name = kodi_style_filename;
                         kodi_file_dir_name.iter().for_each(|p| dir_path = dir_path.join(p));
 
-                        let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes).await;
+                        let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes, header.xtream_cluster).await;
                         additional_info = match tmdb_id {
                             None => { String::new() }
                             Some(id) => { format!(" {{tmdb={id}}}") }

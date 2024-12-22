@@ -591,8 +591,84 @@ where
     }
 }
 
+pub struct BPlusTreeIterator<'a, K, V> {
+    stack: Vec<&'a BPlusTreeNode<K, V>>,
+    current_keys: Option<&'a [K]>,
+    current_values: Option<&'a [V]>,
+    index: usize,
+}
+
+impl<'a, K, V> BPlusTreeIterator<'a, K, V>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    pub fn new(tree: &'a BPlusTree<K, V>) -> Self {
+        let mut stack = Vec::new();
+        stack.push(&tree.root);
+        Self {
+            stack,
+            current_keys: None,
+            current_values: None,
+            index: 0,
+        }
+    }
+}
+
+impl<'a, K, V> Iterator for BPlusTreeIterator<'a, K, V>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Iterate over the current node
+        if let Some(keys) = self.current_keys {
+            if let Some(values) = self.current_values {
+                if self.index < keys.len() {
+                    let key = &keys[self.index];
+                    let value = &values[self.index];
+                    self.index += 1;
+                    return Some((key, value));
+                }
+            }
+        }
+
+        // Move to the next node
+        while let Some(node) = self.stack.pop() {
+            if !node.is_leaf {
+                // Push children in reverse order to maintain traversal order
+                for child in node.children.iter().rev() {
+                    self.stack.push(child);
+                }
+            }
+
+            if node.is_leaf {
+                self.current_keys = Some(&node.keys);
+                self.current_values = Some(&node.values);
+                self.index = 0;
+                return self.next(); // Process the new leaf node
+            }
+        }
+
+        None // No more elements
+    }
+}
+
+impl<K, V> BPlusTree<K, V>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    pub fn iter(&self) -> BPlusTreeIterator<K, V> {
+        BPlusTreeIterator::new(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::io;
     use std::path::PathBuf;
 
@@ -678,28 +754,6 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn traverse_test() -> io::Result<()> {
-    //     let mut tree = BPlusTree::<u32, Record>::new();
-    //     for i in 0u32..=500 {
-    //         tree.insert(i, Record {
-    //             id: i,
-    //             data: format!("Entry {i}"),
-    //         });
-    //     }
-    //     let filepath = PathBuf::from("/tmp/tree.bin");
-    //     // Serialize the tree to a file
-    //     tree.store(&filepath)?;
-    //
-    //     let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::try_new(&filepath)?;
-    //
-    //     // Traverse the tree
-    //     tree_query.traverse(|keys, values| {
-    //         // TODO real test
-    //         println!("Node: {:?} {:?}", keys, values);
-    //     });
-    //     Ok(())
-    // }
 
     #[test]
     fn insert_dulplicate_test() -> io::Result<()> {
@@ -723,6 +777,32 @@ mod tests {
             });
         });
 
+        Ok(())
+    }
+
+    #[test]
+    fn iterator_test() -> io::Result<()> {
+        let mut tree = BPlusTree::<u32, Record>::new();
+        let mut entry_set = HashSet::new();
+        for i in 0u32..=500 {
+            tree.insert(i, Record {
+                id: i,
+                data: format!("Entry {i}"),
+            });
+            entry_set.insert(i);
+        }
+        let filepath = PathBuf::from("/tmp/tree.bin");
+        // Serialize the tree to a file
+        tree.store(&filepath)?;
+
+        let tree: BPlusTree<u32, Record> = BPlusTree::load(&filepath)?;
+
+        // Traverse the tree
+        for (key, value) in tree.iter() {
+            assert!(format!("Entry {}", key).eq(&value.data), "Wrong entry");
+            entry_set.remove(key);
+        }
+        assert!(entry_set.is_empty());
         Ok(())
     }
 }

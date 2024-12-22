@@ -40,12 +40,7 @@ impl M3uPlaylistIterator {
         })?;
 
         let reader =
-            IndexedDocumentReader::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path).map_err(|err| {
-                M3uFilterError::new(
-                    M3uFilterErrorKind::Info,
-                    format!("Could not deserialize file {m3u_path:?} - {err}"),
-                )
-            })?;
+            IndexedDocumentReader::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info,format!("Could not deserialize file {m3u_path:?} - {err}")))?;
 
         let target_options = target.options.as_ref();
         let include_type_in_url = target_options.is_some_and( |opts| opts.m3u_include_type_in_url);

@@ -4,7 +4,7 @@ use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistGroup, Play
 use crate::model::xmltv::TVGuide;
 use crate::processing::xtream_parser::parse_xtream_series_info;
 use crate::processing::{m3u_parser, xtream_parser};
-use crate::repository::xtream_repository::xtream_get_input_vod_info;
+use crate::repository::xtream_repository::{xtream_get_input_info};
 use crate::repository::xtream_repository;
 use crate::utils::{file_utils, request_utils};
 use log::{debug, info};
@@ -122,16 +122,29 @@ where
 {
     if cluster == XtreamCluster::Series {
         if let Some(content) = xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()).await {
+            // Deliver existing target content
             return Ok(content);
+        }
+
+        // Check if the content has been resolved
+        let resolve_series = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_series);
+        if resolve_series {
+            if let Some(provider_id) = pli.get_provider_id() {
+                if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Series).await {
+                    return xtream_repository::write_and_get_xtream_series_info(config, target, pli, &content).await;
+                }
+            }
         }
     } else if cluster == XtreamCluster::Video {
         if let Some(content) = xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id()).await {
+            // Deliver existing target content
             return Ok(content);
         }
-        let resolve_movies = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_video);
-        if resolve_movies {
+        // Check if the content has been resolved
+        let resolve_vod = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_video);
+        if resolve_vod {
             if let Some(provider_id) = pli.get_provider_id() {
-                if let Some(content) = xtream_get_input_vod_info(config, input, provider_id).await {
+                if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Video).await {
                     return xtream_repository::write_and_get_xtream_vod_info(config, target, pli, &content).await;
                 }
             }
@@ -164,7 +177,7 @@ fn get_skip_cluster(input: &ConfigInput) -> Vec<XtreamCluster> {
         }
     }
     if skip_cluster.len() == 3 {
-        let name = input.name.as_ref().map_or_else(|| input.id.to_string(), std::string::ToString::to_string);
+        let name = input.name.as_ref().map_or_else(|| input.id.to_string(), ToString::to_string);
         info!("You have skipped all sections from xtream input {name}");
     }
     skip_cluster
