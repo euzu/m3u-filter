@@ -2,6 +2,11 @@
 set -e
 set -o pipefail
 
+rustup target add x86_64-unknown-linux-musl
+rustup target add x86_64-pc-windows-gnu
+rustup target add armv7-unknown-linux-musleabihf
+rustup add aarch64-unknown-linux-musl
+
 if ! command -v cargo-set-version &> /dev/null
 then
     echo "cargo-set-version could not be found. install it with  'cargo install cargo-edit'"

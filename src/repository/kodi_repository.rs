@@ -4,7 +4,6 @@ use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::PlaylistGroup;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
-use crate::repository::xtream_repository::xtream_get_vod_tmdb_file_path;
 use crate::utils::file_lock_manager::FileReadGuard;
 use crate::utils::file_utils;
 use chrono::Datelike;
@@ -108,7 +107,7 @@ async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
                 std::collections::hash_map::Entry::Vacant(entry) => {
                     if let Some(input) = cfg.get_input_by_id(input_id) {
                         if let Ok(tmdb_path) = get_input_storage_path(input, &cfg.working_dir)
-                            .map(|storage_path| xtream_get_vod_tmdb_file_path(&storage_path)) {
+                            .map(|storage_path| xtream_get_record_file_path(&storage_path, cluster)) {
                             if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
                                 if let Ok(tree) = BPlusTree::<u32, u32>::load(&tmdb_path) {
                                     let tmdb_id = tree.query(&pid).copied();

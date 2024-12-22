@@ -39,22 +39,22 @@ GET http://localhost:8901/player_api.php?action=get_live_categories&username=xt&
 GET http://localhost:8901/player_api.php?action=get_live_streams&username=xt&password=xt&category_id=102
 
 ### xtream vod_categories
-GET http://localhost:8901/player_api.php?action=get_vod_categories&username=xt&password=xt
+GET http://10.41.41.41:8901/player_api.php?action=username=xt&password=xt&get_vod_categories
 
 ### xtream vod info
-GET http://localhost:8901/player_api.php?action=get_vod_streams&category_id=3&username=xt&password=xt
+GET http://10.41.41.41:8901/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=44
 
 ### xtream vod info
-GET http://localhost:8901/player_api.php?action=get_vod_info&vod_id=2&username=xt&password=xt
+GET http://10.41.41.41:8901/player_api.php?username=xt&password=xt&action=get_vod_info&vod_id=8051
 
 ### xtream series_categories
-GET http://localhost:8901/player_api.php?action=get_series_categories&username=xt&password=xt
+GET http://10.41.41.41:8901/player_api.php?username=xt&password=xt&action=get_series_categories
 
 ### xtream series
-GET http://localhost:8901/player_api.php?action=get_series&username=xt&password=xt&category_id=120
+GET http://10.41.41.41:8901/player_api.php?username=xt&password=xt&action=get_series&category_id=56
 
 ### xtream series info
-GET http://localhost:8901/player_api.php?action=get_series_info&username=xt&password=xt&series_id=16467
+GET http://10.41.41.41:8901/player_api.php?username=xt&password=xt&action=get_series_info&series_id=13923
 
 ### xtream series stream
  GET http://localhost:8901/series/xt/xt/18137
