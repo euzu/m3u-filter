@@ -4,7 +4,7 @@ use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
+use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery};
 use crate::utils::file_utils;
 use log::error;
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,8 @@ const LEN_SIZE: usize = 4;
 
 pub(in crate::repository) type OffsetPointer = u32;
 type SizeType = u32;
+
+pub type IndexedDocumentIndex<K> = BPlusTree<K, OffsetPointer>;
 
 pub(in crate::repository) struct IndexedDocument {}
 
@@ -54,12 +56,10 @@ impl IndexedDocument {
 }
 
 ////////////////////////////////////////////////////////
-//
-// IndexedDocumentWriter
-//
+///
+/// IndexedDocumentWriter
+///
 ////////////////////////////////////////////////////////
-
-
 /**
  * Creates two files,
  * - content
@@ -78,7 +78,7 @@ where
     index_path: PathBuf,
     main_file: File,
     main_offset: OffsetPointer,
-    index_tree: BPlusTree<K, OffsetPointer>,
+    index_tree: IndexedDocumentIndex<K>,
     dirty: bool,
     fragmented: bool,
 }
@@ -120,12 +120,12 @@ where
 
         // Initialize the index tree (BPlusTree) - either by deserializing an existing one or creating a new one
         let index_tree = if append_mode && index_path.exists() {
-            BPlusTree::<K, OffsetPointer>::load(&index_path).unwrap_or_else(|err| {
+            IndexedDocumentIndex::<K>::load(&index_path).unwrap_or_else(|err| {
                 error!("Failed to load index {:?}: {}", index_path, err);
-                BPlusTree::<K, OffsetPointer>::new()
+                IndexedDocumentIndex::<K>::new()
             })
         } else {
-            BPlusTree::<K, OffsetPointer>::new()
+            IndexedDocumentIndex::<K>::new()
         };
 
         Ok(Self {
@@ -229,13 +229,69 @@ where
     }
 }
 
+
+////////////////////////////////////////////////////////
+///
+/// IndexedDocumentReader
+///
+////////////////////////////////////////////////////////
+pub struct IndexedDocumentReader<K, T>
+where
+    T: serde::de::DeserializeOwned,
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
+{
+    main_file: BufReader<File>,
+    index_tree: IndexedDocumentIndex<K>,
+    t_type: PhantomData<T>,
+}
+
+
+impl<K, T> IndexedDocumentReader<K, T>
+where
+    T: serde::de::DeserializeOwned,
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
+{
+    pub fn new(main_path: &Path, index_path: &Path) -> Result<Self, Error> {
+        if main_path.exists() && index_path.exists() {
+            let main_file = OpenOptions::new()
+                .read(true)
+                .write(false)
+                .truncate(false)
+                .open(&main_path)?;
+            let index_tree = IndexedDocumentIndex::<K>::load(&index_path)?;
+
+            Ok(Self {
+                main_file: BufReader::new(main_file),
+                index_tree,
+                t_type: PhantomData,
+            })
+        } else {
+            Err(Error::new(ErrorKind::NotFound, format!("File not found {}", main_path.to_str().unwrap())))
+        }
+    }
+    pub fn get(&mut self, doc_id: &K) -> Result<T, Error> {
+        if let Some(offset) = self.index_tree.query(doc_id) {
+            self.main_file.seek(SeekFrom::Start(u64::from(*offset)))?;
+            let buf_size = IndexedDocument::read_content_size(&mut self.main_file)?;
+            let mut buffer: Vec<u8> = vec![0; buf_size];
+            self.main_file.read_exact(&mut buffer)?;
+            if let Ok(item) = bincode::deserialize::<T>(&buffer) {
+                return Ok(item);
+            }
+        }
+        Err(Error::new(ErrorKind::NotFound, format!("Entry not found {doc_id:?}")))
+    }
+}
+
+
 ////////////////////////////////////////////////////////
 //
-// IndexedDocumentReader
-//
+/// IndexedDocumentIterator
+///
+/// Iterator | Sequential access with has_next / next
 ////////////////////////////////////////////////////////
 
-pub(in crate::repository) struct IndexedDocumentReader<K, T> {
+pub(in crate::repository) struct IndexedDocumentIterator<K, T> {
     main_path: PathBuf,
     main_file: BufReader<File>,
     offsets: Vec<OffsetPointer>,
@@ -246,18 +302,17 @@ pub(in crate::repository) struct IndexedDocumentReader<K, T> {
     k_type: PhantomData<K>,
 }
 
-impl<K, T: serde::de::DeserializeOwned> IndexedDocumentReader<K, T>
+impl<K, T> IndexedDocumentIterator<K, T>
 where
+    T: serde::de::DeserializeOwned,
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
 {
     pub fn new(main_path: &Path, index_path: &Path) -> Result<Self, Error> {
         if main_path.exists() && index_path.exists() {
             let mut offsets = Vec::<OffsetPointer>::new();
             {
-                let index_tree = BPlusTree::<K, OffsetPointer>::load(index_path)?;
-                index_tree.traverse(|_, values| {
-                    offsets.extend(values);
-                });
+                let index_tree = IndexedDocumentIndex::<K>::load(index_path)?;
+                index_tree.traverse(|_, values| offsets.extend(values));
                 offsets.sort_unstable();
             }
             match File::open(main_path) {
@@ -276,11 +331,9 @@ where
                 Err(e) => Err(e)
             }
         } else {
-            Err(Error::new(ErrorKind::NotFound, format!("File not found {}",
-                                                        main_path.to_str().unwrap())))
+            Err(Error::new(ErrorKind::NotFound, format!("File not found {}", main_path.to_str().unwrap())))
         }
     }
-
 
     pub fn get_path(&self) -> &Path {
         &self.main_path
@@ -317,37 +370,9 @@ where
             }
         }
     }
-
-    pub(in crate::repository) fn read_indexed_item(main_path: &Path, index_path: &Path, doc_id: &K) -> Result<T, Error>
-    {
-        if main_path.exists() && index_path.exists() {
-            // get the offset from index
-            let offset = IndexedDocument::get_offset(index_path, doc_id)?;
-            let mut main_file = File::open(main_path)?;
-            main_file.seek(SeekFrom::Start(offset))?;
-            let buf_size = IndexedDocument::read_content_size(&mut main_file)?;
-            let mut buffer: Vec<u8> = vec![0; buf_size];
-            main_file.read_exact(&mut buffer)?;
-            if let Ok(item) = bincode::deserialize::<T>(&buffer) {
-                return Ok(item);
-            }
-        }
-        Err(Error::new(ErrorKind::Other, format!("Failed to read item for id {:?} - {}", doc_id, main_path.to_str().unwrap())))
-    }
-
-    pub(in crate::repository) fn read_indexed_item_at_offset(main_file: &mut File, offset: u64, doc_id: &K) -> Result<T, Error> {
-        main_file.seek(SeekFrom::Start(offset))?;
-        let buf_size = IndexedDocument::read_content_size(main_file)?;
-        let mut buffer: Vec<u8> = vec![0; buf_size];
-        main_file.read_exact(&mut buffer)?;
-        if let Ok(item) = bincode::deserialize::<T>(&buffer) {
-            return Ok(item);
-        }
-        Err(Error::new(ErrorKind::Other, format!("Failed to read item for id {:?}", doc_id)))
-    }
 }
 
-impl<K, T: serde::de::DeserializeOwned> Iterator for IndexedDocumentReader<K, T>
+impl<K, T: serde::de::DeserializeOwned> Iterator for IndexedDocumentIterator<K, T>
 where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
 {
@@ -365,16 +390,46 @@ where
 }
 
 ////////////////////////////////////////////////////////
-//
-// IndexedDocumentGarbageCollector
-//
+///
+/// IndexedDocumentDirectAccess
+///
+////////////////////////////////////////////////////////
+pub(in crate::repository) struct IndexedDocumentDirectAccess {}
+
+impl IndexedDocumentDirectAccess {
+    pub(in crate::repository) fn read_indexed_item<K, T>(main_path: &Path, index_path: &Path, doc_id: &K) -> Result<T, Error>
+    where
+        K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
+        T: serde::de::DeserializeOwned,
+    {
+        if main_path.exists() && index_path.exists() {
+            // get the offset from index
+            let offset = IndexedDocument::get_offset(index_path, doc_id)?;
+            let mut main_file = File::open(main_path)?;
+            main_file.seek(SeekFrom::Start(offset))?;
+            let buf_size = IndexedDocument::read_content_size(&mut main_file)?;
+            let mut buffer: Vec<u8> = vec![0; buf_size];
+            main_file.read_exact(&mut buffer)?;
+            if let Ok(item) = bincode::deserialize::<T>(&buffer) {
+                return Ok(item);
+            }
+        }
+        Err(Error::new(ErrorKind::Other, format!("Failed to read item for id {:?} - {}", doc_id, main_path.to_str().unwrap())))
+    }
+}
+
+
+////////////////////////////////////////////////////////
+///
+/// IndexedDocumentGarbageCollector
+///
 ////////////////////////////////////////////////////////
 
 pub(in crate::repository) struct IndexedDocumentGarbageCollector<K> {
     main_path: PathBuf,
     index_path: PathBuf,
     main_file: File,
-    index_tree: BPlusTree<K, OffsetPointer>,
+    index_tree: IndexedDocumentIndex<K>,
 }
 
 impl<K> IndexedDocumentGarbageCollector<K>
@@ -400,7 +455,7 @@ where
             }
 
             // Initialize the index tree (BPlusTree) - by deserializing an existing one
-            let index_tree = BPlusTree::<K, OffsetPointer>::load(&index_path)?;
+            let index_tree = IndexedDocumentIndex::<K>::load(&index_path)?;
 
             Ok(Self {
                 main_path,
@@ -480,7 +535,7 @@ mod tests {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentReader, IndexedDocumentWriter};
+    use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
 
     // Example usage with a simple struct
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -539,7 +594,7 @@ mod tests {
             assert!(size_main_file_5 < size_main_file_4, "Failed, the filesize should be less");
         }
         {
-            let reader = IndexedDocumentReader::<u32, Record>::new(&main_path, &index_path)?;
+            let reader = IndexedDocumentIterator::<u32, Record>::new(&main_path, &index_path)?;
             let mut i = 0;
             for doc in reader {
                 assert_eq!(doc.id, i, "Wrong id");
@@ -552,7 +607,3 @@ mod tests {
         Ok(())
     }
 }
-
-pub type IndexedDocumentQuery<K, V> = BPlusTreeQuery<K, V>;
-pub type IndexedDocumentUpdate<K, V> = BPlusTreeUpdate<K, V>;
-pub type IndexedDocumentIndex<K> = BPlusTree<K, OffsetPointer>;

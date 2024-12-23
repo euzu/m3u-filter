@@ -9,6 +9,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use crate::{info_err, notify_err};
 
 const FILE_SERIES_INFO: &str = "xtream_series_info";
 const FILE_VOD_INFO: &str = "xtream_vod_info";
@@ -76,7 +77,7 @@ pub(in crate::processing) async fn playlist_resolve_process_playlist_item(pli: &
         result = match download::get_xtream_stream_info_content(&info_url, input).await {
             Ok(content) => Some(content),
             Err(err) => {
-                errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}")));
+                errors.push(info_err!(format!("{err}")));
                 None
             }
         };
@@ -159,7 +160,7 @@ where
         Ok(file_path) => file_path,
         Err(err) => {
             let fpl_name = fpl.input.name.as_ref().map_or("?", String::as_str);
-            errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create storage path for input {fpl_name}: {err}")));
+            errors.push(notify_err!(format!("Could not create storage path for input {fpl_name}: {err}")));
             return processed_info_ids;
         }
     };
@@ -173,7 +174,7 @@ where
             }
             drop(file_lock);
         }
-        Err(err) => errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}"))),
+        Err(err) => errors.push(info_err!(format!("{err}"))),
     }
     processed_info_ids
 }

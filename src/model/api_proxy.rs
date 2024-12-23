@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use enum_iterator::Sequence;
 use log::debug;
-use crate::create_m3u_filter_error_result;
+use crate::{create_m3u_filter_error_result, info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::utils::config_reader;
 
@@ -269,10 +269,7 @@ impl ApiProxyConfig {
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(M3uFilterError::new(
-                M3uFilterErrorKind::Info,
-                errors.join("\n"),
-            ))
+            Err(info_err!(errors.join("\n")))
         }
     }
 

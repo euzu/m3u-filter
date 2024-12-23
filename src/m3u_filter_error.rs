@@ -21,6 +21,20 @@ macro_rules! get_errors_notify_message {
     }
 }
 
+#[macro_export]
+macro_rules! notify_err {
+    ($text:expr) => {
+        M3uFilterError::new(M3uFilterErrorKind::Notify, $text)
+    };
+}
+
+#[macro_export]
+macro_rules! info_err {
+    ($text:expr) => {
+        M3uFilterError::new(M3uFilterErrorKind::Info, $text)
+    };
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum M3uFilterErrorKind {
     // do not send with messaging

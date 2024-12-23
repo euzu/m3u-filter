@@ -1,6 +1,5 @@
 extern crate unidecode;
 
-use crate::debug_if_enabled;
 use async_std::sync::Mutex;
 use core::cmp::Ordering;
 use std::cell::RefCell;
@@ -32,7 +31,7 @@ use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
 use crate::utils::request_utils::mask_sensitive_info;
-use crate::{get_errors_notify_message, model::config, Config};
+use crate::{debug_if_enabled, get_errors_notify_message, model::config, Config, notify_err};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };
@@ -319,7 +318,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                 .sum();
             if playlistgroups.is_empty() {
                 info!("source is empty {}", input.url);
-                errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("source is empty {input_name}")));
+                errors.push(notify_err!(format!("source is empty {input_name}")));
             } else {
                 playlistgroups.iter_mut().for_each(PlaylistGroup::on_load);
                 source_playlists.push(
@@ -337,7 +336,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
     }
     if source_playlists.is_empty() {
         debug!("Source at index {source_idx} is empty");
-        errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Source at {source_idx} is empty")));
+        errors.push(notify_err!(format!("Source at {source_idx} is empty")));
     } else {
         debug_if_enabled!("Source has {} groups", source_playlists.iter().map(|fpl| fpl.playlistgroups.len()).sum::<usize>());
         for target in &source.targets {

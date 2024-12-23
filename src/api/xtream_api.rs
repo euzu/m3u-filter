@@ -13,12 +13,12 @@ use futures::Stream;
 use log::{debug, error, warn, Level};
 use serde_json::{Map, Value};
 
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, is_stream_share_enabled, serve_file, stream_response};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
-use crate::debug_if_enabled;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::{debug_if_enabled, info_err};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
@@ -445,7 +445,7 @@ async fn xtream_player_api(
                 skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id).await),
             ACTION_GET_SERIES =>
                 skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id).await),
-            _ => Some(Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Cant find action: {action} for target: {}", &target.name))
+            _ => Some(Err(info_err!(format!("Cant find action: {action} for target: {}", &target.name))
             )),
         };
 

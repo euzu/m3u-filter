@@ -7,7 +7,7 @@ use log::{debug, error, info, warn};
 use regex::Regex;
 use serde::Serialize;
 
-use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result};
+use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::{Config, ConfigDto};
@@ -78,7 +78,7 @@ pub fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterErr
                 return Ok(Some(result));
             },
             Err(err) => {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
+                return Err(info_err!(err.to_string()));
             }
         }
     }

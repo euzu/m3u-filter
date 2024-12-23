@@ -15,7 +15,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{ItemField, AFFIX_FIELDS, COUNTER_FIELDS, MAPPER_ATTRIBUTE_FIELDS};
 use crate::model::playlist::{FieldAccessor, PlaylistItem};
 use crate::utils::string_utils::Capitalize;
-use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, valid_property};
+use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err, valid_property};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct MappingTag {
@@ -209,25 +209,25 @@ impl Mapper {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
         for key in self.attributes.keys() {
             if !valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper attribute field {key}")));
+                return Err(info_err!(format!("Invalid mapper attribute field {key}")));
             }
         }
         for key in self.suffix.keys() {
             if !valid_property!(key.as_str(), AFFIX_FIELDS) {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper suffix field {key}")));
+                return Err(info_err!(format!("Invalid mapper suffix field {key}")));
             }
         }
         for key in self.prefix.keys() {
             if !valid_property!(key.as_str(), AFFIX_FIELDS) {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper prefix field {key}")));
+                return Err(info_err!(format!("Invalid mapper prefix field {key}")));
             }
         }
         for (key, value) in &self.assignments {
             if !valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper assignment field {key}")));
+                return Err(info_err!(format!("Invalid mapper assignment field {key}")));
             }
             if !valid_property!(value.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper assignment field {value}")));
+                return Err(info_err!(format!("Invalid mapper assignment field {value}")));
             }
         }
 
@@ -237,7 +237,7 @@ impl Mapper {
                 for t in transforms {
                     let field = t.field.as_str();
                     if !valid_property!(field, AFFIX_FIELDS) {
-                        return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid mapper transform field {field}")));
+                        return Err(info_err!(format!("Invalid mapper transform field {field}")));
                     }
                     t.prepare(templates)?;
                 }
@@ -452,7 +452,7 @@ impl Mapping {
             let mut counters = vec![];
             for def in counter_def_list {
                 if !valid_property!(def.field.as_str(), COUNTER_FIELDS) {
-                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Invalid counter field {}", def.field)));
+                    return Err(info_err!(format!("Invalid counter field {}", def.field)));
                 }
                 match get_filter(&def.filter, templates) {
                     Ok(flt) => {
@@ -464,7 +464,7 @@ impl Mapping {
                             value: Arc::new(AtomicU32::new(def.value)),
                         });
                     }
-                    Err(e) => return Err(M3uFilterError::new(M3uFilterErrorKind::Info, e.to_string()))
+                    Err(e) => return Err(info_err!(e.to_string()))
                 }
             }
             self.t_counter = Some(counters);

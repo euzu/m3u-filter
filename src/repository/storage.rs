@@ -3,6 +3,7 @@ use std::fmt::Write;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::UUIDType;
+use crate::notify_err;
 use crate::utils::file_utils;
 
 pub(in crate::repository) const FILE_SUFFIX_DB: &str = "db";
@@ -36,12 +37,12 @@ pub fn ensure_target_storage_path(cfg: &Config, target_name: &str) -> Result<Pat
     if let Some(path) = get_target_storage_path(cfg, target_name) {
         if std::fs::create_dir_all(&path).is_err() {
             let msg = format!("Failed to save target data, can't create directory {}", &path.to_str().unwrap());
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg));
+            return Err(notify_err!(msg));
         }
         Ok(path)
     } else {
         let msg = format!("Failed to save target data, can't create directory for target {target_name}");
-        Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg))
+        Err(notify_err!(msg))
     }
 }
 

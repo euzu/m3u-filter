@@ -3,7 +3,7 @@ use std::io::{Cursor, Write};
 use std::path::{Path};
 use log::{Level};
 use quick_xml::{Writer};
-use crate::debug_if_enabled;
+use crate::{debug_if_enabled, notify_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
 use crate::model::config::TargetType;
@@ -20,23 +20,19 @@ fn epg_write_file(target: &ConfigTarget, epg: &Epg, path: &Path) -> Result<(), M
                 Ok(mut epg_file) => {
                     match epg_file.write_all("<?xml version=\"1.0\" encoding=\"utf-8\" ?><!DOCTYPE tv SYSTEM \"xmltv.dtd\">".as_bytes()) {
                         Ok(()) => {}
-                        Err(err) => return Err(M3uFilterError::new(
-                            M3uFilterErrorKind::Notify, format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
+                        Err(err) => return Err(notify_err!(format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
                     }
                     match epg_file.write_all(&result) {
                         Ok(()) => {
                            debug_if_enabled!("Epg for target {} written to {}", target.name, path.to_str().unwrap_or("?"));
                         }
-                        Err(err) => return Err(M3uFilterError::new(
-                            M3uFilterErrorKind::Notify, format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
+                        Err(err) => return Err(notify_err!(format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
                     }
                 }
-                Err(err) => return Err(M3uFilterError::new(
-                    M3uFilterErrorKind::Notify, format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
+                Err(err) => return Err(notify_err!(format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
             }
         }
-        Err(err) => return Err(M3uFilterError::new(
-            M3uFilterErrorKind::Notify, format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
+        Err(err) => return Err(notify_err!(format!("failed to write epg: {} - {}", path.to_str().unwrap_or("?"), err))),
     }
     Ok(())
 }
@@ -46,9 +42,7 @@ pub fn epg_write(target: &ConfigTarget, cfg: &Config, target_path: &Path, epg: O
         match &output.target {
             TargetType::M3u => {
                 if output.filename.is_none() {
-                    return Err(M3uFilterError::new(
-                        M3uFilterErrorKind::Notify,
-                        format!("write epg for target {} failed: No filename set", target.name)));
+                    return Err(notify_err!(format!("write epg for target {} failed: No filename set", target.name)));
                 }
                 let path = m3u_get_epg_file_path(target_path);
                 debug_if_enabled!("writing m3u epg to {}", path.to_str().unwrap_or("?"));
@@ -61,9 +55,7 @@ pub fn epg_write(target: &ConfigTarget, cfg: &Config, target_path: &Path, epg: O
                         debug_if_enabled!("writing xtream epg to {}", epg_path.to_str().unwrap_or("?"));
                         epg_write_file(target, epg_data, &epg_path)?;
                     }
-                    None => return Err(M3uFilterError::new(
-                        M3uFilterErrorKind::Notify,
-                        format!("failed to serialize epg for target: {}, storage path not found", target.name))),
+                    None => return Err(notify_err!(format!("failed to serialize epg for target: {}, storage path not found", target.name))),
                 }
             }
             TargetType::Strm => {}

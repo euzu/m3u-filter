@@ -3,12 +3,12 @@ use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use log::error;
 
-use crate::create_m3u_filter_error;
+use crate::{create_m3u_filter_error, info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
-use crate::repository::indexed_document::{IndexedDocumentReader, IndexedDocumentWriter};
+use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentWriter};
 use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
 use crate::repository::storage::{FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::utils::file_utils;
@@ -61,7 +61,7 @@ pub async fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path
 
         persist_m3u_playlist_as_text(target, cfg, &m3u_playlist);
         {
-            let _file_lock = cfg.file_locks.write_lock(&m3u_path).await.map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}")))?;
+            let _file_lock = cfg.file_locks.write_lock(&m3u_path).await.map_err(|err| info_err!(format!("{err}")))?;
             match IndexedDocumentWriter::new(m3u_path.clone(), idx_path) {
                 Ok(mut writer) => {
                     for m3u in m3u_playlist {
@@ -94,6 +94,6 @@ pub async  fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path:
     }
     {
         let _file_lock = cfg.file_locks.read_lock(m3u_path).await?;
-        IndexedDocumentReader::<u32, M3uPlaylistItem>::read_indexed_item(m3u_path, idx_path, &stream_id)
+        IndexedDocumentDirectAccess::read_indexed_item::<u32, M3uPlaylistItem>(m3u_path, idx_path, &stream_id)
     }
 }

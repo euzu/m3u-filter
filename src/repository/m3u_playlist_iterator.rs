@@ -1,9 +1,10 @@
 use crate::api::api_utils::get_user_server_info;
+use crate::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, ConfigTargetOptions};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType};
-use crate::repository::indexed_document::IndexedDocumentReader;
+use crate::repository::indexed_document::IndexedDocumentIterator;
 use crate::repository::m3u_repository::m3u_get_file_paths;
 use crate::repository::storage::ensure_target_storage_path;
 use crate::utils::file_lock_manager::FileReadGuard;
@@ -11,7 +12,7 @@ use crate::utils::file_lock_manager::FileReadGuard;
 pub const M3U_STREAM_PATH: &str = "m3u-stream";
 
 pub struct M3uPlaylistIterator {
-    reader: IndexedDocumentReader<u32, M3uPlaylistItem>,
+    reader: IndexedDocumentIterator<u32, M3uPlaylistItem>,
     base_url: String,
     username: String,
     password: String,
@@ -32,15 +33,12 @@ impl M3uPlaylistIterator {
         let target_path = ensure_target_storage_path(cfg, target.name.as_str())?;
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
 
-        let file_lock = cfg.file_locks.read_lock(&m3u_path).await.map_err(|err| {
-            M3uFilterError::new(
-                M3uFilterErrorKind::Info,
-                format!("Could not lock document {m3u_path:?}: {err}"),
-            )
-        })?;
+        let file_lock = cfg.file_locks.read_lock(&m3u_path).await
+            .map_err(|err| info_err!(format!("Could not lock document {m3u_path:?}: {err}")))?;
 
         let reader =
-            IndexedDocumentReader::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info,format!("Could not deserialize file {m3u_path:?} - {err}")))?;
+            IndexedDocumentIterator::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path)
+                .map_err(|err| info_err!(format!("Could not deserialize file {m3u_path:?} - {err}")))?;
 
         let target_options = target.options.as_ref();
         let include_type_in_url = target_options.is_some_and( |opts| opts.m3u_include_type_in_url);
@@ -101,15 +99,9 @@ impl Iterator for M3uPlaylistIterator {
             let stream_url = match m3u_pli.item_type {
                 PlaylistItemType::LiveHls => None,
                 _ => match &self.proxy_type {
-                    ProxyType::Reverse => Some(self.get_stream_url(
-                        &m3u_pli,
-                        self.include_type_in_url,
-                    )),
+                    ProxyType::Reverse => Some(self.get_stream_url(&m3u_pli, self.include_type_in_url)),
                     ProxyType::Redirect => if self.mask_redirect_url {
-                        Some(self.get_stream_url(
-                            &m3u_pli,
-                            self.include_type_in_url,
-                        ))
+                        Some(self.get_stream_url(&m3u_pli,self.include_type_in_url))
                     } else {
                         None
                     }

@@ -1,3 +1,4 @@
+use crate::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, TargetType};
 use crate::model::playlist::PlaylistItemType::LiveUnknown;
@@ -23,7 +24,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     let _file_lock = match cfg.file_locks.write_lock(&target_id_mapping_file).await {
         Ok(lock) => lock,
         Err(err) => {
-            errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
+            errors.push(info_err!(err.to_string()));
             return Err(errors);
         }
     };
@@ -55,7 +56,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
             errors.push(err);
         } else {
             if let Err(err) = target_id_mapping.persist() {
-                errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
+                errors.push(info_err!(err.to_string()));
             }
             if !playlist.is_empty() {
                 if let Err(err) = epg_write(target, cfg, &target_path, epg, output) {
@@ -66,7 +67,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     }
 
     if let Err(err) = target_id_mapping.persist() {
-        errors.push(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
+        errors.push(info_err!(err.to_string()));
     }
 
     if errors.is_empty() { Ok(()) } else { Err(errors) }

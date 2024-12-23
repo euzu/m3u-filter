@@ -1,4 +1,4 @@
-use crate::create_m3u_filter_error_result;
+use crate::{create_m3u_filter_error_result, notify_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{PlaylistGroup, XtreamCluster};
@@ -129,7 +129,7 @@ async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
 pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&str>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, "write strm playlist failed: ".to_string()));
+            return Err(notify_err!("write strm playlist failed: ".to_string()));
         }
         let underscore_whitespace = target.options.as_ref().is_some_and(|o| o.underscore_whitespace);
         let cleanup = target.options.as_ref().is_some_and(|o| o.cleanup);

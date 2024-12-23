@@ -482,8 +482,10 @@ where
 //     }
 // }
 
+///
 /// `BPlusTreeQuery` can be used to query the `BPlusTree` on-disk.
 /// If you intend to do frequent queries then use `BPlusTree` instead which loads the tree into memory.
+///
 pub struct BPlusTreeQuery<K, V> {
     file: BufReader<File>,
     _marker_k: PhantomData<K>,

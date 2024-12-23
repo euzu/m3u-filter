@@ -12,13 +12,13 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
-use crate::repository::bplustree::{BPlusTree};
-use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentQuery, IndexedDocumentReader,IndexedDocumentUpdate, IndexedDocumentWriter};
-use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, hash_string,FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
+use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
+use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentWriter, IndexedDocumentDirectAccess};
+use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
-use crate::{create_m3u_filter_error, create_m3u_filter_error_result};
+use crate::{create_m3u_filter_error, create_m3u_filter_error_result, notify_err, info_err};
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -75,12 +75,12 @@ fn ensure_xtream_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf
                 "Failed to save xtream data, can't create directory {}",
                 &path.to_str().unwrap()
             );
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg));
+            return Err(notify_err!(msg));
         }
         Ok(path)
     } else {
         let msg = format!("Failed to save xtream data, can't create directory for target {target_name}");
-        Err(M3uFilterError::new(M3uFilterErrorKind::Notify, msg))
+        Err(notify_err!(msg))
     }
 }
 
@@ -120,7 +120,7 @@ async fn write_playlists_to_file(
     for (cluster, playlist) in collections {
         let (xtream_path, idx_path) = xtream_get_file_paths(storage_path, cluster);
         {
-            let _file_lock = cfg.file_locks.write_lock(&xtream_path).await.map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}")))?;
+            let _file_lock = cfg.file_locks.write_lock(&xtream_path).await.map_err(|err| info_err!(format!("{err}")))?;
             match IndexedDocumentWriter::new(xtream_path.clone(), idx_path) {
                 Ok(mut writer) => {
                     for item in playlist {
@@ -351,11 +351,7 @@ async fn xtream_read_item_for_stream_id(
     let (xtream_path, idx_path) = xtream_get_file_paths(storage_path, cluster);
     {
         let _file_lock = cfg.file_locks.read_lock(&xtream_path).await?;
-        IndexedDocumentReader::<u32, XtreamPlaylistItem>::read_indexed_item(
-            &xtream_path,
-            &idx_path,
-            &stream_id,
-        )
+        IndexedDocumentDirectAccess::read_indexed_item::<u32, XtreamPlaylistItem>(&xtream_path, &idx_path, &stream_id)
     }
 }
 
@@ -367,7 +363,7 @@ async fn xtream_read_series_item_for_stream_id(
     let (xtream_path, idx_path) = xtream_get_file_paths_for_series(storage_path);
     {
         let _file_lock = cfg.file_locks.read_lock(&xtream_path).await?;
-        IndexedDocumentReader::<u32, XtreamPlaylistItem>::read_indexed_item(&xtream_path, &idx_path, &stream_id)
+        IndexedDocumentDirectAccess::read_indexed_item::<u32, XtreamPlaylistItem>(&xtream_path, &idx_path, &stream_id)
     }
 }
 
@@ -391,7 +387,7 @@ pub async fn xtream_get_item_for_stream_id(
         let target_id_mapping_file = get_target_id_mapping_file(&target_path);
         let _file_lock = config.file_locks.read_lock(&target_id_mapping_file).await.map_err(|err| Error::new(ErrorKind::Other, format!("Could not get lock for id mapping for target {} err:{err}", target.name)))?;
 
-        let mut target_id_mapping = IndexedDocumentQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| Error::new(ErrorKind::Other, format!("Could not load id mapping for target {} err:{err}", target.name)))?;
+        let mut target_id_mapping = BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| Error::new(ErrorKind::Other, format!("Could not load id mapping for target {} err:{err}", target.name)))?;
         let mapping = target_id_mapping.query(&virtual_id).ok_or_else(|| Error::new(ErrorKind::Other, format!("Could not find mapping for target {} and id {}", target.name, virtual_id)))?;
         match mapping.item_type {
             PlaylistItemType::SeriesInfo => {
@@ -447,7 +443,7 @@ pub async fn xtream_write_series_info(
     {
         let target_id_mapping_file = get_target_id_mapping_file(&target_path);
         let _file_lock = config.file_locks.write_lock(&target_id_mapping_file).await?;
-        if let Ok(mut target_id_mapping) = IndexedDocumentUpdate::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file) {
+        if let Ok(mut target_id_mapping) = BPlusTreeUpdate::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file) {
             if let Some(record) = target_id_mapping.query(&series_info_id) {
                 let new_record = record.copy_update_timestamp();
                 let _ = target_id_mapping.update(&series_info_id, new_record);
@@ -491,7 +487,7 @@ async fn xtream_get_info_mapping(config: &Config, target_name: &str, info_id: u3
         error!("Could not lock id mapping for target {target_name}: {}", err);
         Error::new(ErrorKind::Other, format!("ID mapping load error for target {target_name}"))
     }).ok()?;
-    IndexedDocumentQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| {
+    BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| {
         error!("Could not load id mapping for target {target_name}: {}", err);
         Error::new(ErrorKind::Other, format!("ID mapping load error for target {target_name}"))
     }).ok().map(|mut tree| tree.query(&info_id))?
@@ -515,7 +511,7 @@ pub async fn xtream_load_series_info(
                 error!("Could not lock document {:?}: {}", info_path, err);
                 Error::new(ErrorKind::Other, format!("Document Reader error for target {target_name}"))
             }).ok()?;
-            return match IndexedDocumentReader::<u32, String>::read_indexed_item(&info_path, &idx_path, &series_id) {
+            return match IndexedDocumentDirectAccess::read_indexed_item::<u32, String>(&info_path, &idx_path, &series_id) {
                 Ok(content) => Some(content),
                 Err(err) => {
                     error!("Failed to read series info for id {series_id} for {target_name}: {}", err);
@@ -556,9 +552,7 @@ pub async fn xtream_load_vod_info(
                 error!("Could not lock document {:?}: {}", info_path, err);
                 Error::new(ErrorKind::Other, format!("Document Reader error for target {target_name}"))
             }).ok()?;
-            return match IndexedDocumentReader::<u32, String>::read_indexed_item(
-                &info_path, &idx_path, &vod_id,
-            ) {
+            return match IndexedDocumentDirectAccess::read_indexed_item::<u32, String>(&info_path, &idx_path, &vod_id) {
                 Ok(content) => Some(content),
                 Err(_err) => {
                     // this is not an error, it means the info is not indexed
@@ -669,11 +663,7 @@ pub async fn xtream_get_input_info(
     if let Ok(Some((info_path, idx_path))) = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_info_file_paths(&storage_path, cluster))
     {
         if let Ok(_file_lock) = cfg.file_locks.read_lock(&info_path).await {
-            if let Ok(content) = IndexedDocumentReader::<u32, String>::read_indexed_item(
-                &info_path,
-                &idx_path,
-                &provider_id,
-            ) {
+            if let Ok(content) = IndexedDocumentDirectAccess::read_indexed_item::<u32, String>(&info_path, &idx_path, &provider_id) {
                 return Some(content);
             }
         }
@@ -692,7 +682,7 @@ pub async fn xtream_update_input_info_file(
         Ok(Some((info_path, idx_path))) => {
             match cfg.file_locks.write_lock(&info_path).await {
                 Ok(_file_lock) => {
-                    wal_file.seek(SeekFrom::Start(0)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify,format!("Could not read {cluster} info {err}")))?;
+                    wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read {cluster} info {err}")))?;
                     let mut reader = BufReader::new(wal_file);
                     match IndexedDocumentWriter::<u32>::new_append(info_path, idx_path) {
                         Ok(mut writer) => {
@@ -703,30 +693,29 @@ pub async fn xtream_update_input_info_file(
                                     break; // End of file
                                 }
                                 let provider_id = u32::from_le_bytes(provider_id_bytes);
-                                reader.read_exact(&mut length_bytes).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read temporary {cluster} info {err}")))?;
+                                reader.read_exact(&mut length_bytes).map_err(|err| notify_err!(format!("Could not read temporary {cluster} info {err}")))?;
                                 let length = u32::from_le_bytes(length_bytes) as usize;
                                 let mut buffer = vec![0u8; length];
-                                reader.read_exact(&mut buffer).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read temporary {cluster} info {err}")))?;
+                                reader.read_exact(&mut buffer).map_err(|err| notify_err!(format!("Could not read temporary {cluster} info {err}")))?;
                                 if let Ok(content) = String::from_utf8(buffer) {
                                     let _ = writer.write_doc(provider_id, &content);
                                 }
                             }
-                            writer.store().map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not store {cluster} info {err}")))?;
+                            writer.store().map_err(|err| notify_err!(format!("Could not store {cluster} info {err}")))?;
                             drop(reader);
                             if let Err(err) = fs::remove_file(wal_path) {
                                 error!("Failed to delete WAL file for {cluster} {err}");
                             }
                             Ok(())
                         }
-                        Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create create indexed document writer for {cluster} info {err}"))),
+                        Err(err) => Err(notify_err!(format!("Could not create create indexed document writer for {cluster} info {err}"))),
                     }
                 }
-                Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}"))),
+                Err(err) => Err(info_err!(format!("{err}"))),
             }
         }
-        Ok(None) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create storage path for input {}", &input.name.as_ref().map_or("?", |v| v)),
-        )),
-        Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not create storage path for input {err}"))),
+        Ok(None) => Err(notify_err!(format!("Could not create storage path for input {}", &input.name.as_ref().map_or("?", |v| v)))),
+        Err(err) => Err(notify_err!(format!("Could not create storage path for input {err}"))),
     }
 }
 
@@ -737,12 +726,12 @@ pub async fn xtream_update_input_vod_record_from_wal_file(
     wal_path: &Path,
 ) -> Result<(), M3uFilterError> {
     let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, XtreamCluster::Video))
-        .map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Error accessing storage path: {err}")))
-        .and_then(|opt| opt.ok_or_else(|| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
+        .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
+        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
 
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            wal_file.seek(SeekFrom::Start(0)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read vod wal info {err}")))?;
+            wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read vod wal info {err}")))?;
             let mut reader = BufReader::new(wal_file);
             let mut provider_id_bytes = [0u8; 4];
             let mut tmdb_id_bytes = [0u8; 4];
@@ -763,14 +752,14 @@ pub async fn xtream_update_input_vod_record_from_wal_file(
                 let ts = u64::from_le_bytes(ts_bytes);
                 tree_record_index.insert(provider_id, InputVodInfoRecord { tmdb_id, ts });
             }
-            tree_record_index.store(&record_path).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not store vod record info {err}")))?;
+            tree_record_index.store(&record_path).map_err(|err| notify_err!(format!("Could not store vod record info {err}")))?;
             drop(reader);
             if let Err(err) = fs::remove_file(wal_path) {
                 error!("Failed to delete record WAL file for vod {err}");
             }
             Ok(())
         }
-        Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}"))),
+        Err(err) => Err(info_err!(format!("{err}"))),
     }
 }
 
@@ -781,11 +770,11 @@ pub async fn xtream_update_input_series_record_from_wal_file(
     wal_path: &Path,
 ) -> Result<(), M3uFilterError> {
     let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, XtreamCluster::Series))
-        .map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Error accessing storage path: {err}")))
-        .and_then(|opt| opt.ok_or_else(|| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
+        .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
+        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            wal_file.seek(SeekFrom::Start(0)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not read vod wal info {err}")))?;
+            wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read vod wal info {err}")))?;
             let mut reader = BufReader::new(wal_file);
             let mut provider_id_bytes = [0u8; 4];
             let mut ts_bytes = [0u8; 8];
@@ -801,7 +790,7 @@ pub async fn xtream_update_input_series_record_from_wal_file(
                 let ts = u64::from_le_bytes(ts_bytes);
                 tree_record_index.insert(provider_id, ts);
             }
-            tree_record_index.store(&record_path).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Could not store series record info {err}")))?;
+            tree_record_index.store(&record_path).map_err(|err| notify_err!(format!("Could not store series record info {err}")))?;
             drop(reader);
             if let Err(err) = fs::remove_file(wal_path) {
                 error!("Failed to delete recrd WAL file for series {err}");
@@ -809,6 +798,6 @@ pub async fn xtream_update_input_series_record_from_wal_file(
             Ok(())
         }
 
-        Err(err) => Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("{err}"))),
+        Err(err) => Err(info_err!(format!("{err}"))),
     }
 }

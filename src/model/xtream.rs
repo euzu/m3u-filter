@@ -349,7 +349,7 @@ impl XtreamSeriesInfoEpisode {
         let mut result = Map::new();
         let bdpath = &series_info.info.backdrop_path;
         if !bdpath.is_empty() {
-            result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first().unwrap()))])));
+            result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first()?))])));
         }
         add_str_property_if_exists!(result, self.added.as_str(), "added");
         add_str_property_if_exists!(result, series_info.info.cast.as_str(), "cast");

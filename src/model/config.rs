@@ -15,6 +15,7 @@ use path_clean::PathClean;
 use url::Url;
 
 use crate::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
+use crate::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ProxyUserCredentials};
@@ -359,7 +360,7 @@ impl ConfigTarget {
     pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
         self.id = id;
         if self.output.is_empty() {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Missing output format for {}", self.name)));
+            return Err(info_err!(format!("Missing output format for {}", self.name)));
         }
         let mut m3u_cnt = 0;
         let mut strm_cnt = 0;
@@ -562,7 +563,7 @@ impl ConfigInput {
     pub fn prepare(&mut self, id: u16) -> Result<(), M3uFilterError> {
         self.id = id;
         if self.url.trim().is_empty() {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "url for input is mandatory".to_string()));
+            return Err(info_err!("url for input is mandatory".to_string()));
         }
         if let Some(user_name) = &self.username {
             if user_name.trim().is_empty() {
@@ -582,7 +583,7 @@ impl ConfigInput {
             }
             InputType::Xtream => {
                 if self.username.is_none() || self.password.is_none() {
-                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "for input type xtream: username and password are mandatory".to_string()));
+                    return Err(info_err!("for input type xtream: username and password are mandatory".to_string()));
                 }
             }
         }

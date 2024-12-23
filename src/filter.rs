@@ -13,7 +13,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ItemField;
 use crate::model::playlist::{PlaylistItem, PlaylistItemType};
 use crate::utils::directed_graph::DirectedGraph;
-use crate::{create_m3u_filter_error_result, exit};
+use crate::{create_m3u_filter_error_result, exit, info_err};
 
 pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<String> {
     let header = pli.header.borrow();
@@ -432,7 +432,7 @@ pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -
 
             if !errors.is_empty() {
                 errors.push(format!("Unable to parse filter: {}", &filter_text));
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, errors.join("\n")));
+                return Err(info_err!(errors.join("\n")));
             }
 
             result.map_or_else(|| create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unable to parse filter: {}", &filter_text), Ok)

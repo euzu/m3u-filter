@@ -4,14 +4,13 @@ use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, Playl
 use crate::processing::playlist_processor::ProcessingPipe;
 use crate::processing::xtream_processor::{create_resolve_info_wal_files, get_u32_from_serde_value, get_u64_from_serde_value, playlist_resolve_process_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
 use crate::repository::xtream_repository::{xtream_get_info_file_paths, xtream_update_input_info_file, xtream_update_input_series_record_from_wal_file};
-use crate::{create_resolve_options_function_for_xtream_target, handle_error, handle_error_and_return};
+use crate::{create_resolve_options_function_for_xtream_target, handle_error, handle_error_and_return, info_err, notify_err};
 use serde_json::{Map, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap};
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use log::error;
-use crate::repository::bplustree::BPlusTree;
-use crate::repository::IndexedDocumentIndex;
+use crate::processing::xtream_parser::parse_xtream_series_info;
+use crate::repository::{IndexedDocumentReader};
 use crate::repository::storage::get_input_storage_path;
 
 const TAG_SERIES_INFO_SERIES_ID: &str = "series_id";
@@ -73,25 +72,108 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
         if should_update {
             if let Some(content) = playlist_resolve_process_playlist_item(pli, processed_fpl.input, errors, resolve_delay, XtreamCluster::Series).await {
                 if let Some((provider_id, ts)) = extract_info_record_from_series_info(&content) {
-                    handle_error_and_return!(write_info_content_to_wal_file(&mut content_writer, provider_id, &content), |err| M3uFilterError::new( M3uFilterErrorKind::Notify, format!("Failed to resolve series, could not write to content wal file {err}")));
+                    handle_error_and_return!(write_info_content_to_wal_file(&mut content_writer, provider_id, &content),
+                        |err| notify_err!(format!("Failed to resolve series, could not write to content wal file {err}")));
                     processed_info_ids.insert(provider_id, ts);
-                    handle_error_and_return!(write_series_info_record_to_wal_file(&mut record_writer, provider_id, ts), |err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve series wal, could not write to record wal file {err}")));
+                    handle_error_and_return!(write_series_info_record_to_wal_file(&mut record_writer, provider_id, ts),
+                        |err| notify_err!(format!("Failed to resolve series wal, could not write to record wal file {err}")));
                     content_updated = true;
                 }
             }
         }
     }
     if content_updated {
-        handle_error!(content_writer.flush(), |err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve vod, could not write to wal file {err}")));
+        handle_error!(content_writer.flush(),
+            |err| notify_err!(format!("Failed to resolve vod, could not write to wal file {err}")));
         drop(content_writer);
-        handle_error!(record_writer.flush(), |err| M3uFilterError::new(M3uFilterErrorKind::Notify, format!("Failed to resolve vod tmdb, could not write to wal file {err}")));
+        handle_error!(record_writer.flush(),
+            |err| notify_err!(format!("Failed to resolve vod tmdb, could not write to wal file {err}")));
         drop(record_writer);
-        handle_error!(xtream_update_input_info_file(cfg, processed_fpl.input, &mut wal_content_file, &wal_content_path, XtreamCluster::Series).await, |err| errors.push(err));
-        handle_error!(xtream_update_input_series_record_from_wal_file(cfg, processed_fpl.input, &mut wal_record_file, &wal_record_path).await, |err| errors.push(err));
+        handle_error!(xtream_update_input_info_file(cfg, processed_fpl.input, &mut wal_content_file, &wal_content_path, XtreamCluster::Series).await,
+            |err| errors.push(err));
+        handle_error!(xtream_update_input_series_record_from_wal_file(cfg, processed_fpl.input, &mut wal_record_file, &wal_record_path).await,
+            |err| errors.push(err));
     }
 
     processed_info_ids
 }
+async fn process_series_info(
+    cfg: &Config,
+    provider_fpl: &mut FetchedPlaylist<'_>,
+    errors: &mut Vec<M3uFilterError>,
+    processed_ids: &HashMap<u32, u64>,
+) -> Vec<PlaylistGroup> {
+    let mut result: Vec<PlaylistGroup> = vec![];
+    let input = provider_fpl.input;
+
+    let (info_path, idx_path) = match get_input_storage_path(input, &cfg.working_dir)
+        .map(|storage_path| xtream_get_info_file_paths(&storage_path, XtreamCluster::Series))
+    {
+        Ok(Some(paths)) => paths,
+        _ => {
+            errors.push(notify_err!("Failed to open input info file for series".to_string()));
+            return result;
+        }
+    };
+
+    let _file_lock = match cfg.file_locks.read_lock(&info_path).await {
+        Ok(lock) => lock,
+        Err(err) => {
+            errors.push(notify_err!(format!("Could not lock input info file for series: {err}")));
+            return result;
+        }
+    };
+
+    let mut doc_reader = match IndexedDocumentReader::<u32, String>::new(&info_path, &idx_path) {
+        Ok(reader) => reader,
+        Err(_) => return result,
+    };
+
+    for plg in provider_fpl
+        .playlistgroups
+        .iter_mut()
+        .filter(|plg| plg.xtream_cluster == XtreamCluster::Series)
+    {
+        let mut group_series = vec![];
+
+        for pli in plg
+            .channels
+            .iter()
+            .filter(|pli| pli.header.borrow().item_type == PlaylistItemType::SeriesInfo)
+        {
+            if let Some(provider_id) = pli.header.borrow_mut().get_provider_id() {
+                if processed_ids.contains_key(&provider_id) {
+                    if let Ok(content) = doc_reader.get(&provider_id) {
+                        match serde_json::from_str::<serde_json::Value>(&content) {
+                            Ok(series_content) => {
+                                if let Ok(Some(mut series)) =
+                                    parse_xtream_series_info(&series_content, pli.header.borrow().group.as_str(), input)
+                                {
+                                    group_series.append(&mut series);
+
+                                    TODO write tmdb ids of episoded to input for kodi export
+                                }
+                            }
+                            Err(err) => errors.push(info_err!(format!("Failed to parse JSON: {err}"))),
+                        }
+                    }
+                }
+            }
+        }
+
+        if !group_series.is_empty() {
+            result.push(PlaylistGroup {
+                id: plg.id,
+                title: plg.title.clone(),
+                channels: group_series,
+                xtream_cluster: XtreamCluster::Series,
+            });
+        }
+    }
+
+    result
+}
+
 
 pub async fn playlist_resolve_series(cfg: &Config, target: &ConfigTarget,
                                      errors: &mut Vec<M3uFilterError>,
@@ -104,38 +186,22 @@ pub async fn playlist_resolve_series(cfg: &Config, target: &ConfigTarget,
 
     let processed_ids = playlist_resolve_series_info(cfg, errors, processed_fpl, resolve_delay).await;
     if processed_ids.is_empty() { return; }
-
-    if let Ok(Some((info_path, idx_path))) =  get_input_storage_path(provider_fpl.input, &cfg.working_dir).map(|storage_path| xtream_get_info_file_paths(&storage_path, XtreamCluster::Series)) {
-        match cfg.file_locks.read_lock(&info_path).await {
-            Ok(_file_lock) => {
-                let index = IndexedDocumentIndex::<u32>::load(&idx_path).unwrap_or_else(|err| {
-                    error!("Failed to load index {idx_path:?}: {err}");
-                    IndexedDocumentIndex::<u32>::new()
-                });
-                let mut result: Vec<PlaylistGroup> = vec![];
-                for plg in &mut provider_fpl.playlistgroups.iter()
-                    .filter(|&plg| plg.xtream_cluster == XtreamCluster::Series)
-                {
-                    let mut group_series: Vec<PlaylistItem> = vec![];
-                    for pli in plg.channels.iter().filter(|&pli| pli.header.borrow().item_type == PlaylistItemType::SeriesInfo) {
-                        if let Some(provider_id) = pli.header.borrow_mut().get_provider_id() {
-                            if processed_ids.contains_key(&provider_id) {
-                                if let Some(offset) = index.query(&provider_id) {
-                                    IndexedDocumentReader::
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            Err(err) => errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, "Could not lock input info file for series".to_string()))
-        }
-    } else {
-        errors.push(M3uFilterError::new(M3uFilterErrorKind::Notify, "Failed to open input info file for series".to_string()));
+    let mut series_playlist = process_series_info(cfg, provider_fpl,  errors, &processed_ids).await;
+    // original content saved into original list
+    for plg in &series_playlist {
+        provider_fpl.update_playlist(plg);
     }
-
-
-    // Now update provider_fpl
+    // run processing pipe over new items
+    for f in pipe {
+        let r = f(&mut series_playlist, target);
+        if let Some(v) = r {
+            series_playlist = v;
+        }
+    }
+    // assign new items to the new playlist
+    for plg in &series_playlist {
+        processed_fpl.update_playlist(plg);
+    }
 
 
 }
