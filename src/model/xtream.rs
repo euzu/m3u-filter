@@ -364,7 +364,7 @@ impl XtreamSeriesInfoEpisode {
         add_str_property_if_exists!(result, self.info.releasedate, "release_date");
         add_str_property_if_exists!(result, self.title, "title");
         add_i64_property_if_exists!(result, self.season, "season");
-        add_str_property_if_exists!(result, series_info.info.youtube_trailer, "youtube_trailer");
+        add_opt_i64_property_if_exists!(result, self.info.tmdb_id, "tmdb_id");
         if result.is_empty() { None } else { Some(Value::Object(result)) }
     }
 }

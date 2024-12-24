@@ -1,6 +1,6 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, InputType};
-use crate::model::playlist::{FetchedPlaylist, PlaylistItem, XtreamCluster};
+use crate::model::playlist::{FetchedPlaylist, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::processing::xtream_processor::{create_resolve_info_wal_files, get_u32_from_serde_value, get_u64_from_serde_value, playlist_resolve_process_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
 use crate::repository::xtream_repository::{xtream_update_input_info_file, xtream_update_input_vod_record_from_wal_file, InputVodInfoRecord};
 use crate::{create_resolve_options_function_for_xtream_target, handle_error, handle_error_and_return, notify_err};
@@ -17,9 +17,8 @@ const TAG_VOD_INFO_ADDED: &str = "added";
 
 create_resolve_options_function_for_xtream_target!(video);
 
-async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>,
-                                     cluster: XtreamCluster) -> HashMap<u32, u64> {
-    read_processed_info_ids(cfg, errors, fpl, cluster, |record: &InputVodInfoRecord| record.ts).await
+async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) -> HashMap<u32, u64> {
+    read_processed_info_ids(cfg, errors, fpl, PlaylistItemType::Video, |record: &InputVodInfoRecord| record.ts).await
 }
 
 fn extract_info_record_from_vod_info(content: &str) -> Option<(u32, InputVodInfoRecord)> {
@@ -71,7 +70,7 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
     let Some((mut wal_content_file, mut wal_record_file, wal_content_path, wal_record_path)) = create_resolve_info_wal_files(cfg, fpl.input, XtreamCluster::Video)
     else { return; };
 
-    let mut processed_info_ids = read_processed_vod_info_ids(cfg, errors, fpl, XtreamCluster::Video).await;
+    let mut processed_info_ids = read_processed_vod_info_ids(cfg, errors, fpl).await;
     let mut content_writer = BufWriter::new(&wal_content_file);
     let mut record_writer = BufWriter::new(&wal_record_file);
     let mut content_updated = false;

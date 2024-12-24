@@ -151,8 +151,6 @@ pub struct PlaylistItemHeader {
     pub additional_properties: Option<Value>,
     #[serde(default, skip_serializing, skip_deserializing)]
     pub item_type: PlaylistItemType,
-    #[serde(default, skip_serializing, skip_deserializing)]
-    pub series_fetched: bool, // only used for series_info
     #[serde(default)]
     pub category_id: u32,
     #[serde(default)]
@@ -320,7 +318,6 @@ pub struct XtreamPlaylistItem {
     pub xtream_cluster: XtreamCluster,
     pub additional_properties: Option<String>,
     pub item_type: PlaylistItemType,
-    pub series_fetched: bool, // only used for series_info
     pub category_id: u32,
     pub input_id: u16,
 }
@@ -399,7 +396,6 @@ impl PlaylistItem {
             xtream_cluster: header.xtream_cluster,
             additional_properties: header.additional_properties.as_ref().and_then(|props| serde_json::to_string(props).ok()),
             item_type: header.item_type,
-            series_fetched: header.series_fetched,
             category_id: header.category_id,
             input_id: header.input_id,
         }

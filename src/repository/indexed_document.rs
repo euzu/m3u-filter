@@ -57,7 +57,7 @@ impl IndexedDocument {
 
 ////////////////////////////////////////////////////////
 ///
-/// IndexedDocumentWriter
+/// `IndexedDocumentWriter`
 ///
 ////////////////////////////////////////////////////////
 /**
@@ -232,7 +232,7 @@ where
 
 ////////////////////////////////////////////////////////
 ///
-/// IndexedDocumentReader
+/// `IndexedDocumentReader`
 ///
 ////////////////////////////////////////////////////////
 pub struct IndexedDocumentReader<K, T>
@@ -257,8 +257,8 @@ where
                 .read(true)
                 .write(false)
                 .truncate(false)
-                .open(&main_path)?;
-            let index_tree = IndexedDocumentIndex::<K>::load(&index_path)?;
+                .open(main_path)?;
+            let index_tree = IndexedDocumentIndex::<K>::load(index_path)?;
 
             Ok(Self {
                 main_file: BufReader::new(main_file),
@@ -285,12 +285,10 @@ where
 
 
 ////////////////////////////////////////////////////////
-//
-/// IndexedDocumentIterator
+/// `IndexedDocumentIterator`
 ///
-/// Iterator | Sequential access with has_next / next
+/// Iterator | Sequential access with `has_next` / next
 ////////////////////////////////////////////////////////
-
 pub(in crate::repository) struct IndexedDocumentIterator<K, T> {
     main_path: PathBuf,
     main_file: BufReader<File>,
@@ -391,7 +389,7 @@ where
 
 ////////////////////////////////////////////////////////
 ///
-/// IndexedDocumentDirectAccess
+/// `IndexedDocumentDirectAccess`
 ///
 ////////////////////////////////////////////////////////
 pub(in crate::repository) struct IndexedDocumentDirectAccess {}
@@ -421,10 +419,9 @@ impl IndexedDocumentDirectAccess {
 
 ////////////////////////////////////////////////////////
 ///
-/// IndexedDocumentGarbageCollector
+/// `IndexedDocumentGarbageCollector`
 ///
 ////////////////////////////////////////////////////////
-
 pub(in crate::repository) struct IndexedDocumentGarbageCollector<K> {
     main_path: PathBuf,
     index_path: PathBuf,

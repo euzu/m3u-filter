@@ -27,6 +27,7 @@ const FILE_SERIES_EPISODES: &str = "series_episodes";
 const FILE_VOD_INFO: &str = "vod_info";
 const FILE_VOD_INFO_RECORD: &str = "vod_info_record";
 const FILE_SERIES_INFO_RECORD: &str = "series_info_record";
+const FILE_SERIES_EPISODE_RECORD: &str = "series_episode_record";
 const FILE_SERIES: &str = "series";
 pub const FILE_EPG: &str = "epg.xml";
 const PATH_XTREAM: &str = "xtream";
@@ -100,18 +101,14 @@ pub fn xtream_get_info_file_paths(
     None
 }
 
-pub fn xtream_get_record_file_path(storage_path: &Path, cluster: XtreamCluster) -> Option<PathBuf> {
-    match cluster {
-        XtreamCluster::Live => None,
-        XtreamCluster::Video => {
-            Some(storage_path.join(format!("{FILE_VOD_INFO_RECORD}.{FILE_SUFFIX_DB}")))
-        }
-        XtreamCluster::Series => {
-            Some(storage_path.join(format!("{FILE_SERIES_INFO_RECORD}.{FILE_SUFFIX_DB}")))
-        }
+pub fn xtream_get_record_file_path(storage_path: &Path, item_type: PlaylistItemType) -> Option<PathBuf> {
+    match item_type {
+        PlaylistItemType::Video => Some(storage_path.join(format!("{FILE_VOD_INFO_RECORD}.{FILE_SUFFIX_DB}"))),
+        PlaylistItemType::SeriesInfo | PlaylistItemType::Series => Some(storage_path.join(format!("{FILE_SERIES_INFO_RECORD}.{FILE_SUFFIX_DB}"))),
+        PlaylistItemType::SeriesEpisode => Some(storage_path.join(format!("{FILE_SERIES_EPISODE_RECORD}.{FILE_SUFFIX_DB}"))),
+        _ => None,
     }
 }
-
 async fn write_playlists_to_file(
     cfg: &Config,
     storage_path: &Path,
@@ -725,7 +722,7 @@ pub async fn xtream_update_input_vod_record_from_wal_file(
     wal_file: &mut File,
     wal_path: &Path,
 ) -> Result<(), M3uFilterError> {
-    let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, XtreamCluster::Video))
+    let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::Video))
         .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
         .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
 
@@ -769,12 +766,12 @@ pub async fn xtream_update_input_series_record_from_wal_file(
     wal_file: &mut File,
     wal_path: &Path,
 ) -> Result<(), M3uFilterError> {
-    let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, XtreamCluster::Series))
+    let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::SeriesInfo))
         .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
         .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read vod wal info {err}")))?;
+            wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read series wal info {err}")))?;
             let mut reader = BufReader::new(wal_file);
             let mut provider_id_bytes = [0u8; 4];
             let mut ts_bytes = [0u8; 8];
@@ -793,7 +790,46 @@ pub async fn xtream_update_input_series_record_from_wal_file(
             tree_record_index.store(&record_path).map_err(|err| notify_err!(format!("Could not store series record info {err}")))?;
             drop(reader);
             if let Err(err) = fs::remove_file(wal_path) {
-                error!("Failed to delete recrd WAL file for series {err}");
+                error!("Failed to delete record WAL file for series {err}");
+            }
+            Ok(())
+        }
+
+        Err(err) => Err(info_err!(format!("{err}"))),
+    }
+}
+
+pub async fn xtream_update_input_series_episodes_record_from_wal_file(
+    cfg: &Config,
+    input: &ConfigInput,
+    wal_file: &mut File,
+    wal_path: &Path,
+) -> Result<(), M3uFilterError> {
+    let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::SeriesEpisode))
+        .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
+        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
+    match cfg.file_locks.write_lock(&record_path).await {
+        Ok(_file_lock) => {
+            wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read series episode wal info {err}")))?;
+            let mut reader = BufReader::new(wal_file);
+            let mut provider_id_bytes = [0u8; 4];
+            let mut tmdb_id_bytes = [0u8; 4];
+            let mut tree_record_index: BPlusTree<u32, u32> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());
+            loop {
+                if reader.read_exact(&mut provider_id_bytes).is_err() {
+                    break; // End of file
+                }
+                let provider_id = u32::from_le_bytes(provider_id_bytes);
+                if reader.read_exact(&mut tmdb_id_bytes).is_err() {
+                    break; // End of file
+                }
+                let tmdb_id = u32::from_le_bytes(tmdb_id_bytes);
+                tree_record_index.insert(provider_id, tmdb_id);
+            }
+            tree_record_index.store(&record_path).map_err(|err| notify_err!(format!("Could not store series episode record info {err}")))?;
+            drop(reader);
+            if let Err(err) = fs::remove_file(wal_path) {
+                error!("Failed to delete record WAL file for series episode {err}");
             }
             Ok(())
         }

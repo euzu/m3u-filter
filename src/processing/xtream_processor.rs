@@ -1,15 +1,15 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput};
-use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistItem, XtreamCluster};
+use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::storage::get_input_storage_path;
 use crate::utils::download;
+use crate::{info_err, notify_err};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
-use crate::{info_err, notify_err};
 
 const FILE_SERIES_INFO: &str = "xtream_series_info";
 const FILE_VOD_INFO: &str = "xtream_vod_info";
@@ -98,6 +98,17 @@ pub(in crate::processing) fn write_info_content_to_wal_file(writer: &mut BufWrit
     Ok(())
 }
 
+pub(in crate::processing) fn create_resolve_episode_wal_files(cfg: &Config, input: &ConfigInput) -> Option<(File, PathBuf)> {
+    match get_input_storage_path(input, &cfg.working_dir) {
+        Ok(storage_path) => {
+            let info_path = storage_path.join(format!("series_episode_record.{FILE_SUFFIX_WAL}"));
+            let info_file = OpenOptions::new().append(true).open(&info_path).ok()?;
+            Some((info_file, info_path))
+        }
+        Err(_) => None
+    }
+}
+
 pub(in crate::processing) fn create_resolve_info_wal_files(cfg: &Config, input: &ConfigInput, cluster: XtreamCluster) -> Option<(File, File, PathBuf, PathBuf)> {
     match get_input_storage_path(input, &cfg.working_dir) {
         Ok(storage_path) => {
@@ -119,7 +130,7 @@ pub(in crate::processing) fn create_resolve_info_wal_files(cfg: &Config, input: 
 }
 
 
-pub(in crate::processing) fn has_different_ts(ts: &u64, pli: &PlaylistItem, field: &str) -> bool {
+pub(in crate::processing) fn has_different_ts(ts: u64, pli: &PlaylistItem, field: &str) -> bool {
     pli.header
         .borrow()
         .additional_properties
@@ -128,7 +139,7 @@ pub(in crate::processing) fn has_different_ts(ts: &u64, pli: &PlaylistItem, fiel
             Value::Object(map) => {
                 if let Some(updated) = map.get(field) {
                     if let Some(update_ts) = get_u64_from_serde_value(updated) {
-                        return update_ts != *ts;
+                        return update_ts != ts;
                     }
                 }
                 true
@@ -140,14 +151,14 @@ pub(in crate::processing) fn has_different_ts(ts: &u64, pli: &PlaylistItem, fiel
 pub(in crate::processing) fn should_update_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>, field: &str) -> bool {
     if let Some(provider_id) = pli.header.borrow_mut().get_provider_id() {
         let timestamp = processed_provider_ids.get(&provider_id);
-        timestamp.is_none() || has_different_ts(timestamp.unwrap(), pli, field)
+        timestamp.is_none() || has_different_ts(*timestamp.unwrap(), pli, field)
     } else {
         false
     }
 }
 
 pub(in crate::processing) async fn read_processed_info_ids<V, F>(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>,
-                                                                 cluster: XtreamCluster, extract_ts: F) -> HashMap<u32, u64>
+                                                                 item_type: PlaylistItemType, extract_ts: F) -> HashMap<u32, u64>
 where
     F: Fn(&V) -> u64,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
@@ -155,7 +166,7 @@ where
     let mut processed_info_ids = HashMap::new();
 
     let file_path = match get_input_storage_path(fpl.input, &cfg.working_dir)
-        .map(|storage_path| xtream_get_record_file_path(&storage_path, cluster)).and_then(|opt| opt.ok_or_else(|| Error::new(ErrorKind::Other, "Not supported".to_string())))
+        .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type)).and_then(|opt| opt.ok_or_else(|| Error::new(ErrorKind::Other, "Not supported".to_string())))
     {
         Ok(file_path) => file_path,
         Err(err) => {

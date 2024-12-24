@@ -127,7 +127,6 @@ pub fn parse_xtream(input: &ConfigInput,
                                     item_type: PlaylistItemType::from(xtream_cluster),
                                     xtream_cluster,
                                     additional_properties: stream.get_additional_properties(),
-                                    series_fetched: false,
                                     category_id: 0,
                                     input_id,
                                     ..Default::default()

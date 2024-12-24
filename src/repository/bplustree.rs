@@ -606,8 +606,7 @@ where
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
     pub fn new(tree: &'a BPlusTree<K, V>) -> Self {
-        let mut stack = Vec::new();
-        stack.push(&tree.root);
+        let stack = vec![&tree.root];
         Self {
             stack,
             current_keys: None,

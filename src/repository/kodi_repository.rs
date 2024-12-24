@@ -1,7 +1,7 @@
 use crate::{create_m3u_filter_error_result, notify_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::{PlaylistGroup, XtreamCluster};
+use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
 use crate::utils::file_lock_manager::FileReadGuard;
@@ -11,6 +11,7 @@ use log::error;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::rc::Rc;
 use std::sync::LazyLock;
 use crate::repository::xtream_repository::xtream_get_record_file_path;
 
@@ -84,7 +85,7 @@ fn kodi_style_rename(name: &str, style: &KodiStyle) -> (Vec<String>, String) {
     (vec![new_name.clone()], new_name)
 }
 
-static KODY_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
+static KODI_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
     season: regex::Regex::new(r"[Ss]\d\d").unwrap(),
     episode: regex::Regex::new(r"[Ee]\d\d").unwrap(),
     year: regex::Regex::new(r"\d\d\d\d").unwrap(),
@@ -93,7 +94,7 @@ static KODY_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
 
 type InputTmdbIndexMap = HashMap<u16, Option<(FileReadGuard, BPlusTree<u32, u32>)>>;
 async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
-                     input_indexes: &mut InputTmdbIndexMap, cluster: XtreamCluster) -> Option<u32> {
+                     input_indexes: &mut InputTmdbIndexMap, item_type: PlaylistItemType) -> Option<u32> {
     match provider_id {
         None => None,
         Some(pid) => {
@@ -108,7 +109,8 @@ async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
                 std::collections::hash_map::Entry::Vacant(entry) => {
                     if let Some(input) = cfg.get_input_by_id(input_id) {
                         if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
-                            .map(|storage_path| xtream_get_record_file_path(&storage_path, cluster)) {
+
+                            .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type)) {
                             if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
                                 if let Ok(tree) = BPlusTree::<u32, u32>::load(&tmdb_path) {
                                     let tmdb_id = tree.query(&pid).copied();
@@ -148,18 +150,26 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
 
             for pg in new_playlist {
                 for pli in &pg.channels {
-                    let header = &mut pli.header.borrow_mut();
-                    let mut dir_path = path.join(sanitize_for_filename(&header.group, underscore_whitespace));
-                    let mut kodi_file_name = sanitize_for_filename(&header.title, underscore_whitespace);
-                    let mut additional_info = String::new();
-                    if kodi_style {
+                    let (group, title, item_type, provider_id, input_id, url) = {
+                        let mut header = pli.header.borrow_mut();
+                        let group = Rc::clone(&header.group);
+                        let title = Rc::clone(&header.title);
+                        let item_type = header.item_type;
                         let provider_id = header.get_provider_id();
                         let input_id = header.input_id;
-                        let (kodi_file_dir_name, kodi_style_filename) = kodi_style_rename(&kodi_file_name, &KODY_STYLE);
+                        let url = Rc::clone(&header.url);
+                        (group, title, item_type, provider_id, input_id, url)
+                    };
+
+                    let mut dir_path = path.join(sanitize_for_filename(&group, underscore_whitespace));
+                    let mut kodi_file_name = sanitize_for_filename(&title, underscore_whitespace);
+                    let mut additional_info = String::new();
+                    if kodi_style {
+                        let (kodi_file_dir_name, kodi_style_filename) = kodi_style_rename(&kodi_file_name, &KODI_STYLE);
                         kodi_file_name = kodi_style_filename;
                         kodi_file_dir_name.iter().for_each(|p| dir_path = dir_path.join(p));
 
-                        let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes, header.xtream_cluster).await;
+                        let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes, item_type).await;
                         additional_info = match tmdb_id {
                             None => { String::new() }
                             Some(id) => { format!(" {{tmdb={id}}}") }
@@ -172,7 +182,7 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                     let file_path = dir_path.join(format!("{kodi_file_name}{additional_info}.strm"));
                     match File::create(&file_path) {
                         Ok(mut strm_file) => {
-                            match file_utils::check_write(&strm_file.write_all(header.url.as_bytes())) {
+                            match file_utils::check_write(&strm_file.write_all(url.as_bytes())) {
                                 Ok(()) => (),
                                 Err(e) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e),
                             }
