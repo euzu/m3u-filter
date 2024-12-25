@@ -11,7 +11,6 @@ use std::thread;
 use actix_rt::System;
 use log::{debug, error, info, log_enabled, trace, Level};
 use std::time::Instant;
-
 use unidecode::unidecode;
 
 use crate::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
@@ -531,19 +530,22 @@ fn process_watch(target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<Playlis
 }
 
 pub async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+    let start_time = Instant::now();
     let (stats, errors) = process_sources(cfg.clone(), targets.clone()).await;
     // log errors
-    for err in &errors {
-        error!("{}", err.message);
+    errors.iter().for_each(|err| error!("{}", err.message));
+    if let Ok(stats_msg) = serde_json::to_string(&serde_json::Value::Object(serde_json::map::Map::from_iter([("stats".to_string(), serde_json::to_value(stats).unwrap())]))) {
+        // print stats
+        info!("{}", stats_msg);
+        // send stats
+        send_message(&MsgKind::Stats, cfg.messaging.as_ref(), stats_msg.as_str());
     }
-    let stats_msg = format!("{{\"stats\": {}}}", stats.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n"));
-    // print stats
-    info!("{}", stats_msg);
-    // send stats
-    send_message(&MsgKind::Stats, cfg.messaging.as_ref(), stats_msg.as_str());
     // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
-        let error_msg = format!("{{\"errors\": \"{}\"}}", message.as_str());
-        send_message(&MsgKind::Error, cfg.messaging.as_ref(), error_msg.as_str());
+        if let Ok(error_msg) = serde_json::to_string(&serde_json::Value::Object(serde_json::map::Map::from_iter([("errors".to_string(), serde_json::Value::String(message))]))) {
+            send_message(&MsgKind::Error, cfg.messaging.as_ref(), error_msg.as_str());
+        }
     }
+    let elapsed = start_time.elapsed().as_secs();
+    info!("Update process finished! Took {elapsed} secs.");
 }

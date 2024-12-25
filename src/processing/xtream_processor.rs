@@ -7,7 +7,7 @@ use crate::{info_err, notify_err};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fs::{File};
+use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::path::PathBuf;
 
@@ -130,32 +130,22 @@ pub(in crate::processing) fn create_resolve_info_wal_files(cfg: &Config, input: 
     }
 }
 
-
-pub(in crate::processing) fn has_different_ts(ts: u64, pli: &PlaylistItem, field: &str) -> bool {
-    pli.header
-        .borrow()
-        .additional_properties
-        .as_ref()
-        .map_or(false, |v| match v {
-            Value::Object(map) => {
-                if let Some(updated) = map.get(field) {
-                    if let Some(update_ts) = get_u64_from_serde_value(updated) {
-                        return update_ts != ts;
-                    }
-                }
-                true
-            }
-            _ => true,
-        })
-}
-
 pub(in crate::processing) fn should_update_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>, field: &str) -> (bool, u32, u64) {
-    if let Some(provider_id) = pli.header.borrow_mut().get_provider_id() {
-        let timestamp = processed_provider_ids.get(&provider_id);
-        (timestamp.is_none() || has_different_ts(*timestamp.unwrap(), pli, field), provider_id, *timestamp.unwrap_or(&0))
-    } else {
-        (false, 0, 0)
-    }
+    let Some(provider_id) = pli.header.borrow_mut().get_provider_id() else { return (false, 0, 0) };
+    let last_modified = pli.header.borrow().additional_properties.as_ref().map_or(None, |v| match v {
+        Value::Object(map) => {
+            if let Some(updated) = map.get(field) {
+                get_u64_from_serde_value(updated)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    });
+    let old_timestamp = processed_provider_ids.get(&provider_id);
+    (old_timestamp.is_none()
+         || last_modified.is_none()
+         || *old_timestamp.unwrap() != last_modified.unwrap(), provider_id, last_modified.unwrap_or(0))
 }
 
 pub(in crate::processing) async fn read_processed_info_ids<V, F>(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>,
