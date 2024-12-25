@@ -1,5 +1,6 @@
+
 ### playlist request
-POST http://localhost:8901/api/v1/playlist
+POST http://{{local}}/api/v1/playlist
 Content-Type: application/json
 
 {
@@ -7,57 +8,57 @@ Content-Type: application/json
 }
 
 ### config request
-GET http://localhost:8901/api/v1/config
+GET http://{{local}}/api/v1/config
 Content-Type: application/json
 
 ### auth
-POST http://localhost:8901/auth/token
+POST http://{{local}}/auth/token
 Content-Type: application/json
 
 {"username": "test", "password": "test"}
 
 ### m3u playlist
-GET http://localhost:8901/m3u?username=xt&password=xt
+GET http://{{local}}/m3u?{{xt_credentials}}
 
 ### m3u playlist - form auth
-POST http://localhost:8901/m3u
+POST http://{{local}}/m3u
 Content-Type: application/x-www-form-urlencoded
 
-username=xt&password=xt
+{{xt_credentials}}
 
 ### m3u playlist reverse
-GET http://localhost:8901/m3u?username=xtream&password=xtream.secret
+GET http://{{local}}/m3u?username=xtream&password=xtream.secret
 
 
 ### xtream login
-GET http://localhost:8901/player_api.php?username=xt&password=xt
+GET http://{{local}}/player_api.php?{{xt_credentials}}
 
 ### xtream live_categories
-GET http://localhost:8901/player_api.php?action=get_live_categories&username=xt&password=xt
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_live_categories
 
 ### xtream live_streams
-GET http://localhost:8901/player_api.php?action=get_live_streams&username=xt&password=xt&category_id=102
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_live_streams&category_id=102
 
 ### xtream vod_categories
-GET http://localhost:8901/player_api.php?action=username=xt&password=xt&get_vod_categories
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_vod_categories
 
 ### xtream vod info
-GET http://localhost:8901/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=44
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_vod_streams&category_id=44
 
 ### xtream vod info
-GET http://localhost:8901/player_api.php?username=xt&password=xt&action=get_vod_info&vod_id=8051
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_vod_info&vod_id=8051
 
 ### xtream series_categories
-GET http://localhost:8901/player_api.php?username=xt&password=xt&action=get_series_categories
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_series_categories
 
 ### xtream series
-GET http://localhost:8901/player_api.php?username=xt&password=xt&action=get_series&category_id=56
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_series&category_id=56
 
 ### xtream series info
-GET http://localhost:8901/player_api.php?username=xt&password=xt&action=get_series_info&series_id=13923
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_series_info&series_id=13923
 
 ### xtream series stream
- GET http://localhost:8901/series/xt/xt/18137
+ GET http://{{local}}/series/xt/xt/18137
 
 ### get stream
-http://127.0.0.1:8901/m3u-stream/live/xt/xt/667
+http://{{local}}/m3u-stream/live/xt/xt/667
