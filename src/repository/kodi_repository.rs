@@ -1,11 +1,13 @@
-use crate::{create_m3u_filter_error_result, notify_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
+use crate::model::xtream::XtreamSeriesInfoEpisode;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
+use crate::repository::xtream_repository::xtream_get_record_file_path;
 use crate::utils::file_lock_manager::FileReadGuard;
 use crate::utils::file_utils;
+use crate::{create_m3u_filter_error_result, notify_err};
 use chrono::Datelike;
 use log::error;
 use std::collections::HashMap;
@@ -13,7 +15,6 @@ use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
 use std::sync::LazyLock;
-use crate::repository::xtream_repository::xtream_get_record_file_path;
 
 struct KodiStyle {
     year: regex::Regex,
@@ -64,20 +65,18 @@ fn kodi_style_rename_episode(name: &str, style: &KodiStyle) -> (String, Option<S
 }
 
 fn kodi_style_rename(name: &str, style: &KodiStyle) -> (Vec<String>, String) {
-    let (work_name_1, year) = kodi_style_rename_year(name, style);
-    let (work_name_2, season) = kodi_style_rename_season(&work_name_1, style);
-    let (work_name_3, episode) = kodi_style_rename_episode(&work_name_2, style);
-    let mut filename = work_name_3;
+    let (work_name, year) = kodi_style_rename_year(name, style);
+
+    // TODO use this for non xtream input
+    // let (work_name_2, season) = kodi_style_rename_season(&work_name_1, style);
+    // let (work_name_3, episode) = kodi_style_rename_episode(&work_name_2, style);
+
+    let mut filename = work_name;
     let mut filedir = vec![String::from(style.whitespace.replace_all(filename.as_str(), " "))];
-    if year.is_some() || season.is_some() {
+    if year.is_some() {
         if year.is_some() {
             filename = format!("{filename} ({})", year.unwrap());
             filedir = vec![String::from(style.whitespace.replace_all(filename.as_str(), " "))];
-        }
-        if season.is_some() && episode.is_some() {
-            let season_value = season.unwrap();
-            filedir.push(format!("Season {season_value}"));
-            filename = format!("{filename} S{season_value}E{}", episode.unwrap());
         }
         return (filedir, String::from(style.whitespace.replace_all(filename.as_str(), " ")));
     }
@@ -92,16 +91,31 @@ static KODI_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
     whitespace: regex::Regex::new(r"\s+").unwrap(),
 });
 
-type InputTmdbIndexMap = HashMap<u16, Option<(FileReadGuard, BPlusTree<u32, u32>)>>;
-async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
-                     input_indexes: &mut InputTmdbIndexMap, item_type: PlaylistItemType) -> Option<u32> {
+#[derive(Clone)]
+enum InputTmdbIndexTree {
+    Video(BPlusTree<u32, u32>),
+    Series(BPlusTree<u32, XtreamSeriesInfoEpisode>),
+}
+
+#[derive(Clone)]
+enum InputTmdbIndexValue {
+    Video(u32),
+    Series(XtreamSeriesInfoEpisode),
+}
+
+type InputTmdbIndexMap = HashMap<u16, Option<(FileReadGuard, InputTmdbIndexTree)>>;
+async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_id: u16,
+                        input_indexes: &mut InputTmdbIndexMap, item_type: PlaylistItemType) -> Option<InputTmdbIndexValue> {
     match provider_id {
         None => None,
         Some(pid) => {
             match input_indexes.entry(input_id) {
                 std::collections::hash_map::Entry::Occupied(entry) => {
-                    if let Some((_, tree)) = entry.get() {
-                        tree.query(&pid).copied()
+                    if let Some((_, tree_value)) = entry.get() {
+                        match tree_value {
+                            InputTmdbIndexTree::Video(tree) => tree.query(&pid).map(|id| InputTmdbIndexValue::Video(*id)),
+                            InputTmdbIndexTree::Series(tree) => tree.query(&pid).map(|episode| InputTmdbIndexValue::Series(episode.clone()))
+                        }
                     } else {
                         None
                     }
@@ -111,10 +125,22 @@ async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
                         if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
                             .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type)) {
                             if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
-                                if let Ok(tree) = BPlusTree::<u32, u32>::load(&tmdb_path) {
-                                    let tmdb_id = tree.query(&pid).copied();
-                                    entry.insert(Some((file_lock, tree)));
-                                    return tmdb_id;
+                                match item_type {
+                                    PlaylistItemType::Series => {
+                                        if let Ok(tree) = BPlusTree::<u32, XtreamSeriesInfoEpisode>::load(&tmdb_path) {
+                                            let tmdb_id = tree.query(&pid).map(|episode| InputTmdbIndexValue::Series(episode.clone()));
+                                            entry.insert(Some((file_lock, InputTmdbIndexTree::Series(tree))));
+                                            return tmdb_id;
+                                        }
+                                    }
+                                    PlaylistItemType::Video => {
+                                        if let Ok(tree) = BPlusTree::<u32, u32>::load(&tmdb_path) {
+                                            let tmdb_id = tree.query(&pid).map(|id| InputTmdbIndexValue::Video(*id));
+                                            entry.insert(Some((file_lock, InputTmdbIndexTree::Video(tree))));
+                                            return tmdb_id;
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             };
                         };
@@ -148,7 +174,12 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
             let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
 
             for pg in new_playlist {
-                for pli in &pg.channels {
+                for pli in pg.channels.iter().filter(|&pli| {
+                    let item_type = pli.header.borrow().item_type;
+                    item_type == PlaylistItemType::Series
+                        || item_type == PlaylistItemType::Live
+                        || item_type == PlaylistItemType::Video
+                }) {
                     let (group, title, item_type, provider_id, input_id, url) = {
                         let mut header = pli.header.borrow_mut();
                         let group = Rc::clone(&header.group);
@@ -168,10 +199,24 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                         kodi_file_name = kodi_style_filename;
                         kodi_file_dir_name.iter().for_each(|p| dir_path = dir_path.join(p));
 
-                        let tmdb_id = get_tmdb_id(cfg, provider_id, input_id, &mut input_tmdb_indexes, item_type).await;
-                        additional_info = match tmdb_id {
+                        let tmdb_value = match item_type {
+                            PlaylistItemType::Series | PlaylistItemType::Video => get_tmdb_value(cfg, provider_id, input_id, &mut input_tmdb_indexes, item_type).await,
+                            _ => None,
+                        };
+                        additional_info = match tmdb_value {
                             None => { String::new() }
-                            Some(id) => { format!(" {{tmdb={id}}}") }
+                            Some(value) => {
+                                match value {
+                                    InputTmdbIndexValue::Video(tmdb_id) => format!(" {{tmdb={tmdb_id}}}"),
+                                    InputTmdbIndexValue::Series(episode) => {
+                                        let mut episode_ext = format!(" S{:02}E{:02}", episode.season, episode.episode_num);
+                                        if let Some(tmdb_id) = episode.info.tmdb_id {
+                                            episode_ext = format!("{episode_ext} {{tmdb={tmdb_id}}}");
+                                        }
+                                        episode_ext
+                                    }
+                                }
+                            }
                         };
                     }
                     if let Err(e) = std::fs::create_dir_all(&dir_path) {

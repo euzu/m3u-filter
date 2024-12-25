@@ -68,8 +68,7 @@ impl M3uPlaylistIterator {
                 | PlaylistItemType::LiveHls => "live",
                 PlaylistItemType::Video => "movie",
                 PlaylistItemType::Series
-                | PlaylistItemType::SeriesInfo
-                | PlaylistItemType::SeriesEpisode => "series",
+                | PlaylistItemType::SeriesInfo => "series",
             };
             format!("{}/{M3U_STREAM_PATH}/{stream_type}/{}/{}/{}",
                     &self.base_url,

@@ -5,6 +5,7 @@ use std::rc::Rc;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
+use crate::utils::json_utils::{string_or_number_u32, string_or_number_f64, opt_string_or_number_u32};
 
 use crate::model::config::ConfigTargetOptions;
 use crate::model::playlist::{PlaylistItem, XtreamCluster, XtreamPlaylistItem};
@@ -270,7 +271,9 @@ pub struct XtreamSeriesInfoSeason {
     pub id: u32,
     pub name: String,
     pub overview: String,
+    #[serde(deserialize_with = "string_or_number_u32")]
     pub season_number: u32,
+    #[serde(deserialize_with = "string_or_number_f64")]
     pub vote_average: f64,
     pub cover: String,
     pub cover_big: String,
@@ -288,38 +291,48 @@ pub struct XtreamSeriesInfoInfo {
     genre: String,
     releaseDate: String,
     last_modified: String,
-    rating: String,
+    #[serde(deserialize_with = "string_or_number_f64")]
+    rating: f64,
+    #[serde(deserialize_with = "string_or_number_f64")]
     rating_5based: f64,
     backdrop_path: Vec<String>,
     youtube_trailer: String,
     episode_run_time: String,
-    category_id: String,
+    #[serde(deserialize_with = "string_or_number_u32")]
+    category_id: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoEpisodeInfo {
+    #[serde(deserialize_with = "opt_string_or_number_u32")]
     pub tmdb_id: Option<u32>,
     pub releasedate: String,
     pub plot: String,
+    #[serde(deserialize_with = "string_or_number_u32")]
     pub duration_secs: u32,
     pub duration: String,
     pub movie_image: String,
     pub video: Value,
     pub audio: Value,
+    #[serde(deserialize_with = "string_or_number_u32")]
     pub bitrate: u32,
+    #[serde(deserialize_with = "string_or_number_f64")]
     pub rating: f64,
+    #[serde(deserialize_with = "string_or_number_u32")]
     pub season: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoEpisode {
     pub id: String,
+    #[serde(deserialize_with = "string_or_number_u32")]
     pub episode_num: u32,
     pub title: String,
     pub container_extension: String,
     pub info: XtreamSeriesInfoEpisodeInfo,
     pub custom_sid: String,
     pub added: String,
+    #[serde(deserialize_with = "string_or_number_u32")]
     pub season: u32,
     pub direct_source: String,
 }

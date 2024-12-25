@@ -102,3 +102,66 @@ where
         Err(e) => Err(e)
     }
 }
+
+pub fn string_or_number_u32<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Value = serde::Deserialize::deserialize(deserializer)?;
+
+    match value {
+        Value::Number(num) => {
+            if let Some(v) = num.as_u64() {
+                u32::try_from(v).map_err(|_| serde::de::Error::custom("Number out of range for u32"))
+            } else {
+                Err(serde::de::Error::custom("Invalid number"))
+            }
+        },
+        Value::String(s) => s
+            .parse::<u32>()
+            .map_err(|_| serde::de::Error::custom("Invalid string number")),
+        _ => Err(serde::de::Error::custom("Expected number or string")),
+    }
+}
+
+pub fn opt_string_or_number_u32<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Value = serde::Deserialize::deserialize(deserializer)?;
+
+    match value {
+        Value::Null => Ok(None), // Handle null explicitly
+        Value::Number(num) => {
+            if let Some(v) = num.as_u64() {
+                u32::try_from(v)
+                    .map(Some)
+                    .map_err(|_| serde::de::Error::custom("Number out of range for u32"))
+            } else {
+                Err(serde::de::Error::custom("Invalid number"))
+            }
+        },
+        Value::String(s) => s
+            .parse::<u32>()
+            .map(Some)
+            .map_err(|_| serde::de::Error::custom("Invalid string number")),
+        _ => Err(serde::de::Error::custom("Expected number, string, or null")),
+    }
+}
+
+pub fn string_or_number_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Value = serde::Deserialize::deserialize(deserializer)?;
+
+    match value {
+        Value::Number(num) => num
+            .as_f64()
+            .ok_or_else(|| serde::de::Error::custom("Invalid number")),
+        Value::String(s) => s
+            .parse::<f64>()
+            .map_err(|_| serde::de::Error::custom("Invalid string number")),
+        _ => Err(serde::de::Error::custom("Expected number or string")),
+    }
+}

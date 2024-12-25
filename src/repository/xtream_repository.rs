@@ -10,7 +10,7 @@ use serde_json::{json, Map, Value};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::XtreamMappingOptions;
+use crate::model::xtream::{XtreamMappingOptions, XtreamSeriesInfoEpisode};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentWriter, IndexedDocumentDirectAccess};
 use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
@@ -104,8 +104,8 @@ pub fn xtream_get_info_file_paths(
 pub fn xtream_get_record_file_path(storage_path: &Path, item_type: PlaylistItemType) -> Option<PathBuf> {
     match item_type {
         PlaylistItemType::Video => Some(storage_path.join(format!("{FILE_VOD_INFO_RECORD}.{FILE_SUFFIX_DB}"))),
-        PlaylistItemType::SeriesInfo | PlaylistItemType::Series => Some(storage_path.join(format!("{FILE_SERIES_INFO_RECORD}.{FILE_SUFFIX_DB}"))),
-        PlaylistItemType::SeriesEpisode => Some(storage_path.join(format!("{FILE_SERIES_EPISODE_RECORD}.{FILE_SUFFIX_DB}"))),
+        PlaylistItemType::SeriesInfo => Some(storage_path.join(format!("{FILE_SERIES_INFO_RECORD}.{FILE_SUFFIX_DB}"))),
+        PlaylistItemType::Series => Some(storage_path.join(format!("{FILE_SERIES_EPISODE_RECORD}.{FILE_SUFFIX_DB}"))),
         _ => None,
     }
 }
@@ -390,7 +390,7 @@ pub async fn xtream_get_item_for_stream_id(
             PlaylistItemType::SeriesInfo => {
                 xtream_read_series_item_for_stream_id(config, virtual_id, &storage_path).await
             }
-            PlaylistItemType::SeriesEpisode => {
+            PlaylistItemType::Series => {
                 let mut item = xtream_read_series_item_for_stream_id(config, mapping.parent_virtual_id, &storage_path).await?;
                 item.provider_id = mapping.provider_id;
                 Ok(item)
@@ -629,7 +629,7 @@ pub async fn write_and_get_xtream_series_info<P>(
                     let episode_virtual_id = target_id_mapping.insert_entry(
                         uuid,
                         provider_id,
-                        PlaylistItemType::SeriesEpisode,
+                        PlaylistItemType::Series,
                         virtual_id,
                     );
                     episode.insert(
@@ -798,25 +798,44 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
     input: &ConfigInput,
     wal_path: &Path,
 ) -> Result<(), M3uFilterError> {
-    let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::SeriesEpisode))
+    let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::Series))
         .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
         .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
             let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series episode wal info {err}")))?);
             let mut provider_id_bytes = [0u8; 4];
-            let mut tmdb_id_bytes = [0u8; 4];
-            let mut tree_record_index: BPlusTree<u32, u32> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());
+            let mut len_bytes = [0u8; 4];
+            let mut tree_record_index: BPlusTree<u32, XtreamSeriesInfoEpisode> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());
+            let mut buffer = vec![0u8; 4096];
             loop {
                 if reader.read_exact(&mut provider_id_bytes).is_err() {
                     break; // End of file
                 }
                 let provider_id = u32::from_le_bytes(provider_id_bytes);
-                if reader.read_exact(&mut tmdb_id_bytes).is_err() {
+                if reader.read_exact(&mut len_bytes).is_err() {
                     break; // End of file
                 }
-                let tmdb_id = u32::from_le_bytes(tmdb_id_bytes);
-                tree_record_index.insert(provider_id, tmdb_id);
+                let len = usize::try_from(u32::from_le_bytes(len_bytes)).unwrap_or(0);
+                if len <= 0 {
+                    break;
+                }
+                if len > buffer.len() {
+                    buffer = vec![0u8; len];
+                }
+                if reader.read_exact(&mut buffer[0..len]).is_err() {
+                    break;
+                }
+                let content = String::from_utf8_lossy(&buffer[0..len]);
+
+                match serde_json::from_str(&content) {
+                    Ok(episode) => {
+                        tree_record_index.insert(provider_id, episode);
+                    },
+                    Err(err) => {
+                        error!("Failed to delete deserialize record WAL file for series episode {err}");
+                    }
+                }
             }
             tree_record_index.store(&record_path).map_err(|err| notify_err!(format!("Could not store series episode record info {err}")))?;
             drop(reader);

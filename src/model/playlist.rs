@@ -85,10 +85,9 @@ pub enum PlaylistItemType {
     Video = 2,
     Series = 3, //  xtream series description
     SeriesInfo = 4, //  xtream series info fetched for series description
-    SeriesEpisode = 5, // from SeriesInfo parsed episodes
-    Catchup = 6,
-    LiveUnknown = 7, // No Provider id
-    LiveHls = 8, // m3u8 entry
+    Catchup = 5,
+    LiveUnknown = 6, // No Provider id
+    LiveHls = 7, // m3u8 entry
 }
 
 impl From<XtreamCluster> for PlaylistItemType {
@@ -106,7 +105,6 @@ impl PlaylistItemType {
     const VIDEO: &'static str = "video";
     const SERIES: &'static str = "series";
     const SERIES_INFO: &'static str = "series-info";
-    const SERIES_EPISODE: &'static str = "series-episode";
     const CATCHUP: &'static str = "catchup";
 }
 
@@ -117,7 +115,6 @@ impl Display for PlaylistItemType {
             Self::Video => Self::VIDEO,
             Self::Series => Self::SERIES,
             Self::SeriesInfo => Self::SERIES_INFO,
-            Self::SeriesEpisode => Self::SERIES_EPISODE,
             Self::Catchup => Self::CATCHUP,
         })
     }

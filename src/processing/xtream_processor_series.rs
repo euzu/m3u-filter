@@ -3,15 +3,15 @@ use crate::model::config::{Config, ConfigTarget, InputType};
 use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::processing::playlist_processor::ProcessingPipe;
 use crate::processing::xtream_parser::parse_xtream_series_info;
-use crate::processing::xtream_processor::{create_resolve_episode_wal_files, create_resolve_info_wal_files, get_u32_from_serde_value, playlist_resolve_process_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
+use crate::processing::xtream_processor::{create_resolve_episode_wal_files, create_resolve_info_wal_files,  playlist_resolve_process_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
 use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::{xtream_get_info_file_paths, xtream_update_input_info_file, xtream_update_input_series_episodes_record_from_wal_file, xtream_update_input_series_record_from_wal_file};
 use crate::repository::IndexedDocumentReader;
 use crate::{create_resolve_options_function_for_xtream_target, handle_error, handle_error_and_return, info_err, notify_err};
-use serde_json::{Value};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use crate::model::xtream::XtreamSeriesInfoEpisode;
 
 const TAG_SERIES_INFO_LAST_MODIFIED: &str = "last_modified";
 
@@ -34,10 +34,15 @@ fn write_series_info_record_to_wal_file(
 fn write_series_episode_record_to_wal_file(
     writer: &mut BufWriter<&File>,
     provider_id: u32,
-    tmdb_id: u32,
+    episode: &XtreamSeriesInfoEpisode,
 ) -> std::io::Result<()> {
-    writer.write_all(&provider_id.to_le_bytes())?;
-    writer.write_all(&tmdb_id.to_le_bytes())?;
+    if let Ok(content) = serde_json::to_string(episode) {
+        writer.write_all(&provider_id.to_le_bytes())?;
+        let content_bytes = content.as_bytes();
+        let len = u32::try_from(content_bytes.len()).unwrap();
+        writer.write_all(&len.to_le_bytes())?;
+        writer.write_all(&content_bytes)?;
+    }
     Ok(())
 }
 
@@ -64,11 +69,11 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
         .filter(|&pli| pli.header.borrow().item_type == PlaylistItemType::SeriesInfo)
     {
         let (should_update, provider_id, ts) = should_update_series_info(pli, &processed_info_ids);
+        processed_info_ids.insert(provider_id, ts);
         if should_update {
             if let Some(content) = playlist_resolve_process_playlist_item(pli, processed_fpl.input, errors, resolve_delay, XtreamCluster::Series).await {
                 handle_error_and_return!(write_info_content_to_wal_file(&mut content_writer, provider_id, &content),
                     |err| errors.push(notify_err!(format!("Failed to resolve series, could not write to content wal file {err}"))));
-                processed_info_ids.insert(provider_id, ts);
                 handle_error_and_return!(write_series_info_record_to_wal_file(&mut record_writer, provider_id, ts),
                     |err| errors.push(notify_err!(format!("Failed to resolve series wal, could not write to record wal file {err}"))));
                 content_updated = true;
@@ -138,20 +143,21 @@ async fn process_series_info(
             let Ok(content) = doc_reader.get(&provider_id)  else { continue; };
             match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(series_content) => {
-                    if let Ok(Some(mut series)) =
-                        parse_xtream_series_info(&series_content, pli.header.borrow().group.as_str(), input)
-                    {
-                        for episode in &series {
-                            let Some(provider_id) = &episode.header.borrow_mut().get_provider_id() else { continue; };
-                            let Some(Value::Object(props)) = &episode.header.borrow().additional_properties else { continue; };
-                            let Some(value) = props.get("tmdb_id") else { continue; };
-                            if let Some(tmdb_id) = get_u32_from_serde_value(value) {
-                                println!("episode {tmdb_id} = {provider_id}");
-                                handle_error!(write_series_episode_record_to_wal_file(&mut wal_writer, *provider_id, tmdb_id),
-                                    |err| errors.push(info_err!(format!("Failed to write to series episode wal file: {err}"))));
+                    match parse_xtream_series_info(&series_content, pli.header.borrow().group.as_str(), input) {
+                        Ok(Some(series)) => {
+                            for (episode, pli_episode) in &series {
+                                let Some(provider_id) = &pli_episode.header.borrow_mut().get_provider_id() else { continue; };
+                                // TODO only write to wal if not previously handled
+                                like tmdb_id handled or not
+                                handle_error!(write_series_episode_record_to_wal_file(&mut wal_writer, *provider_id, episode),
+                                |err| errors.push(info_err!(format!("Failed to write to series episode wal file: {err}"))));
                             }
+                            group_series.extend(series.into_iter().map(|(_, pli)| pli));
                         }
-                        group_series.append(&mut series);
+                        Ok(None) => {}
+                        Err(err) => {
+                            errors.push(err);
+                        }
                     }
                 }
                 Err(err) => errors.push(info_err!(format!("Failed to parse JSON: {err}"))),

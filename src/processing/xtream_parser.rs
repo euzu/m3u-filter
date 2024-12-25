@@ -39,16 +39,16 @@ fn create_xtream_series_info_url(url: &str, username: &str, password: &str, epis
     }
 }
 
-pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigInput) -> Result<Option<Vec<PlaylistItem>>, M3uFilterError> {
+pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigInput) -> Result<Option<Vec<(XtreamSeriesInfoEpisode, PlaylistItem)>>, M3uFilterError> {
     let url = input.url.as_str();
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
 
     match serde_json::from_value::<XtreamSeriesInfo>(info.to_owned()) {
         Ok(series_info) => {
-            let result: Vec<PlaylistItem> = series_info.episodes.values().flatten().map(|episode| {
-
+            let result: Vec<(XtreamSeriesInfoEpisode, PlaylistItem)> = series_info.episodes.values().flatten().into_iter().map(|episode| {
                 let episode_url = create_xtream_series_info_url(url, username, password, episode);
+                (episode.clone(),
                 PlaylistItem {
                     header: RefCell::new(PlaylistItemHeader {
                         id: Rc::new(episode.id.to_string()),
@@ -65,7 +65,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigI
                         input_id: input.id,
                         ..Default::default()
                     })
-                }}).collect();
+                })}).collect();
             if result.is_empty() { Ok(None) } else { Ok(Some(result)) }
         }
         Err(err) => {
