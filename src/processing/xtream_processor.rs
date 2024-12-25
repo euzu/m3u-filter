@@ -7,7 +7,7 @@ use crate::{info_err, notify_err};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
+use std::fs::{File};
 use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::path::PathBuf;
 
@@ -35,6 +35,7 @@ macro_rules! handle_error_and_return {
 }
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::xtream_repository::xtream_get_record_file_path;
+use crate::utils::file_utils::append_or_crate_file;
 
 #[macro_export]
 macro_rules! create_resolve_options_function_for_xtream_target {
@@ -102,7 +103,7 @@ pub(in crate::processing) fn create_resolve_episode_wal_files(cfg: &Config, inpu
     match get_input_storage_path(input, &cfg.working_dir) {
         Ok(storage_path) => {
             let info_path = storage_path.join(format!("series_episode_record.{FILE_SUFFIX_WAL}"));
-            let info_file = OpenOptions::new().append(true).open(&info_path).ok()?;
+            let info_file = append_or_crate_file(&info_path).ok()?;
             Some((info_file, info_path))
         }
         Err(_) => None
@@ -119,8 +120,8 @@ pub(in crate::processing) fn create_resolve_info_wal_files(cfg: &Config, input: 
             } {
                 let content_path = storage_path.join(format!("{file_prefix}_content.{FILE_SUFFIX_WAL}"));
                 let info_path = storage_path.join(format!("{file_prefix}_record.{FILE_SUFFIX_WAL}"));
-                let content_file = OpenOptions::new().append(true).open(&content_path).ok()?;
-                let info_file = OpenOptions::new().append(true).open(&info_path).ok()?;
+                let content_file = append_or_crate_file(&content_path).ok()?;
+                let info_file = append_or_crate_file(&info_path).ok()?;
                 return Some((content_file, info_file, content_path, info_path));
             }
             None
@@ -148,12 +149,12 @@ pub(in crate::processing) fn has_different_ts(ts: u64, pli: &PlaylistItem, field
         })
 }
 
-pub(in crate::processing) fn should_update_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>, field: &str) -> bool {
+pub(in crate::processing) fn should_update_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>, field: &str) -> (bool, u32, u64) {
     if let Some(provider_id) = pli.header.borrow_mut().get_provider_id() {
         let timestamp = processed_provider_ids.get(&provider_id);
-        timestamp.is_none() || has_different_ts(*timestamp.unwrap(), pli, field)
+        (timestamp.is_none() || has_different_ts(*timestamp.unwrap(), pli, field), provider_id, *timestamp.unwrap_or(&0))
     } else {
-        false
+        (false, 0, 0)
     }
 }
 

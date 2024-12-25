@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
-use std::io::{Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use log::error;
@@ -19,6 +18,7 @@ use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 use crate::{create_m3u_filter_error, create_m3u_filter_error_result, notify_err, info_err};
+use crate::utils::file_utils::open_readonly_file;
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -671,7 +671,6 @@ pub async fn xtream_get_input_info(
 pub async fn xtream_update_input_info_file(
     cfg: &Config,
     input: &ConfigInput,
-    wal_file: &mut File,
     wal_path: &Path,
     cluster: XtreamCluster,
 ) -> Result<(), M3uFilterError> {
@@ -679,8 +678,7 @@ pub async fn xtream_update_input_info_file(
         Ok(Some((info_path, idx_path))) => {
             match cfg.file_locks.write_lock(&info_path).await {
                 Ok(_file_lock) => {
-                    wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read {cluster} info {err}")))?;
-                    let mut reader = BufReader::new(wal_file);
+                    let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read {cluster} info {err}")))?);
                     match IndexedDocumentWriter::<u32>::new_append(info_path, idx_path) {
                         Ok(mut writer) => {
                             let mut provider_id_bytes = [0u8; 4];
@@ -719,7 +717,6 @@ pub async fn xtream_update_input_info_file(
 pub async fn xtream_update_input_vod_record_from_wal_file(
     cfg: &Config,
     input: &ConfigInput,
-    wal_file: &mut File,
     wal_path: &Path,
 ) -> Result<(), M3uFilterError> {
     let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::Video))
@@ -728,8 +725,7 @@ pub async fn xtream_update_input_vod_record_from_wal_file(
 
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read vod wal info {err}")))?;
-            let mut reader = BufReader::new(wal_file);
+            let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read vod wal info {err}")))?);
             let mut provider_id_bytes = [0u8; 4];
             let mut tmdb_id_bytes = [0u8; 4];
             let mut ts_bytes = [0u8; 8];
@@ -763,7 +759,6 @@ pub async fn xtream_update_input_vod_record_from_wal_file(
 pub async fn xtream_update_input_series_record_from_wal_file(
     cfg: &Config,
     input: &ConfigInput,
-    wal_file: &mut File,
     wal_path: &Path,
 ) -> Result<(), M3uFilterError> {
     let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::SeriesInfo))
@@ -771,8 +766,7 @@ pub async fn xtream_update_input_series_record_from_wal_file(
         .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read series wal info {err}")))?;
-            let mut reader = BufReader::new(wal_file);
+            let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series wal info {err}")))?);
             let mut provider_id_bytes = [0u8; 4];
             let mut ts_bytes = [0u8; 8];
             let mut tree_record_index: BPlusTree<u32, u64> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());
@@ -802,7 +796,6 @@ pub async fn xtream_update_input_series_record_from_wal_file(
 pub async fn xtream_update_input_series_episodes_record_from_wal_file(
     cfg: &Config,
     input: &ConfigInput,
-    wal_file: &mut File,
     wal_path: &Path,
 ) -> Result<(), M3uFilterError> {
     let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::SeriesEpisode))
@@ -810,8 +803,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
         .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            wal_file.seek(SeekFrom::Start(0)).map_err(|err| notify_err!(format!("Could not read series episode wal info {err}")))?;
-            let mut reader = BufReader::new(wal_file);
+            let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series episode wal info {err}")))?);
             let mut provider_id_bytes = [0u8; 4];
             let mut tmdb_id_bytes = [0u8; 4];
             let mut tree_record_index: BPlusTree<u32, u32> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());

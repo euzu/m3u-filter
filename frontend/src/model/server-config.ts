@@ -32,6 +32,11 @@ export interface InputConfig {
     persist: string,
     name: string,
     enabled: boolean
+    options: {
+        xtream_skip_live: boolean,
+        xtream_skip_vod: boolean,
+        xtream_skip_series: boolean,
+    },
 }
 
 export interface TargetConfig {

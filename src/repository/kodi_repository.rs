@@ -109,7 +109,6 @@ async fn get_tmdb_id(cfg: &Config, provider_id: Option<u32>, input_id: u16,
                 std::collections::hash_map::Entry::Vacant(entry) => {
                     if let Some(input) = cfg.get_input_by_id(input_id) {
                         if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
-
                             .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type)) {
                             if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
                                 if let Ok(tree) = BPlusTree::<u32, u32>::load(&tmdb_path) {

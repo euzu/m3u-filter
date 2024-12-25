@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::fs::{File, OpenOptions};
+use std::fs::{File};
 use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
@@ -8,6 +8,7 @@ use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery};
 use crate::utils::file_utils;
 use log::error;
 use serde::{Deserialize, Serialize};
+use crate::utils::file_utils::{create_new_file_for_read_write, create_new_file_for_write, open_read_write_file, open_readonly_file};
 
 const BLOCK_SIZE: usize = 4096;
 const LEN_SIZE: usize = 4;
@@ -90,18 +91,9 @@ where
     fn new_with_mode(main_path: PathBuf, index_path: PathBuf, append: bool) -> Result<Self, Error> {
         let append_mode = append && main_path.exists();
         let mut main_file = if append_mode {
-            OpenOptions::new()
-                .read(true)
-                .write(true)
-                .truncate(false)
-                .open(&main_path)
+            open_read_write_file(&main_path)
         } else {
-            OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&main_path)
+            create_new_file_for_read_write(&main_path)
         }?;
 
         // Retrieve file size and convert to `u32` for `main_offset`, if possible
@@ -253,11 +245,7 @@ where
 {
     pub fn new(main_path: &Path, index_path: &Path) -> Result<Self, Error> {
         if main_path.exists() && index_path.exists() {
-            let main_file = OpenOptions::new()
-                .read(true)
-                .write(false)
-                .truncate(false)
-                .open(main_path)?;
+            let main_file = open_readonly_file(main_path)?;
             let index_tree = IndexedDocumentIndex::<K>::load(index_path)?;
 
             Ok(Self {
@@ -437,10 +425,7 @@ where
         if main_path.exists() && index_path.exists() {
             // Attempt to open the main file in the specified mode (append or not)
 
-            let main_file = OpenOptions::new()
-                .read(true) // Open in append mode
-                .write(true) // Open in append mode
-                .open(&main_path)?;
+            let main_file = open_read_write_file(&main_path)?;
 
             // Retrieve file size and convert to `u32` for `main_file`, if possible
             let size = main_file
@@ -474,11 +459,7 @@ where
         let gc_main_path = file_utils::append_extension(&self.main_path, ".gc");
         let gc_index_path = file_utils::append_extension(&self.index_path, ".gc");
         {
-            let mut gc_file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(&gc_main_path)?;
+            let mut gc_file = create_new_file_for_write(&gc_main_path)?;
 
             let mut key_offset = Vec::<(K, OffsetPointer)>::new();
             self.index_tree.traverse(|keys, values| {

@@ -3,30 +3,22 @@ use crate::model::config::{Config, ConfigTarget, InputType};
 use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::processing::playlist_processor::ProcessingPipe;
 use crate::processing::xtream_parser::parse_xtream_series_info;
-use crate::processing::xtream_processor::{create_resolve_episode_wal_files, create_resolve_info_wal_files, get_u32_from_serde_value, get_u64_from_serde_value, playlist_resolve_process_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
+use crate::processing::xtream_processor::{create_resolve_episode_wal_files, create_resolve_info_wal_files, get_u32_from_serde_value, playlist_resolve_process_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
 use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::{xtream_get_info_file_paths, xtream_update_input_info_file, xtream_update_input_series_episodes_record_from_wal_file, xtream_update_input_series_record_from_wal_file};
 use crate::repository::IndexedDocumentReader;
 use crate::{create_resolve_options_function_for_xtream_target, handle_error, handle_error_and_return, info_err, notify_err};
-use serde_json::{Map, Value};
+use serde_json::{Value};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
-const TAG_SERIES_INFO_SERIES_ID: &str = "series_id";
 const TAG_SERIES_INFO_LAST_MODIFIED: &str = "last_modified";
 
 create_resolve_options_function_for_xtream_target!(series);
 
 async fn read_processed_series_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) -> HashMap<u32, u64> {
     read_processed_info_ids(cfg, errors, fpl, PlaylistItemType::SeriesInfo, |ts: &u64| *ts).await
-}
-
-fn extract_info_record_from_series_info(content: &str) -> Option<(u32, u64)> {
-    let doc = serde_json::from_str::<Map<String, Value>>(content).ok()?;
-    let provider_id = get_u32_from_serde_value(doc.get(TAG_SERIES_INFO_SERIES_ID)?)?;
-    let last_modified = get_u64_from_serde_value(doc.get(TAG_SERIES_INFO_LAST_MODIFIED)?).unwrap_or(0);
-    Some((provider_id, last_modified))
 }
 
 fn write_series_info_record_to_wal_file(
@@ -49,8 +41,8 @@ fn write_series_episode_record_to_wal_file(
     Ok(())
 }
 
-fn should_update_series_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> bool {
-    should_update_info(pli, processed_provider_ids, "last_modified")
+fn should_update_series_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
+    should_update_info(pli, processed_provider_ids, TAG_SERIES_INFO_LAST_MODIFIED)
 }
 
 async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterError>,
@@ -58,7 +50,7 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
     // we cant write to the indexed-document directly because of the write lock and time-consuming operation.
     // All readers would be waiting for the lock and the app would be unresponsive.
     // We collect the content into a wal file and write it once we collected everything.
-    let Some((mut wal_content_file, mut wal_record_file, wal_content_path, wal_record_path)) = create_resolve_info_wal_files(cfg, processed_fpl.input, XtreamCluster::Series)
+    let Some((wal_content_file, wal_record_file, wal_content_path, wal_record_path)) = create_resolve_info_wal_files(cfg, processed_fpl.input, XtreamCluster::Series)
     else { return HashMap::new(); };
 
     let mut processed_info_ids = read_processed_series_info_ids(cfg, errors, processed_fpl).await;
@@ -71,17 +63,15 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
         .flat_map(|plg| &plg.channels)
         .filter(|&pli| pli.header.borrow().item_type == PlaylistItemType::SeriesInfo)
     {
-        let should_update = should_update_series_info(pli, &processed_info_ids);
+        let (should_update, provider_id, ts) = should_update_series_info(pli, &processed_info_ids);
         if should_update {
             if let Some(content) = playlist_resolve_process_playlist_item(pli, processed_fpl.input, errors, resolve_delay, XtreamCluster::Series).await {
-                if let Some((provider_id, ts)) = extract_info_record_from_series_info(&content) {
-                    handle_error_and_return!(write_info_content_to_wal_file(&mut content_writer, provider_id, &content),
-                        |err| errors.push(notify_err!(format!("Failed to resolve series, could not write to content wal file {err}"))));
-                    processed_info_ids.insert(provider_id, ts);
-                    handle_error_and_return!(write_series_info_record_to_wal_file(&mut record_writer, provider_id, ts),
-                        |err| errors.push(notify_err!(format!("Failed to resolve series wal, could not write to record wal file {err}"))));
-                    content_updated = true;
-                }
+                handle_error_and_return!(write_info_content_to_wal_file(&mut content_writer, provider_id, &content),
+                    |err| errors.push(notify_err!(format!("Failed to resolve series, could not write to content wal file {err}"))));
+                processed_info_ids.insert(provider_id, ts);
+                handle_error_and_return!(write_series_info_record_to_wal_file(&mut record_writer, provider_id, ts),
+                    |err| errors.push(notify_err!(format!("Failed to resolve series wal, could not write to record wal file {err}"))));
+                content_updated = true;
             }
         }
     }
@@ -89,12 +79,14 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
         handle_error!(content_writer.flush(),
             |err| errors.push(notify_err!(format!("Failed to resolve vod, could not write to wal file {err}"))));
         drop(content_writer);
+        drop(wal_content_file);
         handle_error!(record_writer.flush(),
             |err| errors.push(notify_err!(format!("Failed to resolve vod tmdb, could not write to wal file {err}"))));
         drop(record_writer);
-        handle_error!(xtream_update_input_info_file(cfg, processed_fpl.input, &mut wal_content_file, &wal_content_path, XtreamCluster::Series).await,
+        drop(wal_record_file);
+        handle_error!(xtream_update_input_info_file(cfg, processed_fpl.input, &wal_content_path, XtreamCluster::Series).await,
             |err| errors.push(err));
-        handle_error!(xtream_update_input_series_record_from_wal_file(cfg, processed_fpl.input, &mut wal_record_file, &wal_record_path).await,
+        handle_error!(xtream_update_input_series_record_from_wal_file(cfg, processed_fpl.input, &wal_record_path).await,
             |err| errors.push(err));
     }
 
@@ -123,7 +115,7 @@ async fn process_series_info(
 
     let Ok(mut doc_reader) = IndexedDocumentReader::<u32, String>::new(&info_path, &idx_path) else { return result; };
 
-    let Some((mut wal_file, wal_path)) = create_resolve_episode_wal_files(cfg, input) else {
+    let Some((wal_file, wal_path)) = create_resolve_episode_wal_files(cfg, input) else {
         errors.push(notify_err!("Could not create wal file for series episodes record".to_string()));
         return result;
     };
@@ -178,7 +170,8 @@ async fn process_series_info(
     handle_error!(wal_writer.flush(),
             |err| errors.push(notify_err!(format!("Failed to resolve series episodes, could not write to wal file {err}"))));
     drop(wal_writer);
-    handle_error!(xtream_update_input_series_episodes_record_from_wal_file(cfg, input, &mut wal_file, &wal_path).await,
+    drop(wal_file);
+    handle_error!(xtream_update_input_series_episodes_record_from_wal_file(cfg, input, &wal_path).await,
             |err| errors.push(err));
     result
 }

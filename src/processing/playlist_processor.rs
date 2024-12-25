@@ -303,7 +303,6 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                 InputType::M3u => download::get_m3u_playlist(&cfg, input, &cfg.working_dir).await,
                 InputType::Xtream => download::get_xtream_playlist(input, &cfg.working_dir).await,
             };
-            // @TODO optmization dont hold tv_guide in memory, persist raw and  later use sax parser to extract.
             let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
                 download::get_xmltv(&cfg, input, &cfg.working_dir).await
             } else {

@@ -56,7 +56,7 @@ fn write_vod_info_record_to_wal_file(
     Ok(())
 }
 
-fn should_update_vod_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> bool {
+fn should_update_vod_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
     should_update_info(pli, processed_provider_ids, TAG_VOD_INFO_ADDED)
 }
 
@@ -67,7 +67,7 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
     // we cant write to the indexed-document directly because of the write lock and time-consuming operation.
     // All readers would be waiting for the lock and the app would be unresponsive.
     // We collect the content into a wal file and write it once we collected everything.
-    let Some((mut wal_content_file, mut wal_record_file, wal_content_path, wal_record_path)) = create_resolve_info_wal_files(cfg, fpl.input, XtreamCluster::Video)
+    let Some((wal_content_file, wal_record_file, wal_content_path, wal_record_path)) = create_resolve_info_wal_files(cfg, fpl.input, XtreamCluster::Video)
     else { return; };
 
     let mut processed_info_ids = read_processed_vod_info_ids(cfg, errors, fpl).await;
@@ -78,7 +78,7 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
     for pli in fpl.playlistgroups.iter()
         .flat_map(|plg| &plg.channels)
         .filter(|&pli| pli.header.borrow().xtream_cluster == XtreamCluster::Video) {
-        let should_update = should_update_vod_info(pli, &processed_info_ids);
+        let (should_update, _provider_id, _ts) = should_update_vod_info(pli, &processed_info_ids);
         if should_update {
             if let Some(content) = playlist_resolve_process_playlist_item(pli, fpl.input, errors, resolve_delay, XtreamCluster::Video).await {
                 if let Some((provider_id, info_record)) = extract_info_record_from_vod_info(&content) {
@@ -96,13 +96,15 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
     if content_updated {
         handle_error!(content_writer.flush(),
             |err| errors.push(notify_err!(format!("Failed to resolve vod, could not write to wal file {err}"))));
-        drop(content_writer);
         handle_error!(record_writer.flush(),
             |err| errors.push(notify_err!(format!("Failed to resolve vod tmdb, could not write to wal file {err}"))));
+        drop(content_writer);
         drop(record_writer);
-        handle_error!(xtream_update_input_info_file(cfg, fpl.input, &mut wal_content_file, &wal_content_path, XtreamCluster::Video).await,
+        drop(wal_content_file);
+        drop(wal_record_file);
+        handle_error!(xtream_update_input_info_file(cfg, fpl.input, &wal_content_path, XtreamCluster::Video).await,
             |err| errors.push(err));
-        handle_error!(xtream_update_input_vod_record_from_wal_file(cfg, fpl.input, &mut wal_record_file, &wal_record_path).await,
+        handle_error!(xtream_update_input_vod_record_from_wal_file(cfg, fpl.input, &wal_record_path).await,
             |err| errors.push(err));
     }
 }

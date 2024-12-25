@@ -1,9 +1,8 @@
-use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 use flate2::bufread::{GzDecoder, ZlibDecoder};
 use crate::utils::compression_utils::{is_deflate, is_gzip};
-
+use crate::utils::file_utils::open_readonly_file;
 
 pub struct CompressedFileReader {
     reader: BufReader<Box<dyn Read>>,
@@ -11,9 +10,7 @@ pub struct CompressedFileReader {
 
 impl CompressedFileReader {
     pub fn new(path: &Path) -> std::io::Result<Self> {
-        let file = OpenOptions::new()
-            .read(true)
-            .open(path)?;
+        let file = open_readonly_file(path)?;
 
         let mut buffered_file = BufReader::new(file);
         let mut header = [0u8; 2];

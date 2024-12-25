@@ -378,8 +378,10 @@ pub struct XtreamMappingOptions {
 impl XtreamMappingOptions {
     pub fn from_target_options(options: Option<&ConfigTargetOptions>) -> Self {
         let (skip_live_direct_source, skip_video_direct_source, skip_series_direct_source) = options
-            .map_or((false, false, false), |o| (o.xtream_skip_live_direct_source,
-                                                o.xtream_skip_video_direct_source, o.xtream_skip_series_direct_source));
+            .map_or((false, false, false), |o| (
+                o.xtream_skip_live_direct_source,
+                o.xtream_skip_video_direct_source,
+                o.xtream_skip_series_direct_source));
         Self {
             skip_live_direct_source,
             skip_video_direct_source,

@@ -285,6 +285,7 @@ impl ConfigRename {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigTargetOptions {
     #[serde(default)]
     pub ignore_logo: bool,
@@ -514,6 +515,7 @@ impl FromStr for InputType {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigInputOptions {
     #[serde(default)]
     pub xtream_skip_live: bool,

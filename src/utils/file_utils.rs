@@ -1,5 +1,5 @@
 use std::fs;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -175,4 +175,29 @@ pub fn sanitize_filename(file_name: &str) -> String {
         .chars()
         .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
         .collect()
+}
+
+#[inline]
+pub fn append_or_crate_file(path: &Path) -> std::io::Result<File> {
+    OpenOptions::new().create(true).append(true).open(path)
+}
+
+#[inline]
+pub fn create_new_file_for_write(path:&Path) -> std::io::Result<File> {
+    OpenOptions::new().write(true).create(true).truncate(true).open(path)
+}
+
+#[inline]
+pub fn create_new_file_for_read_write(path:&Path) -> std::io::Result<File> {
+    OpenOptions::new().read(true).write(true).create(true).truncate(true).open(path)
+}
+
+#[inline]
+pub fn open_read_write_file(path:&Path) -> std::io::Result<File> {
+    OpenOptions::new().read(true).write(true).create(false).truncate(false).open(path)
+}
+
+#[inline]
+pub fn open_readonly_file(path:&Path) -> std::io::Result<File> {
+    OpenOptions::new().read(true).write(false).truncate(false).create(false).open(path)
 }

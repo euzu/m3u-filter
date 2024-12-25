@@ -49,9 +49,15 @@ GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_vod_streams&ca
 GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_vod_info&vod_id=8051
 
 ### xtream series_categories
-GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_series_categories
+GET http://{{silver}}/player_api.php?{{xt_credentials}}&action=get_series_categories
 
 ### xtream series
+GET http://{{silver}}/player_api.php?{{xt_credentials}}&action=get_series
+
+### xtream series for category
+GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_series&category_id=56
+
+### xtream series for category
 GET http://{{local}}/player_api.php?{{xt_credentials}}&action=get_series&category_id=56
 
 ### xtream series info

@@ -1,5 +1,5 @@
 use std::array::TryFromSliceError;
-use std::fs::{File, OpenOptions};
+use std::fs::{File};
 use std::io::{self, BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::mem::size_of;
@@ -8,6 +8,7 @@ use std::path::Path;
 use flate2::Compression;
 use log::error;
 use serde::{Deserialize, Serialize};
+use crate::utils::file_utils::{create_new_file_for_write, open_read_write_file};
 
 const BINCODE_OVERHEAD: usize = 4;
 const BLOCK_SIZE: usize = 4096;
@@ -402,7 +403,7 @@ where
 
     pub fn store(&mut self, filepath: &Path) -> io::Result<u64> {
         if self.dirty {
-            let mut file = BufWriter::new(OpenOptions::new().write(true).create(true).truncate(true).open(filepath)?);
+            let mut file = BufWriter::new(create_new_file_for_write(filepath)?);
             let mut buffer = vec![0u8; BLOCK_SIZE];
             let result = self.root.serialize_to_block(&mut file, &mut buffer, 0u64);
             file.flush()?;
@@ -538,10 +539,7 @@ where
         if !filepath.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, format!("File not found {}", filepath.to_str().unwrap_or("?"))));
         }
-        let file = is_file_valid(OpenOptions::new()
-            .write(true)
-            .read(true)
-            .open(filepath)?)?;
+        let file = is_file_valid(open_read_write_file(filepath)?)?;
         Ok(Self {
             file,
             _marker_k: PhantomData,
