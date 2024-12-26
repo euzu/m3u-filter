@@ -1,12 +1,13 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
-use crate::model::xtream::XtreamSeriesInfoEpisode;
+use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType};
+use crate::model::xtream::{XtreamSeriesEpisode};
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::xtream_get_record_file_path;
 use crate::utils::file_lock_manager::FileReadGuard;
 use crate::utils::file_utils;
+use crate::utils::json_utils::{get_string_from_serde_value};
 use crate::{create_m3u_filter_error_result, notify_err};
 use chrono::Datelike;
 use log::error;
@@ -15,6 +16,7 @@ use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
 use std::sync::LazyLock;
+use serde_json::Value;
 
 struct KodiStyle {
     year: regex::Regex,
@@ -94,18 +96,20 @@ static KODI_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
 #[derive(Clone)]
 enum InputTmdbIndexTree {
     Video(BPlusTree<u32, u32>),
-    Series(BPlusTree<u32, XtreamSeriesInfoEpisode>),
+    Series(BPlusTree<u32, XtreamSeriesEpisode>),
 }
 
 #[derive(Clone)]
 enum InputTmdbIndexValue {
     Video(u32),
-    Series(XtreamSeriesInfoEpisode),
+    Series(XtreamSeriesEpisode),
 }
 
 type InputTmdbIndexMap = HashMap<u16, Option<(FileReadGuard, InputTmdbIndexTree)>>;
 async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_id: u16,
                         input_indexes: &mut InputTmdbIndexMap, item_type: PlaylistItemType) -> Option<InputTmdbIndexValue> {
+    // the tmdb_ids are stored inside record files for xtream input.
+    // we load this record files on request for each input and item_type.
     match provider_id {
         None => None,
         Some(pid) => {
@@ -127,7 +131,7 @@ async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_id: u16,
                             if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
                                 match item_type {
                                     PlaylistItemType::Series => {
-                                        if let Ok(tree) = BPlusTree::<u32, XtreamSeriesInfoEpisode>::load(&tmdb_path) {
+                                        if let Ok(tree) = BPlusTree::<u32, XtreamSeriesEpisode>::load(&tmdb_path) {
                                             let tmdb_id = tree.query(&pid).map(|episode| InputTmdbIndexValue::Series(episode.clone()));
                                             entry.insert(Some((file_lock, InputTmdbIndexTree::Series(tree))));
                                             return tmdb_id;
@@ -173,32 +177,65 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
 
             let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
 
-            for pg in new_playlist {
-                for pli in pg.channels.iter().filter(|&pli| {
-                    let item_type = pli.header.borrow().item_type;
-                    item_type == PlaylistItemType::Series
-                        || item_type == PlaylistItemType::Live
-                        || item_type == PlaylistItemType::Video
-                }) {
-                    let (group, title, item_type, provider_id, input_id, url) = {
-                        let mut header = pli.header.borrow_mut();
-                        let group = Rc::clone(&header.group);
-                        let title = Rc::clone(&header.title);
-                        let item_type = header.item_type;
-                        let provider_id = header.get_provider_id();
-                        let input_id = header.input_id;
-                        let url = Rc::clone(&header.url);
-                        (group, title, item_type, provider_id, input_id, url)
-                    };
+            let filter_item = |&pli: &&PlaylistItem| {
+                let item_type = pli.header.borrow().item_type;
+                item_type == PlaylistItemType::Series
+                    || item_type == PlaylistItemType::Live
+                    || item_type == PlaylistItemType::Video
+            };
 
+            let extract_item_info = |pli: &PlaylistItem| {
+                let mut header = pli.header.borrow_mut();
+                let group = Rc::clone(&header.group);
+                let title = Rc::clone(&header.title);
+                let item_type = header.item_type;
+                let provider_id = header.get_provider_id();
+                let input_id = header.input_id;
+                let url = Rc::clone(&header.url);
+                let (series_name, series_release_date) = if header.item_type == PlaylistItemType::Series {
+                     header.additional_properties.as_ref().map_or((None, None), |v| match v {
+                         Value::Object(map) => {
+                             let series_name = if let Some(updated) = map.get("series_name") {
+                                 get_string_from_serde_value(updated)
+                             } else {
+                                 None
+                             };
+                             let release_date = if let Some(updated) = map.get("release_date") {
+                                 get_string_from_serde_value(updated)
+                             } else {
+                                 None
+                             };
+                             (series_name, release_date)
+                         }
+                         _ => (None, None),
+                     })
+                 } else {
+                    (None, None)
+                 };
+
+                (group, title, item_type, provider_id, input_id, url, series_name, series_release_date)
+            };
+
+            for pg in new_playlist {
+                for pli in pg.channels.iter().filter(filter_item) {
+                    // we need to consider
+                    // - Xtream Series Episode (has series_name and release_date)
+                    // - Xtream VOD (should have year or release_date)
+                    // - M3u Series (TODO we dont have this currently, should be guessed through m3u parser)
+                    // - M3u Vod (no additional infos, need to extract from title)
+
+                    let (group, title, item_type, provider_id, input_id, url, series_name, series_release_date) = extract_item_info(pli);
                     let mut dir_path = path.join(sanitize_for_filename(&group, underscore_whitespace));
                     let mut kodi_file_name = sanitize_for_filename(&title, underscore_whitespace);
                     let mut additional_info = String::new();
                     if kodi_style {
-                        let (kodi_file_dir_name, kodi_style_filename) = kodi_style_rename(&kodi_file_name, &KODI_STYLE);
+                        let (kodi_file_dir_name, kodi_style_filename) = if item_type == PlaylistItemType::Series && series_name.is_some() && series_release_date.is_some() {
+                            (series_name,
+                        } else {
+                            kodi_style_rename(&kodi_file_name, &KODI_STYLE)
+                        };
                         kodi_file_name = kodi_style_filename;
                         kodi_file_dir_name.iter().for_each(|p| dir_path = dir_path.join(p));
-
                         let tmdb_value = match item_type {
                             PlaylistItemType::Series | PlaylistItemType::Video => get_tmdb_value(cfg, provider_id, input_id, &mut input_tmdb_indexes, item_type).await,
                             _ => None,
@@ -210,8 +247,8 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                                     InputTmdbIndexValue::Video(tmdb_id) => format!(" {{tmdb={tmdb_id}}}"),
                                     InputTmdbIndexValue::Series(episode) => {
                                         let mut episode_ext = format!(" S{:02}E{:02}", episode.season, episode.episode_num);
-                                        if let Some(tmdb_id) = episode.info.tmdb_id {
-                                            episode_ext = format!("{episode_ext} {{tmdb={tmdb_id}}}");
+                                        if episode.tmdb_id > 0 {
+                                            episode_ext = format!("{episode_ext} {{tmdb={}}}", episode.tmdb_id);
                                         }
                                         episode_ext
                                     }

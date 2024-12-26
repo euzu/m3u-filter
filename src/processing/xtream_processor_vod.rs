@@ -1,9 +1,10 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, InputType};
 use crate::model::playlist::{FetchedPlaylist, PlaylistItem, PlaylistItemType, XtreamCluster};
-use crate::processing::xtream_processor::{create_resolve_info_wal_files, get_u32_from_serde_value, get_u64_from_serde_value, playlist_resolve_process_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
+use crate::processing::xtream_processor::{create_resolve_info_wal_files, playlist_resolve_download_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
 use crate::repository::xtream_repository::{xtream_update_input_info_file, xtream_update_input_vod_record_from_wal_file, InputVodInfoRecord};
 use crate::{create_resolve_options_function_for_xtream_target, handle_error, handle_error_and_return, notify_err};
+use crate::utils::json_utils::{get_u32_from_serde_value, get_u64_from_serde_value};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -80,7 +81,7 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
         .filter(|&pli| pli.header.borrow().xtream_cluster == XtreamCluster::Video) {
         let (should_update, _provider_id, _ts) = should_update_vod_info(pli, &processed_info_ids);
         if should_update {
-            if let Some(content) = playlist_resolve_process_playlist_item(pli, fpl.input, errors, resolve_delay, XtreamCluster::Video).await {
+            if let Some(content) = playlist_resolve_download_playlist_item(pli, fpl.input, errors, resolve_delay, XtreamCluster::Video).await {
                 if let Some((provider_id, info_record)) = extract_info_record_from_vod_info(&content) {
                     let ts = info_record.ts;
                     handle_error_and_return!(write_info_content_to_wal_file(&mut content_writer, provider_id, &content),

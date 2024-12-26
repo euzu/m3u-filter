@@ -165,3 +165,30 @@ where
         _ => Err(serde::de::Error::custom("Expected number or string")),
     }
 }
+
+
+pub fn get_u64_from_serde_value(value: &Value) -> Option<u64> {
+    match value {
+        Value::Number(num_val) => num_val.as_u64(),
+        Value::String(str_val) => {
+            match str_val.parse::<u64>() {
+                Ok(val) => Some(val),
+                Err(_) => None
+            }
+        }
+        _ => None,
+    }
+}
+
+pub fn get_u32_from_serde_value(value: &Value) -> Option<u32> {
+    get_u64_from_serde_value(value).and_then(|val| u32::try_from(val).ok())
+}
+
+pub fn get_string_from_serde_value(value: &Value) -> Option<String> {
+    match value {
+        Value::String(str_val) => {
+            Some(str_val.to_string())
+        }
+        _ => None,
+    }
+}

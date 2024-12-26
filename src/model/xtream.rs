@@ -283,7 +283,7 @@ pub struct XtreamSeriesInfoSeason {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct XtreamSeriesInfoInfo {
-    name: String,
+    pub(crate) name: String,
     cover: String,
     plot: String,
     cast: String,
@@ -322,6 +322,7 @@ pub struct XtreamSeriesInfoEpisodeInfo {
     pub season: u32,
 }
 
+// Used for serde_json deserialization, can not be used with bincode
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoEpisode {
     pub id: String,
@@ -337,17 +338,41 @@ pub struct XtreamSeriesInfoEpisode {
     pub direct_source: String,
 }
 
-// impl XtreamSeriesInfoEpisode {
-//     pub fn get_id(&self) -> u32 {
-//         match self.id.parse::<u32>() {
-//             Ok(id) => id,
-//             Err(_) => {
-//                 error!("Failed to convert id to number {}", self.id);
-//                 0
-//             }
-//         }
-//     }
-// }
+impl XtreamSeriesInfoEpisode {
+    pub fn get_id(&self) -> u32 {
+        self.id.parse::<u32>().unwrap_or_else(|_| 0)
+    }
+}
+
+//bincode does not support deserialize_with. We use this struct for db
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct XtreamSeriesEpisode {
+    pub id: u32,
+    pub episode_num: u32,
+    pub title: String,
+    pub container_extension: String,
+    pub custom_sid: String,
+    pub added: String,
+    pub season: u32,
+    pub tmdb_id: u32,
+    pub direct_source: String,
+}
+
+impl XtreamSeriesEpisode {
+    pub fn from(info_episode: &XtreamSeriesInfoEpisode) -> Self {
+        Self {
+            id: info_episode.get_id(),
+            episode_num: info_episode.episode_num,
+            title: info_episode.title.to_string(),
+            container_extension: info_episode.container_extension.to_string(),
+            custom_sid: info_episode.custom_sid.to_string(),
+            added: info_episode.added.to_string(),
+            season: info_episode.season,
+            tmdb_id: info_episode.info.tmdb_id.unwrap_or(0),
+            direct_source: info_episode.direct_source.to_string(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfo {
@@ -364,6 +389,7 @@ impl XtreamSeriesInfoEpisode {
         if !bdpath.is_empty() {
             result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first()?))])));
         }
+        add_str_property_if_exists!(result, series_info.info.name.as_str(), "series_name");
         add_str_property_if_exists!(result, self.added.as_str(), "added");
         add_str_property_if_exists!(result, series_info.info.cast.as_str(), "cast");
         add_str_property_if_exists!(result, self.container_extension.as_str(), "container_extension");

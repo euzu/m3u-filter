@@ -10,7 +10,7 @@ use serde_json::{json, Map, Value};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::{XtreamMappingOptions, XtreamSeriesInfoEpisode};
+use crate::model::xtream::{XtreamMappingOptions, XtreamSeriesEpisode};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentWriter, IndexedDocumentDirectAccess};
 use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
@@ -23,7 +23,7 @@ use crate::utils::file_utils::open_readonly_file;
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
 pub static COL_CAT_VOD: &str = "cat_vod";
-const FILE_SERIES_EPISODES: &str = "series_episodes";
+const FILE_SERIES_INFO: &str = "series_info";
 const FILE_VOD_INFO: &str = "vod_info";
 const FILE_VOD_INFO_RECORD: &str = "vod_info_record";
 const FILE_SERIES_INFO_RECORD: &str = "series_info_record";
@@ -90,8 +90,8 @@ pub fn xtream_get_info_file_paths(
     cluster: XtreamCluster,
 ) -> Option<(PathBuf, PathBuf)> {
     if cluster == XtreamCluster::Series {
-        let xtream_path = storage_path.join(format!("{FILE_SERIES_EPISODES}.{FILE_SUFFIX_DB}"));
-        let index_path = storage_path.join(format!("{FILE_SERIES_EPISODES}.{FILE_SUFFIX_INDEX}"));
+        let xtream_path = storage_path.join(format!("{FILE_SERIES_INFO}.{FILE_SUFFIX_DB}"));
+        let index_path = storage_path.join(format!("{FILE_SERIES_INFO}.{FILE_SUFFIX_INDEX}"));
         return Some((xtream_path, index_path));
     } else if cluster == XtreamCluster::Video {
         let xtream_path = storage_path.join(format!("{FILE_VOD_INFO}.{FILE_SUFFIX_DB}"));
@@ -806,7 +806,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
             let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series episode wal info {err}")))?);
             let mut provider_id_bytes = [0u8; 4];
             let mut len_bytes = [0u8; 4];
-            let mut tree_record_index: BPlusTree<u32, XtreamSeriesInfoEpisode> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());
+            let mut tree_record_index: BPlusTree<u32, XtreamSeriesEpisode> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());
             let mut buffer = vec![0u8; 4096];
             loop {
                 if reader.read_exact(&mut provider_id_bytes).is_err() {
@@ -826,9 +826,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
                 if reader.read_exact(&mut buffer[0..len]).is_err() {
                     break;
                 }
-                let content = String::from_utf8_lossy(&buffer[0..len]);
-
-                match serde_json::from_str(&content) {
+                match bincode::deserialize(&buffer[0..len]) {
                     Ok(episode) => {
                         tree_record_index.insert(provider_id, episode);
                     },

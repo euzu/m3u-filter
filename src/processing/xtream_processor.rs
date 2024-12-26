@@ -14,6 +14,7 @@ use std::path::PathBuf;
 const FILE_SERIES_INFO: &str = "xtream_series_info";
 const FILE_VOD_INFO: &str = "xtream_vod_info";
 const FILE_SUFFIX_WAL: &str = "wal";
+const FILE_SERIES_EPISODE_RECORD: &str = "series_episode_record";
 
 #[macro_export]
 macro_rules! handle_error {
@@ -36,6 +37,7 @@ macro_rules! handle_error_and_return {
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::xtream_repository::xtream_get_record_file_path;
 use crate::utils::file_utils::append_or_crate_file;
+use crate::utils::json_utils::get_u64_from_serde_value;
 
 #[macro_export]
 macro_rules! create_resolve_options_function_for_xtream_target {
@@ -53,27 +55,9 @@ macro_rules! create_resolve_options_function_for_xtream_target {
     };
 }
 
-
-pub fn get_u64_from_serde_value(value: &Value) -> Option<u64> {
-    match value {
-        Value::Number(num_val) => num_val.as_u64(),
-        Value::String(str_val) => {
-            match str_val.parse::<u64>() {
-                Ok(val) => Some(val),
-                Err(_) => None
-            }
-        }
-        _ => None,
-    }
-}
-
-pub fn get_u32_from_serde_value(value: &Value) -> Option<u32> {
-    get_u64_from_serde_value(value).and_then(|val| u32::try_from(val).ok())
-}
-
-pub(in crate::processing) async fn playlist_resolve_process_playlist_item(pli: &PlaylistItem, input: &ConfigInput, errors: &mut Vec<M3uFilterError>, resolve_delay: u16, cluster: XtreamCluster) -> Option<String> {
+pub(in crate::processing) async fn playlist_resolve_download_playlist_item(pli: &PlaylistItem, input: &ConfigInput, errors: &mut Vec<M3uFilterError>, resolve_delay: u16, cluster: XtreamCluster) -> Option<String> {
     let mut result = None;
-    let provider_id = pli.get_provider_id().unwrap_or(0);
+    let Some(provider_id) = pli.get_provider_id() else { return None; };
     if let Some(info_url) = download::get_xtream_player_api_info_url(input, cluster, provider_id) {
         result = match download::get_xtream_stream_info_content(&info_url, input).await {
             Ok(content) => Some(content),
@@ -102,7 +86,7 @@ pub(in crate::processing) fn write_info_content_to_wal_file(writer: &mut BufWrit
 pub(in crate::processing) fn create_resolve_episode_wal_files(cfg: &Config, input: &ConfigInput) -> Option<(File, PathBuf)> {
     match get_input_storage_path(input, &cfg.working_dir) {
         Ok(storage_path) => {
-            let info_path = storage_path.join(format!("series_episode_record.{FILE_SUFFIX_WAL}"));
+            let info_path = storage_path.join(format!("{FILE_SERIES_EPISODE_RECORD}.{FILE_SUFFIX_WAL}"));
             let info_file = append_or_crate_file(&info_path).ok()?;
             Some((info_file, info_path))
         }
