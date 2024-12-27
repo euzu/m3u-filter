@@ -8,12 +8,13 @@ use crate::repository::xtream_repository::xtream_get_record_file_path;
 use crate::utils::file_lock_manager::FileReadGuard;
 use crate::utils::file_utils;
 use crate::utils::json_utils::{get_string_from_serde_value};
-use crate::{create_m3u_filter_error_result, notify_err};
+use crate::{create_m3u_filter_error, create_m3u_filter_error_result, notify_err};
 use chrono::Datelike;
 use log::error;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::LazyLock;
 use serde_json::Value;
@@ -157,120 +158,122 @@ async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_id: u16,
     }
 }
 
+struct StrmItemInfo {
+    group: Rc<String>,
+    title: Rc<String>,
+    item_type: PlaylistItemType,
+    provider_id: Option<u32>,
+    input_id: u16,
+    url: Rc<String>,
+    series_name: Option<String>,
+    release_date: Option<String>,
+}
+
+fn  extract_item_info(pli: &PlaylistItem) -> StrmItemInfo  {
+    let mut header = pli.header.borrow_mut();
+    let group = Rc::clone(&header.group);
+    let title = Rc::clone(&header.title);
+    let item_type = header.item_type;
+    let provider_id = header.get_provider_id();
+    let input_id = header.input_id;
+    let url = Rc::clone(&header.url);
+    let (series_name, series_release_date) = if header.item_type == PlaylistItemType::Series {
+        let series_name = header.get_additional_property_as_str("series_name");
+        let release_date = header.get_additional_property_as_str("release_date");
+        (series_name, release_date)
+    } else { (None, None) };
+    StrmItemInfo { group, title, item_type, provider_id, input_id, url, series_name, release_date }
+}
+
+fn prepare_strm_output_directory(cleanup: bool, path: &PathBuf) -> Result<(), M3uFilterError> {
+    if cleanup {
+        let _ = std::fs::remove_dir_all(&path);
+    }
+    if let Err(e) = std::fs::create_dir_all(&path) {
+        error!("cant create directory: {:?}", &path);
+        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
+    };
+    Ok(())
+}
+
+fn filter_strm_item(&pli: &&PlaylistItem) -> bool {
+    let item_type = pli.header.borrow().item_type;
+    item_type == PlaylistItemType::Series
+    || item_type == PlaylistItemType::Live
+    || item_type == PlaylistItemType::Video
+}
+
+fn get_strm_output_options(target: &ConfigTarget) -> (bool, bool, bool) {
+    target.options.as_ref().map_or_else(
+        || (false, false, false),
+        |o| (o.underscore_whitespace,  o.cleanup, o.kodi_style))
+}
+
 pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&str>) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         if filename.is_none() {
             return Err(notify_err!("write strm playlist failed: ".to_string()));
         }
-        let underscore_whitespace = target.options.as_ref().is_some_and(|o| o.underscore_whitespace);
-        let cleanup = target.options.as_ref().is_some_and(|o| o.cleanup);
-        let kodi_style = target.options.as_ref().is_some_and(|o| o.kodi_style);
+        let (underscore_whitespace, cleanup, kodi_style) = get_strm_output_options(target);
+        let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap())))
+        else { return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, format!("Failed to get file path for {}", filename.unwrap_or(""))) };
+        if _ = prepare_strm_output_directory(cleanup, &path)?;
+        let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
+        for pg in new_playlist {
+            for pli in pg.channels.iter().filter(filter_strm_item) {
+                // we need to consider
+                // - Live streams
+                // - Xtream Series Episode (has series_name and release_date)
+                // - Xtream VOD (should have year or release_date)
+                // - M3u Series (TODO we dont have this currently, should be guessed through m3u parser)
+                // - M3u Vod (no additional infos, need to extract from title)
 
-        if let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) {
-            if cleanup {
-                let _ = std::fs::remove_dir_all(&path);
-            }
-            if let Err(e) = std::fs::create_dir_all(&path) {
-                error!("cant create directory: {:?}", &path);
-                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
-            };
-
-            let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
-
-            let filter_item = |&pli: &&PlaylistItem| {
-                let item_type = pli.header.borrow().item_type;
-                item_type == PlaylistItemType::Series
-                    || item_type == PlaylistItemType::Live
-                    || item_type == PlaylistItemType::Video
-            };
-
-            let extract_item_info = |pli: &PlaylistItem| {
-                let mut header = pli.header.borrow_mut();
-                let group = Rc::clone(&header.group);
-                let title = Rc::clone(&header.title);
-                let item_type = header.item_type;
-                let provider_id = header.get_provider_id();
-                let input_id = header.input_id;
-                let url = Rc::clone(&header.url);
-                let (series_name, series_release_date) = if header.item_type == PlaylistItemType::Series {
-                     header.additional_properties.as_ref().map_or((None, None), |v| match v {
-                         Value::Object(map) => {
-                             let series_name = if let Some(updated) = map.get("series_name") {
-                                 get_string_from_serde_value(updated)
-                             } else {
-                                 None
-                             };
-                             let release_date = if let Some(updated) = map.get("release_date") {
-                                 get_string_from_serde_value(updated)
-                             } else {
-                                 None
-                             };
-                             (series_name, release_date)
-                         }
-                         _ => (None, None),
-                     })
-                 } else {
-                    (None, None)
-                 };
-
-                (group, title, item_type, provider_id, input_id, url, series_name, series_release_date)
-            };
-
-            for pg in new_playlist {
-                for pli in pg.channels.iter().filter(filter_item) {
-                    // we need to consider
-                    // - Xtream Series Episode (has series_name and release_date)
-                    // - Xtream VOD (should have year or release_date)
-                    // - M3u Series (TODO we dont have this currently, should be guessed through m3u parser)
-                    // - M3u Vod (no additional infos, need to extract from title)
-
-                    let (group, title, item_type, provider_id, input_id, url, series_name, series_release_date) = extract_item_info(pli);
-                    let mut dir_path = path.join(sanitize_for_filename(&group, underscore_whitespace));
-                    let mut kodi_file_name = sanitize_for_filename(&title, underscore_whitespace);
-                    let mut additional_info = String::new();
-                    if kodi_style {
-                        let (kodi_file_dir_name, kodi_style_filename) = if item_type == PlaylistItemType::Series && series_name.is_some() && series_release_date.is_some() {
-                            (series_name,
-                        } else {
-                            kodi_style_rename(&kodi_file_name, &KODI_STYLE)
-                        };
-                        kodi_file_name = kodi_style_filename;
-                        kodi_file_dir_name.iter().for_each(|p| dir_path = dir_path.join(p));
-                        let tmdb_value = match item_type {
-                            PlaylistItemType::Series | PlaylistItemType::Video => get_tmdb_value(cfg, provider_id, input_id, &mut input_tmdb_indexes, item_type).await,
-                            _ => None,
-                        };
-                        additional_info = match tmdb_value {
-                            None => { String::new() }
-                            Some(value) => {
-                                match value {
-                                    InputTmdbIndexValue::Video(tmdb_id) => format!(" {{tmdb={tmdb_id}}}"),
-                                    InputTmdbIndexValue::Series(episode) => {
-                                        let mut episode_ext = format!(" S{:02}E{:02}", episode.season, episode.episode_num);
-                                        if episode.tmdb_id > 0 {
-                                            episode_ext = format!("{episode_ext} {{tmdb={}}}", episode.tmdb_id);
-                                        }
-                                        episode_ext
+                let str_item_info = extract_item_info(pli);
+                let mut dir_path = path.join(sanitize_for_filename(&str_item_info.group, underscore_whitespace));
+                let mut kodi_file_name = sanitize_for_filename(&str_item_info.title, underscore_whitespace);
+                let mut additional_info = String::new();
+                if kodi_style {
+                    let (kodi_file_dir_name, kodi_style_filename) = if str_item_info.item_type == PlaylistItemType::Series && str_item_info.series_name.is_some() && str_item_info.release_date.is_some() {
+                        (series_name,
+                    } else {
+                        kodi_style_rename(&kodi_file_name, &KODI_STYLE)
+                    };
+                    kodi_file_name = kodi_style_filename;
+                    kodi_file_dir_name.iter().for_each(|p| dir_path = dir_path.join(p));
+                    let tmdb_value = match str_item_info.item_type {
+                        PlaylistItemType::Series | PlaylistItemType::Video => get_tmdb_value(cfg, str_item_info.provider_id, str_item_info.input_id, &mut input_tmdb_indexes, str_item_info.item_type).await,
+                        _ => None,
+                    };
+                    additional_info = match tmdb_value {
+                        None => { String::new() }
+                        Some(value) => {
+                            match value {
+                                InputTmdbIndexValue::Video(tmdb_id) => format!(" {{tmdb={tmdb_id}}}"),
+                                InputTmdbIndexValue::Series(episode) => {
+                                    let mut episode_ext = format!(" S{:02}E{:02}", episode.season, episode.episode_num);
+                                    if episode.tmdb_id > 0 {
+                                        episode_ext = format!("{episode_ext} {{tmdb={}}}", episode.tmdb_id);
                                     }
+                                    episode_ext
                                 }
                             }
-                        };
-                    }
-                    if let Err(e) = std::fs::create_dir_all(&dir_path) {
-                        error!("cant create directory: {:?}", &dir_path);
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
+                        }
                     };
-                    let file_path = dir_path.join(format!("{kodi_file_name}{additional_info}.strm"));
-                    match File::create(&file_path) {
-                        Ok(mut strm_file) => {
-                            match file_utils::check_write(&strm_file.write_all(url.as_bytes())) {
-                                Ok(()) => (),
-                                Err(e) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e),
-                            }
+                }
+                if let Err(e) = std::fs::create_dir_all(&dir_path) {
+                    error!("cant create directory: {:?}", &dir_path);
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
+                };
+                let file_path = dir_path.join(format!("{kodi_file_name}{additional_info}.strm"));
+                match File::create(&file_path) {
+                    Ok(mut strm_file) => {
+                        match file_utils::check_write(&strm_file.write_all(url.as_bytes())) {
+                            Ok(()) => (),
+                            Err(e) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e),
                         }
-                        Err(err) => {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", err);
-                        }
+                    }
+                    Err(err) => {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", err);
                     }
                 }
             }
