@@ -186,9 +186,8 @@ pub fn get_u32_from_serde_value(value: &Value) -> Option<u32> {
 
 pub fn get_string_from_serde_value(value: &Value) -> Option<String> {
     match value {
-        Value::String(str_val) => {
-            Some(str_val.to_string())
-        }
+        Value::Number(num_val) => num_val.as_i64().map(|num| num.to_string()),
+        Value::String(str_val) => Some(str_val.clone()),
         _ => None,
     }
 }

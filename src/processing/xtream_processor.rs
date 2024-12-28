@@ -5,7 +5,6 @@ use crate::repository::storage::get_input_storage_path;
 use crate::utils::download;
 use crate::{info_err, notify_err};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Write};
@@ -37,7 +36,6 @@ macro_rules! handle_error_and_return {
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::xtream_repository::xtream_get_record_file_path;
 use crate::utils::file_utils::append_or_crate_file;
-use crate::utils::json_utils::get_u64_from_serde_value;
 
 #[macro_export]
 macro_rules! create_resolve_options_function_for_xtream_target {

@@ -11,7 +11,7 @@ use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
 use crate::processing::m3u_parser::extract_id_from_url;
 use crate::repository::storage::hash_string;
-use crate::utils::json_utils::{get_string_from_serde_value, get_u32_from_serde_value, get_u64_from_serde_value};
+use crate::utils::json_utils::{get_string_from_serde_value, get_u64_from_serde_value};
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
@@ -190,12 +190,12 @@ impl PlaylistItemHeader {
             _ => None,
         })
     }
-    pub fn get_additional_property_as_u32(&self, field: &str) -> Option<u32> {
-        match self.get_additional_property(field) {
-            Some(value) => get_u32_from_serde_value(value),
-            None => None
-        }
-    }
+    // pub fn get_additional_property_as_u32(&self, field: &str) -> Option<u32> {
+    //     match self.get_additional_property(field) {
+    //         Some(value) => get_u32_from_serde_value(value),
+    //         None => None
+    //     }
+    // }
     pub fn get_additional_property_as_u64(&self, field: &str) -> Option<u64> {
         match self.get_additional_property(field) {
             Some(value) => get_u64_from_serde_value(value),

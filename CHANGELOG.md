@@ -4,7 +4,7 @@
 - no error log for xtream api when content is skipped with options `xtream_skip_[live|vod|series]`
 - added live channel connection sharing in reverse proxy mode. To activate set `share_live_streams` in target options.
 - added `info` and `tmdb-id` caching for vod.
-- The `kodi` format for movies can contain the `tmdb-id` (_optional_). To add the `tmdb-id` you can set now `kodi_style`,  `xtream_resolve_video` and  `xtream_resolve_video_delay` to target options.
+- The `kodi` format for movies can contain the `tmdb-id` (_optional_). To add the `tmdb-id` you can set now `kodi_style`,  `xtream_resolve_vod`, `xtream_resolve_vod_delay`, `xtream_resolve_series` and  `xtream_resolve_series_delay` to target options.
 
 # 2.0.10 (2024-12-03)
 - added Target Output Option `m3u_include_type_in_url`, default false. This adds `live`, `movie`, `series` to the url of the stream in reverse proxy mode.

@@ -138,7 +138,7 @@ where
             return Ok(content);
         }
         // Check if the content has been resolved
-        let resolve_vod = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_video);
+        let resolve_vod = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_vod);
         if resolve_vod {
             if let Some(provider_id) = pli.get_provider_id() {
                 if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Video).await {

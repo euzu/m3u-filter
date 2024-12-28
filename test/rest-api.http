@@ -42,11 +42,11 @@ GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_streams&cat
 ### xtream vod_categories
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_categories
 
-### xtream vod info
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=44
+### xtream vod streams
+GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=57
 
 ### xtream vod info
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_info&vod_id=8051
+GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_info&vod_id=7590
 
 ### xtream series_categories
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_series_categories

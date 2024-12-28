@@ -306,9 +306,9 @@ pub struct ConfigTargetOptions {
     #[serde(default = "default_as_two_u16")]
     pub xtream_resolve_series_delay: u16,
     #[serde(default)]
-    pub xtream_resolve_video: bool,
+    pub xtream_resolve_vod: bool,
     #[serde(default = "default_as_two_u16")]
-    pub xtream_resolve_video_delay: u16,
+    pub xtream_resolve_vod_delay: u16,
     #[serde(default)]
     pub m3u_include_type_in_url: bool,
     #[serde(default)]

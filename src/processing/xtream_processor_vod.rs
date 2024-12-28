@@ -16,7 +16,7 @@ const TAG_VOD_INFO_TMDB_ID: &str = "tmdb_id";
 const TAG_VOD_INFO_STREAM_ID: &str = "stream_id";
 const TAG_VOD_INFO_ADDED: &str = "added";
 
-create_resolve_options_function_for_xtream_target!(video);
+create_resolve_options_function_for_xtream_target!(vod);
 
 async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) -> HashMap<u32, u64> {
     read_processed_info_ids(cfg, errors, fpl, PlaylistItemType::Video, |record: &InputVodInfoRecord| record.ts).await
@@ -62,7 +62,7 @@ fn should_update_vod_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u
 }
 
 pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) {
-    let (resolve_movies, resolve_delay) = get_resolve_video_options(target, fpl);
+    let (resolve_movies, resolve_delay) = get_resolve_vod_options(target, fpl);
     if !resolve_movies { return; }
 
     // we cant write to the indexed-document directly because of the write lock and time-consuming operation.
