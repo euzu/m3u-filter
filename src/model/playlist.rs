@@ -179,13 +179,9 @@ impl PlaylistItemHeader {
     }
 
     pub fn get_additional_property(&self, field: &str) -> Option<&Value> {
-        self.additional_properties.as_ref().map_or(None, |v| match v {
+        self.additional_properties.as_ref().and_then(|v| match v {
             Value::Object(map) => {
-                if let Some(updated) = map.get(field) {
-                    Some(updated)
-                } else {
-                    None
-                }
+                map.get(field)
             }
             _ => None,
         })

@@ -266,16 +266,23 @@ impl XtreamStream {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoSeason {
+    #[serde(default)]
     pub air_date: String,
+    #[serde(default)]
     pub episode_count: u32,
+    #[serde(default)]
     pub id: u32,
+    #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub overview: String,
-    #[serde(deserialize_with = "string_or_number_u32")]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     pub season_number: u32,
-    #[serde(deserialize_with = "string_or_number_f64")]
+    #[serde(default, deserialize_with = "string_or_number_f64")]
     pub vote_average: f64,
+    #[serde(default)]
     pub cover: String,
+    #[serde(default)]
     pub cover_big: String,
 
 }
@@ -283,64 +290,88 @@ pub struct XtreamSeriesInfoSeason {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct XtreamSeriesInfoInfo {
+    #[serde(default)]
     pub(crate) name: String,
+    #[serde(default)]
     cover: String,
+    #[serde(default)]
     plot: String,
+    #[serde(default)]
     cast: String,
+    #[serde(default)]
     director: String,
+    #[serde(default)]
     genre: String,
+    #[serde(default)]
     releaseDate: String,
+    #[serde(default)]
     last_modified: String,
-    #[serde(deserialize_with = "string_or_number_f64")]
+    #[serde(default, deserialize_with = "string_or_number_f64")]
     rating: f64,
-    #[serde(deserialize_with = "string_or_number_f64")]
+    #[serde(default, deserialize_with = "string_or_number_f64")]
     rating_5based: f64,
+    #[serde(default)]
     backdrop_path: Vec<String>,
+    #[serde(default)]
     youtube_trailer: String,
+    #[serde(default)]
     episode_run_time: String,
-    #[serde(deserialize_with = "string_or_number_u32")]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     category_id: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoEpisodeInfo {
     #[serde(deserialize_with = "opt_string_or_number_u32")]
+    #[serde(default)]
     pub tmdb_id: Option<u32>,
+    #[serde(default)]
     pub releasedate: String,
+    #[serde(default)]
     pub plot: String,
-    #[serde(deserialize_with = "string_or_number_u32")]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     pub duration_secs: u32,
+    #[serde(default)]
     pub duration: String,
+    #[serde(default)]
     pub movie_image: String,
+    #[serde(default)]
     pub video: Value,
+    #[serde(default)]
     pub audio: Value,
-    #[serde(deserialize_with = "string_or_number_u32")]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     pub bitrate: u32,
-    #[serde(deserialize_with = "string_or_number_f64")]
+    #[serde(default, deserialize_with = "string_or_number_f64")]
     pub rating: f64,
-    #[serde(deserialize_with = "string_or_number_u32")]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     pub season: u32,
 }
 
 // Used for serde_json deserialization, can not be used with bincode
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoEpisode {
+    #[serde(default)]
     pub id: String,
-    #[serde(deserialize_with = "string_or_number_u32")]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     pub episode_num: u32,
+    #[serde(default)]
     pub title: String,
+    #[serde(default)]
     pub container_extension: String,
     pub info: XtreamSeriesInfoEpisodeInfo,
+    #[serde(default)]
     pub custom_sid: String,
+    #[serde(default)]
     pub added: String,
-    #[serde(deserialize_with = "string_or_number_u32")]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     pub season: u32,
+    #[serde(default)]
     pub direct_source: String,
 }
 
 impl XtreamSeriesInfoEpisode {
     pub fn get_id(&self) -> u32 {
-        self.id.parse::<u32>().unwrap_or_else(|_| 0)
+        self.id.parse::<u32>().unwrap_or(0)
     }
 }
 

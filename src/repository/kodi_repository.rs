@@ -41,7 +41,7 @@ fn sanitize_for_filename(text: &str, underscore_whitespace: bool) -> String {
 }
 
 fn extract_match(name: &str, pattern: &Regex) -> (String, Option<String>) {
-    pattern.find(&name).map_or_else(|| (name.to_string(), None), |m| {
+    pattern.find(name).map_or_else(|| (name.to_string(), None), |m| {
         let matched = String::from(&name[m.start()..m.end()]);
         let new_name = format!("{}{}", &name[0..m.start()], &name[m.end()..]);
         (new_name, Some(matched))
@@ -83,7 +83,7 @@ fn kodi_style_rename_year(
     }
 
     if let Some(rel_date) = release_date {
-        if let Some(year) = extract_match(&rel_date, &style.year).1.and_then(|y| y.parse::<u32>().ok()) {
+        if let Some(year) = extract_match(rel_date, &style.year).1.and_then(|y| y.parse::<u32>().ok()) {
             return (name.to_string(), Some(year));
         }
     }
@@ -108,7 +108,7 @@ async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &
     let (name_1, year) = kodi_style_rename_year(&strm_item_info.title, style, strm_item_info.release_date.as_ref());
     let (name_2, season) = kodi_style_rename_season(&name_1, style, strm_item_info.season.as_ref());
     let (name_3, episode) = kodi_style_rename_episode(&name_2, style, strm_item_info.episode.as_ref());
-    let name_4 = trim_whitespace(&style.whitespace, &*style.alphanumeric.replace_all(&name_3, ""));
+    let name_4 = trim_whitespace(&style.whitespace, &style.alphanumeric.replace_all(&name_3, ""));
     let title = &strm_item_info.series_name.as_ref()
         .filter(|&series_name| name_4.starts_with(series_name))
         .and_then(|series_name| trim_string_after_pos(&name_3, series_name.len()));
@@ -263,16 +263,16 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
 
 fn prepare_strm_output_directory(cleanup: bool, path: &PathBuf) -> Result<(), M3uFilterError> {
     if cleanup {
-        let _ = std::fs::remove_dir_all(&path);
+        let _ = std::fs::remove_dir_all(path);
     }
-    if let Err(e) = std::fs::create_dir_all(&path) {
+    if let Err(e) = std::fs::create_dir_all(path) {
         error!("cant create directory: {:?}", &path);
         return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
     };
     Ok(())
 }
 
-fn filter_strm_item(&pli: &&PlaylistItem) -> bool {
+fn filter_strm_item(pli: &PlaylistItem) -> bool {
     let item_type = pli.header.borrow().item_type;
     item_type == PlaylistItemType::Series
         || item_type == PlaylistItemType::Live
@@ -295,10 +295,10 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
         let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) else {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Failed to get file path for {}", filename.unwrap_or(""));
         };
-        let _ = prepare_strm_output_directory(cleanup, &path)?;
+        prepare_strm_output_directory(cleanup, &path)?;
         let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
         for pg in new_playlist {
-            for pli in pg.channels.iter().filter(filter_strm_item) {
+            for pli in pg.channels.iter().filter(|&pli: &&PlaylistItem| filter_strm_item(pli)) {
                 // we need to consider
                 // - Live streams
                 // - Xtream Series Episode (has series_name and release_date)

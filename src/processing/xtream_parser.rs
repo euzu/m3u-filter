@@ -46,7 +46,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigI
 
     match serde_json::from_value::<XtreamSeriesInfo>(info.to_owned()) {
         Ok(series_info) => {
-            let result: Vec<(XtreamSeriesInfoEpisode, PlaylistItem)> = series_info.episodes.values().flatten().into_iter().map(|episode| {
+            let result: Vec<(XtreamSeriesInfoEpisode, PlaylistItem)> = series_info.episodes.values().flatten().map(|episode| {
                 let episode_url = create_xtream_series_info_url(url, username, password, episode);
                 (episode.clone(),
                 PlaylistItem {

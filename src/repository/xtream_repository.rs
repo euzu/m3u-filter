@@ -817,7 +817,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
                     break; // End of file
                 }
                 let len = usize::try_from(u32::from_le_bytes(len_bytes)).unwrap_or(0);
-                if len <= 0 {
+                if len == 0 {
                     break;
                 }
                 if len > buffer.len() {

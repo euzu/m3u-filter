@@ -533,7 +533,9 @@ pub async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let start_time = Instant::now();
     let (stats, errors) = process_sources(cfg.clone(), targets.clone()).await;
     // log errors
-    errors.iter().for_each(|err| error!("{}", err.message));
+    for err in &errors {
+        error!("{}", err.message);
+    }
     if let Ok(stats_msg) = serde_json::to_string(&serde_json::Value::Object(serde_json::map::Map::from_iter([("stats".to_string(), serde_json::to_value(stats).unwrap())]))) {
         // print stats
         info!("{}", stats_msg);

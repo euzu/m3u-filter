@@ -55,7 +55,7 @@ macro_rules! create_resolve_options_function_for_xtream_target {
 
 pub(in crate::processing) async fn playlist_resolve_download_playlist_item(pli: &PlaylistItem, input: &ConfigInput, errors: &mut Vec<M3uFilterError>, resolve_delay: u16, cluster: XtreamCluster) -> Option<String> {
     let mut result = None;
-    let Some(provider_id) = pli.get_provider_id() else { return None; };
+    let provider_id = pli.get_provider_id()?;
     if let Some(info_url) = download::get_xtream_player_api_info_url(input, cluster, provider_id) {
         result = match download::get_xtream_stream_info_content(&info_url, input).await {
             Ok(content) => Some(content),
