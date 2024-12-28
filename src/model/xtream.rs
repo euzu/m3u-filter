@@ -268,9 +268,9 @@ impl XtreamStream {
 pub struct XtreamSeriesInfoSeason {
     #[serde(default)]
     pub air_date: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     pub episode_count: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_or_number_u32")]
     pub id: u32,
     #[serde(default)]
     pub name: String,
@@ -287,7 +287,7 @@ pub struct XtreamSeriesInfoSeason {
 
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[allow(non_snake_case)]
 pub struct XtreamSeriesInfoInfo {
     #[serde(default)]
@@ -320,10 +320,9 @@ pub struct XtreamSeriesInfoInfo {
     category_id: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct XtreamSeriesInfoEpisodeInfo {
-    #[serde(deserialize_with = "opt_string_or_number_u32")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "opt_string_or_number_u32")]
     pub tmdb_id: Option<u32>,
     #[serde(default)]
     pub releasedate: String,
@@ -358,6 +357,7 @@ pub struct XtreamSeriesInfoEpisode {
     pub title: String,
     #[serde(default)]
     pub container_extension: String,
+    #[serde(default)]
     pub info: XtreamSeriesInfoEpisodeInfo,
     #[serde(default)]
     pub custom_sid: String,
@@ -407,8 +407,11 @@ impl XtreamSeriesEpisode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfo {
+    #[serde(default)]
     pub seasons: Vec<XtreamSeriesInfoSeason>,
+    #[serde(default)]
     pub info: XtreamSeriesInfoInfo,
+    #[serde(default)]
     pub episodes: HashMap<String, Vec<XtreamSeriesInfoEpisode>>,
 }
 
