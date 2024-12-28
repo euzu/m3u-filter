@@ -23,7 +23,10 @@ fn invalid_data(msg: &str) -> io::Error {
 
 fn deserialize_single<T: DeserializeOwned, R: Read>(reader: R) -> io::Result<T> {
     let next_obj = Deserializer::from_reader(reader).into_iter::<T>().next();
-    next_obj.map_or_else(|| Err(invalid_data("premature EOF")), |result| result.map_err(Into::into))
+    next_obj.map_or_else(
+        || Err(invalid_data("premature EOF")),
+        |result| result.map_err(Into::into),
+    )
 }
 
 fn yield_next_obj<T: DeserializeOwned, R: Read>(
@@ -55,7 +58,7 @@ fn yield_next_obj<T: DeserializeOwned, R: Read>(
 // https://stackoverflow.com/questions/68641157/how-can-i-stream-elements-from-inside-a-json-array-using-serde-json
 pub fn json_iter_array<T: DeserializeOwned, R: Read>(
     mut reader: R,
-) -> impl Iterator<Item=Result<T, io::Error>> {
+) -> impl Iterator<Item = Result<T, io::Error>> {
     let mut at_start = false;
     std::iter::from_fn(move || yield_next_obj(&mut reader, &mut at_start).transpose())
 }
@@ -66,17 +69,19 @@ pub fn json_filter_file(file_path: &Path, filter: &HashMap<&str, &str>) -> Vec<s
         return filtered; // Return early if the file does not exist
     }
 
-    let Ok(file) = File::open(file_path) else { return filtered };
+    let Ok(file) = File::open(file_path) else {
+        return filtered;
+    };
 
     let reader = BufReader::new(file);
     for entry in json_iter_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
         if let Some(item) = entry.as_object() {
             if filter.iter().all(|(&key, &value)| {
                 item.get(key).is_some_and(|field_value| match field_value {
-                        Value::String(s) => s == value,
-                        Value::Number(n) => value.parse::<i64>().ok() == n.as_i64(),
-                        _ => false,
-                    })
+                    Value::String(s) => s == value,
+                    Value::Number(n) => value.parse::<i64>().ok() == n.as_i64(),
+                    _ => false,
+                })
             }) {
                 filtered.push(entry);
             }
@@ -96,10 +101,10 @@ where
             serde_json::to_writer(&mut writer, value)?;
             match writer.flush() {
                 Ok(()) => Ok(()),
-                Err(e) => Err(e)
+                Err(e) => Err(e),
             }
         }
-        Err(e) => Err(e)
+        Err(e) => Err(e),
     }
 }
 
@@ -112,11 +117,12 @@ where
     match value {
         Value::Number(num) => {
             if let Some(v) = num.as_u64() {
-                u32::try_from(v).map_err(|_| serde::de::Error::custom("Number out of range for u32"))
+                u32::try_from(v)
+                    .map_err(|_| serde::de::Error::custom("Number out of range for u32"))
             } else {
                 Err(serde::de::Error::custom("Invalid number"))
             }
-        },
+        }
         Value::String(s) => s
             .parse::<u32>()
             .map_err(|_| serde::de::Error::custom("Invalid string number")),
@@ -140,7 +146,7 @@ where
             } else {
                 Err(serde::de::Error::custom("Invalid number"))
             }
-        },
+        }
         Value::String(s) => s
             .parse::<u32>()
             .map(Some)
@@ -166,16 +172,13 @@ where
     }
 }
 
-
 pub fn get_u64_from_serde_value(value: &Value) -> Option<u64> {
     match value {
         Value::Number(num_val) => num_val.as_u64(),
-        Value::String(str_val) => {
-            match str_val.parse::<u64>() {
-                Ok(val) => Some(val),
-                Err(_) => None
-            }
-        }
+        Value::String(str_val) => match str_val.parse::<u64>() {
+            Ok(val) => Some(val),
+            Err(_) => None,
+        },
         _ => None,
     }
 }
@@ -187,7 +190,13 @@ pub fn get_u32_from_serde_value(value: &Value) -> Option<u32> {
 pub fn get_string_from_serde_value(value: &Value) -> Option<String> {
     match value {
         Value::Number(num_val) => num_val.as_i64().map(|num| num.to_string()),
-        Value::String(str_val) => Some(str_val.clone()),
+        Value::String(str_val) => {
+            if str_val.is_empty() {
+                None
+            } else {
+                Some(str_val.clone())
+            }
+        }
         _ => None,
     }
 }
