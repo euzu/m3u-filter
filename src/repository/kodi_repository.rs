@@ -114,6 +114,7 @@ fn trim_whitespace(pattern: &Regex, input: &str) -> String {
 async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &KodiStyle, input_tmdb_indexes: &mut InputTmdbIndexMap, underscore_whitespace: bool) -> (PathBuf, String) {
     let separator = if underscore_whitespace { "_" } else { " " };
     let (name_1, year) = kodi_style_rename_year(&strm_item_info.title, style, strm_item_info.release_date.as_ref());
+    let mut series_year = year;
     let (name_2, season) = kodi_style_rename_season(&name_1, style, strm_item_info.season.as_ref());
     let (name_3, episode) = kodi_style_rename_episode(&name_2, style, strm_item_info.episode.as_ref());
     let name_4 = trim_whitespace(&style.whitespace, &style.alphanumeric.replace_all(&name_3, ""));
@@ -137,11 +138,17 @@ async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &
     filename.push(sanitized_name.clone());
 
     let dir_name = if let Some(series_name) = &strm_item_info.series_name {
-        series_name
-    } else { &name_4 };
+        let (folder_name, year) = kodi_style_rename_year(series_name, style, strm_item_info.release_date.as_ref());
+        if let (Some(y), Some(sy)) = (year, series_year) {
+            if y < sy {
+                series_year = year;
+            }
+        }
+        folder_name
+    } else { name_4 };
 
-    let sanitized_dir_name = sanitize_for_filename(dir_name, underscore_whitespace);
-    if let Some(value) = year {
+    let sanitized_dir_name = sanitize_for_filename(&dir_name, underscore_whitespace);
+    if let Some(value) = series_year {
         filename.push(format!("{separator}({value})"));
         file_dir.push(format!("{sanitized_dir_name}{separator}({value})"));
     } else {
