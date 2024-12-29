@@ -195,21 +195,21 @@ pub async fn playlist_resolve_series(cfg: &Config, target: &ConfigTarget,
     if !resolve_series { return; }
 
     if !playlist_resolve_series_info(cfg, errors, processed_fpl, resolve_delay).await { return; }
-    let mut series_playlist = process_series_info(cfg, provider_fpl, errors).await;
+    let series_playlist = process_series_info(cfg, provider_fpl, errors).await;
     if series_playlist.is_empty() { return; }
     // original content saved into original list
     for plg in &series_playlist {
         provider_fpl.update_playlist(plg);
     }
     // run processing pipe over new items
+    let mut new_playlist = series_playlist;
     for f in pipe {
-        let r = f(&mut series_playlist, target);
-        if let Some(v) = r {
-            series_playlist = v;
+        if let Some(v) = f(&mut new_playlist, target) {
+            new_playlist = v;
         }
     }
     // assign new items to the new playlist
-    for plg in &series_playlist {
+    for plg in &new_playlist {
         processed_fpl.update_playlist(plg);
     }
 }

@@ -17,6 +17,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::LazyLock;
+use serde::Serialize;
 
 struct KodiStyle {
     year: Regex,
@@ -27,11 +28,11 @@ struct KodiStyle {
 }
 
 static KODI_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
-    season: regex::Regex::new(r"[Ss]\d{1,2}").unwrap(),
-    episode: regex::Regex::new(r"[Ee]\d{1,2}").unwrap(),
-    year: regex::Regex::new(r"\d{4}").unwrap(),
-    whitespace: regex::Regex::new(r"\s+").unwrap(),
-    alphanumeric: regex::Regex::new(r"[^\w\s]").unwrap(),
+    season: Regex::new(r"[Ss]\d{1,2}").unwrap(),
+    episode: Regex::new(r"[Ee]\d{1,2}").unwrap(),
+    year: Regex::new(r"\d{4}").unwrap(),
+    whitespace: Regex::new(r"\s+").unwrap(),
+    alphanumeric: Regex::new(r"[^\w\s]").unwrap(),
 });
 
 fn sanitize_for_filename(text: &str, underscore_whitespace: bool) -> String {
@@ -71,23 +72,30 @@ fn kodi_style_rename_year(
     style: &KodiStyle,
     release_date: Option<&String>,
 ) -> (String, Option<u32>) {
-    let (new_name, possible_year) = extract_match(name, &style.year);
 
-    if let Some(year) = possible_year.as_deref() {
-        if let Ok(num_year) = year.parse::<u32>() {
-            let cur_year = u32::try_from(chrono::Utc::now().year()).unwrap_or(0);
-            if (1900..=cur_year).contains(&num_year) {
-                return (new_name, Some(num_year));
+    let mut years = Vec::new();
+
+    let cur_year = u32::try_from(chrono::Utc::now().year()).unwrap_or(0);
+    let new_name = style.year.replace_all(name, |caps: &regex::Captures| {
+        if let Ok(year) = caps[0].parse::<u32>() {
+            if (1900..=cur_year).contains(&year) {
+                years.push(year);
+                return String::new();
+            }
+        }
+        caps[0].to_string()
+    }).to_string();
+
+    let smallest_year = years.into_iter().min();
+    if smallest_year.is_none() {
+        if let Some(rel_date) = release_date {
+            if let Some(year) = extract_match(rel_date, &style.year).1.and_then(|y| y.parse::<u32>().ok()) {
+                return (name.to_string(), Some(year));
             }
         }
     }
 
-    if let Some(rel_date) = release_date {
-        if let Some(year) = extract_match(rel_date, &style.year).1.and_then(|y| y.parse::<u32>().ok()) {
-            return (name.to_string(), Some(year));
-        }
-    }
-    (name.to_string(), None)
+    (new_name, smallest_year)
 }
 
 fn trim_string_after_pos(input: &str, start_pos: usize) -> Option<String> {
@@ -112,25 +120,32 @@ async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &
     let title = &strm_item_info.series_name.as_ref()
         .filter(|&series_name| name_4.starts_with(series_name))
         .and_then(|series_name| trim_string_after_pos(&name_3, series_name.len()));
-    let tmdb_value = match strm_item_info.item_type {
+    let tmdb_id = if let Some(value) = match strm_item_info.item_type {
         PlaylistItemType::Series | PlaylistItemType::Video => get_tmdb_value(cfg, strm_item_info.provider_id, strm_item_info.input_id, input_tmdb_indexes, strm_item_info.item_type).await,
         _ => None,
-    };
+    } {
+        match value {
+            InputTmdbIndexValue::Video(vod_record) => vod_record.tmdb_id,
+            InputTmdbIndexValue::Series(episode) =>  episode.tmdb_id,
+        }
+    } else { 0 };
 
     let mut file_dir = vec![strm_item_info.group.to_string()];
     let mut filename = vec![];
 
-    let name = if let Some(series_name) = &strm_item_info.series_name {
-        series_name
-    } else { &name_4 };
-    let sanitized_name = sanitize_for_filename(name, underscore_whitespace);
+    let sanitized_name = sanitize_for_filename(&name_4, underscore_whitespace);
     filename.push(sanitized_name.clone());
 
+    let dir_name = if let Some(series_name) = &strm_item_info.series_name {
+        series_name
+    } else { &name_4 };
+
+    let sanitized_dir_name = sanitize_for_filename(dir_name, underscore_whitespace);
     if let Some(value) = year {
         filename.push(format!("{separator}({value})"));
-        file_dir.push(format!("{sanitized_name}{separator}({value})"));
+        file_dir.push(format!("{sanitized_dir_name}{separator}({value})"));
     } else {
-        file_dir.push(sanitized_name);
+        file_dir.push(sanitized_dir_name);
     }
 
     if let Some(value) = season {
@@ -145,15 +160,14 @@ async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &
         filename.push(format!("E{value:02}"));
     };
     if let Some(value) = title {
-        filename.push(format!("{separator}-{separator}{}", sanitize_for_filename(value, underscore_whitespace)));
+        let sanitized_value = sanitize_for_filename(&trim_whitespace(&style.whitespace, &style.alphanumeric.replace_all(value, "")), underscore_whitespace);
+        if !filename.iter().any(|e| e.contains(&sanitized_value)) {
+            filename.push(format!("{separator}-{separator}{sanitized_value}", ));
+        }
     }
 
-
-    if let Some(value) = tmdb_value {
-        match value {
-            InputTmdbIndexValue::Video(vod_record) => filename.push(format!("{separator}{{tmdb={}}}", vod_record.tmdb_id)),
-            InputTmdbIndexValue::Series(episode) => filename.push(format!("{separator}{{tmdb={}}}", episode.tmdb_id)),
-        }
+    if tmdb_id > 0 {
+        filename.push(format!("{separator}{{tmdb={tmdb_id}}}"));
     }
     let kodi_filename = filename.join("");
 
@@ -228,6 +242,7 @@ async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_id: u16,
     }
 }
 
+#[derive(Serialize)]
 struct StrmItemInfo {
     group: Rc<String>,
     title: Rc<String>,
