@@ -492,8 +492,7 @@ fn xtream_create_content_stream(xtream_iter: impl Iterator<Item=String>) -> impl
                 format!(",{line}")
             };
             Ok::<Bytes, String>(Bytes::from(line))
-        }))
-            .chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
+        })).chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
 }
 
 
@@ -544,8 +543,8 @@ pub fn xtream_api_register(cfg: &mut web::ServiceConfig) {
         ("/series", xtream_player_api_series_stream)]);
     register_xtream_api_timeshift!(cfg, [
         "/timeshift/{username}/{password}/{duration}/{start}/{stream_id}",
-       "/timeshift.php",
-       "/streaming/timeshift.php"]);
+        "/timeshift.php",
+        "/streaming/timeshift.php"]);
     /* TODO
     cfg.service(web::resource("/hlsr/{token}/{username}/{password}/{channel}/{hash}/{chunk}").route(web::get().to(xtream_player_api_hlsr_stream)));
     cfg.service(web::resource("/hls/{token}/{chunk}").route(web::get().to(xtream_player_api_hls_stream)));

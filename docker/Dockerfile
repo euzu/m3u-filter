@@ -48,7 +48,7 @@ CMD ["-s", "-p", "/config"]
 # Final container
 FROM alpine:latest as alpine-final
 
-RUN apk add --no-cache bash curl
+RUN apk add --no-cache bash curl ca-certificates tini
 
 WORKDIR /app
 
@@ -57,5 +57,5 @@ COPY --from=node-build /app/build web
 # config should be mounted as volume
 # COPY ./config config
 
-ENTRYPOINT ["/app/m3u-filter"]
+ENTRYPOINT ["/sbin/tini", "--", "/app/m3u-filter"]
 CMD ["-s", "-p", "/app/config"]

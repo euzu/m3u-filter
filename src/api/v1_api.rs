@@ -151,13 +151,13 @@ async fn playlist(
     req: web::Json<PlaylistRequest>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    return if let Some(input_id) = req.input_id {
+    if let Some(input_id) = req.input_id {
         get_playlist(app_state.config.get_input_by_id(input_id), &app_state.config).await
     } else {
         let url = req.url.as_deref().unwrap_or("");
         let input = create_config_input_for_url(url);
         get_playlist(Some(&input), &app_state.config).await
-    };
+    }
 }
 
 async fn config(
