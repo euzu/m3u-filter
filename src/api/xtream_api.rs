@@ -162,11 +162,11 @@ fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizati
     XtreamAuthorizationResponse::new(&server_info, user)
 }
 
-fn xtream_api_request_separate_number_and_rest(input: &str) -> (String, String) {
-    input.find('.').map_or_else(|| (input.to_string(), String::new()), |dot_index| {
+fn xtream_api_request_separate_number_and_remainder(input: &str) -> (String, Option<String>) {
+    input.find('.').map_or_else(|| (input.to_string(), None), |dot_index| {
         let number_part = input[..dot_index].to_string();
         let rest = input[dot_index..].to_string();
-        (number_part, rest)
+        (number_part, if rest.len() < 2 { None } else { Some(rest) })
     })
 }
 
@@ -182,7 +182,7 @@ async fn xtream_player_api_stream(
         debug!("Target has no xtream output {}", target_name);
         return HttpResponse::BadRequest().finish();
     }
-    let (action_stream_id, stream_ext) = xtream_api_request_separate_number_and_rest(stream_req.stream_id);
+    let (action_stream_id, stream_ext) = xtream_api_request_separate_number_and_remainder(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
@@ -193,18 +193,24 @@ async fn xtream_player_api_stream(
         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
     }
 
-    let query_path = if stream_req.action_path.is_empty() {
-        format!("{}{stream_ext}", pli.provider_id)
-    } else {
-        format!("{}/{}{stream_ext}", stream_req.action_path, pli.provider_id)
-    };
-
     if user.proxy == ProxyType::Redirect {
         debug_if_enabled!("Redirecting stream request to {}", mask_sensitive_info(&pli.url));
         return HttpResponse::Found().insert_header(("Location", mask_sensitive_info(pli.url.as_str()))).finish();
     }
 
-    let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input, stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()), true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
+    let extension = stream_ext.unwrap_or_else(
+        || xtream_api_request_separate_number_and_remainder(&pli.url).1.map_or_else(|| String::new(), |ext| ext));
+
+    let query_path = if stream_req.action_path.is_empty() {
+        format!("{}{extension}", pli.provider_id)
+    } else {
+        format!("{}/{}{extension}", stream_req.action_path, pli.provider_id)
+    };
+
+    let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input,
+        stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()),
+        true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}",
+        stream_req.context));
     debug_if_enabled!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
     let share_live_streams = is_stream_share_enabled(pli.item_type, target);
     stream_response(app_state, &stream_url, req, Some(input), share_live_streams).await
