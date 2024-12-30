@@ -199,7 +199,7 @@ async fn xtream_player_api_stream(
     }
 
     let extension = stream_ext.unwrap_or_else(
-        || xtream_api_request_separate_number_and_remainder(&pli.url).1.map_or_else(|| String::new(), |ext| ext));
+        || xtream_api_request_separate_number_and_remainder(&pli.url).1.map_or_else(String::new, |ext| ext));
 
     let query_path = if stream_req.action_path.is_empty() {
         format!("{}{extension}", pli.provider_id)

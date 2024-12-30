@@ -397,7 +397,12 @@ fn get_strm_url(credentials_and_server_info: Option<&(ProxyUserCredentials, ApiP
                              PlaylistItemType::Video => Some("movie"),
                              _ => None,
                          } {
-                             format!("{}/{stream_type}/{}/{}/{}",
+                             let url = str_item_info.url.as_str();
+                             let ext = url.find('.').map_or_else(String::new, |dot_index| {
+                                     let extension = url[dot_index..].to_string();
+                                     if extension.len() < 2 { String::new() } else { extension }
+                                 });
+                             format!("{}/{stream_type}/{}/{}/{}{ext}",
                                      server_info.get_base_url(),
                                      user.username,
                                      user.password,
