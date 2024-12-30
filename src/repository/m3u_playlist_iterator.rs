@@ -1,4 +1,3 @@
-use crate::api::api_utils::get_user_server_info;
 use crate::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
@@ -44,7 +43,7 @@ impl M3uPlaylistIterator {
         let include_type_in_url = target_options.is_some_and( |opts| opts.m3u_include_type_in_url);
         let mask_redirect_url = target_options.is_some_and(|opts| opts.m3u_mask_redirect_url);
 
-        let server_info = get_user_server_info(cfg, user);
+        let server_info = cfg.get_user_server_info(user);
         Ok(Self {
             reader,
             base_url: server_info.get_base_url(),

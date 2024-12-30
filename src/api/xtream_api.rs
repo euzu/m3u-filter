@@ -14,7 +14,7 @@ use log::{debug, error, warn, Level};
 use serde_json::{Map, Value};
 
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::api::api_utils::{get_user_server_info, get_user_target, get_user_target_by_credentials, is_stream_share_enabled, serve_file, stream_response};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_stream_share_enabled, serve_file, stream_response};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
@@ -158,7 +158,7 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_p
 }
 
 fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
-    let server_info = get_user_server_info(cfg, user);
+    let server_info = cfg.get_user_server_info(user);
     XtreamAuthorizationResponse::new(&server_info, user)
 }
 

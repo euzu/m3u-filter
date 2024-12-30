@@ -1,8 +1,8 @@
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::shared_stream::SharedStream;
-use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigInput, ConfigTarget};
+use crate::model::api_proxy::{ProxyUserCredentials};
+use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::utils::request_utils;
 use crate::utils::request_utils::mask_sensitive_info;
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
@@ -55,13 +55,6 @@ pub fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a AppState)
     let password = api_req.password.as_str().trim();
     get_user_target_by_credentials(username, password, api_req, app_state)
 }
-
-pub fn get_user_server_info(cfg: &Config, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
-    let server_info_list = cfg.t_api_proxy.read().unwrap().as_ref().unwrap().server.clone();
-    let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
-    server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), std::clone::Clone::clone)
-}
-
 
 /// Creates a notify stream for the given URL if a shared stream exists.
 async fn create_notify_stream(

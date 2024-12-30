@@ -12,13 +12,13 @@ use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::{XtreamMappingOptions, XtreamSeriesEpisode};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
-use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentWriter, IndexedDocumentDirectAccess};
+use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentWriter};
 use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
-use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
-use crate::{create_m3u_filter_error, create_m3u_filter_error_result, notify_err, info_err};
 use crate::utils::file_utils::open_readonly_file;
+use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
+use crate::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err};
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -391,6 +391,7 @@ pub async fn xtream_get_item_for_stream_id(
                 xtream_read_series_item_for_stream_id(config, virtual_id, &storage_path).await
             }
             PlaylistItemType::Series => {
+                // TODO reverse proxy mode not working when resolve_series
                 let mut item = xtream_read_series_item_for_stream_id(config, mapping.parent_virtual_id, &storage_path).await?;
                 item.provider_id = mapping.provider_id;
                 Ok(item)
@@ -829,7 +830,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
                 match bincode::deserialize(&buffer[0..len]) {
                     Ok(episode) => {
                         tree_record_index.insert(provider_id, episode);
-                    },
+                    }
                     Err(err) => {
                         error!("Failed to delete deserialize record WAL file for series episode {err}");
                     }

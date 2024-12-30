@@ -1,5 +1,6 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigTarget};
+use crate::model::api_proxy::{ApiProxyServerInfo, ProxyType, ProxyUserCredentials};
+use crate::model::config::{Config, ConfigTarget, TargetOutput};
 use crate::model::playlist::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::model::xtream::XtreamSeriesEpisode;
 use crate::repository::bplustree::BPlusTree;
@@ -11,13 +12,13 @@ use crate::{create_m3u_filter_error_result, notify_err};
 use chrono::Datelike;
 use log::error;
 use regex::Regex;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::LazyLock;
-use serde::Serialize;
 
 struct KodiStyle {
     year: Regex,
@@ -72,7 +73,6 @@ fn kodi_style_rename_year<'a>(
     style: &KodiStyle,
     release_date: Option<&'a String>,
 ) -> (&'a str, Option<u32>) {
-
     let mut years = Vec::new();
 
     let cur_year = u32::try_from(chrono::Utc::now().year()).unwrap_or(0);
@@ -136,7 +136,7 @@ async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &
     } {
         match value {
             InputTmdbIndexValue::Video(vod_record) => vod_record.tmdb_id,
-            InputTmdbIndexValue::Series(episode) =>  episode.tmdb_id,
+            InputTmdbIndexValue::Series(episode) => episode.tmdb_id,
         }
     } else { 0 };
 
@@ -264,6 +264,7 @@ struct StrmItemInfo {
     title: Rc<String>,
     item_type: PlaylistItemType,
     provider_id: Option<u32>,
+    virtual_id: u32,
     input_id: u16,
     url: Rc<String>,
     series_name: Option<String>,
@@ -278,6 +279,7 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
     let title = Rc::clone(&header.title);
     let item_type = header.item_type;
     let provider_id = header.get_provider_id();
+    let virtual_id = header.virtual_id;
     let input_id = header.input_id;
     // TODO reverse proxy url
     let url = Rc::clone(&header.url);
@@ -292,7 +294,7 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
         (series_name, release_date, season, episode)
     } else { (None, None, None, None) };
 
-    StrmItemInfo { group, title, item_type, provider_id, input_id, url, series_name, release_date, season, episode }
+    StrmItemInfo { group, title, item_type, provider_id, virtual_id, input_id, url, series_name, release_date, season, episode }
 }
 
 fn prepare_strm_output_directory(cleanup: bool, path: &PathBuf) -> Result<(), M3uFilterError> {
@@ -319,15 +321,23 @@ fn get_strm_output_options(target: &ConfigTarget) -> (bool, bool, bool) {
         |o| (o.underscore_whitespace, o.cleanup, o.kodi_style))
 }
 
-pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], filename: Option<&str>) -> Result<(), M3uFilterError> {
+pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], output: &TargetOutput) -> Result<(), M3uFilterError> {
     let mut result = Ok(());
     if !new_playlist.is_empty() {
-        if filename.is_none() {
+        if output.filename.is_none() {
             return Err(notify_err!("write strm playlist failed: ".to_string()));
         }
+        let credentials_and_server_info = output.username.as_ref()
+            .and_then(|username| cfg.get_user_credentials(username))
+            .filter(|credentials| credentials.proxy == ProxyType::Reverse)
+            .map(|credentials| {
+                let server_info = cfg.get_user_server_info(&credentials);
+                (credentials, server_info)
+            });
+
         let (underscore_whitespace, cleanup, kodi_style) = get_strm_output_options(target);
-        let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&filename.as_ref().unwrap()))) else {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Failed to get file path for {}", filename.unwrap_or(""));
+        let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&output.filename.as_ref().unwrap()))) else {
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Failed to get file path for {}", output.filename.as_deref().unwrap_or(""));
         };
         prepare_strm_output_directory(cleanup, &path)?;
         let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
@@ -353,10 +363,13 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                     error!("cant create directory: {output_path:?}");
                     return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to create directory for strm playlist:{output_path:?} {e}");
                 };
+
+                let url = get_strm_url(credentials_and_server_info.as_ref(), &str_item_info);
+
                 let file_path = output_path.join(format!("{strm_file_name}.strm"));
                 match File::create(&file_path) {
                     Ok(mut strm_file) => {
-                        match file_utils::check_write(&strm_file.write_all(str_item_info.url.as_bytes())) {
+                        match file_utils::check_write(&strm_file.write_all(url.as_bytes())) {
                             Ok(()) => {}
                             Err(err) => {
                                 error!("failed to write strm playlist: {err}");
@@ -373,4 +386,26 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
         }
     }
     result
+}
+
+fn get_strm_url(credentials_and_server_info: Option<&(ProxyUserCredentials, ApiProxyServerInfo)>, str_item_info: &StrmItemInfo) -> String {
+    let url = credentials_and_server_info.as_ref()
+        .map_or_else(|| str_item_info.url.to_string(),
+                     |(user, server_info)|
+                         if let Some(stream_type) = match str_item_info.item_type {
+                             PlaylistItemType::Series => Some("series"),
+                             PlaylistItemType::Live => Some("live"),
+                             PlaylistItemType::Video => Some("movie"),
+                             _ => None,
+                         } {
+                             format!("{}/{stream_type}/{}/{}/{}",
+                                     server_info.get_base_url(),
+                                     user.username,
+                                     user.password,
+                                     str_item_info.virtual_id)
+                         } else {
+                             str_item_info.url.to_string()
+                         },
+        );
+    url
 }

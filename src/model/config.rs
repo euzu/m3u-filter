@@ -18,7 +18,7 @@ use crate::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, P
 use crate::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::MsgKind;
-use crate::model::api_proxy::{ApiProxyConfig, ProxyUserCredentials};
+use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
@@ -318,11 +318,14 @@ pub struct ConfigTargetOptions {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TargetOutput {
     #[serde(alias = "type")]
     pub target: TargetType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -366,15 +369,25 @@ impl ConfigTarget {
         let mut m3u_cnt = 0;
         let mut strm_cnt = 0;
         let mut xtream_cnt = 0;
+        let mut strm_needs_xtream = false;
         for format in &self.output {
+            let has_username = if let Some(username) = &format.username { !username.trim().is_empty() } else { false };
+            let has_filename = if let Some(fname) = &format.filename { !fname.trim().is_empty() } else { false };
+
             match format.target {
                 TargetType::M3u => {
                     m3u_cnt += 1;
+                    if has_username {
+                        warn!("Username for target output m3u is ignored: {}", self.name);
+                    }
                 }
                 TargetType::Strm => {
                     strm_cnt += 1;
-                    if format.filename.is_none() {
+                    if !has_filename {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for strm type: {}", self.name);
+                    }
+                    if has_username {
+                        strm_needs_xtream = true;
                     }
                 }
                 TargetType::Xtream => {
@@ -382,10 +395,11 @@ impl ConfigTarget {
                     if default_as_default().eq_ignore_ascii_case(&self.name) {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unique target name is required for xtream type: {}", self.name);
                     }
-                    if let Some(fname) = &format.filename {
-                        if !fname.trim().is_empty() {
-                            warn!("Filename for target output xtream is ignored: {}", self.name);
-                        }
+                    if has_username {
+                        warn!("Username for target output xtream is ignored: {}", self.name);
+                    }
+                    if has_filename {
+                        warn!("Filename for target output xtream is ignored: {}", self.name);
                     }
                 }
             }
@@ -393,6 +407,10 @@ impl ConfigTarget {
 
         if m3u_cnt > 1 || strm_cnt > 1 || xtream_cnt > 1 {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Multiple output formats with same type : {}", self.name);
+        }
+
+        if strm_cnt > 0 && strm_needs_xtream && xtream_cnt == 0 {
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "strm output with a username is only permitted when used in combination with xtream output: {}", self.name);
         }
 
         if let Some(watch) = &self.watch {
@@ -903,6 +921,10 @@ impl Config {
         self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name_by_token(token)))
     }
 
+    pub fn get_user_credentials(&self, username: &str) -> Option<ProxyUserCredentials> {
+        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| api_proxy.get_user_credentials(username))
+    }
+
     pub fn get_input_by_id(&self, input_id: u16) -> Option<&ConfigInput> {
         for source in &self.sources {
             for input in &source.inputs {
@@ -1040,6 +1062,12 @@ impl Config {
                 }
             }
         }
+    }
+
+    pub fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
+        let server_info_list = self.t_api_proxy.read().unwrap().as_ref().unwrap().server.clone();
+        let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
+        server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), std::clone::Clone::clone)
     }
 }
 

@@ -297,4 +297,15 @@ impl ApiProxyConfig {
         }
         None
     }
+
+    pub fn get_user_credentials(&self,username: &str) -> Option<ProxyUserCredentials> {
+        let result = self.user.iter()
+            .flat_map(|target_user| &target_user.credentials)
+            .find(|credential| credential.username == username)
+            .cloned();
+        if result.is_none() {
+            debug!("Could not find any user {username}");
+        }
+        result
+    }
 }
