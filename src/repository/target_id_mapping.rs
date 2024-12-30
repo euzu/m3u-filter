@@ -13,7 +13,7 @@ use crate::repository::bplustree::BPlusTree;
 // TODO make configurable
 const EXPIRATION_DURATION: i64 = 86400;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct VirtualIdRecord {
     pub virtual_id: u32,
     pub provider_id: u32,

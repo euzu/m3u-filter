@@ -281,7 +281,6 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
     let provider_id = header.get_provider_id();
     let virtual_id = header.virtual_id;
     let input_id = header.input_id;
-    // TODO reverse proxy url
     let url = Rc::clone(&header.url);
     let (series_name, release_date, season, episode) = if header.item_type == PlaylistItemType::Series {
         let series_name = match header.get_field("name") {
@@ -389,7 +388,7 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
 }
 
 fn get_strm_url(credentials_and_server_info: Option<&(ProxyUserCredentials, ApiProxyServerInfo)>, str_item_info: &StrmItemInfo) -> String {
-    let url = credentials_and_server_info.as_ref()
+    credentials_and_server_info.as_ref()
         .map_or_else(|| str_item_info.url.to_string(),
                      |(user, server_info)|
                          if let Some(stream_type) = match str_item_info.item_type {
@@ -406,6 +405,5 @@ fn get_strm_url(credentials_and_server_info: Option<&(ProxyUserCredentials, ApiP
                          } else {
                              str_item_info.url.to_string()
                          },
-        );
-    url
+        )
 }

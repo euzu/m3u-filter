@@ -37,6 +37,7 @@ const TAG_DIRECT_SOURCE: &str = "direct_source";
 const TAG_PARENT_ID: &str = "parent_id";
 const TAG_MOVIE_DATA: &str = "movie_data";
 const TAG_STREAM_ID: &str = "stream_id";
+const TAG_ID: &str = "id";
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
@@ -246,10 +247,6 @@ pub async fn xtream_write_playlist(
             for pli in &plg.channels {
                 let mut header = pli.header.borrow_mut();
                 let col = match header.item_type {
-                    PlaylistItemType::Series => {
-                        // we skip resolved series, because this is only necessary when writing m3u files
-                        None
-                    }
                     PlaylistItemType::LiveUnknown | PlaylistItemType::LiveHls => {
                         header.category_id = *cat_id;
                         Some(&mut live_col)
@@ -391,10 +388,12 @@ pub async fn xtream_get_item_for_stream_id(
                 xtream_read_series_item_for_stream_id(config, virtual_id, &storage_path).await
             }
             PlaylistItemType::Series => {
-                // TODO reverse proxy mode not working when resolve_series
-                let mut item = xtream_read_series_item_for_stream_id(config, mapping.parent_virtual_id, &storage_path).await?;
-                item.provider_id = mapping.provider_id;
-                Ok(item)
+                if let Ok(mut item) = xtream_read_series_item_for_stream_id(config, mapping.parent_virtual_id, &storage_path).await {
+                    item.provider_id = mapping.provider_id;
+                    Ok(item)
+                } else {
+                    xtream_read_item_for_stream_id(config, virtual_id, &storage_path, XtreamCluster::Series).await
+                }
             }
             PlaylistItemType::Catchup => {
                 let cluster = try_cluster!(xtream_cluster, mapping.item_type, virtual_id)?;
@@ -624,7 +623,7 @@ pub async fn write_and_get_xtream_series_info<P>(
         let provider_url = pli_series_info.get_provider_url();
         for episode_list in episodes.values_mut().filter_map(Value::as_array_mut) {
             for episode in episode_list.iter_mut().filter_map(Value::as_object_mut) {
-                if let Some(provider_id) = episode.get("id").and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok())
+                if let Some(provider_id) = episode.get(TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok())
                 {
                     let uuid = hash_string(&format!("{provider_url}/{provider_id}"));
                     let episode_virtual_id = target_id_mapping.insert_entry(
@@ -634,7 +633,7 @@ pub async fn write_and_get_xtream_series_info<P>(
                         virtual_id,
                     );
                     episode.insert(
-                        "id".to_string(),
+                        TAG_ID.to_string(),
                         Value::String(episode_virtual_id.to_string()),
                     );
                 }
@@ -845,5 +844,18 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
         }
 
         Err(err) => Err(info_err!(format!("{err}"))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::io;
+    use crate::repository::bplustree::{BPlusTree};
+    use crate::repository::target_id_mapping::VirtualIdRecord;
+
+    #[test]
+    fn test() -> io::Result<()> {
+        Ok(())
     }
 }
