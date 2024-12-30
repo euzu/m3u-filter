@@ -386,7 +386,7 @@ impl PlaylistItem {
         M3uPlaylistItem {
             virtual_id: header.virtual_id,
             provider_id: Rc::clone(&header.id),
-            name: Rc::clone(&header.name),
+            name: Rc::clone(if header.item_type == PlaylistItemType::Series {&header.title} else {&header.name}),
             chno: Rc::clone(&header.chno),
             logo: Rc::clone(&header.logo),
             logo_small: Rc::clone(&header.logo_small),
@@ -409,7 +409,7 @@ impl PlaylistItem {
         XtreamPlaylistItem {
             virtual_id: header.virtual_id,
             provider_id,
-            name: Rc::clone(&header.name),
+            name: Rc::clone(if header.item_type == PlaylistItemType::Series {&header.title} else {&header.name}),
             logo: Rc::clone(&header.logo),
             logo_small: Rc::clone(&header.logo_small),
             group: Rc::clone(&header.group),

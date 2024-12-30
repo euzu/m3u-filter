@@ -39,7 +39,7 @@ fn create_xtream_series_info_url(url: &str, username: &str, password: &str, epis
     }
 }
 
-pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigInput) -> Result<Option<Vec<(XtreamSeriesInfoEpisode, PlaylistItem)>>, M3uFilterError> {
+pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &str, input: &ConfigInput) -> Result<Option<Vec<(XtreamSeriesInfoEpisode, PlaylistItem)>>, M3uFilterError> {
     let url = input.url.as_str();
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
@@ -53,7 +53,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, input: &ConfigI
                     header: RefCell::new(PlaylistItemHeader {
                         id: Rc::new(episode.id.to_string()),
                         uuid: Rc::new(hash_string(&episode_url)),
-                        name: Rc::new(episode.title.clone()),
+                        name: Rc::new(series_name.to_string()),
                         logo: Rc::new(episode.info.movie_image.clone()),
                         group: Rc::new(group_title.to_string()),
                         title: Rc::new(episode.title.clone()),

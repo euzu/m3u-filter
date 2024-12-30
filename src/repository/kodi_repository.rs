@@ -1,6 +1,6 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemType};
+use crate::model::playlist::{FieldAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::model::xtream::XtreamSeriesEpisode;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
@@ -67,35 +67,44 @@ fn kodi_style_rename_episode(name: &str, style: &KodiStyle, series_episode: Opti
     extract_season_or_episode_match_with_default(name, &style.episode, series_episode)
 }
 
-fn kodi_style_rename_year(
-    name: &str,
+fn kodi_style_rename_year<'a>(
+    name: &'a str,
     style: &KodiStyle,
-    release_date: Option<&String>,
-) -> (String, Option<u32>) {
+    release_date: Option<&'a String>,
+) -> (&'a str, Option<u32>) {
 
     let mut years = Vec::new();
 
     let cur_year = u32::try_from(chrono::Utc::now().year()).unwrap_or(0);
-    let new_name = style.year.replace_all(name, |caps: &regex::Captures| {
+    let mut new_name = String::with_capacity(name.len());
+    let mut last_index = 0;
+
+    for caps in style.year.captures_iter(name) {
         if let Ok(year) = caps[0].parse::<u32>() {
             if (1900..=cur_year).contains(&year) {
                 years.push(year);
-                return String::new();
+                let match_start = caps.get(0).unwrap().start();
+                let match_end = caps.get(0).unwrap().end();
+                new_name.push_str(&name[last_index..match_start]);
+                last_index = match_end;
             }
         }
-        caps[0].to_string()
-    }).to_string();
+    }
+    new_name.push_str(&name[last_index..]);
 
     let smallest_year = years.into_iter().min();
     if smallest_year.is_none() {
         if let Some(rel_date) = release_date {
-            if let Some(year) = extract_match(rel_date, &style.year).1.and_then(|y| y.parse::<u32>().ok()) {
-                return (name.to_string(), Some(year));
+            if let Some(year) = extract_match(rel_date, &style.year)
+                .1
+                .and_then(|y| y.parse::<u32>().ok())
+            {
+                return (name, Some(year));
             }
         }
     }
 
-    (new_name, smallest_year)
+    (Box::leak(new_name.into_boxed_str()), smallest_year)
 }
 
 fn trim_string_after_pos(input: &str, start_pos: usize) -> Option<String> {
@@ -113,9 +122,9 @@ fn trim_whitespace(pattern: &Regex, input: &str) -> String {
 
 async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &KodiStyle, input_tmdb_indexes: &mut InputTmdbIndexMap, underscore_whitespace: bool) -> (PathBuf, String) {
     let separator = if underscore_whitespace { "_" } else { " " };
-    let (name_1, year) = kodi_style_rename_year(&strm_item_info.title, style, strm_item_info.release_date.as_ref());
-    let mut series_year = year;
-    let (name_2, season) = kodi_style_rename_season(&name_1, style, strm_item_info.season.as_ref());
+    let (name_1, year_from_title) = kodi_style_rename_year(&strm_item_info.title, style, strm_item_info.release_date.as_ref());
+    let mut series_year = year_from_title;
+    let (name_2, season) = kodi_style_rename_season(name_1, style, strm_item_info.season.as_ref());
     let (name_3, episode) = kodi_style_rename_episode(&name_2, style, strm_item_info.episode.as_ref());
     let name_4 = trim_whitespace(&style.whitespace, &style.alphanumeric.replace_all(&name_3, ""));
     let title = &strm_item_info.series_name.as_ref()
@@ -144,7 +153,7 @@ async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &
                 series_year = year;
             }
         }
-        folder_name
+        trim_whitespace(&style.whitespace, &style.alphanumeric.replace_all(folder_name, ""))
     } else { name_4 };
 
     let sanitized_dir_name = sanitize_for_filename(&dir_name, underscore_whitespace);
@@ -273,7 +282,10 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
     // TODO reverse proxy url
     let url = Rc::clone(&header.url);
     let (series_name, release_date, season, episode) = if header.item_type == PlaylistItemType::Series {
-        let series_name = header.get_additional_property_as_str("series_name");
+        let series_name = match header.get_field("name") {
+            Some(name) if !name.is_empty() => Some(name.to_string()),
+            _ => header.get_additional_property_as_str("series_name"),
+        };
         let release_date = header.get_additional_property_as_str("release_date");
         let season = header.get_additional_property_as_str("season");
         let episode = header.get_additional_property_as_str("episode");

@@ -30,6 +30,13 @@ username=xt&password=xt
 GET {{local}}/m3u?username=xtream&password=xtream.secret
 
 
+### m3u playlist
+GET {{local}}/m3u?username=xt&password=xt
+
+### m3u playlist
+GET {{local}}/m3u?username=xt2&password=xt2
+
+
 ### xtream login
 GET {{local}}/player_api.php?username=xt&password=xt
 
@@ -53,9 +60,6 @@ GET {{local}}/player_api.php?username=xt&password=xt&action=get_series_categorie
 
 ### xtream series
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_series
-
-### xtream series for category
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_series&category_id=56
 
 ### xtream series for category
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_series&category_id=56
