@@ -400,7 +400,7 @@ fn get_strm_url(credentials_and_server_info: Option<&(ProxyUserCredentials, ApiP
                              _ => None,
                          } {
                              let url = str_item_info.url.as_str();
-                             let ext = extract_extension_from_url(url).map_or_else(String::new, |ext| ext.to_string());
+                             let ext = extract_extension_from_url(url).map_or_else(String::new, std::string::ToString::to_string);
                              format!("{}/{stream_type}/{}/{}/{}{ext}",
                                      server_info.get_base_url(),
                                      user.username,

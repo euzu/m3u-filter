@@ -370,11 +370,9 @@ pub fn extract_extension_from_url(url: &str) -> Option<&str> {
                 return Some(&path[last_dot_pos..]);
             }
         }
-    } else {
-        if let Some(last_dot_pos) = url.rfind('.') {
-            if last_dot_pos > url.rfind('/').unwrap_or(0) {
-                return Some(&url[last_dot_pos..]);
-            }
+    } else if let Some(last_dot_pos) = url.rfind('.') {
+        if last_dot_pos > url.rfind('/').unwrap_or(0) {
+            return Some(&url[last_dot_pos..]);
         }
     }
     None
