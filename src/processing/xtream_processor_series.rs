@@ -74,7 +74,8 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
 
     info!("Found {series_info_count} series info to resolve");
     let start_time = Instant::now();
-    let mut processed_series_info = 0;
+    let mut processed_series_info_count = 0;
+    let mut last_processed_series_info_count = 0;
     for pli in series_info_iter {
         let (should_update, provider_id, ts) = should_update_series_info(pli, &processed_info_ids);
         if should_update {
@@ -87,13 +88,16 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
                 content_updated = true;
             }
         }
-        processed_series_info += 1;
+        processed_series_info_count += 1;
         let elapsed = start_time.elapsed().as_secs();
         if elapsed > 0 && elapsed % 5 == 0 {
-            info!("resolved {processed_series_info}/{series_info_count} series info");
+            info!("resolved {processed_series_info_count}/{series_info_count} series info");
+            last_processed_series_info_count = processed_series_info_count;
         }
     }
-    info!("resolved {processed_series_info}/{series_info_count} series info");
+    if last_processed_series_info_count != processed_series_info_count {
+        info!("resolved {processed_series_info_count}/{series_info_count} series info");
+    }
     // content_wal contains the provider_id and series_info with episode listing
     // record_wal contains provider_id and timestamp
     if content_updated {

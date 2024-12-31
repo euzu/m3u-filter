@@ -41,9 +41,6 @@ pub fn epg_write(target: &ConfigTarget, cfg: &Config, target_path: &Path, epg: O
     if let Some(epg_data) = epg {
         match &output.target {
             TargetType::M3u => {
-                if output.filename.is_none() {
-                    return Err(notify_err!(format!("write epg for target {} failed: No filename set", target.name)));
-                }
                 let path = m3u_get_epg_file_path(target_path);
                 debug_if_enabled!("writing m3u epg to {}", path.to_str().unwrap_or("?"));
                 epg_write_file(target, epg_data, &path)?;

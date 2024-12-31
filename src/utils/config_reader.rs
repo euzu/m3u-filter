@@ -147,3 +147,14 @@ pub fn resolve_env_var(value: &str) -> String {
         env::var(var_name).unwrap_or_else(|_| format!("${{env:{var_name}}}"))
     }).to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::utils::config_reader::resolve_env_var;
+
+    #[test]
+    fn test_resolve() {
+       let resolved =  resolve_env_var("${env:HOME}");
+        assert_eq!(resolved, std::env::var("HOME").unwrap());
+    }
+}

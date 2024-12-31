@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::rc::Rc;
 
+use crate::utils::json_utils::{opt_string_or_number_u32, string_default_on_null, string_or_number_f64, string_or_number_u32};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
-use crate::utils::json_utils::{string_or_number_u32, string_or_number_f64, opt_string_or_number_u32};
 
 use crate::model::config::ConfigTargetOptions;
 use crate::model::playlist::{PlaylistItem, XtreamCluster, XtreamPlaylistItem};
@@ -266,23 +266,23 @@ impl XtreamStream {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoSeason {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub air_date: String,
     #[serde(default, deserialize_with = "string_or_number_u32")]
     pub episode_count: u32,
     #[serde(default, deserialize_with = "string_or_number_u32")]
     pub id: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub overview: String,
     #[serde(default, deserialize_with = "string_or_number_u32")]
     pub season_number: u32,
     #[serde(default, deserialize_with = "string_or_number_f64")]
     pub vote_average: f64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub cover: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub cover_big: String,
 
 }
@@ -290,31 +290,37 @@ pub struct XtreamSeriesInfoSeason {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[allow(non_snake_case)]
 pub struct XtreamSeriesInfoInfo {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub(crate) name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     cover: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     plot: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     cast: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     director: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     genre: String,
-    #[serde(default, alias = "release_date", alias = "releaseDate", alias = "releasedate")]
+    #[serde(
+        default,
+        alias = "release_date",
+        alias = "releaseDate",
+        alias = "releasedate",
+        deserialize_with = "string_default_on_null"
+    )]
     release_date: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     last_modified: String,
     #[serde(default, deserialize_with = "string_or_number_f64")]
     rating: f64,
     #[serde(default, deserialize_with = "string_or_number_f64")]
     rating_5based: f64,
-    #[serde(default)]
-    backdrop_path: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_as_string_array")]
+    pub backdrop_path: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "string_default_on_null")]
     youtube_trailer: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     episode_run_time: String,
     #[serde(default, deserialize_with = "string_or_number_u32")]
     category_id: u32,
@@ -324,15 +330,21 @@ pub struct XtreamSeriesInfoInfo {
 pub struct XtreamSeriesInfoEpisodeInfo {
     #[serde(default, deserialize_with = "opt_string_or_number_u32")]
     pub tmdb_id: Option<u32>,
-    #[serde(default, alias = "release_date", alias = "releaseDate", alias = "releasedate")]
+    #[serde(
+        default,
+        alias = "release_date",
+        alias = "releaseDate",
+        alias = "releasedate",
+        deserialize_with = "string_default_on_null"
+    )]
     pub releasedate: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub plot: String,
     #[serde(default, deserialize_with = "string_or_number_u32")]
     pub duration_secs: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub duration: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub movie_image: String,
     #[serde(default)]
     pub video: Value,
@@ -349,23 +361,23 @@ pub struct XtreamSeriesInfoEpisodeInfo {
 // Used for serde_json deserialization, can not be used with bincode
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfoEpisode {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub id: String,
     #[serde(default, deserialize_with = "string_or_number_u32")]
     pub episode_num: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub title: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub container_extension: String,
     #[serde(default)]
     pub info: XtreamSeriesInfoEpisodeInfo,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub custom_sid: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub added: String,
     #[serde(default, deserialize_with = "string_or_number_u32")]
     pub season: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_default_on_null")]
     pub direct_source: String,
 }
 
@@ -420,8 +432,9 @@ impl XtreamSeriesInfoEpisode {
     pub fn get_additional_properties(&self, series_info: &XtreamSeriesInfo) -> Option<Value> {
         let mut result = Map::new();
         let bdpath = &series_info.info.backdrop_path;
-        if !bdpath.is_empty() {
-            result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first()?))])));
+        let bdpath_is_set = bdpath.as_ref().map_or(false, |bdpath| !bdpath.is_empty());
+        if bdpath_is_set {
+            result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.as_ref().unwrap().first()?))])));
         }
         add_str_property_if_exists!(result, series_info.info.name.as_str(), "series_name");
         add_str_property_if_exists!(result, series_info.info.release_date, "series_release_date");

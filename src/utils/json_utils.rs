@@ -4,7 +4,7 @@ use std::io::{self, BufReader, BufWriter, Error, Read, Write};
 use std::path::Path;
 
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{self, Deserializer, Value};
 
 fn read_skipping_ws(mut reader: impl Read) -> io::Result<u8> {
@@ -199,4 +199,12 @@ pub fn get_string_from_serde_value(value: &Value) -> Option<String> {
         }
         _ => None,
     }
+}
+
+pub fn string_default_on_null<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Option<String> = Option::deserialize(deserializer)?;
+    Ok(value.unwrap_or_else(String::new))
 }
