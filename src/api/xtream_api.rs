@@ -26,7 +26,7 @@ use crate::model::playlist::{PlaylistItemType, XtreamCluster};
 use crate::repository::storage::{get_target_storage_path, hash_string};
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository;
-use crate::utils::request_utils::mask_sensitive_info;
+use crate::utils::request_utils::{extract_extension_from_url, mask_sensitive_info};
 use crate::utils::{download, json_utils, request_utils};
 
 const ACTION_GET_SERIES_INFO: &str = "get_series_info";
@@ -163,7 +163,7 @@ fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizati
 }
 
 fn xtream_api_request_separate_number_and_remainder(input: &str) -> (String, Option<String>) {
-    input.find('.').map_or_else(|| (input.to_string(), None), |dot_index| {
+    input.rfind('.').map_or_else(|| (input.to_string(), None), |dot_index| {
         let number_part = input[..dot_index].to_string();
         let rest = input[dot_index..].to_string();
         (number_part, if rest.len() < 2 { None } else { Some(rest) })
@@ -199,7 +199,7 @@ async fn xtream_player_api_stream(
     }
 
     let extension = stream_ext.unwrap_or_else(
-        || xtream_api_request_separate_number_and_remainder(&pli.url).1.map_or_else(String::new, |ext| ext));
+        || extract_extension_from_url(&pli.url).map_or_else(String::new, |ext| ext.to_string()));
 
     let query_path = if stream_req.action_path.is_empty() {
         format!("{}{extension}", pli.provider_id)

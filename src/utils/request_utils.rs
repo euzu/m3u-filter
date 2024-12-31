@@ -361,3 +361,21 @@ pub fn mask_sensitive_info(query: &str) -> String {
 
     masked_query.to_string()
 }
+
+pub fn extract_extension_from_url(url: &str) -> Option<&str> {
+    if let Some(protocol_pos) = url.find("://") {
+        if let Some(last_slash_pos) = url[protocol_pos + 3..].rfind('/') {
+            let path = &url[protocol_pos + 3 + last_slash_pos + 1..];
+            if let Some(last_dot_pos) = path.rfind('.') {
+                return Some(&path[last_dot_pos..]);
+            }
+        }
+    } else {
+        if let Some(last_dot_pos) = url.rfind('.') {
+            if last_dot_pos > url.rfind('/').unwrap_or(0) {
+                return Some(&url[last_dot_pos..]);
+            }
+        }
+    }
+    None
+}

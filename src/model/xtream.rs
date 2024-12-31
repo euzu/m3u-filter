@@ -302,8 +302,8 @@ pub struct XtreamSeriesInfoInfo {
     director: String,
     #[serde(default)]
     genre: String,
-    #[serde(default)]
-    releaseDate: String,
+    #[serde(default, alias = "release_date", alias = "releaseDate", alias = "releasedate")]
+    release_date: String,
     #[serde(default)]
     last_modified: String,
     #[serde(default, deserialize_with = "string_or_number_f64")]
@@ -324,7 +324,7 @@ pub struct XtreamSeriesInfoInfo {
 pub struct XtreamSeriesInfoEpisodeInfo {
     #[serde(default, deserialize_with = "opt_string_or_number_u32")]
     pub tmdb_id: Option<u32>,
-    #[serde(default)]
+    #[serde(default, alias = "release_date", alias = "releaseDate", alias = "releasedate")]
     pub releasedate: String,
     #[serde(default)]
     pub plot: String,
@@ -424,6 +424,7 @@ impl XtreamSeriesInfoEpisode {
             result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first()?))])));
         }
         add_str_property_if_exists!(result, series_info.info.name.as_str(), "series_name");
+        add_str_property_if_exists!(result, series_info.info.release_date, "series_release_date");
         add_str_property_if_exists!(result, self.added.as_str(), "added");
         add_str_property_if_exists!(result, series_info.info.cast.as_str(), "cast");
         add_str_property_if_exists!(result, self.container_extension.as_str(), "container_extension");
@@ -465,23 +466,17 @@ impl XtreamMappingOptions {
 }
 
 fn append_release_date(document: &mut serde_json::Map<String, Value>) {
-    // Do we really need releaseDate ?
-    let has_release_date_1 = document.contains_key("release_date");
-    let has_release_date_2 = document.contains_key("releaseDate");
-    if !(has_release_date_1 && has_release_date_2) {
-        let release_date = if has_release_date_1 {
-            document.get("release_date")
-        } else if has_release_date_2 {
-            document.get("releaseDate")
-        } else {
-            None
-        }.map_or_else(|| Value::Null, std::clone::Clone::clone);
-        if !&has_release_date_1 {
-            document.insert("release_date".to_string(), release_date.clone());
-        }
-        if !&has_release_date_2 {
-            document.insert("releaseDate".to_string(), release_date);
-        }
+    let release_date = document
+        .get("release_date")
+        .or_else(|| document.get("releaseDate"))
+        .cloned()
+        .unwrap_or(Value::Null);
+
+    if !document.contains_key("release_date") {
+        document.insert("release_date".to_string(), release_date.clone());
+    }
+    if !document.contains_key("releaseDate") {
+        document.insert("releaseDate".to_string(), release_date);
     }
 }
 

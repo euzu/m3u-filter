@@ -19,6 +19,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::LazyLock;
+use crate::utils::request_utils::extract_extension_from_url;
 
 struct KodiStyle {
     year: Regex,
@@ -287,7 +288,8 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
             Some(name) if !name.is_empty() => Some(name.to_string()),
             _ => header.get_additional_property_as_str("series_name"),
         };
-        let release_date = header.get_additional_property_as_str("release_date");
+        let release_date =  header.get_additional_property_as_str("series_release_date")
+            .or_else(|| header.get_additional_property_as_str("release_date"));
         let season = header.get_additional_property_as_str("season");
         let episode = header.get_additional_property_as_str("episode");
         (series_name, release_date, season, episode)
@@ -398,10 +400,7 @@ fn get_strm_url(credentials_and_server_info: Option<&(ProxyUserCredentials, ApiP
                              _ => None,
                          } {
                              let url = str_item_info.url.as_str();
-                             let ext = url.find('.').map_or_else(String::new, |dot_index| {
-                                     let extension = url[dot_index..].to_string();
-                                     if extension.len() < 2 { String::new() } else { extension }
-                                 });
+                             let ext = extract_extension_from_url(url).map_or_else(String::new, |ext| ext.to_string());
                              format!("{}/{stream_type}/{}/{}/{}{ext}",
                                      server_info.get_base_url(),
                                      user.username,
