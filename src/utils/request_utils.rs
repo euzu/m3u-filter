@@ -202,10 +202,10 @@ async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &
                 debug!("File downloaded successfully to {file_path:?}, took:{}", format_elapsed_time(elapsed));
                 Ok(file_path.to_path_buf())
             } else {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed with status {}", response.status())))
+                Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed with status {} {}", response.status(), mask_sensitive_info(url.as_str()))))
             }
         }
-        Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed: {err}"))),
+        Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed: {} {err}", mask_sensitive_info(url.as_str())))),
     }
 }
 
@@ -262,13 +262,13 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
                             Ok(decode_buffer)
                         }
                     }
-                    Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to read response {err}")))
+                    Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to read response {} {err}", mask_sensitive_info(url.as_str()))))
                 }
             } else {
-                Err(std::io::Error::new(ErrorKind::Other, format!("Request failed with status {}", response.status())))
+                Err(std::io::Error::new(ErrorKind::Other, format!("Request failed with status {} {}", response.status(), mask_sensitive_info(url.as_str()))))
             }
         }
-        Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {err}")))
+        Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {} {err}", mask_sensitive_info(url.as_str()))))
     }
 }
 

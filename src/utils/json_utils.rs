@@ -206,5 +206,5 @@ where
     D: serde::Deserializer<'de>,
 {
     let value: Option<String> = Option::deserialize(deserializer)?;
-    Ok(value.unwrap_or_else(String::new))
+    Ok(value.unwrap_or_default())
 }

@@ -435,7 +435,7 @@ impl XtreamSeriesInfoEpisode {
     pub fn get_additional_properties(&self, series_info: &XtreamSeriesInfo) -> Option<Value> {
         let mut result = Map::new();
         let bdpath = &series_info.info.backdrop_path;
-        let bdpath_is_set = bdpath.as_ref().map_or(false, |bdpath| !bdpath.is_empty());
+        let bdpath_is_set = bdpath.as_ref().is_some_and(|bdpath| !bdpath.is_empty());
         if bdpath_is_set {
             result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.as_ref().unwrap().first()?))])));
         }
