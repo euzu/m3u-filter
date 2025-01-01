@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::time::Instant;
-use log::info;
+use log::{info, log_enabled, Level};
 use crate::model::xtream::{XtreamSeriesEpisode, XtreamSeriesInfoEpisode};
 
 const TAG_SERIES_INFO_LAST_MODIFIED: &str = "last_modified";
@@ -88,11 +88,13 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
                 content_updated = true;
             }
         }
-        processed_series_info_count += 1;
-        let elapsed = start_time.elapsed().as_secs();
-        if elapsed > 0 && elapsed % 5 == 0 {
-            info!("resolved {processed_series_info_count}/{series_info_count} series info");
-            last_processed_series_info_count = processed_series_info_count;
+        if log_enabled!(Level::Info) {
+            processed_series_info_count += 1;
+            let elapsed = start_time.elapsed().as_secs();
+            if elapsed > 0 && elapsed % 30 == 0 {
+                info!("resolved {processed_series_info_count}/{series_info_count} series info");
+                last_processed_series_info_count = processed_series_info_count;
+            }
         }
     }
     if last_processed_series_info_count != processed_series_info_count {

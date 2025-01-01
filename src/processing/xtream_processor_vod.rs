@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::time::Instant;
-use log::info;
+use log::{info, log_enabled, Level};
 
 const TAG_VOD_INFO_INFO: &str = "info";
 const TAG_VOD_INFO_MOVIE_DATA: &str = "movie_data";
@@ -104,11 +104,13 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
                 }
             }
         }
-        processed_vod_info_count += 1;
-        let elapsed = start_time.elapsed().as_secs();
-        if elapsed > 0 && elapsed % 5 == 0 {
-            info!("resolved {processed_vod_info_count}/{vod_info_count} vod info");
-            last_processed_vod_info_count = processed_vod_info_count;
+        if log_enabled!(Level::Info) {
+            processed_vod_info_count += 1;
+            let elapsed = start_time.elapsed().as_secs();
+            if elapsed > 0 && elapsed % 30 == 0 {
+                info!("resolved {processed_vod_info_count}/{vod_info_count} vod info");
+                last_processed_vod_info_count = processed_vod_info_count;
+            }
         }
     }
     if last_processed_vod_info_count != processed_vod_info_count {
