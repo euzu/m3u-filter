@@ -186,6 +186,8 @@ fn init_logger(log_level: &str) {
     }
     log_builder.filter_module("actix_web::middleware::logger", LevelFilter::Error);
     log_builder.filter_module("reqwest::async_impl::client", LevelFilter::Error);
+    log_builder.filter_module("reqwest::connect", LevelFilter::Error);
+    log_builder.filter_module("hyper_util::client", LevelFilter::Error);
     log_builder.init();
     info!("Log Level {}", get_log_level(log_level));
 }

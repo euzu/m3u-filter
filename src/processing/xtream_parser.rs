@@ -104,39 +104,47 @@ pub fn parse_xtream(input: &ConfigInput,
 
             match map_to_xtream_streams(xtream_cluster, streams) {
                 Ok(xtream_streams) => {
-                    let group_map: HashMap::<Rc<String>, RefCell<XtreamCategory>> =
+                    let mut group_map: HashMap::<Rc<String>, RefCell<XtreamCategory>> =
                         xtream_categories.into_iter().map(|category|
                             (Rc::clone(&category.category_id), RefCell::new(category))
                         ).collect();
-
+                    let unknown_grp = RefCell::new(XtreamCategory {
+                        category_id: Rc::new("0".to_string()),
+                        category_name: Rc::new("Unknown".to_string()),
+                        channels: vec![],
+                    });
                     for stream in xtream_streams {
-                        if let Some(group) = group_map.get(&stream.category_id) {
-                            let mut grp = group.borrow_mut();
-                            let category_name = &grp.category_name;
-                            let stream_url = create_xtream_url(xtream_cluster, url, username, password, &stream);
-                            let item = PlaylistItem {
-                                header: RefCell::new(PlaylistItemHeader {
-                                    id: Rc::new(stream.get_stream_id().to_string()),
-                                    uuid: Rc::new(hash_string(&stream_url)),
-                                    name: Rc::clone(&stream.name),
-                                    logo: Rc::clone(&stream.stream_icon),
-                                    group: Rc::clone(category_name),
-                                    title: Rc::clone(&stream.name),
-                                    url: stream_url,
-                                    epg_channel_id: stream.epg_channel_id.clone(),
-                                    item_type: PlaylistItemType::from(xtream_cluster),
-                                    xtream_cluster,
-                                    additional_properties: stream.get_additional_properties(),
-                                    category_id: 0,
-                                    input_id,
-                                    ..Default::default()
-                                }),
-                            };
-                            grp.add(item);
-                        }
+                        let group = group_map.get(&stream.category_id).unwrap_or(&unknown_grp);
+                        let mut grp = group.borrow_mut();
+                        let category_name = &grp.category_name;
+                        let stream_url = create_xtream_url(xtream_cluster, url, username, password, &stream);
+                        let item = PlaylistItem {
+                            header: RefCell::new(PlaylistItemHeader {
+                                id: Rc::new(stream.get_stream_id().to_string()),
+                                uuid: Rc::new(hash_string(&stream_url)),
+                                name: Rc::clone(&stream.name),
+                                logo: Rc::clone(&stream.stream_icon),
+                                group: Rc::clone(category_name),
+                                title: Rc::clone(&stream.name),
+                                url: stream_url,
+                                epg_channel_id: stream.epg_channel_id.clone(),
+                                item_type: PlaylistItemType::from(xtream_cluster),
+                                xtream_cluster,
+                                additional_properties: stream.get_additional_properties(),
+                                category_id: 0,
+                                input_id,
+                                ..Default::default()
+                            }),
+                        };
+                        grp.add(item);
+                    }
+                    let has_channels = !unknown_grp.borrow().channels.is_empty();
+                    if has_channels {
+                        group_map.insert(Rc::new("0".to_string()), unknown_grp);
                     }
 
-                    Ok(Some(group_map.values().map(|category| {
+                    Ok(Some(group_map.values().filter(|category| !category.borrow().channels.is_empty())
+                        .map(|category| {
                         let cat = category.borrow();
                         PlaylistGroup {
                             id: cat.category_id.parse::<u32>().unwrap_or(0),

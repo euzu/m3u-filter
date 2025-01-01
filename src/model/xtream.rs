@@ -90,6 +90,7 @@ where
 
     match &value {
         Value::String(s) => Ok(Rc::new(s.to_owned())),
+        Value::Null => Ok(Rc::new(String::new())),
         _ => Ok(Rc::new(value.to_string())),
     }
 }
@@ -137,6 +138,8 @@ pub struct XtreamStream {
     pub direct_source: Rc<String>,
 
     // optional attributes
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    pub custom_sid: Option<Rc<String>>,
     #[serde(default, deserialize_with = "deserialize_as_string_array")]
     pub backdrop_path: Option<Vec<String>>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]

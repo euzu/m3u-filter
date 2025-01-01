@@ -9,6 +9,8 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::time::Instant;
+use log::info;
 
 const TAG_VOD_INFO_INFO: &str = "info";
 const TAG_VOD_INFO_MOVIE_DATA: &str = "movie_data";
@@ -76,9 +78,18 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
     let mut record_writer = BufWriter::new(&wal_record_file);
     let mut content_updated = false;
 
-    for pli in fpl.playlistgroups.iter()
+    let vod_info_iter = fpl.playlistgroups.iter()
         .flat_map(|plg| &plg.channels)
-        .filter(|&pli| pli.header.borrow().xtream_cluster == XtreamCluster::Video) {
+        .filter(|&pli| pli.header.borrow().xtream_cluster == XtreamCluster::Video);
+
+    let vod_info_count = vod_info_iter.clone().count();
+
+    info!("Found {vod_info_count} vod info to resolve");
+    let start_time = Instant::now();
+    let mut processed_vod_info_count = 0;
+    let mut last_processed_vod_info_count = 0;
+
+    for pli in  vod_info_iter {
         let (should_update, _provider_id, _ts) = should_update_vod_info(pli, &processed_info_ids);
         if should_update {
             if let Some(content) = playlist_resolve_download_playlist_item(pli, fpl.input, errors, resolve_delay, XtreamCluster::Video).await {
@@ -93,6 +104,15 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
                 }
             }
         }
+        processed_vod_info_count += 1;
+        let elapsed = start_time.elapsed().as_secs();
+        if elapsed > 0 && elapsed % 5 == 0 {
+            info!("resolved {processed_vod_info_count}/{vod_info_count} vod info");
+            last_processed_vod_info_count = processed_vod_info_count;
+        }
+    }
+    if last_processed_vod_info_count != processed_vod_info_count {
+        info!("resolved {processed_vod_info_count}/{vod_info_count} vod info");
     }
     if content_updated {
         handle_error!(content_writer.flush(),

@@ -135,7 +135,11 @@ fn exec_rename(pli: &PlaylistItem, rename: Option<&Vec<config::ConfigRename>>) {
             for r in renames {
                 let value = get_field_value(result, &r.field);
                 let cap = r.re.as_ref().unwrap().replace_all(value.as_str(), &r.new_name);
-                debug_if_enabled!("Renamed {}={} to {}", &r.field, value, cap);
+                if log::log_enabled!(log::Level::Debug) {
+                    if *value != cap {
+                        debug_if_enabled!("Renamed {}={} to {}", &r.field, value, cap);
+                    }
+                }
                 let value = cap.into_owned();
                 set_field_value(result, &r.field, Rc::new(value));
             }

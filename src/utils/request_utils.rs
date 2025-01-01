@@ -149,7 +149,9 @@ pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, cu
     }
     if log_enabled!(Level::Debug) {
         let he: HashMap<String, String> = headers.iter().map(|(k, v)| (k.to_string(), String::from_utf8_lossy(v.as_bytes()).to_string())).collect();
-        debug!("Request headers {:?}", he);
+        if !he.is_empty() {
+            debug!("Request headers {:?}", he);
+        }
     }
     headers
 }
@@ -250,13 +252,13 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
                         if decode_buffer.is_empty() {
                             match String::from_utf8(bytes.to_vec()) {
                                 Ok(decoded_content) => {
-                                    debug!("Request took:{} {}", format_elapsed_time(start_time.elapsed().as_secs()), mask_sensitive_info(url.to_string().as_str()));
+                                    debug_if_enabled!("Request took:{} {}", format_elapsed_time(start_time.elapsed().as_secs()), mask_sensitive_info(url.as_str()));
                                     Ok(decoded_content)
                                 }
                                 Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
                             }
                         } else {
-                            debug!("Request took:{},  {url:?}", format_elapsed_time(start_time.elapsed().as_secs()));
+                            debug_if_enabled!("Request took:{},  {}", format_elapsed_time(start_time.elapsed().as_secs()), mask_sensitive_info(url.as_str()));
                             Ok(decode_buffer)
                         }
                     }
