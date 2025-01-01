@@ -71,7 +71,6 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
         .filter(|&pli| pli.header.borrow().item_type == PlaylistItemType::SeriesInfo);
 
     let series_info_count = series_info_iter.clone().count();
-
     info!("Found {series_info_count} series info to resolve");
     let start_time = Instant::now();
     let mut processed_series_info_count = 0;

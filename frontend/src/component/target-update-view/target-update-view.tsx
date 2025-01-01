@@ -23,7 +23,7 @@ export default function TargetUpdateView(props: TargetUpdateViewProps) {
             selected.current.push(target);
         } else {
             const idx = selected.current.indexOf(target);
-            selected.current.slice(idx, 1);
+            selected.current.splice(idx, 1);
         }
     }, []);
 
