@@ -10,7 +10,7 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use crate::auth::user::UserCredential;
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use path_clean::PathClean;
 use url::Url;
 
@@ -199,8 +199,7 @@ pub enum SortOrder {
     Desc,
 }
 
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ProcessTargets {
     pub enabled: bool,
     pub inputs: Vec<u16>,
@@ -847,6 +846,14 @@ impl WebAuthConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct ScheduleConfig {
+    #[serde(default)]
+    pub schedule: String,
+    #[serde(default)]
+    pub targets: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub threads: u8,
@@ -860,7 +867,7 @@ pub struct Config {
     #[serde(default)]
     pub video: Option<VideoConfig>,
     #[serde(default)]
-    pub schedule: Option<String>,
+    pub schedules: Option<Vec<ScheduleConfig>>,
     #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]
@@ -1000,13 +1007,25 @@ impl Config {
                     }
                     target_names_check.insert(target_name);
                 }
-                // prepare templaes
+                // prepare templates
                 let prepare_result = match &self.templates {
                     Some(templ) => target.prepare(target_index, Some(templ)),
                     _ => target.prepare(target_index, None)
                 };
                 prepare_result?;
                 target_index += 1;
+            }
+
+            if let Some(schedules) = &self.schedules {
+                for schedule in schedules {
+                    if let Some(targets) = &schedule.targets {
+                        for target_name in targets {
+                            if !target_names_check.contains(target_name) {
+                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown target name in scheduler: {}", target_name);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1108,7 +1127,7 @@ pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigS
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "No target found for {}", missing_targets.join(", "));
         }
         let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
-        debug!("Processing targets {}", processing_targets.join(", "));
+        info!("Processing targets {}", processing_targets.join(", "));
     } else {
         enabled = false;
     }

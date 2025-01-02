@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::model::api_proxy::ApiProxyConfig;
-use crate::model::config::ProcessingOrder;
+use crate::model::config::{ProcessingOrder, ScheduleConfig};
 use crate::model::config::{ConfigApi, ConfigRename, ConfigSort, ConfigTargetOptions, InputType, MessagingConfig, TargetOutput, VideoConfig};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -44,7 +44,7 @@ pub struct ServerConfig {
     pub threads: u8,
     pub working_dir: String,
     pub backup_dir: Option<String>,
-    pub schedule: Option<String>,
+    pub schedules: Option<Vec<ScheduleConfig>>,
     pub sources: Vec<ServerSourceConfig>,
     pub messaging: Option<MessagingConfig>,
     pub video: Option<VideoConfig>,

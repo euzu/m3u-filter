@@ -70,7 +70,7 @@ Top level entries in the config files are:
 * `threads` _optional_
 * `messaging`  _optional_
 * `video` _optional_
-* `schedule` _optional_
+* `schedules` _optional_
 * `backup_dir` _optional_
 * `update_on_boot` _optional_
 * `web_ui_enabled` _optional_
@@ -152,13 +152,30 @@ video:
     episode_pattern: '.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*'
 ```
 
-### 1.5 `schedule`
+### 1.5 `schedules`
+For `version < 2.0.11`:
 Schedule is optional.
 Format is
 ```yaml
 #   sec  min   hour   day of month   month   day of week   year
 schedule: "0  0  8,20  *  *  *  *"
 ```
+
+For `version >= 2.0.11`
+Format is
+```yaml
+#   sec  min   hour   day of month   month   day of week   year
+schedules:
+- schedule: "0  0  8  *  *  *  *"
+  targets:
+  - m3u
+- schedule: "0  0  10  *  *  *  *"
+  targets:
+  - xtream
+- schedule: "0  0  20  *  *  *  *"
+```
+
+
 
 At the given times the complete processing is started. Do not start it every second or minute.
 You could be banned from your server. Twice a day should be enough.

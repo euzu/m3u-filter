@@ -198,7 +198,7 @@ async fn config(
         threads: config.threads,
         working_dir: config.working_dir.clone(),
         backup_dir: config.backup_dir.clone(),
-        schedule: config.schedule.clone(),
+        schedules: config.schedules.clone(),
         messaging: config.messaging.clone(),
         video: config.video.clone(),
         sources: config.sources.iter().map(map_source).collect(),

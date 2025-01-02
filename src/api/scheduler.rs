@@ -1,11 +1,11 @@
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use actix_web::web::Data;
 use chrono::{DateTime, FixedOffset, Local};
 use cron::Schedule;
 use log::error;
-use crate::api::model::app_state::AppState;
 use crate::exit;
+use crate::model::config::{Config, ProcessTargets};
 use crate::processing::playlist_processor::exec_processing;
 
 fn datetime_to_instant(datetime: DateTime<FixedOffset>) -> Instant {
@@ -24,7 +24,7 @@ fn datetime_to_instant(datetime: DateTime<FixedOffset>) -> Instant {
     Instant::now() + duration_until
 }
 
-pub async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
+pub async fn start_scheduler(expression: &str, config: Arc<Config>, targets: Arc<ProcessTargets>) -> ! {
     match Schedule::from_str(expression) {
         Ok(schedule) => {
             let offset = *Local::now().offset();
@@ -32,8 +32,8 @@ pub async fn start_scheduler(expression: &str, data: Data<AppState>) -> ! {
                 let mut upcoming = schedule.upcoming(offset).take(1);
                 if let Some(datetime) = upcoming.next() {
                     actix_web::rt::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
-                    exec_processing(data.config.clone(), data.targets.clone()).await;
-                }
+                    exec_processing(Arc::clone(&config), Arc::clone(&targets)).await;
+                 }
             }
         }
         Err(err) => exit!("Failed to start scheduler: {}", err)

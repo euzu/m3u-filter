@@ -32,7 +32,7 @@
 - breaking change virtual_id handling. You need to clear the data directory.
 - new content storage implementation with BPlusTree indexing.
 - api responses are now streamed directly from disk to avoid memory allocation.
-- fixed schedular implementation to only wake up on scheduled times.
+- fixed scheduler implementation to only wake up on scheduled times.
 - 
 # 2.0.5(2024-10-16)
 - input url supports now scheme `file://...` (which is not necessary because file paths are supported). Gzip files are also supported.     
@@ -169,7 +169,8 @@ messaging:
     bot_token: '<your telegram bot token>'
     chat_ids:
       - <your telegram chat_id>
-schedule: '0  0  0,8,18  *  *  *  *'
+schedules:
+  - schedule: '0  0  0,8,18  *  *  *  *'
 ```
 
 `api-proxy.yml`
