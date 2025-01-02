@@ -27,7 +27,7 @@ Content-Type: application/x-www-form-urlencoded
 username=xt&password=xt
 
 ### m3u playlist reverse
-GET {{local}}/m3u?username=xtream&password=xtream.secret
+GET {{local}}/m3u?username=m3u&password=m3u
 
 
 ### m3u playlist
@@ -50,7 +50,7 @@ GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_streams&cat
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_categories
 
 ### xtream vod streams
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=57
+GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=636
 
 ### xtream vod info
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_info&vod_id=7590

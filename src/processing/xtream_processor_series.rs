@@ -90,7 +90,7 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
         if log_enabled!(Level::Info) {
             processed_series_info_count += 1;
             let elapsed = start_time.elapsed().as_secs();
-            if elapsed > 0 && elapsed % 30 == 0 {
+            if elapsed > 0 &&  ((processed_series_info_count - last_processed_series_info_count) > 50) && (elapsed % 30 == 0) {
                 info!("resolved {processed_series_info_count}/{series_info_count} series info");
                 last_processed_series_info_count = processed_series_info_count;
             }

@@ -107,7 +107,7 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
         if log_enabled!(Level::Info) {
             processed_vod_info_count += 1;
             let elapsed = start_time.elapsed().as_secs();
-            if elapsed > 0 && elapsed % 30 == 0 {
+            if elapsed > 0 && ((processed_vod_info_count - last_processed_vod_info_count) > 50) && (elapsed % 30 == 0) {
                 info!("resolved {processed_vod_info_count}/{vod_info_count} vod info");
                 last_processed_vod_info_count = processed_vod_info_count;
             }
