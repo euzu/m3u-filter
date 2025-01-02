@@ -12,7 +12,7 @@ use async_std::prelude::Stream;
 use async_std::stream::StreamExt;
 use bytes::Bytes;
 use chrono::Utc;
-use log::{debug, error, Level};
+use log::{debug, error};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;

@@ -15,7 +15,7 @@ pub mod directed_graph;
 macro_rules! debug_if_enabled {
     ($fmt:expr, $( $args:expr ),*) => {
         if log::log_enabled!(log::Level::Debug) {
-            log::log!(Level::Debug, $fmt, $($args),*);
+            log::log!(log::Level::Debug, $fmt, $($args),*);
         }
     };
 

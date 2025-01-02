@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::{Cursor, Write};
 use std::path::{Path};
-use log::{Level};
 use quick_xml::{Writer};
 use crate::{debug_if_enabled, notify_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};

@@ -10,7 +10,7 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use futures::Stream;
-use log::{debug, error, warn, Level};
+use log::{debug, error, warn};
 use serde_json::{Map, Value};
 
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
