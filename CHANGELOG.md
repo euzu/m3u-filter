@@ -1,11 +1,12 @@
 # Changelog
-# 2.0.11 (2024-12-xx)
+# 2.0.11 (2025-01-xx)
 - watch files are now moved inside the `target` folder. Move them manually from `watch_<target_name>_<watched_group>.bin` to `<target_name>/watch_<watched_group>.bin` 
 - no error log for xtream api when content is skipped with options `xtream_skip_[live|vod|series]`
-- added live channel connection sharing in reverse proxy mode. To activate set `share_live_streams` in target options.
-- added `info` and `tmdb-id` caching for vod.
+- _experimental_:  added live channel connection sharing in reverse proxy mode. To activate set `share_live_streams` in target options.
+- added `info` and `tmdb-id` caching for vod and series with options `xtream_resolve_(series|vod)`.
 - The `kodi` format for movies can contain the `tmdb-id` (_optional_). To add the `tmdb-id` you can set now `kodi_style`,  `xtream_resolve_vod`, `xtream_resolve_vod_delay`, `xtream_resolve_series` and  `xtream_resolve_series_delay` to target options.
 - `kodi` output can now have `username` attribute to use reverse proxy mode when combined with `xtream` output.
+- Fixed webUI manual update for selected targets
 
 # 2.0.10 (2024-12-03)
 - added Target Output Option `m3u_include_type_in_url`, default false. This adds `live`, `movie`, `series` to the url of the stream in reverse proxy mode.
