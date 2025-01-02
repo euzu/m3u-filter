@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, XtreamCluster};
@@ -10,6 +11,7 @@ use log::{debug, info};
 use std::cmp::Ordering;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
+use crate::debug_if_enabled;
 
 const ACTION_GET_SERIES_INFO: &str = "get_series_info";
 const ACTION_GET_VOD_INFO: &str = "get_vod_info";
@@ -20,7 +22,7 @@ fn prepare_file_path(persist: Option<&str>, working_dir: &str, action: &str) -> 
         persist.map(|persist_path| file_utils::prepare_persist_path(persist_path, action));
     if persist_file.is_some() {
         let file_path = file_utils::get_file_path(working_dir, persist_file);
-        debug!("persist to file:  {file_path:?}");
+        debug_if_enabled!("persist to file:  {}", file_path.as_ref().map(|p| p.to_string_lossy()).unwrap_or(Cow::from("?")));
         file_path
     } else {
         None
@@ -37,53 +39,6 @@ pub async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &s
         Err(err) => (vec![], vec![err])
     }
 }
-//
-// pub async fn get_xtream_playlist_series(fpl: &mut FetchedPlaylist<'_>, process_uuids: HashSet<Rc<UUIDType>>, errors: &mut Vec<M3uFilterError>, resolve_delay: u16) -> Vec<PlaylistGroup> {
-//     let input = fpl.input;
-//     let mut result: Vec<PlaylistGroup> = vec![];
-//     for plg in &mut fpl.playlistgroups {
-//         let mut group_series: Vec<PlaylistItem> = vec![];
-//         for pli in &plg.channels {
-//             let (fetch_series, series_info_url) = {
-//                 let mut header = pli.header.borrow_mut();
-//                 let fetch_series = !header.series_fetched && header.item_type == PlaylistItemType::SeriesInfo && process_uuids.contains(header.get_uuid());
-//                 if fetch_series {
-//                     header.series_fetched = true;
-//                 }
-//                 (fetch_series, header.url.to_string())
-//             };
-//             if fetch_series {
-//                 match request_utils::get_input_json_content(fpl.input, series_info_url.as_str(), None).await {
-//                     Ok(series_content) => {
-//                         match parse_xtream_series_info(&series_content, pli.header.borrow().group.as_str(), input) {
-//                             Ok(series_info) => {
-//                                 if let Some(mut series) = series_info {
-//                                     group_series.append(&mut series);
-//                                 }
-//                             }
-//                             Err(err) => errors.push(err),
-//                         }
-//                     }
-//                     Err(err) => errors.push(err)
-//                 };
-//                 if resolve_delay > 0 {
-//                     actix_web::rt::time::sleep(std::time::Duration::new(u64::from(resolve_delay), 0)).await;
-//                 }
-//             }
-//         }
-//         if !group_series.is_empty() {
-//             let group = PlaylistGroup {
-//                 id: plg.id,
-//                 title: plg.title.clone(),
-//                 channels: group_series,
-//                 xtream_cluster: XtreamCluster::Series,
-//             };
-//             result.push(group);
-//         }
-//     }
-//     result
-// }
-
 
 pub fn get_xtream_player_api_action_url(input: &ConfigInput, action: &str) -> Option<String> {
     if let Some(user_info) = input.get_user_info() {
