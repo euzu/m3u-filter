@@ -7,6 +7,18 @@
 - The `kodi` format for movies can contain the `tmdb-id` (_optional_). To add the `tmdb-id` you can set now `kodi_style`,  `xtream_resolve_vod`, `xtream_resolve_vod_delay`, `xtream_resolve_series` and  `xtream_resolve_series_delay` to target options.
 - `kodi` output can now have `username` attribute to use reverse proxy mode when combined with `xtream` output.
 - Fixed webUI manual update for selected targets
+- Breaking change: multi scheduler config with optional targets. 
+```yaml
+#   sec  min   hour   day of month   month   day of week   year
+schedules:
+- schedule: "0  0  8  *  *  *  *"
+  targets:
+  - vod_channels
+- schedule: "0  0  10  *  *  *  *"
+  targets:
+  - series_channels
+- schedule: "0  0  20  *  *  *  *"
+```
 
 # 2.0.10 (2024-12-03)
 - added Target Output Option `m3u_include_type_in_url`, default false. This adds `live`, `movie`, `series` to the url of the stream in reverse proxy mode.
