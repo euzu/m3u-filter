@@ -19,6 +19,7 @@ use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::file_utils::open_readonly_file;
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 use crate::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err};
+use crate::model::api_proxy::{ ProxyUserCredentials};
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -414,8 +415,9 @@ pub async fn xtream_load_rewrite_playlist(
     config: &Config,
     target: &ConfigTarget,
     category_id: u32,
+    user: &ProxyUserCredentials,
 ) -> Result<Box<dyn Iterator<Item=String>>, M3uFilterError> {
-    Ok(Box::new(XtreamPlaylistIterator::new(cluster, config, target, category_id).await?))
+    Ok(Box::new(XtreamPlaylistIterator::new(cluster, config, target, category_id, user).await?))
 }
 
 pub async fn xtream_write_series_info(

@@ -2,13 +2,16 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::rc::Rc;
 
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
+use crate::model::config::ConfigTargetOptions;
+use crate::model::playlist::{PlaylistEntry, PlaylistItem, XtreamCluster, XtreamPlaylistItem};
 use crate::utils::json_utils::{opt_string_or_number_u32, string_default_on_null, string_or_number_f64, string_or_number_u32};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
-use crate::model::config::ConfigTargetOptions;
-use crate::model::playlist::{PlaylistItem, XtreamCluster, XtreamPlaylistItem};
+const PROP_BACKDROP_PATH: &str = "backdrop_path";
+const PROP_COVER: &str = "cover";
 
 const LIVE_STREAM_FIELDS: &[&str] = &[];
 
@@ -20,10 +23,11 @@ const VIDEO_STREAM_FIELDS: &[&str] = &[
 ];
 
 const SERIES_STREAM_FIELDS: &[&str] = &[
-    "backdrop_path", "cast", "cover", "director", "episode_run_time", "genre",
+    PROP_BACKDROP_PATH, "cast", PROP_COVER, "director", "episode_run_time", "genre",
     "last_modified", "name", "plot", "rating_5based",
     "stream_type", "title", "year", "youtube_trailer",
 ];
+
 
 fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     deserializer: D,
@@ -100,6 +104,7 @@ where
     D: Deserializer<'de>,
 {
     Value::deserialize(deserializer).map(|v| match v {
+        Value::String(value) => Some(vec![value]),
         Value::Array(value) => Some(value_to_string_array(&value)),
         _ => None,
     })
@@ -522,15 +527,34 @@ fn append_prepared_series_properties(add_props: Option<&Map<String, Value>>, doc
     }
 }
 
-pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options: &XtreamMappingOptions) -> serde_json::Value {
+fn make_bdpath_resource_url(resource_url: &str, bd_path: &str, index: usize) -> String {
+    if bd_path.starts_with("http") {
+        format!("{resource_url}/bd_path_{index}")
+    } else {
+        bd_path.to_string()
+    }
+}
+
+pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, options: &XtreamMappingOptions, user: &ProxyUserCredentials) -> serde_json::Value {
     let stream_id_value = Value::Number(serde_json::Number::from(pli.virtual_id));
+    let (resource_url, logo, logo_small) = match user.proxy {
+        ProxyType::Reverse => {
+            let resource_url = format!("{url}/resource/{}/{}/{}/{}", pli.xtream_cluster.as_stream_type(), user.username, user.password, pli.get_virtual_id());
+            let logo_url = if pli.logo.is_empty() { String::new() } else { format!("{resource_url}/logo") };
+            let logo_small_url = if pli.logo_small.is_empty() { String::new() } else { format!("{resource_url}/logo_small") };
+            (Some(resource_url), logo_url, logo_small_url)
+        }
+        ProxyType::Redirect => {
+            (None, pli.logo.as_ref().clone(), pli.logo_small.as_ref().clone())
+        }
+    };
     let mut document = serde_json::Map::from_iter([
         ("category_id".to_string(), Value::String(format!("{}", &pli.category_id))),
         ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(pli.category_id))]))),
         ("name".to_string(), Value::String(pli.name.as_ref().clone())),
         ("num".to_string(), stream_id_value.clone()),
         ("title".to_string(), Value::String(pli.title.as_ref().clone())),
-        ("stream_icon".to_string(), Value::String(pli.logo.as_ref().clone())),
+        ("stream_icon".to_string(), Value::String(logo)),
     ]);
 
     match pli.xtream_cluster {
@@ -541,7 +565,7 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options: &Xtrea
             } else {
                 document.insert("direct_source".to_string(), Value::String(pli.url.as_ref().clone()));
             }
-            document.insert("thumbnail".to_string(), Value::String(pli.logo_small.as_ref().clone()));
+            document.insert("thumbnail".to_string(), Value::String(logo_small));
             document.insert("custom_sid".to_string(), Value::String(String::new()));
             document.insert("epg_channel_id".to_string(), pli.epg_channel_id.as_ref().map_or(Value::Null, |epg_id| Value::String(epg_id.as_ref().clone())));
         }
@@ -584,5 +608,30 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, options: &Xtrea
             append_release_date(&mut document);
         }
     };
+
+    if let Some(rewrite_url) = resource_url {
+        if let Some(bdpath) = document.get(PROP_BACKDROP_PATH) {
+            match bdpath {
+                Value::String(bd_path) => {
+                    document.insert(PROP_BACKDROP_PATH.to_string(), Value::Array(vec![Value::String(make_bdpath_resource_url(rewrite_url.as_str(), bd_path, 0))]));
+                }
+                Value::Array(bd_path) => {
+                    document.insert(PROP_BACKDROP_PATH.to_string(), Value::Array(
+                        bd_path.iter()
+                            .filter_map(|val| val.as_str())
+                            .enumerate()
+                            .map(|(index, value)| Value::String(make_bdpath_resource_url(rewrite_url.as_str(), value, index)))
+                            .collect()));
+                }
+                _ => {}
+            };
+        }
+        if let Some(Value::String(cover)) = document.get(PROP_COVER) {
+            if cover.starts_with("http") {
+                document.insert(PROP_COVER.to_string(), Value::String(format!("{}/cover", rewrite_url.as_str())));
+            }
+        }
+    }
+
     Value::Object(document)
 }

@@ -50,23 +50,24 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
                 let result: Vec<(XtreamSeriesInfoEpisode, PlaylistItem)> = episodes.values().flatten().map(|episode| {
                     let episode_url = create_xtream_series_info_url(url, username, password, episode);
                     (episode.clone(),
-                    PlaylistItem {
-                        header: RefCell::new(PlaylistItemHeader {
-                            id: Rc::new(episode.id.to_string()),
-                            uuid: Rc::new(hash_string(&episode_url)),
-                            name: Rc::new(series_name.to_string()),
-                            logo: Rc::new(episode.info.as_ref().map_or_else(String::new, |info| info.movie_image.to_string())),
-                            group: Rc::new(group_title.to_string()),
-                            title: Rc::new(episode.title.clone()),
-                            url: episode_url,
-                            item_type: PlaylistItemType::Series,
-                            xtream_cluster: XtreamCluster::Series,
-                            additional_properties: episode.get_additional_properties(&series_info),
-                            category_id: 0,
-                            input_id: input.id,
-                            ..Default::default()
-                        })
-                    })}).collect();
+                     PlaylistItem {
+                         header: RefCell::new(PlaylistItemHeader {
+                             id: Rc::new(episode.id.to_string()),
+                             uuid: Rc::new(hash_string(&episode_url)),
+                             name: Rc::new(series_name.to_string()),
+                             logo: Rc::new(episode.info.as_ref().map_or_else(String::new, |info| info.movie_image.to_string())),
+                             group: Rc::new(group_title.to_string()),
+                             title: Rc::new(episode.title.clone()),
+                             url: episode_url,
+                             item_type: PlaylistItemType::Series,
+                             xtream_cluster: XtreamCluster::Series,
+                             additional_properties: episode.get_additional_properties(&series_info),
+                             category_id: 0,
+                             input_id: input.id,
+                             ..Default::default()
+                         })
+                     })
+                }).collect();
                 return if result.is_empty() { Ok(None) } else { Ok(Some(result)) };
             }
             Ok(None)
@@ -80,24 +81,24 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
 fn create_xtream_url(xtream_cluster: XtreamCluster, url: &str, username: &str, password: &str, stream: &XtreamStream) -> Rc<String> {
     if stream.direct_source.is_empty() {
         let stream_base_url = match xtream_cluster {
-            XtreamCluster::Live => format!("{}/live/{}/{}/{}.ts", url, username, password, &stream.get_stream_id()),
+            XtreamCluster::Live => format!("{url}/live/{username}/{password}/{}.ts", &stream.get_stream_id()),
             XtreamCluster::Video => {
                 let ext = stream.container_extension.as_ref().map_or("mp4", |e| e.as_str());
-                format!("{}/movie/{}/{}/{}.{}", url, username, password, &stream.get_stream_id(), ext)
+                format!("{url}/movie/{username}/{password}/{}.{ext}", &stream.get_stream_id())
             }
             XtreamCluster::Series =>
-                format!("{}/player_api.php?username={}&password={}&action=get_series_info&series_id={}",
-                        url, username, password, &stream.get_stream_id())
+                format!("{url}/player_api.php?username={username}&password={password}&action=get_series_info&series_id={}", &stream.get_stream_id())
         };
         Rc::new(stream_base_url)
     } else {
         Rc::clone(&stream.direct_source)
     }
 }
+
 pub fn parse_xtream(input: &ConfigInput,
-                           xtream_cluster: XtreamCluster,
-                           categories: &Value,
-                           streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
+                    xtream_cluster: XtreamCluster,
+                    categories: &Value,
+                    streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match map_to_xtream_category(categories) {
         Ok(xtream_categories) => {
             let input_id = input.id;
@@ -148,14 +149,14 @@ pub fn parse_xtream(input: &ConfigInput,
 
                     Ok(Some(group_map.values().filter(|category| !category.borrow().channels.is_empty())
                         .map(|category| {
-                        let cat = category.borrow();
-                        PlaylistGroup {
-                            id: cat.category_id.parse::<u32>().unwrap_or(0),
-                            xtream_cluster,
-                            title: Rc::clone(&cat.category_name),
-                            channels: cat.channels.clone(),
-                        }
-                    }).collect()))
+                            let cat = category.borrow();
+                            PlaylistGroup {
+                                id: cat.category_id.parse::<u32>().unwrap_or(0),
+                                xtream_cluster,
+                                title: Rc::clone(&cat.category_name),
+                                channels: cat.channels.clone(),
+                            }
+                        }).collect()))
                 }
                 Err(err) => Err(err)
             }

@@ -197,6 +197,9 @@ pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarge
 }
 
 pub async fn resource_response(_app_state: &AppState, resource_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
+    if resource_url.is_empty() {
+        return HttpResponse::NoContent().finish();
+    }
     let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
     debug_if_enabled!("Try to open resource {}", mask_sensitive_info(resource_url));
 

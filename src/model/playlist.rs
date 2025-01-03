@@ -3,15 +3,15 @@ use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-
+use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
 use crate::processing::m3u_parser::extract_id_from_url;
 use crate::repository::storage::hash_string;
 use crate::utils::json_utils::{get_string_from_serde_value, get_u64_from_serde_value};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
@@ -55,6 +55,13 @@ impl XtreamCluster {
             Self::Live => "Live",
             Self::Video => "Video",
             Self::Series => "Series",
+        }
+    }
+    pub const fn as_stream_type(&self) -> &str {
+        match self {
+            Self::Live => "live",
+            Self::Video => "movie",
+            Self::Series => "series",
         }
     }
 }
@@ -127,7 +134,7 @@ pub trait FieldSetAccessor {
     fn set_field(&mut self, field: &str, value: &str) -> bool;
 }
 
-pub type UUIDType = [u8;32];
+pub type UUIDType = [u8; 32];
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PlaylistItemHeader {
@@ -300,7 +307,7 @@ impl M3uPlaylistItem {
             match resource_url {
                 None => {
                     to_m3u_non_empty_fields!(self, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
-                },
+                }
                 Some(res_url) => {
                     to_m3u_resource_non_empty_fields!(self, res_url, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
                 }
@@ -319,7 +326,6 @@ impl M3uPlaylistItem {
 }
 
 impl PlaylistEntry for M3uPlaylistItem {
-
     #[inline]
     fn get_virtual_id(&self) -> u32 {
         self.virtual_id
@@ -388,13 +394,12 @@ pub struct XtreamPlaylistItem {
 }
 
 impl XtreamPlaylistItem {
-    pub fn to_doc(&self, options: &XtreamMappingOptions) -> Value {
-        xtream_playlistitem_to_document(self, options)
+    pub fn to_doc(&self, url: &str, options: &XtreamMappingOptions, user: &ProxyUserCredentials) -> Value {
+        xtream_playlistitem_to_document(self, url, options, user)
     }
 }
 
 impl PlaylistEntry for XtreamPlaylistItem {
-
     #[inline]
     fn get_virtual_id(&self) -> u32 {
         self.virtual_id
@@ -411,8 +416,61 @@ impl PlaylistEntry for XtreamPlaylistItem {
     fn get_provider_url(&self) -> Rc<String> {
         Rc::clone(&self.url)
     }
+}
+
+fn get_backdrop_path_value(field: &str, value: Option<&Value>) -> Option<Rc<String>> {
+    match value {
+        Some(Value::String(url)) => Some(Rc::new(url.clone())),
+        Some(Value::Array(values)) => {
+            match values.as_slice() {
+                [single] => Some(Rc::new(single.to_string())),
+                multiple if !multiple.is_empty() => {
+                    if let Some(index) = field.rfind('_') {
+                        if let Ok(bd_index) = field[index + 1..].parse::<usize>() {
+                            if let Some(selected) = multiple.get(bd_index) {
+                                return Some(Rc::new(selected.to_string()));
+                            }
+                        }
+                    }
+                    Some(Rc::new(multiple[0].to_string()))
+                }
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
 
 
+macro_rules! generate_field_accessor_impl_for_xtream_playlist_item {
+    ($($prop:ident),*;) => {
+        impl FieldGetAccessor for XtreamPlaylistItem {
+            fn get_field(&self, field: &str) -> Option<Rc<String>> {
+                match field {
+                    $(
+                        stringify!($prop) => Some(self.$prop.clone()),
+                    )*
+                     "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
+                    _ => {
+                       if field.starts_with("bakdrop_path") || field == "cover" {
+                            let props = self.additional_properties.as_ref().and_then(|add_props| serde_json::from_str::<Map<String, Value>>(add_props).ok());
+                            return match props {
+                                Some(doc) => {
+                                    return if field == "cover" {
+                                       doc.get("cover").and_then(|value| value.as_str().map(|s| Rc::new(s.to_string())))
+                                    } else {
+                                       get_backdrop_path_value(field, doc.get("backdrop_path"))
+                                    }
+                                }
+                                _=> None,
+                            }
+                        }
+                        None
+                    },
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -420,13 +478,15 @@ pub struct PlaylistItem {
     pub header: RefCell<PlaylistItemHeader>,
 }
 
+generate_field_accessor_impl_for_xtream_playlist_item!(name, logo, logo_small, group,title, parent_code, rec, url;);
+
 impl PlaylistItem {
     pub fn to_m3u(&self) -> M3uPlaylistItem {
         let header = self.header.borrow();
         M3uPlaylistItem {
             virtual_id: header.virtual_id,
             provider_id: Rc::clone(&header.id),
-            name: Rc::clone(if header.item_type == PlaylistItemType::Series {&header.title} else {&header.name}),
+            name: Rc::clone(if header.item_type == PlaylistItemType::Series { &header.title } else { &header.name }),
             chno: Rc::clone(&header.chno),
             logo: Rc::clone(&header.logo),
             logo_small: Rc::clone(&header.logo_small),
@@ -449,7 +509,7 @@ impl PlaylistItem {
         XtreamPlaylistItem {
             virtual_id: header.virtual_id,
             provider_id,
-            name: Rc::clone(if header.item_type == PlaylistItemType::Series {&header.title} else {&header.name}),
+            name: Rc::clone(if header.item_type == PlaylistItemType::Series { &header.title } else { &header.name }),
             logo: Rc::clone(&header.logo),
             logo_small: Rc::clone(&header.logo_small),
             group: Rc::clone(&header.group),
@@ -468,7 +528,6 @@ impl PlaylistItem {
 }
 
 impl PlaylistEntry for PlaylistItem {
-
     #[inline]
     fn get_virtual_id(&self) -> u32 {
         self.header.borrow().virtual_id
@@ -498,7 +557,6 @@ impl PlaylistEntry for PlaylistItem {
     fn get_provider_url(&self) -> Rc<String> {
         Rc::clone(&self.header.borrow().url)
     }
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

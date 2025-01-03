@@ -43,22 +43,37 @@ GET {{local}}/player_api.php?username=xt&password=xt
 ### xtream live_categories
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_categories
 
-### xtream live_streams
+### xtream live_streams reverse
+GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_live_streams&category_id=102
+
+### xtream live_streams redirect
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_streams&category_id=102
 
 ### xtream vod_categories
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_categories
 
-### xtream vod streams
+### xtream vod streams reverse
+GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_vod_streams&category_id=636
+
+### xtream vod streams redirect
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=636
 
-### xtream vod info
+### xtream vod info reverse
+GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_vod_info&vod_id=7590
+
+### xtream vod info redirect
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_info&vod_id=7590
 
-### xtream series_categories
+### xtream series_categories reverse
+GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_series_categories
+
+### xtream series_categories redirect
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_series_categories
 
-### xtream series
+### xtream series reverse
+GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_series
+
+### xtream series redirect
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_series
 
 ### xtream series for category
