@@ -1,5 +1,5 @@
 use crate::model::config::{ConfigInput, InputAffix, AFFIX_FIELDS};
-use crate::model::playlist::{FetchedPlaylist, FieldAccessor, PlaylistItem};
+use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor, PlaylistItem};
 use crate::{debug_if_enabled, valid_property};
 
 type AffixProcessor<'a> = Box<dyn Fn(&mut PlaylistItem) + 'a>;

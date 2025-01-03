@@ -195,3 +195,31 @@ async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Optio
 pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarget) -> bool {
     item_type == PlaylistItemType::Live && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
 }
+
+pub async fn resource_response(_app_state: &AppState, resource_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
+    let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
+    debug_if_enabled!("Try to open resource {}", mask_sensitive_info(resource_url));
+
+    if let Ok(url) = Url::parse(resource_url) {
+        let client = request_utils::get_client_request(input, &url, Some(&req_headers));
+        match client.send().await {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() {
+                    let mut response_builder = HttpResponse::Ok();
+                    response.headers().iter().for_each(|(k, v)| {
+                        response_builder.insert_header((k.as_str(), v.as_ref()));
+                    });
+                    return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
+                }
+                debug_if_enabled!("Failed to open resource got status {} for {}", status, mask_sensitive_info(resource_url));
+            }
+            Err(err) => {
+                error!("Received failure from server {}:  {}", mask_sensitive_info(resource_url), err);
+            }
+        }
+    } else {
+        error!("Url is malformed {}", mask_sensitive_info(resource_url));
+    }
+    HttpResponse::BadRequest().finish()
+}

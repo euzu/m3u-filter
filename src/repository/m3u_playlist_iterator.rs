@@ -9,6 +9,7 @@ use crate::repository::storage::ensure_target_storage_path;
 use crate::utils::file_lock_manager::FileReadGuard;
 
 pub const M3U_STREAM_PATH: &str = "m3u-stream";
+pub const M3U_RESOURCE_PATH: &str = "m3u-resource";
 
 pub struct M3uPlaylistIterator {
     reader: IndexedDocumentIterator<u32, M3uPlaylistItem>,
@@ -40,7 +41,7 @@ impl M3uPlaylistIterator {
                 .map_err(|err| info_err!(format!("Could not deserialize file {m3u_path:?} - {err}")))?;
 
         let target_options = target.options.as_ref();
-        let include_type_in_url = target_options.is_some_and( |opts| opts.m3u_include_type_in_url);
+        let include_type_in_url = target_options.is_some_and(|opts| opts.m3u_include_type_in_url);
         let mask_redirect_url = target_options.is_some_and(|opts| opts.m3u_mask_redirect_url);
 
         let server_info = cfg.get_user_server_info(user);
@@ -58,7 +59,7 @@ impl M3uPlaylistIterator {
         })
     }
 
-    fn get_stream_url(&self, m3u_pli: &M3uPlaylistItem, typed: bool) -> String {
+    fn get_rewritten_url(&self, m3u_pli: &M3uPlaylistItem, typed: bool, prefix_path: &str) -> String {
         if typed {
             let stream_type = match m3u_pli.item_type {
                 PlaylistItemType::Live
@@ -69,18 +70,26 @@ impl M3uPlaylistIterator {
                 PlaylistItemType::Series
                 | PlaylistItemType::SeriesInfo => "series",
             };
-            format!("{}/{M3U_STREAM_PATH}/{stream_type}/{}/{}/{}",
+            format!("{}/{prefix_path}/{stream_type}/{}/{}/{}",
                     &self.base_url,
                     &self.username,
                     &self.password,
                     m3u_pli.virtual_id
             )
         } else {
-            format!("{}/{M3U_STREAM_PATH}/{}/{}/{}",
+            format!("{}/{prefix_path}/{}/{}/{}",
                     &self.base_url, &self.username, &self.password, m3u_pli.virtual_id
             )
         }
     }
+
+    fn get_stream_url(&self, m3u_pli: &M3uPlaylistItem, typed: bool) -> String {
+        self.get_rewritten_url(m3u_pli, typed, M3U_STREAM_PATH)
+    }
+    fn get_resource_url(&self, m3u_pli: &M3uPlaylistItem) -> String {
+        self.get_rewritten_url(m3u_pli, false, M3U_RESOURCE_PATH)
+    }
+
 }
 
 impl Iterator for M3uPlaylistIterator {
@@ -94,19 +103,19 @@ impl Iterator for M3uPlaylistIterator {
 
         // TODO hls and unknown reverse proxy
         self.reader.next().map(|m3u_pli| {
-            let stream_url = match m3u_pli.item_type {
+            let rewrite_urls = match m3u_pli.item_type {
                 PlaylistItemType::LiveHls => None,
-                _ => match &self.proxy_type {
-                    ProxyType::Reverse => Some(self.get_stream_url(&m3u_pli, self.include_type_in_url)),
-                    ProxyType::Redirect => if self.mask_redirect_url {
-                        Some(self.get_stream_url(&m3u_pli,self.include_type_in_url))
-                    } else {
-                        None
-                    }
+                _ => if match &self.proxy_type {
+                    ProxyType::Reverse => true,
+                    ProxyType::Redirect => self.mask_redirect_url,
+                } {
+                    Some((self.get_stream_url(&m3u_pli, self.include_type_in_url), self.get_resource_url(&m3u_pli)))
+                } else {
+                    None
                 }
             };
             let target_options = self.target_options.as_ref();
-            m3u_pli.to_m3u(target_options, stream_url.as_deref())
+            m3u_pli.to_m3u(target_options, rewrite_urls.as_ref())
         })
     }
 }

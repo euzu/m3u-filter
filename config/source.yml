@@ -2,14 +2,15 @@ templates:
   - name: DE_CHAN
     value: >-
       Group ~ "(?i)^.DE.*Serien.*" OR
+  - name: TR_CHAN
+    value: >-
       Group ~ "(?i)^.TR.*Filme.*" OR
       Group ~ "(?i)^.TR.*Live.*"
   - name: FR_CHAN
     value: Group ~ "^.FR..*"
   - name: ALL_CHAN
     value: >-
-      !DE_CHAN! OR
-      !FR_CHAN!
+      !DE_CHAN! OR !TR_CHAN! OR !FR_CHAN!
 sources:
   - inputs:
       - enabled: true
@@ -32,7 +33,6 @@ sources:
         sort:
           groups:
             order: asc
-
         mapping:
           - France TNT
           - France Premium

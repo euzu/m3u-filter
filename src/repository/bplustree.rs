@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use crate::utils::file_utils::{open_read_write_file, rename_or_copy};
 
+// TODO replace ZLib with faster compression like lz4 or zstd
+
 const BINCODE_OVERHEAD: usize = 8;
 const BLOCK_SIZE: usize = 4096;
 const LEN_SIZE: usize = 4;

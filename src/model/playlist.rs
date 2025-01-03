@@ -120,8 +120,10 @@ impl Display for PlaylistItemType {
     }
 }
 
-pub trait FieldAccessor {
+pub trait FieldGetAccessor {
     fn get_field(&self, field: &str) -> Option<Rc<String>>;
+}
+pub trait FieldSetAccessor {
     fn set_field(&mut self, field: &str, value: &str) -> bool;
 }
 
@@ -217,10 +219,19 @@ macro_rules! to_m3u_non_empty_fields {
     };
 }
 
+macro_rules! to_m3u_resource_non_empty_fields {
+    ($header:expr, $url:expr, $line:expr, $(($prop:ident, $field:expr)),*;) => {
+        $(
+           if !$header.$prop.is_empty() {
+                $line = format!("{} {}=\"{}/{}\"", $line, $field, $url, stringify!($prop));
+            }
+         )*
+    };
+}
 
 macro_rules! generate_field_accessor_impl_for_playlist_item_header {
     ($($prop:ident),*;) => {
-        impl FieldAccessor for PlaylistItemHeader {
+        impl FieldGetAccessor for PlaylistItemHeader {
             fn get_field(&self, field: &str) -> Option<Rc<String>> {
                 match field {
                     $(
@@ -230,7 +241,8 @@ macro_rules! generate_field_accessor_impl_for_playlist_item_header {
                     _ => None,
                 }
             }
-
+         }
+         impl FieldSetAccessor for PlaylistItemHeader {
             fn set_field(&mut self, field: &str, value: &str) -> bool {
                 let val = String::from(value);
                 match field {
@@ -274,7 +286,10 @@ pub struct M3uPlaylistItem {
 }
 
 impl M3uPlaylistItem {
-    pub fn to_m3u(&self, target_options: Option<&ConfigTargetOptions>, url: Option<&str>) -> String {
+    pub fn to_m3u(&self, target_options: Option<&ConfigTargetOptions>, rewrite_urls: Option<&(String, String)>) -> String {
+        let (stream_url, resource_url) = rewrite_urls
+            .map_or_else(|| (self.url.as_str(), None), |(su, ru)| (su.as_str(), Some(ru.as_str())));
+
         let options = target_options.as_ref();
         let ignore_logo = options.is_some_and(|o| o.ignore_logo);
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",
@@ -282,7 +297,14 @@ impl M3uPlaylistItem {
                                self.name, self.group);
 
         if !ignore_logo {
-            to_m3u_non_empty_fields!(self, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
+            match resource_url {
+                None => {
+                    to_m3u_non_empty_fields!(self, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
+                },
+                Some(res_url) => {
+                    to_m3u_resource_non_empty_fields!(self, res_url, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
+                }
+            }
         }
 
         to_m3u_non_empty_fields!(self, line,
@@ -292,7 +314,7 @@ impl M3uPlaylistItem {
             (time_shift, "timeshift"),
             (rec, "tvg-rec"););
 
-        format!("{},{}\n{}", line, self.title, url.unwrap_or_else(|| self.url.as_str()))
+        format!("{},{}\n{}", line, self.title, stream_url)
     }
 }
 
@@ -326,6 +348,24 @@ impl PlaylistEntry for M3uPlaylistItem {
         Rc::clone(&self.url)
     }
 }
+
+macro_rules! generate_field_accessor_impl_for_m3u_playlist_item {
+    ($($prop:ident),*;) => {
+        impl FieldGetAccessor for M3uPlaylistItem {
+            fn get_field(&self, field: &str) -> Option<Rc<String>> {
+                match field {
+                    $(
+                        stringify!($prop) => Some(self.$prop.clone()),
+                    )*
+                     "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
+                    _ => None,
+                }
+            }
+        }
+    }
+}
+
+generate_field_accessor_impl_for_m3u_playlist_item!(provider_id, name, chno, logo, logo_small, group, title, parent_code, audio_track, time_shift, rec, url;);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamPlaylistItem {

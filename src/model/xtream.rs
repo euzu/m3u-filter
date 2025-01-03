@@ -373,7 +373,7 @@ pub struct XtreamSeriesInfoEpisode {
     #[serde(default, deserialize_with = "string_default_on_null")]
     pub container_extension: String,
     #[serde(default)]
-    pub info: XtreamSeriesInfoEpisodeInfo,
+    pub info: Option<XtreamSeriesInfoEpisodeInfo>,
     #[serde(default, deserialize_with = "string_default_on_null")]
     pub custom_sid: String,
     #[serde(default, deserialize_with = "string_default_on_null")]
@@ -414,7 +414,7 @@ impl XtreamSeriesEpisode {
             custom_sid: info_episode.custom_sid.to_string(),
             added: info_episode.added.to_string(),
             season: info_episode.season,
-            tmdb_id: info_episode.info.tmdb_id.unwrap_or(0),
+            tmdb_id: info_episode.info.as_ref().and_then(|info| info.tmdb_id).unwrap_or(0),
             direct_source: info_episode.direct_source.to_string(),
         }
     }
@@ -425,7 +425,7 @@ pub struct XtreamSeriesInfo {
     #[serde(default)]
     pub seasons: Vec<XtreamSeriesInfoSeason>,
     #[serde(default)]
-    pub info: XtreamSeriesInfoInfo,
+    pub info: Option<XtreamSeriesInfoInfo>,
     #[serde(default)]
     pub episodes: HashMap<String, Vec<XtreamSeriesInfoEpisode>>,
 }
@@ -434,28 +434,29 @@ pub struct XtreamSeriesInfo {
 impl XtreamSeriesInfoEpisode {
     pub fn get_additional_properties(&self, series_info: &XtreamSeriesInfo) -> Option<Value> {
         let mut result = Map::new();
-        let bdpath = &series_info.info.backdrop_path;
+        let info = series_info.info.as_ref();
+        let bdpath = info.and_then(|i| i.backdrop_path.as_ref());
         let bdpath_is_set = bdpath.as_ref().is_some_and(|bdpath| !bdpath.is_empty());
         if bdpath_is_set {
             result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.as_ref().unwrap().first()?))])));
         }
-        add_str_property_if_exists!(result, series_info.info.name.as_str(), "series_name");
-        add_str_property_if_exists!(result, series_info.info.release_date, "series_release_date");
+        add_str_property_if_exists!(result, info.map_or("", |i| i.name.as_str()), "series_name");
+        add_str_property_if_exists!(result, info.map_or("", |i| i.release_date.as_str()), "series_release_date");
         add_str_property_if_exists!(result, self.added.as_str(), "added");
-        add_str_property_if_exists!(result, series_info.info.cast.as_str(), "cast");
+        add_str_property_if_exists!(result, info.map_or("", |i| i.cast.as_str()), "cast");
         add_str_property_if_exists!(result, self.container_extension.as_str(), "container_extension");
-        add_str_property_if_exists!(result, self.info.movie_image, "cover");
-        add_str_property_if_exists!(result, series_info.info.director, "director");
-        add_str_property_if_exists!(result, series_info.info.episode_run_time, "episode_run_time");
-        add_str_property_if_exists!(result, series_info.info.last_modified, "last_modified");
-        add_str_property_if_exists!(result, self.info.plot, "plot");
-        add_str_property_if_exists!(result, series_info.info.rating, "rating");
-        add_f64_property_if_exists!(result, series_info.info.rating_5based, "rating_5based");
-        add_str_property_if_exists!(result, self.info.releasedate, "release_date");
+        add_str_property_if_exists!(result, self.info.as_ref().map_or("", |info| info.movie_image.as_str()), "cover");
+        add_str_property_if_exists!(result, info.map_or("", |i| i.director.as_str()), "director");
+        add_str_property_if_exists!(result, info.map_or("", |i| i.episode_run_time.as_str()), "episode_run_time");
+        add_str_property_if_exists!(result, info.map_or("", |i| i.last_modified.as_str()), "last_modified");
+        add_str_property_if_exists!(result, self.info.as_ref().map_or("", |info| info.plot.as_str()), "plot");
+        add_f64_property_if_exists!(result, info.map_or(0_f64, |i| i.rating), "rating");
+        add_f64_property_if_exists!(result, info.map_or(0_f64, |i| i.rating_5based), "rating_5based");
+        add_str_property_if_exists!(result, self.info.as_ref().map_or("", |info| info.releasedate.as_str()), "release_date");
         add_str_property_if_exists!(result, self.title, "title");
         add_i64_property_if_exists!(result, self.season, "season");
         add_i64_property_if_exists!(result, self.episode_num, "episode");
-        add_opt_i64_property_if_exists!(result, self.info.tmdb_id, "tmdb_id");
+        add_opt_i64_property_if_exists!(result, self.info.as_ref().and_then(|info| info.tmdb_id), "tmdb_id");
         if result.is_empty() { None } else { Some(Value::Object(result)) }
     }
 }

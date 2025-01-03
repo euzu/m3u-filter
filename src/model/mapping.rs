@@ -13,7 +13,7 @@ use regex::Regex;
 use crate::filter::{apply_templates_to_pattern, get_filter, prepare_templates, Filter, PatternTemplate, RegexWithCaptures, ValueProcessor};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{ItemField, AFFIX_FIELDS, COUNTER_FIELDS, MAPPER_ATTRIBUTE_FIELDS};
-use crate::model::playlist::{FieldAccessor, PlaylistItem};
+use crate::model::playlist::{FieldGetAccessor, FieldSetAccessor, PlaylistItem};
 use crate::utils::string_utils::Capitalize;
 use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err, valid_property};
 

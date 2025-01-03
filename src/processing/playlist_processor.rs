@@ -19,7 +19,7 @@ use crate::messaging::{send_message, MsgKind};
 use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, InputType,
                            ItemField, ProcessTargets, ProcessingOrder, SortOrder::{Asc, Desc}};
 use crate::model::mapping::{CounterModifier, Mapping, MappingValueProcessor};
-use crate::model::playlist::{FetchedPlaylist, FieldAccessor, PlaylistGroup, PlaylistItem, XtreamCluster};
+use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor, PlaylistGroup, PlaylistItem, XtreamCluster};
 use crate::model::stats::{InputStats, PlaylistStats};
 use crate::processing::affix_processor::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
