@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use std::fs::{File};
-use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
@@ -8,7 +8,8 @@ use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery};
 use crate::utils::file_utils;
 use log::error;
 use serde::{Deserialize, Serialize};
-use crate::utils::file_utils::{create_new_file_for_read_write, create_new_file_for_write, open_read_write_file, open_readonly_file};
+use tempfile::NamedTempFile;
+use crate::utils::file_utils::{create_new_file_for_read_write, open_read_write_file, open_readonly_file, rename_or_copy};
 
 const BLOCK_SIZE: usize = 4096;
 const LEN_SIZE: usize = 4;
@@ -456,18 +457,17 @@ where
             return Ok(());
         }
 
-        let gc_main_path = file_utils::append_extension(&self.main_path, ".gc");
-        let gc_index_path = file_utils::append_extension(&self.index_path, ".gc");
+        let gc_file = NamedTempFile::new()?;
+        let gc_path = gc_file.path();
         {
-            let mut gc_file = create_new_file_for_write(&gc_main_path)?;
-
             let mut key_offset = Vec::<(K, OffsetPointer)>::new();
             self.index_tree.traverse(|keys, values| {
                 keys.iter().zip(values.iter()).for_each(|(key, &offset)| key_offset.push((key.clone(), offset)));
             });
+            let mut gc_writer = BufWriter::new(&gc_file);
 
             let fragmented_byte = 0u8.to_le_bytes();
-            gc_file.write_all(&fragmented_byte)?;
+            gc_writer.write_all(&fragmented_byte)?;
 
             let mut gc_offset = 1usize; // offset is 1 because of fragment bit
             let mut buffer: Vec<u8> = Vec::with_capacity(BLOCK_SIZE);
@@ -484,23 +484,19 @@ where
                 buffer.resize(buf_size, 0u8);
                 self.main_file.read_exact(&mut buffer[0..buf_size])?;
 
-                gc_file.write_all(&size_bytes)?;
-                gc_file.write_all(&buffer[0..buf_size])?;
+                gc_writer.write_all(&size_bytes)?;
+                gc_writer.write_all(&buffer[0..buf_size])?;
 
                 let pointer = OffsetPointer::try_from(gc_offset).map_err(|err| Error::new(ErrorKind::Other, err))?;
                 self.index_tree.insert(key, pointer);
                 gc_offset += size_bytes.len() + buf_size; // gc_file.stream_position();
             }
 
-            gc_file.flush()?;
-            self.index_tree.store(&gc_index_path)?;
+            gc_writer.flush()?;
         }
 
-        let _ = std::fs::remove_file(&self.main_path);
-        let _ = std::fs::remove_file(&self.index_path);
-
-        std::fs::rename(&gc_main_path, &self.main_path)?;
-        std::fs::rename(&gc_index_path, &self.index_path)?;
+        rename_or_copy(gc_path, &self.main_path, false)?;
+        self.index_tree.store(&self.index_path)?;
 
         Ok(())
     }

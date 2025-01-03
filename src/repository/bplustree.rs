@@ -9,7 +9,7 @@ use flate2::Compression;
 use log::error;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
-use crate::utils::file_utils::{open_read_write_file};
+use crate::utils::file_utils::{open_read_write_file, rename_or_copy};
 
 const BINCODE_OVERHEAD: usize = 8;
 const BLOCK_SIZE: usize = 4096;
@@ -455,8 +455,8 @@ where
                 Ok(result) => {
                     file.flush()?;
                     drop(file);
-                    if let Err(err) = std::fs::rename(tempfile.path(), filepath) {
-                        return Err(Error::new(io::ErrorKind::Other, format!("Temp file renaming did not work {err}")));
+                    if let Err(err) = rename_or_copy(tempfile.path(), filepath, false) {
+                        return Err(Error::new(io::ErrorKind::Other, format!("Temp file rename/copy did not work {} {err}", tempfile.path().to_string_lossy())));
                     }
                     self.dirty = false;
                     Ok(result)

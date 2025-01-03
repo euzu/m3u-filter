@@ -163,10 +163,10 @@ pub fn check_write(res: &std::io::Result<()>) -> Result<(), std::io::Error> {
     }
 }
 
-pub fn append_extension(path: &Path, ext: &str) -> PathBuf {
-    let extension = path.extension().map(|ext| ext.to_str().unwrap_or(""));
-    path.with_extension(format!("{}{ext}", &extension.unwrap_or_default()))
-}
+// pub fn append_extension(path: &Path, ext: &str) -> PathBuf {
+//     let extension = path.extension().map(|ext| ext.to_str().unwrap_or(""));
+//     path.with_extension(format!("{}{ext}", &extension.unwrap_or_default()))
+// }
 
 
 #[inline]
@@ -182,22 +182,36 @@ pub fn append_or_crate_file(path: &Path) -> std::io::Result<File> {
     OpenOptions::new().create(true).append(true).open(path)
 }
 
-#[inline]
-pub fn create_new_file_for_write(path:&Path) -> std::io::Result<File> {
-    OpenOptions::new().write(true).create(true).truncate(true).open(path)
-}
+// #[inline]
+// pub fn create_new_file_for_write(path: &Path) -> std::io::Result<File> {
+//     OpenOptions::new().write(true).create(true).truncate(true).open(path)
+// }
 
 #[inline]
-pub fn create_new_file_for_read_write(path:&Path) -> std::io::Result<File> {
+pub fn create_new_file_for_read_write(path: &Path) -> std::io::Result<File> {
     OpenOptions::new().read(true).write(true).create(true).truncate(true).open(path)
 }
 
 #[inline]
-pub fn open_read_write_file(path:&Path) -> std::io::Result<File> {
+pub fn open_read_write_file(path: &Path) -> std::io::Result<File> {
     OpenOptions::new().read(true).write(true).create(false).truncate(false).open(path)
 }
 
 #[inline]
-pub fn open_readonly_file(path:&Path) -> std::io::Result<File> {
+pub fn open_readonly_file(path: &Path) -> std::io::Result<File> {
     OpenOptions::new().read(true).write(false).truncate(false).create(false).open(path)
+}
+
+pub fn rename_or_copy(src: &Path, dest: &Path, remove_old: bool) -> std::io::Result<()> {
+    // Try to rename the file
+    if fs::rename(src, dest).is_err() {
+        fs::copy(src, dest)?;
+        if remove_old {
+            if let Err(err) = fs::remove_file(src) {
+                error!("Could not delete file {} {err}", src.to_string_lossy());
+            }
+        }
+    }
+
+    Ok(())
 }
