@@ -1791,6 +1791,7 @@ dependencies = [
  "rpassword",
  "rust-argon2",
  "rustelebot",
+ "ruzstd",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2505,6 +2506,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruzstd"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c581601827da5c717bfae77d7b187e54293d23d8fb6b700b4b5e9b5828a13cc3"
+dependencies = [
+ "twox-hash",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2997,6 +3007,12 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
+
+[[package]]
+name = "twox-hash"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7b17f197b3050ba473acf9181f7b1d3b66d1cf7356c6cc57886662276e65908"
 
 [[package]]
 name = "typenum"

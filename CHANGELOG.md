@@ -7,7 +7,8 @@
 - The `kodi` format for movies can contain the `tmdb-id` (_optional_). To add the `tmdb-id` you can set now `kodi_style`,  `xtream_resolve_vod`, `xtream_resolve_vod_delay`, `xtream_resolve_series` and  `xtream_resolve_series_delay` to target options.
 - `kodi` output can now have `username` attribute to use reverse proxy mode when combined with `xtream` output.
 - Fixed webUI manual update for selected targets
-- Added m3u logo url rewrite in `reverse proxy` mode or with `m3u_mask_redirect_url` option. 
+- Added m3u logo url rewrite in `reverse proxy` mode or with `m3u_mask_redirect_url` option.
+- BPlusTree compression changed from zlib to zstd.
 - Breaking change: multi scheduler config with optional targets. 
 ```yaml
 #   sec  min   hour   day of month   month   day of week   year

@@ -5,16 +5,15 @@ use std::marker::PhantomData;
 use std::mem::size_of;
 use std::path::Path;
 
-use flate2::Compression;
 use log::error;
+use ruzstd::decoding::StreamingDecoder;
+use ruzstd::encoding::{compress_to_vec, CompressionLevel};
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use crate::utils::file_utils::{open_read_write_file, rename_or_copy};
 
-// TODO replace ZLib with faster compression like lz4 or zstd
-
-const BINCODE_OVERHEAD: usize = 8;
 const BLOCK_SIZE: usize = 4096;
+const BINCODE_OVERHEAD: usize = 8;
 const LEN_SIZE: usize = 4;
 const FLAG_SIZE: usize = 1;
 
@@ -236,9 +235,10 @@ where
             buffer_slice[write_pos..=write_pos].copy_from_slice(&compression_byte);
             write_pos += FLAG_SIZE;
             let content_bytes = if use_compression {
-                let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), Compression::fast());
-                encoder.write_all(&values_encoded)?;
-                encoder.finish()?
+                {
+                    // use ruzstd::io::Read;
+                    compress_to_vec(&*values_encoded, CompressionLevel::Fastest)
+                }
             } else {
                 values_encoded
             };
@@ -337,14 +337,12 @@ where
             };
 
             let values_bytes = if use_compression {
-                let mut decoder = flate2::write::ZlibDecoder::new(Vec::new());
-                decoder.write_all(&content_bytes)?;
-                &decoder.finish()?
+                decode_content(&content_bytes).unwrap_or(content_bytes)
             } else {
-                &content_bytes
+                content_bytes
             };
 
-            let values: Vec<V> = bincode_deserialize(values_bytes)?;
+            let values: Vec<V> = bincode_deserialize(&values_bytes)?;
             read_pos += values_length;
             values
         } else {
@@ -375,6 +373,24 @@ where
 
         Ok((Self { keys, children, is_leaf, values }, children_pointer))
     }
+}
+
+fn decode_content(content_bytes: &Vec<u8>) -> Option<Vec<u8>> {
+    if let Ok(mut decoder) = StreamingDecoder::new(&**content_bytes) {
+        let mut result = Vec::new();
+        if decoder.read_to_end(&mut result).is_ok() {
+            return Some(result)
+        }
+    }
+
+    // TODO remove at next deployment, this is only fallback for older compressed files
+    let mut decoder = flate2::write::ZlibDecoder::new(Vec::new());
+    if let Ok(()) = decoder.write_all(content_bytes) {
+        if let Ok(decoded) = decoder.finish() {
+            return Some(decoded);
+        }
+    }
+    None
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

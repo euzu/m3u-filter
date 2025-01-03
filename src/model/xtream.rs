@@ -423,11 +423,11 @@ impl XtreamSeriesEpisode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XtreamSeriesInfo {
     #[serde(default)]
-    pub seasons: Vec<XtreamSeriesInfoSeason>,
+    pub seasons: Option<Vec<XtreamSeriesInfoSeason>>,
     #[serde(default)]
     pub info: Option<XtreamSeriesInfoInfo>,
     #[serde(default)]
-    pub episodes: HashMap<String, Vec<XtreamSeriesInfoEpisode>>,
+    pub episodes: Option<HashMap<String, Vec<XtreamSeriesInfoEpisode>>>,
 }
 
 

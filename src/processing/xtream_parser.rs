@@ -10,7 +10,6 @@ use crate::model::config::ConfigInput;
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::model::xtream::{XtreamCategory, XtreamSeriesInfo, XtreamSeriesInfoEpisode, XtreamStream};
 use crate::repository::storage::hash_string;
-use crate::utils::request_utils::mask_sensitive_info;
 
 fn map_to_xtream_category(categories: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(categories.to_owned()) {
@@ -47,30 +46,33 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
 
     match serde_json::from_value::<XtreamSeriesInfo>(info.to_owned()) {
         Ok(series_info) => {
-            let result: Vec<(XtreamSeriesInfoEpisode, PlaylistItem)> = series_info.episodes.values().flatten().map(|episode| {
-                let episode_url = create_xtream_series_info_url(url, username, password, episode);
-                (episode.clone(),
-                PlaylistItem {
-                    header: RefCell::new(PlaylistItemHeader {
-                        id: Rc::new(episode.id.to_string()),
-                        uuid: Rc::new(hash_string(&episode_url)),
-                        name: Rc::new(series_name.to_string()),
-                        logo: Rc::new(episode.info.as_ref().map_or_else(String::new, |info| info.movie_image.to_string())),
-                        group: Rc::new(group_title.to_string()),
-                        title: Rc::new(episode.title.clone()),
-                        url: episode_url,
-                        item_type: PlaylistItemType::Series,
-                        xtream_cluster: XtreamCluster::Series,
-                        additional_properties: episode.get_additional_properties(&series_info),
-                        category_id: 0,
-                        input_id: input.id,
-                        ..Default::default()
-                    })
-                })}).collect();
-            if result.is_empty() { Ok(None) } else { Ok(Some(result)) }
+            if let Some(episodes) = &series_info.episodes {
+                let result: Vec<(XtreamSeriesInfoEpisode, PlaylistItem)> = episodes.values().flatten().map(|episode| {
+                    let episode_url = create_xtream_series_info_url(url, username, password, episode);
+                    (episode.clone(),
+                    PlaylistItem {
+                        header: RefCell::new(PlaylistItemHeader {
+                            id: Rc::new(episode.id.to_string()),
+                            uuid: Rc::new(hash_string(&episode_url)),
+                            name: Rc::new(series_name.to_string()),
+                            logo: Rc::new(episode.info.as_ref().map_or_else(String::new, |info| info.movie_image.to_string())),
+                            group: Rc::new(group_title.to_string()),
+                            title: Rc::new(episode.title.clone()),
+                            url: episode_url,
+                            item_type: PlaylistItemType::Series,
+                            xtream_cluster: XtreamCluster::Series,
+                            additional_properties: episode.get_additional_properties(&series_info),
+                            category_id: 0,
+                            input_id: input.id,
+                            ..Default::default()
+                        })
+                    })}).collect();
+                return if result.is_empty() { Ok(None) } else { Ok(Some(result)) };
+            }
+            Ok(None)
         }
         Err(err) => {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to process series info {} {}", &err, mask_sensitive_info(url))
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to process series info for {series_name} {err}")
         }
     }
 }
