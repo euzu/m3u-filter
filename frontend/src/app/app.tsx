@@ -30,9 +30,9 @@ export default function App(props: AppProps) {
     const [progress, setProgress] = useState<boolean>(false);
     const [playlist, setPlaylist] = useState<PlaylistGroup[]>([]);
     const [serverConfig, setServerConfig] = useState<ServerConfig>(undefined);
-    const [preferencesVisible, setPreferencesVisible] = useState<boolean>(false);
+    const [preferencesVisible, setPreferencesVisible] = useState<boolean>(true);
     const clipboardChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
-    const viewerRef = useRef<IPlaylistViewer>();
+    const viewerRef = useRef<IPlaylistViewer>(null);
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const services = useServices();
     const videoChannel = useMemo(() => new Subject<PlaylistItem>(), []);

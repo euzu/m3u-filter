@@ -13,7 +13,7 @@ interface SourceSelectorProps {
 }
 
 export default function SourceSelector(props: SourceSelectorProps) {
-    const textField = useRef<HTMLInputElement>();
+    const textField = useRef<HTMLInputElement>(null);
     const [popupVisible, setPopupVisible] = useState<{ x: number, y: number }>(undefined);
     const [sources, setSources] = useState<InputConfig[]>([]);
     const [selected, setSelected] = useState<InputConfig>(undefined);
@@ -23,6 +23,7 @@ export default function SourceSelector(props: SourceSelectorProps) {
     const handleDownload = useCallback(() => {
         const value = textField.current.value;
         if (value && value.trim().length > 0) {
+            // eslint-disable-next-line
             if (value.trim() == selected?.name) {
                 onDownload({input_id: selected.id});
             } else {

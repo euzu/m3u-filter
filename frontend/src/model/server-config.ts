@@ -151,12 +151,17 @@ export interface ServerApiConfig {
     web_root: string
 }
 
+export interface Schedule {
+    schedule: string;
+    targets: string[];
+}
+
 export interface ServerMainConfig {
     api: ServerApiConfig;
     threads: number;
     working_dir: string;
     backup_dir: string;
-    schedule: string;
+    schedules: Schedule[];
     messaging?: MessagingConfig;
     video?: VideoConfig;
 }

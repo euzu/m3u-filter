@@ -1,4 +1,4 @@
-import React, {useRef} from "react";
+import React, {JSX, useRef} from "react";
 import VideoPlayer from "../video-player/video-player";
 import {PlaylistItem} from "../../model/playlist";
 import {Observable} from "rxjs";

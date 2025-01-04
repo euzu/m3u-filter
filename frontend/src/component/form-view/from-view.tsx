@@ -4,6 +4,7 @@ import Checkbox from "../checkbox/checkbox";
 import TagSelect from "../tag-select/tags-select";
 import MapEditor from "../map-editor/map-editor";
 import TagInput from "../tag-input/tag-input";
+import ScheduleEditor from "../schedule-editor/schedule-editor";
 
 // export const isNumber = (value: string): boolean => {
 //     return !isNaN(value as any);
@@ -17,7 +18,8 @@ export enum FormFieldType {
     SINGLE_SELECT = 'single_select',
     CHECK = 'checkbox',
     TAGS = 'tags',
-    MAP = 'map'
+    MAP = 'map',
+    SCHEDULE = 'schedule'
 }
 
 export type FormField = {
@@ -71,6 +73,8 @@ export default function FormView(props: FormViewProps) {
                 return <div className="form-view__map-editor"><MapEditor onChange={handleChange} name={field.name} values={data?.[field.name]}></MapEditor></div>
             case FormFieldType.TAGS:
                 return <TagInput placeHolder={''} onChange={handleChange} name={field.name} values={data?.[field.name] || []}></TagInput>
+            case FormFieldType.SCHEDULE:
+                return <ScheduleEditor onChange={handleChange} name={field.name} values={data?.[field.name] || []} sources={data?.sources || []}></ScheduleEditor>
             case FormFieldType.NUMBER:
             case FormFieldType.TEXT:
             default:

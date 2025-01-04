@@ -9,7 +9,7 @@ interface PlaylistFilterProps {
 
 export default function PlaylistFilter(props: PlaylistFilterProps) {
     const {onFilter} = props;
-    const textField = useRef<HTMLInputElement>();
+    const textField = useRef<HTMLInputElement>(null);
     const [useRegexp, setUseRegexp] = useState<boolean>(false);
 
     const handleSearch = useCallback(() => {

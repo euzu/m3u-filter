@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from "react";
+import React, {JSX, useCallback, useState} from "react";
 import './sidebar.scss';
 import {getIconByName} from "../../icons/icons";
 /* eslint-disable @typescript-eslint/no-empty-interface */

@@ -754,7 +754,7 @@ pub struct ConfigDto {
     #[serde(default)]
     pub video: Option<VideoConfig>,
     #[serde(default)]
-    pub schedule: Option<String>,
+    pub schedules: Option<Vec<ScheduleConfig>>,
     #[serde(default)]
     pub messaging: Option<MessagingConfig>,
 }

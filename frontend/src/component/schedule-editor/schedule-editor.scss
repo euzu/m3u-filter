@@ -1,0 +1,37 @@
+@use '../../scss/common';
+@use '../../scss/preferences';
+
+$input-width: 150px;
+
+.schedule-editor {
+  display: flex;
+  flex-flow: column;
+  box-sizing: border-box;
+  gap: 2px;
+
+  &__schedule {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    padding: 6px;
+    height: 1.5rem;
+
+    input {
+      width: $input-width;
+      min-width: $input-width;
+      max-width: $input-width;
+    }
+    @include preferences.prefsInput();
+
+    &-toolbar {
+      display: flex;
+      flex-flow: row nowrap;
+      justify-content: flex-start;
+      gap: 2px;
+    }
+  }
+  button {
+    @include common.iconButton();
+  }
+
+}

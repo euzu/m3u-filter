@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {JSX, useEffect, useState} from 'react';
 import App from "../../app/app";
 import Login from "../login/login";
 import {useServices} from "../../provider/service-provider";
@@ -31,6 +31,6 @@ export default function Authentication(): JSX.Element {
         return <></>
     }
 
-    return <>{authenticated ?  <App/> : <Login/>}</>
+    return authenticated ?  <App/> : <Login/>
 
 }

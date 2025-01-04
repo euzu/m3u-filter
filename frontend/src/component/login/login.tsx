@@ -1,4 +1,4 @@
-import React, {useCallback, useRef, useState} from 'react';
+import React, {JSX, useCallback, useRef, useState} from 'react';
 import './login.scss';
 import {useServices} from "../../provider/service-provider";
 import {first} from "rxjs/operators";
@@ -7,8 +7,8 @@ const checkUserPwd = (username: string, password: string) => username.trim().len
 
 export default function Login(): JSX.Element {
 
-    const usernameRef = useRef<HTMLInputElement>();
-    const passwordRef = useRef<HTMLInputElement>();
+    const usernameRef = useRef<HTMLInputElement>(null);
+    const passwordRef = useRef<HTMLInputElement>(null);
     const services = useServices();
     const [authorized, setAuthorized] = useState(true);
 

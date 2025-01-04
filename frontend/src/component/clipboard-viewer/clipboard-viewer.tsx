@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {JSX, useCallback, useEffect, useState} from 'react';
 import './clipboard-viewer.scss';
 import {noop, Observable} from "rxjs";
 import copyToClipboard from "../../utils/clipboard";

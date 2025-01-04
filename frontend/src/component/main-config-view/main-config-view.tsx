@@ -28,7 +28,7 @@ const CONFIG_FIELDS = [
     {name: 'threads', label: 'Threads', fieldType: FormFieldType.NUMBER, validator: isNumber},
     {name: 'working_dir', label: 'Working dir', fieldType: FormFieldType.TEXT, validator: undefined},
     {name: 'backup_dir', label: 'Backup dir', fieldType: FormFieldType.TEXT, validator: undefined},
-    {name: 'schedule', label: 'Schedule', fieldType: FormFieldType.TEXT, validator: undefined},
+    {name: 'schedules', label: 'Schedules', fieldType: FormFieldType.SCHEDULE, validator: undefined},
 ];
 
 const CONFIG_MESSAGING_FIELDS = [
@@ -87,9 +87,10 @@ export default function MainConfigView(props: MainConfigViewProps) {
 
     const handleSave = useCallback(() => {
         if (mainConfig && apiConfig) {
+            let telegramConfigAvailable = telegramConfig?.bot_token?.trim().length && telegramConfig?.chat_ids?.length;
             const cfgMessaging: MessagingConfig = {
                 notify_on: messagingConfig.notify_on,
-                telegram: telegramConfig
+                telegram:   telegramConfigAvailable ? telegramConfig : null,
             };
 
             const cfgVideo = {
@@ -101,13 +102,11 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 api: apiConfig,
                 working_dir: mainConfig.working_dir,
                 backup_dir: mainConfig.backup_dir,
-                schedule: mainConfig.schedule,
+                schedules: mainConfig.schedules?.filter(s => s.schedule?.trim().length),
                 threads: mainConfig.threads,
                 messaging: cfgMessaging,
                 video: cfgVideo,
             };
-
-            //enqueueSnackbar("not implemented!", {variant: 'error'})
 
             services.config().saveMainConfig(cfgMain).subscribe({
                 next: () => enqueueSnackbar("Main config saved!", {variant: 'success'}),
