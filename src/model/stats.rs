@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display};
 use serde::{Serialize, Serializer};
 use crate::model::config::InputType;
 
@@ -49,3 +49,47 @@ impl Display for InputStats {
         serde_json::to_string(&self).map_or(Err(std::fmt::Error), |json_str| write!(f, "{json_str}"))
     }
 }
+
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TargetStats {
+    #[serde(rename = "target")]
+    pub name: String,
+    pub success: bool,
+}
+
+impl TargetStats {
+    pub fn success(name: &str) -> Self {
+        Self  {name: name.to_string(), success: true}
+    }
+    pub fn failure(name: &str) -> Self {
+        Self  {name: name.to_string(), success: false}
+    }
+}
+
+impl Display for TargetStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        serde_json::to_string(&self).map_or(Err(std::fmt::Error), |json_str| write!(f, "{json_str}"))
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SourceStats {
+    #[serde(rename = "inputs")]
+    pub inputs: Vec<InputStats>,
+    #[serde(rename = "targets")]
+    pub targets: Vec<TargetStats>,
+}
+
+impl SourceStats {
+    pub fn new(inputs: Vec<InputStats>, targets: Vec<TargetStats>)->Self {
+        Self {inputs, targets}
+    }
+}
+
+impl Display for SourceStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        serde_json::to_string(&self).map_or(Err(std::fmt::Error), |json_str| write!(f, "{json_str}"))
+    }
+}
+

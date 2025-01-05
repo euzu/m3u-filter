@@ -20,7 +20,7 @@ use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, Inp
                            ItemField, ProcessTargets, ProcessingOrder, SortOrder::{Asc, Desc}};
 use crate::model::mapping::{CounterModifier, Mapping, MappingValueProcessor};
 use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor, PlaylistGroup, PlaylistItem, XtreamCluster};
-use crate::model::stats::{InputStats, PlaylistStats};
+use crate::model::stats::{SourceStats, InputStats, TargetStats, PlaylistStats};
 use crate::processing::affix_processor::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
 use crate::processing::xmltv_parser::flatten_tvguide;
@@ -289,10 +289,11 @@ fn is_target_enabled(target: &ConfigTarget, user_targets: &ProcessTargets) -> bo
     (!user_targets.enabled && target.enabled) || (user_targets.enabled && user_targets.has_target(target.id))
 }
 
-async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
+async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<TargetStats>, Vec<M3uFilterError>) {
     let source = cfg.sources.get(source_idx).unwrap();
     let mut errors = vec![];
-    let mut stats = HashMap::<u16, InputStats>::new();
+    let mut input_stats = HashMap::<u16, InputStats>::new();
+    let mut target_stats = Vec::<TargetStats>::new();
     let mut source_playlists = Vec::new();
     let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
     // Downlod the sources
@@ -330,8 +331,8 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
                 );
             }
             let elapsed = start_time.elapsed().as_secs();
-            stats.insert(input_id, create_input_stat(group_count, channel_count, error_list.len(),
-                                                     input.input_type.clone(), &input_name, elapsed));
+            input_stats.insert(input_id, create_input_stat(group_count, channel_count, error_list.len(),
+                                                           input.input_type.clone(), &input_name, elapsed));
         }
     }
     if source_playlists.is_empty() {
@@ -341,14 +342,19 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         debug_if_enabled!("Source has {} groups", source_playlists.iter().map(|fpl| fpl.playlistgroups.len()).sum::<usize>());
         for target in &source.targets {
             if is_target_enabled(target, &user_targets) {
-                match process_playlist(&mut source_playlists, target, &cfg, &mut stats, &mut errors).await {
-                    Ok(()) => {}
-                    Err(mut err) => errors.append(&mut err)
+                match process_playlist(&mut source_playlists, target, &cfg, &mut input_stats, &mut errors).await {
+                    Ok(()) => {
+                        target_stats.push(TargetStats::success(&target.name));
+                    }
+                    Err(mut err) => {
+                        target_stats.push(TargetStats::failure(&target.name));
+                        errors.append(&mut err);
+                    }
                 }
             }
         }
     }
-    (stats.into_values().collect(), errors)
+    (input_stats.into_values().collect(), target_stats, errors)
 }
 
 fn create_input_stat(group_count: usize, channel_count: usize, error_count: usize, input_type: InputType, input_name: &str, secs_took: u64) -> InputStats {
@@ -368,7 +374,7 @@ fn create_input_stat(group_count: usize, channel_count: usize, error_count: usiz
     }
 }
 
-async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<M3uFilterError>) {
+async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<SourceStats>, Vec<M3uFilterError>) {
     let mut handle_list = vec![];
     let thread_num = config.threads;
     let process_parallel = thread_num > 1 && config.sources.len() > 1;
@@ -376,7 +382,7 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
         debug!("Using {} threads", thread_num);
     }
     let errors = Arc::new(Mutex::<Vec<M3uFilterError>>::new(vec![]));
-    let stats = Arc::new(Mutex::<Vec<InputStats>>::new(vec![]));
+    let stats = Arc::new(Mutex::<Vec<SourceStats>>::new(vec![]));
     for (index, _) in config.sources.iter().enumerate() {
         let shared_errors = errors.clone();
         let shared_stats = stats.clone();
@@ -386,9 +392,10 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
             let handles = &mut handle_list;
             let process = move || {
                 System::new().block_on(async {
-                    let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
+                    let (input_stats, target_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
                     shared_errors.lock().await.append(&mut res_errors);
-                    shared_stats.lock().await.append(&mut res_stats);
+                    let process_stats = SourceStats::new(input_stats, target_stats);
+                    shared_stats.lock().await.push(process_stats);
                 });
             };
             handles.push(thread::spawn(process));
@@ -396,9 +403,10 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
                 handles.drain(..).for_each(|handle| { let _ = handle.join(); });
             }
         } else {
-            let (mut res_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
+            let (input_stats, target_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
             shared_errors.lock().await.append(&mut res_errors);
-            shared_stats.lock().await.append(&mut res_stats);
+            let process_stats = SourceStats::new(input_stats, target_stats);
+            shared_stats.lock().await.push(process_stats);
         }
     }
     for handle in handle_list {
