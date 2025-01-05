@@ -6,7 +6,7 @@ use std::rc::Rc;
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
-use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
+use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions, PROP_BACKDROP_PATH, PROP_COVER};
 use crate::processing::m3u_parser::extract_id_from_url;
 use crate::repository::storage::hash_string;
 use crate::utils::json_utils::{get_string_from_serde_value, get_u64_from_serde_value};
@@ -418,21 +418,25 @@ impl PlaylistEntry for XtreamPlaylistItem {
     }
 }
 
-fn get_backdrop_path_value(field: &str, value: Option<&Value>) -> Option<Rc<String>> {
+pub fn get_backdrop_path_value(field: &str, value: Option<&Value>) -> Option<Rc<String>> {
     match value {
         Some(Value::String(url)) => Some(Rc::new(url.clone())),
         Some(Value::Array(values)) => {
             match values.as_slice() {
-                [single] => Some(Rc::new(single.to_string())),
+                [Value::String(single)] => Some(Rc::new(single.to_string())),
                 multiple if !multiple.is_empty() => {
                     if let Some(index) = field.rfind('_') {
                         if let Ok(bd_index) = field[index + 1..].parse::<usize>() {
-                            if let Some(selected) = multiple.get(bd_index) {
+                            if let Some(Value::String(selected)) = multiple.get(bd_index) {
                                 return Some(Rc::new(selected.to_string()));
                             }
                         }
                     }
-                    Some(Rc::new(multiple[0].to_string()))
+                    if let Value::String(url) = &multiple[0] {
+                        Some(Rc::new(url.to_string()))
+                    } else {
+                        None
+                    }
                 }
                 _ => None,
             }
@@ -440,7 +444,6 @@ fn get_backdrop_path_value(field: &str, value: Option<&Value>) -> Option<Rc<Stri
         _ => None,
     }
 }
-
 
 macro_rules! generate_field_accessor_impl_for_xtream_playlist_item {
     ($($prop:ident),*;) => {
@@ -452,14 +455,14 @@ macro_rules! generate_field_accessor_impl_for_xtream_playlist_item {
                     )*
                      "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
                     _ => {
-                       if field.starts_with("bakdrop_path") || field == "cover" {
+                       if field.starts_with(PROP_BACKDROP_PATH) || field == PROP_COVER {
                             let props = self.additional_properties.as_ref().and_then(|add_props| serde_json::from_str::<Map<String, Value>>(add_props).ok());
                             return match props {
                                 Some(doc) => {
-                                    return if field == "cover" {
-                                       doc.get("cover").and_then(|value| value.as_str().map(|s| Rc::new(s.to_string())))
+                                    return if field == PROP_COVER {
+                                       doc.get(field).and_then(|value| value.as_str().map(|s| Rc::new(s.to_string())))
                                     } else {
-                                       get_backdrop_path_value(field, doc.get("backdrop_path"))
+                                       get_backdrop_path_value(field, doc.get(PROP_BACKDROP_PATH))
                                     }
                                 }
                                 _=> None,

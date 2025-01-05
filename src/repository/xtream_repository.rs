@@ -10,7 +10,7 @@ use serde_json::{json, Map, Value};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::{XtreamMappingOptions, XtreamSeriesEpisode};
+use crate::model::xtream::{rewrite_doc_urls, XtreamMappingOptions, XtreamSeriesEpisode, INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentWriter};
 use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
@@ -19,7 +19,7 @@ use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::file_utils::open_readonly_file;
 use crate::utils::json_utils::{json_iter_array, json_write_documents_to_file};
 use crate::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err};
-use crate::model::api_proxy::{ ProxyUserCredentials};
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -33,12 +33,17 @@ const FILE_SERIES: &str = "series";
 pub const FILE_EPG: &str = "epg.xml";
 const PATH_XTREAM: &str = "xtream";
 const TAG_CATEGORY_ID: &str = "category_id";
+const TAG_CATEGORY_IDS: &str = "category_ids";
 const TAG_CATEGORY_NAME: &str = "category_name";
 const TAG_DIRECT_SOURCE: &str = "direct_source";
 const TAG_PARENT_ID: &str = "parent_id";
 const TAG_MOVIE_DATA: &str = "movie_data";
+pub const TAG_INFO_DATA: &str = "info";
 const TAG_STREAM_ID: &str = "stream_id";
 const TAG_ID: &str = "id";
+pub const TAG_EPISODES: &str = "episodes";
+
+const INFO_REWRITE_FIELDS: &[&str] = &["cover_big", "movie_image", "tmdb_url", "cover"];
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
@@ -564,28 +569,36 @@ pub async fn xtream_load_vod_info(
     None
 }
 
-pub async fn write_and_get_xtream_vod_info<P>(
+fn rewrite_xtream_vod_info<P>(
     config: &Config,
     target: &ConfigTarget,
     pli: &P,
-    content: &str,
+    user: &ProxyUserCredentials,
+    doc: &mut Map<String, Value>,
 ) -> Result<String, Error> where
     P: PlaylistEntry,
 {
-    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    // we need to update the info data.
+    if let Some(Value::Object(info_data)) = doc.get_mut(TAG_INFO_DATA) {
+        match user.proxy {
+            ProxyType::Reverse => {
+                let server_info = config.get_user_server_info(user);
+                let url = server_info.get_base_url();
+                let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
+                rewrite_doc_urls(resource_url.as_ref(), info_data, INFO_REWRITE_FIELDS, INFO_RESOURCE_PREFIX);
+                // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
+            }
+            ProxyType::Redirect => {}
+        };
+    }
 
-    // wen need to update the movie data with virtual ids.
+    // we need to update the movie data with virtual ids.
     if let Some(Value::Object(movie_data)) = doc.get_mut(TAG_MOVIE_DATA) {
         let stream_id = pli.get_virtual_id();
         let category_id = pli.get_category_id().unwrap_or(0);
-        movie_data.insert(
-            TAG_STREAM_ID.to_string(),
-            Value::Number(serde_json::value::Number::from(stream_id)),
-        );
-        movie_data.insert(
-            TAG_CATEGORY_ID.to_string(),
-            Value::Number(serde_json::value::Number::from(category_id)),
-        );
+        movie_data.insert(TAG_STREAM_ID.to_string(),Value::Number(serde_json::value::Number::from(stream_id)));
+        movie_data.insert(TAG_CATEGORY_ID.to_string(),Value::Number(serde_json::value::Number::from(category_id)));
+        movie_data.insert(TAG_CATEGORY_IDS.to_string(), Value::Array(vec![Value::Number(serde_json::value::Number::from(category_id))]));
         let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
         if options.skip_video_direct_source {
             movie_data.insert(TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
@@ -597,47 +610,93 @@ pub async fn write_and_get_xtream_vod_info<P>(
         }
     }
     let result = serde_json::to_string(&doc).map_err(|_| Error::new(ErrorKind::Other, "Failed to serialize vod info"))?;
-    xtream_write_vod_info(config, target.name.as_str(), pli.get_virtual_id(), &result).await.ok();
 
     Ok(result)
 }
 
-pub async fn write_and_get_xtream_series_info<P>(
+pub fn rewrite_xtream_vod_info_content<P>(
     config: &Config,
     target: &ConfigTarget,
-    pli_series_info: &P,
+    pli: &P,
+    user: &ProxyUserCredentials,
     content: &str,
 ) -> Result<String, Error> where
     P: PlaylistEntry,
 {
-    let mut doc = serde_json::from_str::<Value>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    rewrite_xtream_vod_info(config, target, pli, user, &mut doc)
+}
 
+pub async fn write_and_get_xtream_vod_info<P>(
+    config: &Config,
+    target: &ConfigTarget,
+    pli: &P,
+    user: &ProxyUserCredentials,
+    content: &str,
+) -> Result<String, Error> where
+    P: PlaylistEntry,
+{
+    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    xtream_write_vod_info(config, target.name.as_str(), pli.get_virtual_id(), content).await.ok();
+    rewrite_xtream_vod_info(config, target, pli, user, &mut doc)
+}
+
+async fn rewrite_xtream_series_info<P>(
+    config: &Config,
+    target: &ConfigTarget,
+    pli: &P,
+    user: &ProxyUserCredentials,
+    doc: &mut Map<String, Value>,
+) -> Result<String, Error> where
+    P: PlaylistEntry,
+{
     let target_path = get_target_storage_path(config, target.name.as_str()).ok_or_else(|| Error::new(ErrorKind::Other, format!("Could not find path for target {}", target.name)))?;
-    let episodes = doc.get_mut("episodes").and_then(Value::as_object_mut).ok_or_else(|| Error::new(ErrorKind::Other, "No episodes found in content"))?;
 
-    let virtual_id = pli_series_info.get_virtual_id();
+    let resource_url = match user.proxy {
+        ProxyType::Reverse => {
+            let server_info = config.get_user_server_info(user);
+            let url = server_info.get_base_url();
+            Some(format!("{url}/resource/series/{}/{}/{}", user.username, user.password, pli.get_virtual_id()))
+        }
+        ProxyType::Redirect => None,
+    };
+
+    if resource_url.is_some() {
+        // we need to update the info data.
+        if let Some(Value::Object(info_data)) = doc.get_mut(TAG_INFO_DATA) {
+            rewrite_doc_urls(resource_url.as_ref(), info_data, INFO_REWRITE_FIELDS, INFO_RESOURCE_PREFIX);
+        }
+    }
+
+    let episodes = doc.get_mut(TAG_EPISODES).and_then(Value::as_object_mut).ok_or_else(|| Error::new(ErrorKind::Other, "No episodes found in content"))?;
+
+    let virtual_id = pli.get_virtual_id();
     {
         let target_id_mapping_file = get_target_id_mapping_file(&target_path);
         let _file_lock = config.file_locks.write_lock(&target_id_mapping_file).await.map_err(|err| Error::new(ErrorKind::Other, format!("Could not load id mapping for target {} err:{err}", target.name)))?;
         let mut target_id_mapping = TargetIdMapping::new(&target_id_mapping_file);
         let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
 
-        let provider_url = pli_series_info.get_provider_url();
+        let provider_url = pli.get_provider_url();
         for episode_list in episodes.values_mut().filter_map(Value::as_array_mut) {
             for episode in episode_list.iter_mut().filter_map(Value::as_object_mut) {
-                if let Some(provider_id) = episode.get(TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok())
+                if let Some(episode_provider_id) = episode.get(TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok())
                 {
-                    let uuid = hash_string(&format!("{provider_url}/{provider_id}"));
+                    let uuid = hash_string(&format!("{provider_url}/{episode_provider_id}"));
                     let episode_virtual_id = target_id_mapping.insert_entry(
                         uuid,
-                        provider_id,
+                        episode_provider_id,
                         PlaylistItemType::Series,
                         virtual_id,
                     );
-                    episode.insert(
-                        TAG_ID.to_string(),
-                        Value::String(episode_virtual_id.to_string()),
-                    );
+                    episode.insert(TAG_ID.to_string(),Value::String(episode_virtual_id.to_string()));
+                    if resource_url.is_some() {
+                        // we need to update the info data.
+                        if let Some(Value::Object(info_data)) = episode.get_mut(TAG_INFO_DATA) {
+                            let field_prefix = format!("{INFO_RESOURCE_PREFIX_EPISODE}{episode_provider_id}_");
+                            rewrite_doc_urls(resource_url.as_ref(), info_data, INFO_REWRITE_FIELDS, &field_prefix);
+                        }
+                    }
                 }
                 if options.skip_series_direct_source {
                     episode.insert(TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
@@ -648,9 +707,36 @@ pub async fn write_and_get_xtream_series_info<P>(
         drop(target_id_mapping);
     }
     let result = serde_json::to_string(&doc).map_err(|_| Error::new(ErrorKind::Other, "Failed to serialize updated series info"))?;
-    xtream_write_series_info(config, target.name.as_str(), virtual_id, &result).await.ok();
 
     Ok(result)
+}
+
+pub async fn rewrite_xtream_series_info_content<P>(
+    config: &Config,
+    target: &ConfigTarget,
+    pli_series_info: &P,
+    user: &ProxyUserCredentials,
+    content: &str,
+) -> Result<String, Error> where
+    P: PlaylistEntry,
+{
+    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    rewrite_xtream_series_info(config, target, pli_series_info, user, &mut doc).await
+}
+
+pub async fn write_and_get_xtream_series_info<P>(
+    config: &Config,
+    target: &ConfigTarget,
+    pli_series_info: &P,
+    user: &ProxyUserCredentials,
+    content: &str,
+) -> Result<String, Error> where
+    P: PlaylistEntry,
+{
+    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    let virtual_id = pli_series_info.get_virtual_id();
+    xtream_write_series_info(config, target.name.as_str(), virtual_id, content).await.ok();
+    rewrite_xtream_series_info(config, target, pli_series_info, user, &mut doc).await
 }
 
 pub async fn xtream_get_input_info(

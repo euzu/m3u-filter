@@ -10,8 +10,11 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
-const PROP_BACKDROP_PATH: &str = "backdrop_path";
-const PROP_COVER: &str = "cover";
+pub const INFO_RESOURCE_PREFIX: &str = "nfo_";
+pub const INFO_RESOURCE_PREFIX_EPISODE: &str = "nfo_ep_";
+
+pub const PROP_BACKDROP_PATH: &str = "backdrop_path";
+pub const PROP_COVER: &str = "cover";
 
 const LIVE_STREAM_FIELDS: &[&str] = &[];
 
@@ -27,6 +30,8 @@ const SERIES_STREAM_FIELDS: &[&str] = &[
     "last_modified", "name", "plot", "rating_5based",
     "stream_type", "title", "year", "youtube_trailer",
 ];
+
+const XTREAM_VOD_REWRITE_URL_PROPS: &[&str] = &[PROP_COVER];
 
 
 fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
@@ -177,7 +182,12 @@ pub struct XtreamStream {
     pub title: Option<Rc<String>>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
     pub year: Option<Rc<String>>,
-    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    #[serde(
+        default,
+        alias = "youtube_trailer",
+        alias = "trailer",
+        deserialize_with = "deserialize_as_option_rc_string"
+    )]
     pub youtube_trailer: Option<Rc<String>>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
     pub epg_channel_id: Option<Rc<String>>,
@@ -185,6 +195,11 @@ pub struct XtreamStream {
     pub tv_archive: Option<i32>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub tv_archive_duration: Option<i32>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    pub tmdb: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_number_from_string")]
+    pub is_adult: Option<i32>,
+
 }
 
 macro_rules! add_str_property_if_exists {
@@ -245,9 +260,10 @@ impl XtreamStream {
         let mut result = Map::new();
         if let Some(bdpath) = self.backdrop_path.as_ref() {
             if !bdpath.is_empty() {
-                result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.first().unwrap()))])));
+                result.insert(String::from(PROP_BACKDROP_PATH), Value::Array(Vec::from([Value::String(String::from(bdpath.first().unwrap()))])));
             }
         }
+        add_rc_str_property_if_exists!(result, self.tmdb, "tmdb");
         add_rc_str_property_if_exists!(result, self.added, "added");
         add_rc_str_property_if_exists!(result, self.cast, "cast");
         add_rc_str_property_if_exists!(result, self.container_extension, "container_extension");
@@ -263,10 +279,12 @@ impl XtreamStream {
         add_rc_str_property_if_exists!(result, self.stream_type, "stream_type");
         add_rc_str_property_if_exists!(result, self.title, "title");
         add_rc_str_property_if_exists!(result, self.year, "year");
+        add_rc_str_property_if_exists!(result, self.youtube_trailer, "trailer");
         add_rc_str_property_if_exists!(result, self.youtube_trailer, "youtube_trailer");
         add_rc_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
         add_opt_i64_property_if_exists!(result, self.tv_archive, "tv_archive");
         add_opt_i64_property_if_exists!(result, self.tv_archive_duration, "tv_archive_duration");
+        add_opt_i64_property_if_exists!(result, self.is_adult, "is_adult");
         if result.is_empty() { None } else { Some(Value::Object(result)) }
     }
 }
@@ -527,9 +545,9 @@ fn append_prepared_series_properties(add_props: Option<&Map<String, Value>>, doc
     }
 }
 
-fn make_bdpath_resource_url(resource_url: &str, bd_path: &str, index: usize) -> String {
+fn make_bdpath_resource_url(resource_url: &str, bd_path: &str, index: usize, field_prefix: &str) -> String {
     if bd_path.starts_with("http") {
-        format!("{resource_url}/bd_path_{index}")
+        format!("{resource_url}/{field_prefix}{PROP_BACKDROP_PATH}_{index}")
     } else {
         bd_path.to_string()
     }
@@ -609,29 +627,35 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
         }
     };
 
+    rewrite_doc_urls(resource_url.as_ref(), &mut document, XTREAM_VOD_REWRITE_URL_PROPS, "");
+
+    Value::Object(document)
+}
+
+pub fn rewrite_doc_urls(resource_url: Option<&String>, document: &mut Map<String, Value>, fields: &[&str], field_prefix: &str) {
     if let Some(rewrite_url) = resource_url {
         if let Some(bdpath) = document.get(PROP_BACKDROP_PATH) {
             match bdpath {
                 Value::String(bd_path) => {
-                    document.insert(PROP_BACKDROP_PATH.to_string(), Value::Array(vec![Value::String(make_bdpath_resource_url(rewrite_url.as_str(), bd_path, 0))]));
+                    document.insert(PROP_BACKDROP_PATH.to_string(), Value::Array(vec![Value::String(make_bdpath_resource_url(rewrite_url.as_str(), bd_path, 0, field_prefix))]));
                 }
                 Value::Array(bd_path) => {
                     document.insert(PROP_BACKDROP_PATH.to_string(), Value::Array(
                         bd_path.iter()
                             .filter_map(|val| val.as_str())
                             .enumerate()
-                            .map(|(index, value)| Value::String(make_bdpath_resource_url(rewrite_url.as_str(), value, index)))
+                            .map(|(index, value)| Value::String(make_bdpath_resource_url(rewrite_url.as_str(), value, index, field_prefix)))
                             .collect()));
                 }
                 _ => {}
             };
         }
-        if let Some(Value::String(cover)) = document.get(PROP_COVER) {
-            if cover.starts_with("http") {
-                document.insert(PROP_COVER.to_string(), Value::String(format!("{}/cover", rewrite_url.as_str())));
+        for &field in fields {
+            if let Some(Value::String(value)) = document.get(field) {
+                if value.starts_with("http") {
+                    document.insert(field.to_string(), Value::String(format!("{rewrite_url}/{field_prefix}{field}")));
+                }
             }
         }
     }
-
-    Value::Object(document)
 }

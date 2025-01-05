@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+use std::rc::Rc;
 use std::str::FromStr;
 
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -13,21 +14,24 @@ use futures::Stream;
 use log::{debug, error, warn};
 use serde_json::{Map, Value};
 
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_stream_share_enabled, resource_response, serve_file, stream_response};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
-use crate::{debug_if_enabled, info_err};
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
-use crate::model::playlist::{FieldGetAccessor, PlaylistItemType, XtreamCluster};
+use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
+use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH};
 use crate::repository::storage::{get_target_storage_path, hash_string};
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository;
+use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA};
+use crate::utils::json_utils::get_u32_from_serde_value;
 use crate::utils::request_utils::{extract_extension_from_url, mask_sensitive_info};
 use crate::utils::{download, json_utils, request_utils};
+use crate::{debug_if_enabled, info_err};
 
 const ACTION_GET_SERIES_INFO: &str = "get_series_info";
 const ACTION_GET_VOD_INFO: &str = "get_vod_info";
@@ -216,6 +220,80 @@ async fn xtream_player_api_stream(
     stream_response(app_state, &stream_url, req, Some(input), share_live_streams).await
 }
 
+fn get_episode_id_and_field_name(input: &str) -> Option<(u32, &str)> {
+    if let Some(pos) = input.find('_') {
+        let (number_part, rest) = input.split_at(pos);
+        let field = &rest[1..]; // cut _
+        if let Ok(number) = number_part.parse::<u32>() {
+            return Some((number, field));
+        }
+    }
+    None
+}
+
+async fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<Rc<String>>, serde_json::Error> {
+    let info_content = match pli.xtream_cluster {
+        XtreamCluster::Video => {
+            xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id()).await
+        }
+        XtreamCluster::Series => {
+            xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()).await
+        }
+        XtreamCluster::Live => None,
+    };
+    if let Some(content) = info_content {
+        let doc: Map<String, Value> = serde_json::from_str(&content)?;
+        let (field, possible_episode_id) = if let Some(field_name_with_episode_id) = resource.strip_prefix(INFO_RESOURCE_PREFIX_EPISODE) {
+            if let Some((episode_id, field_name)) = get_episode_id_and_field_name(field_name_with_episode_id) {
+                (field_name, Some(episode_id))
+            } else {
+                return Ok(None);
+            }
+        } else {
+            (&resource[INFO_RESOURCE_PREFIX.len()..], None)
+        };
+        let info_doc = match pli.xtream_cluster {
+            XtreamCluster::Video | XtreamCluster::Series => {
+                if let Some(episode_id) = possible_episode_id {
+                    get_episode_info_doc(&doc, episode_id)
+                } else {
+                    doc.get(TAG_INFO_DATA)
+                }
+            }
+            XtreamCluster::Live => None,
+        };
+
+        if let Some(Value::Object(info_data)) = info_doc {
+            if field.starts_with(PROP_BACKDROP_PATH) {
+                return Ok(get_backdrop_path_value(field, info_data.get(PROP_BACKDROP_PATH)));
+            } else if let Some(Value::String(url)) = info_data.get(field) {
+                return Ok(Some(Rc::new(url.to_string())));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn get_episode_info_doc(doc: &Map<String, Value>, episode_id: u32) -> Option<&Value> {
+    let episodes = doc.get(TAG_EPISODES)?.as_object()?;
+    for season_episodes in episodes.values() {
+        if let Value::Array(episode_list) = season_episodes {
+            for episode in episode_list {
+                if let Value::Object(episode_doc) = episode {
+                    if let Some(episode_id_value) = episode_doc.get(TAG_ID) {
+                        if let Some(doc_episode_id) = get_u32_from_serde_value(episode_id_value) {
+                            if doc_episode_id == episode_id {
+                                return episode_doc.get(TAG_INFO_DATA);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 async fn xtream_player_api_resource(
     req: &HttpRequest,
     api_req: &web::Query<UserApiRequest>,
@@ -229,11 +307,14 @@ async fn xtream_player_api_resource(
         return HttpResponse::BadRequest().finish();
     }
     let virtual_id: u32 = try_result_bad_request!(resource_req.stream_id.trim().parse());
-    let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
-    // let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", resource_req.context));
-
     let resource = resource_req.action_path.trim();
-    let stream_url = pli.get_field(resource);
+    let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
+    let stream_url = if resource.starts_with(INFO_RESOURCE_PREFIX) {
+        try_result_bad_request!(xtream_get_info_resource_url(&app_state.config, &pli, target, resource).await)
+    } else {
+        pli.get_field(resource)
+    };
+
     match stream_url {
         None => HttpResponse::NotFound().finish(),
         Some(url) => {
@@ -261,7 +342,7 @@ macro_rules! create_xtream_player_api_stream {
     }
 }
 
-macro_rules! create_xtream_player_api_resource{
+macro_rules! create_xtream_player_api_resource {
     ($fn_name:ident, $context:expr) => {
         async fn $fn_name(
             req: HttpRequest,
@@ -326,7 +407,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
                 // Redirect is only possible for live streams, vod and series info needs to be modified
                 if user.proxy == ProxyType::Redirect && cluster == XtreamCluster::Live {
                     return HttpResponse::Found().insert_header(("Location", info_url)).finish();
-                } else if let Ok(content) = download::get_xtream_stream_info(&app_state.config, input, target, &pli, info_url.as_str(), cluster).await {
+                } else if let Ok(content) = download::get_xtream_stream_info(&app_state.config, user, input, target, &pli, info_url.as_str(), cluster).await {
                     return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content);
                 }
             }

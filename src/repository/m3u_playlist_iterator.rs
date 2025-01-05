@@ -9,7 +9,7 @@ use crate::repository::storage::ensure_target_storage_path;
 use crate::utils::file_lock_manager::FileReadGuard;
 
 pub const M3U_STREAM_PATH: &str = "m3u-stream";
-pub const M3U_RESOURCE_PATH: &str = "m3u-resource";
+pub const M3U_RESOURCE_PATH: &str = "resource/m3u";
 
 pub struct M3uPlaylistIterator {
     reader: IndexedDocumentIterator<u32, M3uPlaylistItem>,

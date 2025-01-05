@@ -4,7 +4,7 @@ use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, XtreamCluster};
 use crate::model::xmltv::TVGuide;
 use crate::processing::{m3u_parser, xtream_parser};
-use crate::repository::xtream_repository::{xtream_get_input_info};
+use crate::repository::xtream_repository::{rewrite_xtream_series_info_content, rewrite_xtream_vod_info_content, xtream_get_input_info};
 use crate::repository::xtream_repository;
 use crate::utils::{file_utils, request_utils};
 use log::{debug, info};
@@ -12,6 +12,7 @@ use std::cmp::Ordering;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use crate::debug_if_enabled;
+use crate::model::api_proxy::{ProxyUserCredentials};
 
 const ACTION_GET_SERIES_INFO: &str = "get_series_info";
 const ACTION_GET_VOD_INFO: &str = "get_vod_info";
@@ -67,7 +68,7 @@ pub async fn get_xtream_stream_info_content(info_url: &str, input: &ConfigInput)
     request_utils::download_text_content(input, info_url, None).await
 }
 
-pub async fn get_xtream_stream_info<P>(config: &Config, input: &ConfigInput, target: &ConfigTarget,
+pub async fn get_xtream_stream_info<P>(config: &Config,  user: &ProxyUserCredentials, input: &ConfigInput, target: &ConfigTarget,
                                        pli: &P, info_url: &str, cluster: XtreamCluster) -> Result<String, Error>
 where
     P: PlaylistEntry,
@@ -75,7 +76,7 @@ where
     if cluster == XtreamCluster::Series {
         if let Some(content) = xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()).await {
             // Deliver existing target content
-            return Ok(content);
+            return rewrite_xtream_series_info_content(config, target, pli, user, &content).await;
         }
 
         // Check if the content has been resolved
@@ -83,21 +84,21 @@ where
         if resolve_series {
             if let Some(provider_id) = pli.get_provider_id() {
                 if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Series).await {
-                    return xtream_repository::write_and_get_xtream_series_info(config, target, pli, &content).await;
+                    return xtream_repository::write_and_get_xtream_series_info(config, target, pli, user, &content).await;
                 }
             }
         }
     } else if cluster == XtreamCluster::Video {
         if let Some(content) = xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id()).await {
             // Deliver existing target content
-            return Ok(content);
+            return rewrite_xtream_vod_info_content(config, target, pli, user, &content);
         }
         // Check if the content has been resolved
         let resolve_vod = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_vod);
         if resolve_vod {
             if let Some(provider_id) = pli.get_provider_id() {
                 if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Video).await {
-                    return xtream_repository::write_and_get_xtream_vod_info(config, target, pli, &content).await;
+                    return xtream_repository::write_and_get_xtream_vod_info(config, target, pli, user, &content).await;
                 }
             }
         }
@@ -106,8 +107,8 @@ where
     if let Ok(content) = get_xtream_stream_info_content(info_url, input).await {
         return match cluster {
             XtreamCluster::Live => Ok(content),
-            XtreamCluster::Video => xtream_repository::write_and_get_xtream_vod_info(config, target, pli, &content).await,
-            XtreamCluster::Series => xtream_repository::write_and_get_xtream_series_info(config, target, pli, &content).await,
+            XtreamCluster::Video => xtream_repository::write_and_get_xtream_vod_info(config, target, pli, user, &content).await,
+            XtreamCluster::Series => xtream_repository::write_and_get_xtream_series_info(config, target, pli, user, &content).await,
         };
     }
 
