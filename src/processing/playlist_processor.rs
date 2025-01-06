@@ -4,12 +4,13 @@ use async_std::sync::Mutex;
 use core::cmp::Ordering;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
 
 use actix_rt::System;
-use log::{debug, error, info, log_enabled, trace, Level};
+use log::{debug, error, info, log_enabled, trace, warn, Level};
 use std::time::Instant;
 use unidecode::unidecode;
 
@@ -20,7 +21,7 @@ use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, Inp
                            ItemField, ProcessTargets, ProcessingOrder, SortOrder::{Asc, Desc}};
 use crate::model::mapping::{CounterModifier, Mapping, MappingValueProcessor};
 use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor, PlaylistGroup, PlaylistItem, XtreamCluster};
-use crate::model::stats::{SourceStats, InputStats, TargetStats, PlaylistStats};
+use crate::model::stats::{InputStats, PlaylistStats, SourceStats, TargetStats};
 use crate::processing::affix_processor::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
 use crate::processing::xmltv_parser::flatten_tvguide;
@@ -30,7 +31,7 @@ use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
 use crate::utils::request_utils::mask_sensitive_info;
-use crate::{debug_if_enabled, get_errors_notify_message, model::config, Config, notify_err};
+use crate::{debug_if_enabled, get_errors_notify_message, model::config, notify_err, Config};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli: RefCell::new(pli) };
@@ -384,6 +385,13 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
     let errors = Arc::new(Mutex::<Vec<M3uFilterError>>::new(vec![]));
     let stats = Arc::new(Mutex::<Vec<SourceStats>>::new(vec![]));
     for (index, _) in config.sources.iter().enumerate() {
+        // We're using the file lock this way on purpose
+        let source_lock_path = PathBuf::from(format!("source_{index}"));
+        let Ok(update_lock) = config.file_locks.try_write_lock(&source_lock_path).await else {
+            warn!("The update operation for the source at index {index} was skipped because an update is already in progress.");
+            continue;
+        };
+
         let shared_errors = errors.clone();
         let shared_stats = stats.clone();
         let cfg = config.clone();
@@ -408,6 +416,7 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
             let process_stats = SourceStats::new(input_stats, target_stats);
             shared_stats.lock().await.push(process_stats);
         }
+        drop(update_lock);
     }
     for handle in handle_list {
         let _ = handle.join();

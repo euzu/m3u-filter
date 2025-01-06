@@ -36,6 +36,20 @@ impl FileLockManager {
         Ok(FileWriteGuard::new(Arc::clone(&file_lock), guard))
     }
 
+    // Tries to acquire a write lock for the specified file and returns a FileWriteGuard.
+    pub async fn try_write_lock(&self, path: &Path) -> io::Result<FileWriteGuard> {
+        let file_lock = self.get_or_create_lock(path).await.map_err(|_| {
+            io::Error::new(io::ErrorKind::Other, "Failed to acquire write lock")
+        })?;
+        let guard = file_lock.try_write();
+        match guard {
+            // Clone the Arc to avoid moving `file_lock` out, as it is still borrowed by `guard`
+            Some(lock_guard) => Ok(FileWriteGuard::new(Arc::clone(&file_lock), lock_guard)),
+            None => Err(io::Error::new(io::ErrorKind::Other, "Failed to acquire write lock"))
+        }
+    }
+
+
     // Helper function: retrieves or creates a lock for a file.
    async fn get_or_create_lock(&self, path: &Path) -> io::Result<Arc<RwLock<()>>> {
         let mut locks = self.locks.lock().await;
