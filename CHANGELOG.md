@@ -23,6 +23,7 @@ schedules:
 ```
 - Stats have now target information
 - Prevent simultaneous updates
+- Added target options `remove_duplicates` to remove entries with same `url`.
 
 # 2.0.10 (2024-12-03)
 - added Target Output Option `m3u_include_type_in_url`, default false. This adds `live`, `movie`, `series` to the url of the stream in reverse proxy mode.

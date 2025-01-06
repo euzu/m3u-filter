@@ -390,6 +390,7 @@ Target options are:
 
 - `ignore_logo` logo attributes are ignored to avoid caching logo files on devices.
 - `share_live_streams` to share live stream connections  in reverse proxy mode.
+- `remove_duplicates` tries to remove duplicates by `url`.
 
 `strm` output has additional options
 - `underscore_whitespace` replaces all whitespaces with `_` in the path.

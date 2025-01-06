@@ -57,6 +57,7 @@ export interface TargetConfig {
         m3u_include_type_in_url: boolean,
         m3u_mask_redirect_url: boolean,
         share_live_streams: boolean,
+        remove_duplicates: boolean,
     },
     sort: {
         match_as_ascii: boolean,

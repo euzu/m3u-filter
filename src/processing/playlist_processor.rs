@@ -1,5 +1,6 @@
 extern crate unidecode;
 
+use crate::repository::storage::hash_string;
 use async_std::sync::Mutex;
 use core::cmp::Ordering;
 use std::cell::RefCell;
@@ -20,7 +21,7 @@ use crate::messaging::{send_message, MsgKind};
 use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, InputType,
                            ItemField, ProcessTargets, ProcessingOrder, SortOrder::{Asc, Desc}};
 use crate::model::mapping::{CounterModifier, Mapping, MappingValueProcessor};
-use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor, PlaylistGroup, PlaylistItem, XtreamCluster};
+use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor, PlaylistEntry, PlaylistGroup, PlaylistItem, UUIDType, XtreamCluster};
 use crate::model::stats::{InputStats, PlaylistStats, SourceStats, TargetStats};
 use crate::processing::affix_processor::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
@@ -343,7 +344,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         debug_if_enabled!("Source has {} groups", source_playlists.iter().map(|fpl| fpl.playlistgroups.len()).sum::<usize>());
         for target in &source.targets {
             if is_target_enabled(target, &user_targets) {
-                match process_playlist(&mut source_playlists, target, &cfg, &mut input_stats, &mut errors).await {
+                match process_playlist_for_target(&mut source_playlists, target, &cfg, &mut input_stats, &mut errors).await {
                     Ok(()) => {
                         target_stats.push(TargetStats::success(&target.name));
                     }
@@ -437,13 +438,23 @@ fn get_processing_pipe(target: &ConfigTarget) -> ProcessingPipe {
     }
 }
 
+fn duplicate_hash(item: &PlaylistItem) -> UUIDType {
+    hash_string(&item.get_provider_url())
+}
 
-fn execute_pipe<'a>(target: &ConfigTarget, pipe: &ProcessingPipe, fpl: &FetchedPlaylist<'a>) -> FetchedPlaylist<'a> {
+fn execute_pipe<'a>(target: &ConfigTarget, pipe: &ProcessingPipe, fpl: &FetchedPlaylist<'a>, duplicates: &mut HashSet<UUIDType>) -> FetchedPlaylist<'a> {
     let mut new_fpl = FetchedPlaylist {
         input: fpl.input,
         playlistgroups: fpl.playlistgroups.clone(), // we need to clone, because of multiple target definitions, we cant change the initial playlist.
         epg: fpl.epg.clone(),
     };
+    if target.options.as_ref().is_some_and(|opt| opt.remove_duplicates) {
+        for group in &mut new_fpl.playlistgroups {
+            // `HashSet::insert`  returns true for first insert, otherweise false
+            group.channels.retain(|item| duplicates.insert(duplicate_hash(item)));
+        }
+    }
+
     for f in pipe {
         if let Some(groups) = f(&mut new_fpl.playlistgroups, target) {
             new_fpl.playlistgroups = groups;
@@ -474,17 +485,18 @@ fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
     sort_order
 }
 
-async fn process_playlist(playlists: &mut [FetchedPlaylist<'_>],
-                          target: &ConfigTarget,
-                          cfg: &Config,
-                          stats: &mut HashMap<u16, InputStats>,
-                          errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
+async fn process_playlist_for_target(playlists: &mut [FetchedPlaylist<'_>],
+                                     target: &ConfigTarget,
+                                     cfg: &Config,
+                                     stats: &mut HashMap<u16, InputStats>,
+                                     errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
     let pipe = get_processing_pipe(target);
     debug_if_enabled!("Processing order is {}", &target.processing_order);
 
+    let mut duplicates: HashSet<UUIDType> = HashSet::new();
     let mut processed_fetched_playlists: Vec<FetchedPlaylist> = vec![];
     for provider_fpl in playlists.iter_mut() {
-        let mut processed_fpl = execute_pipe(target, &pipe, provider_fpl);
+        let mut processed_fpl = execute_pipe(target, &pipe, provider_fpl, &mut duplicates);
         playlist_resolve_series(cfg, target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
         playlist_resolve_vod(cfg, target, errors, &processed_fpl).await;
         // stats
