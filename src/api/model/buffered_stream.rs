@@ -1,63 +1,100 @@
 use crate::model::config::ConfigInput;
 use crate::utils::request_utils;
+use crate::utils::request_utils::{get_request_headers, mask_sensitive_info};
 use actix_web::{HttpRequest, HttpResponse, HttpResponseBuilder};
 use async_std::stream::StreamExt;
 use bytes::Bytes;
 use core::time::Duration;
-use reqwest::{Error, RequestBuilder};
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use log::debug;
 use reqwest::header::{HeaderMap, HeaderValue, RANGE};
+use reqwest::{Error, RequestBuilder};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, LazyLock};
+use regex::Regex;
 use tokio::sync::mpsc;
-use tokio_stream::Stream;
 use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::Stream;
 use url::Url;
-use crate::utils::request_utils::get_request_headers;
 
 const BUFFER_SIZE: usize = 8092;
+const STREAM_CONNECT_TIMEOUT_SECS: u64 = 5; // Wait timeout secs for connection, then retry
 
 pub struct BufferedStreamHandler {
     client: Arc<RequestBuilder>,
-    bytes: Arc<Option<AtomicU64>>,
+    bytes: Arc<Option<AtomicUsize>>,
     headers: Arc<HeaderMap>,
+    url: String,
+}
+
+fn get_request_bytes(req_headers: &HashMap<&str, &[u8]>) -> usize {
+    let mut req_bytes: usize = 0;
+
+    if let Some(req_range) = req_headers.get(actix_web::http::header::RANGE.as_str()) {
+        if let Some(bytes_range) = req_range.strip_prefix(b"bytes=") {
+            if let Some(index) = bytes_range.iter().position(|&x| x == b'-') {
+                let start_bytes = &bytes_range[..index];
+                if let Ok(start_str) = std::str::from_utf8(start_bytes) {
+                    if let Ok(bytes_requested) = start_str.parse::<usize>() {
+                        req_bytes = bytes_requested;
+                    }
+                }
+            }
+        }
+    }
+
+    req_bytes
 }
 
 impl BufferedStreamHandler {
     pub fn new(url: &Url, req: &HttpRequest, input: Option<&ConfigInput>, send_bytes: bool) -> Self {
         let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
+        let req_bytes = get_request_bytes(&req_headers);
         let headers = Arc::new(get_request_headers(input.map(|i| &i.headers), Some(&req_headers)));
-        let client = Arc::new(request_utils::get_client_request(input, url, Some(&req_headers)));
+        let mut builder = request_utils::get_client_request(input, url, Some(&req_headers));
+        builder = builder.timeout(Duration::from_secs(STREAM_CONNECT_TIMEOUT_SECS));
+        let client = Arc::new(builder);
         BufferedStreamHandler {
+            url: mask_sensitive_info(url.as_str()),
             client,
-            bytes: Arc::new(if send_bytes { Some(AtomicU64::new(0)) } else { None }),
-            headers
+            bytes: Arc::new(if send_bytes { Some(AtomicUsize::new(req_bytes)) } else { None }),
+            headers,
         }
     }
 
-    pub fn get_stream(&mut self) -> impl Stream<Item = Result<Bytes, Error>> + Unpin + 'static {
+    pub fn get_stream(&mut self) -> impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static {
         let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(BUFFER_SIZE);
         let client = Arc::clone(&self.client);
         let headers = Arc::clone(&self.headers);
         let bytes_counter = Arc::clone(&self.bytes);
+        let url = mask_sensitive_info(&self.url);
         actix_web::rt::spawn({
             async move {
-                loop {
-                    let Some(client) = client.try_clone() else { break };
-                    debug!("Connection to stream");
-                    let req_client =  if let Some(bytes)  = bytes_counter.as_ref() {
+                'outer: loop {
+                    let Some(client) = client.try_clone() else {
+                        debug!("Cant clone client exiting retry");
+                        break;
+                    };
+                    debug!("Try connection to stream {url}");
+                    let bytes_to_request = if let Some(req_bytes) = bytes_counter.as_ref() {
+                        req_bytes.load(Ordering::Relaxed)
+                    } else {
+                        0
+                    };
+                    let req_client = if bytes_to_request > 0 {
                         // on reconnect send range header to avoid starting from beginning for vod
                         let mut req_headers = headers.as_ref().clone();
-                        let range = format!("bytes={}-", bytes.load(Ordering::Relaxed));
+                        let range = format!("bytes={bytes_to_request}-", );
                         req_headers.insert(RANGE, HeaderValue::from_bytes(range.as_bytes()).unwrap());
                         client.headers(req_headers)
                     } else {
-                        client
+                        client.headers(headers.as_ref().clone())
                     };
+
                     match req_client.send().await {
                         Ok(response) => {
                             if !response.status().is_success() {
+                                debug!("response status is not success  {}", response.status());
                                 continue;
                             }
                             let mut byte_stream = response.bytes_stream();
@@ -65,20 +102,20 @@ impl BufferedStreamHandler {
                                 match chunk {
                                     Ok(chunk) => {
                                         if chunk.is_empty() {
-                                            debug!("Stream finished ?");
-                                            return;
+                                            debug!("Stream finished ? {url}");
+                                            break;
                                         }
                                         if let Some(bytes) = bytes_counter.as_ref() {
-                                            bytes.fetch_add(chunk.len() as u64, Ordering::Relaxed);
+                                            bytes.fetch_add(chunk.len(), Ordering::Relaxed);
                                         }
                                         if tx.send(Ok(chunk)).await.is_err() {
-                                            debug!("Stream finished, client disconnect ?");
-                                            return;
+                                            debug!("Stream finished, client disconnect ?  {url}");
+                                            break 'outer;
                                         }
                                     }
-                                    Err(err) => {
-                                        debug!("Stream disconnected, cant read from server {err}");
-                                        break;
+                                    Err(_err) => {
+                                        //debug!("Stream disconnected, cant read from server {err}");
+                                        // break 'outer;
                                     }
                                 }
                             }
@@ -88,12 +125,13 @@ impl BufferedStreamHandler {
                                 actix_web::rt::time::sleep(Duration::from_secs(1)).await;
                                 continue;
                             }
-                            debug!("Stream finished {err}");
+                            debug!("Stream finished  {url} {err}");
                             break;
                         }
                     }
                     actix_web::rt::time::sleep(Duration::from_secs(1)).await;
                 }
+                debug!("Reconnecting stream finished {url}");
             }
         });
 

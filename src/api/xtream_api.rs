@@ -318,9 +318,10 @@ async fn xtream_player_api_resource(
         None => HttpResponse::NotFound().finish(),
         Some(url) => {
             if user.proxy == ProxyType::Redirect {
-                debug!("Redirecting stream request to {}", mask_sensitive_info(&url));
+                debug!("Redirecting resource request to {}", mask_sensitive_info(&url));
                 HttpResponse::Found().insert_header(("Location", url.as_str())).finish()
             } else {
+                debug_if_enabled!("Resource request to {}", mask_sensitive_info(&url));
                 resource_response(app_state, url.as_str(), req, None).await
             }
         }

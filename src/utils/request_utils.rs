@@ -354,13 +354,14 @@ pub async fn get_input_json_content(input: &ConfigInput, url: &str, persist_file
 static USERNAME_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(username=)[^&]*").unwrap());
 static PASSWORD_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(password=)[^&]*").unwrap());
 static TOKEN_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(token=)[^&]*").unwrap());
+static STREAM_URL: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(.*://).*/(live|video|movie|series|m3u-stream)/\w+/\w+").unwrap());
 
 pub fn mask_sensitive_info(query: &str) -> String {
     // Replace with "***"
     let masked_query = USERNAME_REGEX.replace_all(query, "$1***");
     let masked_query = PASSWORD_REGEX.replace_all(&masked_query, "$1***");
     let masked_query = TOKEN_REGEX.replace_all(&masked_query, "$1***");
-
+    let masked_query =STREAM_URL.replace_all(&masked_query, "$1***/$2/***");
     masked_query.to_string()
 }
 
@@ -378,4 +379,18 @@ pub fn extract_extension_from_url(url: &str) -> Option<&str> {
         }
     }
     None
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::utils::request_utils::STREAM_URL;
+
+    #[test]
+    fn test_url_mask() {
+        // Replace with "***"
+        let masked_query = "https://bubblegum.tv/live/username/password/2344.ts";
+        let masked_query = STREAM_URL.replace_all(&masked_query, "$1***/$2/***");
+        println!("{masked_query}")
+    }
 }

@@ -70,7 +70,6 @@ async fn create_notify_stream(
     }
 }
 
-
 pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>, item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
     debug_if_enabled!("Try to open stream {}", mask_sensitive_info(stream_url));
     let share_stream = is_stream_share_enabled(item_type, target);
