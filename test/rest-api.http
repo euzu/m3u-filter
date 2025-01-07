@@ -27,7 +27,7 @@ Content-Type: application/x-www-form-urlencoded
 username=xt&password=xt
 
 ### m3u playlist reverse
-GET {{local}}/m3u?username=m3u&password=m3u
+GET {{local}}/m3u?username=xtr&password=xtr
 
 
 ### m3u playlist
