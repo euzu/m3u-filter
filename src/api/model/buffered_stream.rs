@@ -10,15 +10,15 @@ use reqwest::header::{HeaderMap, HeaderValue, RANGE};
 use reqwest::{Error, RequestBuilder};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, LazyLock};
-use regex::Regex;
+use std::sync::{Arc,};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::Stream;
 use url::Url;
 
 const BUFFER_SIZE: usize = 8092;
-const STREAM_CONNECT_TIMEOUT_SECS: u64 = 5; // Wait timeout secs for connection, then retry
+const STREAM_CONNECT_TIMEOUT_SECS: u64 = 5; // Wait timeout secs for connection when server dropped connection, then retry
+const CLIENT_RETRY_TIMEOUT_SECS: u64 = 10; // If connect status is 4xx or 5xx, we wait until we allow next request from client
 
 pub struct BufferedStreamHandler {
     client: Arc<RequestBuilder>,
@@ -64,15 +64,15 @@ impl BufferedStreamHandler {
 
     pub fn get_stream(&mut self) -> impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static {
         let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(BUFFER_SIZE);
-        let client = Arc::clone(&self.client);
+        let client_builder = Arc::clone(&self.client);
         let headers = Arc::clone(&self.headers);
         let bytes_counter = Arc::clone(&self.bytes);
         let url = mask_sensitive_info(&self.url);
         actix_web::rt::spawn({
             async move {
                 'outer: loop {
-                    let Some(client) = client.try_clone() else {
-                        debug!("Cant clone client exiting retry");
+                    let Some(client) = client_builder.try_clone() else {
+                        debug!("Cant clone client, exiting reconnect");
                         break;
                     };
                     debug!("Try connection to stream {url}");
@@ -93,8 +93,13 @@ impl BufferedStreamHandler {
 
                     match req_client.send().await {
                         Ok(response) => {
-                            if !response.status().is_success() {
-                                debug!("response status is not success  {}", response.status());
+                            let status = response.status();
+                            if !status.is_success() {
+                                debug!("Failed connect  {status}");
+                                if status.is_client_error() || status.is_server_error() {
+                                    actix_web::rt::time::sleep(Duration::from_secs(CLIENT_RETRY_TIMEOUT_SECS)).await;
+                                    break 'outer;
+                                }
                                 continue;
                             }
                             let mut byte_stream = response.bytes_stream();
@@ -114,7 +119,8 @@ impl BufferedStreamHandler {
                                         }
                                     }
                                     Err(_err) => {
-                                        //debug!("Stream disconnected, cant read from server {err}");
+                                        // this happens very often, we cant debug this because of flooding
+                                        //debug!("stream error, cant read from server  {url} {err} ");
                                         // break 'outer;
                                     }
                                 }

@@ -139,7 +139,7 @@ pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, cu
         for (key, value) in custom {
             let key_lc = key.to_lowercase();
             if "host" == key_lc || header_keys.contains(key_lc.as_str()) {
-                debug_if_enabled!("Ignoring request header {}={}", key_lc, String::from_utf8_lossy(value));
+                debug_if_enabled!("Ignoring request header '{}={}'", key_lc, String::from_utf8_lossy(value));
             } else {
                 headers.insert(
                     HeaderName::from_bytes(key.as_bytes()).unwrap(),
