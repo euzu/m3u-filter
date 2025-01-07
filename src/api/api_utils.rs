@@ -71,16 +71,19 @@ async fn create_notify_stream(
 }
 
 
-pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>, share_stream: bool) -> HttpResponse {
+pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>, item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
     debug_if_enabled!("Try to open stream {}", mask_sensitive_info(stream_url));
+    let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
         if let Some(value) = shared_stream_response(app_state, stream_url).await {
             return value;
         }
     }
 
+    let send_bytes = matches!(item_type, PlaylistItemType::Video  | PlaylistItemType::Series);
+
     if let Ok(url) = Url::parse(stream_url) {
-        let mut buffered_stream_handler = buffered_stream::BufferedStreamHandler::new(&url, req, input);
+        let mut buffered_stream_handler = buffered_stream::BufferedStreamHandler::new(&url, req, input, send_bytes);
         let stream =  buffered_stream_handler.get_stream();
         return if share_stream {
             SharedStream::register(app_state, stream_url, stream).await;

@@ -3,7 +3,7 @@ use bytes::Bytes;
 use futures::stream;
 use log::{debug, error};
 
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_stream_share_enabled, resource_response, stream_response};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, resource_response, stream_response};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::model::api_proxy::ProxyType;
@@ -84,8 +84,7 @@ async fn m3u_api_stream(
         return HttpResponse::Found().insert_header(("Location", stream_url.to_string())).finish();
     }
 
-    let share_live_streams = is_stream_share_enabled(m3u_item.item_type, target);
-    stream_response(&app_state, m3u_item.url.as_str(), &req, None, share_live_streams).await
+    stream_response(&app_state, m3u_item.url.as_str(), &req, None, m3u_item.item_type, target).await
 }
 
 async fn m3u_api_resource(

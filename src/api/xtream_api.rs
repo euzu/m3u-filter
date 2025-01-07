@@ -14,7 +14,7 @@ use futures::Stream;
 use log::{debug, error, warn};
 use serde_json::{Map, Value};
 
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_stream_share_enabled, resource_response, serve_file, stream_response};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, resource_response, serve_file, stream_response};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
@@ -216,8 +216,7 @@ async fn xtream_player_api_stream(
         true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}",
         stream_req.context));
     debug_if_enabled!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
-    let share_live_streams = is_stream_share_enabled(pli.item_type, target);
-    stream_response(app_state, &stream_url, req, Some(input), share_live_streams).await
+    stream_response(app_state, &stream_url, req, Some(input), pli.item_type, target).await
 }
 
 fn get_episode_id_and_field_name(input: &str) -> Option<(u32, &str)> {
