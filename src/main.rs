@@ -115,6 +115,10 @@ fn main() {
         exit!("{}", err);
     }
 
+    let mut temp_path = PathBuf::from(&cfg.working_dir);
+    temp_path.push("tmp");
+    let _ = tempfile::env::override_temp_dir(&temp_path);
+
     if args.server {
         config_reader::read_api_proxy_config(args.api_proxy, &mut cfg);
         start_in_server_mode(Arc::new(cfg), Arc::new(targets));
@@ -125,27 +129,32 @@ fn main() {
 
 fn create_directories(cfg: &Config) {
     // Collect the paths into a vector.
-    let paths = [
+    let paths_strings = [
         Some(cfg.working_dir.clone()),
         cfg.backup_dir.clone(),
         cfg.video.as_ref().and_then(|v| v.download.as_ref()).and_then(|d| d.directory.clone())
     ];
 
-    // Iterate over the paths, filter out `None` values, and process the `Some(path)` values.
-    paths.iter()
+    let mut paths : Vec<PathBuf>= paths_strings.iter()
         .filter_map(|opt| opt.as_ref()) // Get rid of the `Option`
-        .for_each(|dir| {
-            let path = PathBuf::from(dir);
+        .map(PathBuf::from).collect();
+    let mut temp_path = PathBuf::from(&cfg.working_dir);
+    temp_path.push("tmp");
+    paths.push(temp_path);
+
+            // Iterate over the paths, filter out `None` values, and process the `Some(path)` values.
+    for path in &paths {
             if !path.exists() {
                 // Create the directory tree if it doesn't exist
                 let path_value = path.to_str().unwrap_or("?");
-                if let Err(e) = std::fs::create_dir_all(&path) {
+                if let Err(e) = std::fs::create_dir_all(path) {
                     error!("Failed to create directory {path_value}: {e}");
                 } else {
                     info!("Created directory: {path_value}");
                 }
             }
-        });
+        }
+
 }
 
 fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
