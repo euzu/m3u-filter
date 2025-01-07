@@ -119,6 +119,7 @@ impl BufferedStreamHandler {
                                         }
                                     }
                                     Err(_err) => {
+                                        actix_web::rt::time::sleep(Duration::from_millis(100)).await;
                                         // this happens very often, we cant debug this because of flooding
                                         //debug!("stream error, cant read from server  {url} {err} ");
                                         // break 'outer;
