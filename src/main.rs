@@ -77,6 +77,14 @@ struct Args {
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// #[cfg(not(target_env = "msvc"))]
+// #[global_allocator]
+// static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+//
+// #[allow(non_upper_case_globals)]
+// #[export_name = "malloc_conf"]
+// pub static malloc_conf: &[u8] = b"lg_prof_interval:25,prof:true,prof_leak:true,prof_active:true,prof_prefix:/tmp/jeprof\0";
+
 fn main() {
     let args = Args::parse();
     let default_log_level = std::env::var("M3U_FILTER_LOG").unwrap_or_else(|_| "info".to_string());

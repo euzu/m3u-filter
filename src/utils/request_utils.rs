@@ -119,13 +119,13 @@ pub async fn get_input_text_content(input: &ConfigInput, working_dir: &str, url_
     }
 }
 
-pub fn get_client_request(input: Option<&ConfigInput>, url: &Url, custom_headers: Option<&HashMap<&str, &[u8]>>) -> reqwest::RequestBuilder {
+pub fn get_client_request(headers: Option<&HashMap<String, String>>, url: &Url, custom_headers: Option<&HashMap<String, Vec<u8>>>) -> reqwest::RequestBuilder {
     let request = reqwest::Client::new().get(url.clone());
-    let headers = get_request_headers(input.map(|i| &i.headers), custom_headers);
+    let headers = get_request_headers(headers, custom_headers);
     request.headers(headers)
 }
 
-pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, custom_headers: Option<&HashMap<&str, &[u8]>>) -> HeaderMap {
+pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, custom_headers: Option<&HashMap<String, Vec<u8>>>) -> HeaderMap {
     let mut headers = HeaderMap::new();
     if let Some(def_headers) = defined_headers {
         for (key, value) in def_headers {
@@ -178,7 +178,7 @@ fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
 
 async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &Path) -> Result<PathBuf, std::io::Error> {
     let start_time = Instant::now();
-    let request = get_client_request(Some(input), url, None);
+    let request = get_client_request(Some(&input.headers), url, None);
     match request.send().await {
         Ok(response) => {
             if response.status().is_success() {
@@ -211,7 +211,7 @@ async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &
 
 async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Error> {
     let start_time = Instant::now();
-    let request = get_client_request(Some(input), url, None);
+    let request = get_client_request(Some(&input.headers), url, None);
     match request.send().await {
         Ok(response) => {
             let is_success = response.status().is_success();

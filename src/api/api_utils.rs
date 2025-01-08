@@ -72,6 +72,7 @@ async fn create_notify_stream(
 
 pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>, item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
     debug_if_enabled!("Try to open stream {}", mask_sensitive_info(stream_url));
+
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
         if let Some(value) = shared_stream_response(app_state, stream_url).await {
@@ -82,8 +83,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
     let send_bytes = matches!(item_type, PlaylistItemType::Video  | PlaylistItemType::Series);
 
     if let Ok(url) = Url::parse(stream_url) {
-        let mut buffered_stream_handler = buffered_stream::BufferedStreamHandler::new(&url, req, input, send_bytes);
-        let stream =  buffered_stream_handler.get_stream();
+        let stream = buffered_stream::get_buffered_stream(&url, req, input, send_bytes);
         return if share_stream {
             SharedStream::register(app_state, stream_url, stream).await;
             if let Some(broadcast_stream) = create_notify_stream(app_state, stream_url).await {
@@ -95,8 +95,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
             }
         } else {
             let mut response_builder = get_stream_response_with_headers();
-            let body_stream = actix_web::body::BodyStream::new(stream);
-            response_builder.body(body_stream)
+            response_builder.streaming(stream)
         }
     }
     error!("Url is malformed {}", mask_sensitive_info(stream_url));
@@ -121,15 +120,23 @@ pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarge
     item_type == PlaylistItemType::Live && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
 }
 
+
+pub fn get_headers_from_request(req: &HttpRequest) -> HashMap<String, Vec<u8>> {
+    req.headers()
+        .iter()
+        .map(|(k, v)| (k.as_str().to_string(), v.as_bytes().to_vec()))
+        .collect()
+}
+
 pub async fn resource_response(_app_state: &AppState, resource_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
     if resource_url.is_empty() {
         return HttpResponse::NoContent().finish();
     }
-    let req_headers: HashMap<&str, &[u8]> = req.headers().iter().map(|(k, v)| (k.as_str(), v.as_bytes())).collect();
+    let req_headers = get_headers_from_request(req);
     debug_if_enabled!("Try to open resource {}", mask_sensitive_info(resource_url));
 
     if let Ok(url) = Url::parse(resource_url) {
-        let client = request_utils::get_client_request(input, &url, Some(&req_headers));
+        let client = request_utils::get_client_request(input.map(|i| &i.headers), &url, Some(&req_headers));
         match client.send().await {
             Ok(response) => {
                 let status = response.status();
