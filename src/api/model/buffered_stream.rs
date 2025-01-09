@@ -83,7 +83,9 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url:
     let stop_stream = Arc::clone(&stop_signal);
     let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
     let base_client = Arc::clone(http_client);
-    let (header_sender, mut header_receiver) = mpsc::channel::<Vec<(String, String)>>(1);
+    let (header_sender, mut header_receiver) = mpsc::channel::<Option<Vec<(String, String)>>>(1);
+    let first_run_header_sender = Arc::new(header_sender);
+    let timeout_header_sender = Arc::clone(&first_run_header_sender);
     actix_rt::spawn(async move {
         // let masked_url = mask_sensitive_info(url.as_str());
         let bytes_counter = if range_send { Some(AtomicUsize::new(req_bytes)) } else { None };
@@ -99,13 +101,6 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url:
 
             match client.send().await {
                 Ok(mut response) => {
-                    if first_run {
-                        first_run = false;
-                        let headers:  Vec<(String, String)> = response.headers_mut().iter()
-                            .filter(|(key, _)| MEDIA_STREAM_HEADERS.contains(&key.as_str()))
-                            .map(|(key, value)| (key.to_string(), value.to_str().unwrap().to_string())).collect();
-                        let _ = header_sender.send(headers).await;
-                    }
                     let status = response.status();
                     // let mut byte_stream = response.bytes_stream();
                     if !status.is_success() {
@@ -115,6 +110,13 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url:
                             stop_signal.store(true, Ordering::Relaxed);
                         }
                         continue;
+                    }
+                    if first_run {
+                        first_run = false;
+                        let headers:  Vec<(String, String)> = response.headers_mut().iter()
+                            .filter(|(key, _)| MEDIA_STREAM_HEADERS.contains(&key.as_str()))
+                            .map(|(key, value)| (key.to_string(), value.to_str().unwrap().to_string())).collect();
+                        let _ = first_run_header_sender.send(Some(headers)).await;
                     }
                     while !stop_signal.load(Ordering::Relaxed) {
                         match response.chunk().await {
@@ -165,11 +167,15 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url:
         drop(tx);
     });
 
-    let header = header_receiver.recv().await;
+    actix_rt::spawn(async move {
+       actix_web::rt::time::sleep(Duration::from_secs(5)).await;
+       let _ = timeout_header_sender.send(None).await;
+    });
+
+    let header = header_receiver.recv().await.and_then(|o| o);
     drop(header_receiver);
     (BufferedReceiverStream::new(rx, stop_stream), header)
 }
-
 
 pub fn get_stream_response_with_headers(custom: Option<Vec<(String, String)>>) -> HttpResponseBuilder {
     let mut response_builder = HttpResponse::Ok();
