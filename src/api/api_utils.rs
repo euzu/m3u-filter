@@ -83,7 +83,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
     let send_bytes = matches!(item_type, PlaylistItemType::Video  | PlaylistItemType::Series);
 
     if let Ok(url) = Url::parse(stream_url) {
-        let stream = buffered_stream::get_buffered_stream(&url, req, input, send_bytes);
+        let stream = buffered_stream::get_buffered_stream(&app_state.http_client, &url, req, input, send_bytes);
         return if share_stream {
             SharedStream::register(app_state, stream_url, stream).await;
             if let Some(broadcast_stream) = create_notify_stream(app_state, stream_url).await {
@@ -128,7 +128,7 @@ pub fn get_headers_from_request(req: &HttpRequest) -> HashMap<String, Vec<u8>> {
         .collect()
 }
 
-pub async fn resource_response(_app_state: &AppState, resource_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
+pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
     if resource_url.is_empty() {
         return HttpResponse::NoContent().finish();
     }
@@ -136,7 +136,7 @@ pub async fn resource_response(_app_state: &AppState, resource_url: &str, req: &
     debug_if_enabled!("Try to open resource {}", mask_sensitive_info(resource_url));
 
     if let Ok(url) = Url::parse(resource_url) {
-        let client = request_utils::get_client_request(input.map(|i| &i.headers), &url, Some(&req_headers));
+        let client = request_utils::get_client_request(&app_state.http_client, input.map(|i| &i.headers), &url, Some(&req_headers));
         match client.send().await {
             Ok(response) => {
                 let status = response.status();

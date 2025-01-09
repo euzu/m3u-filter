@@ -11,6 +11,7 @@ use crate::{create_resolve_options_function_for_xtream_target, handle_error, han
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
 use crate::model::xtream::{XtreamSeriesEpisode, XtreamSeriesInfoEpisode};
@@ -52,7 +53,7 @@ fn should_update_series_info(pli: &PlaylistItem, processed_provider_ids: &HashMa
     should_update_info(pli, processed_provider_ids, TAG_SERIES_INFO_LAST_MODIFIED)
 }
 
-async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterError>,
+async fn playlist_resolve_series_info(client: Arc<reqwest::Client>, cfg: &Config, errors: &mut Vec<M3uFilterError>,
                                       fpl: &mut FetchedPlaylist<'_>, resolve_delay: u16) -> bool {
     let mut processed_info_ids = read_processed_series_info_ids(cfg, errors, fpl).await;
     // we cant write to the indexed-document directly because of the write lock and time-consuming operation.
@@ -78,7 +79,7 @@ async fn playlist_resolve_series_info(cfg: &Config, errors: &mut Vec<M3uFilterEr
     for pli in series_info_iter {
         let (should_update, provider_id, ts) = should_update_series_info(pli, &processed_info_ids);
         if should_update {
-            if let Some(content) = playlist_resolve_download_playlist_item(pli, fpl.input, errors, resolve_delay, XtreamCluster::Series).await {
+            if let Some(content) = playlist_resolve_download_playlist_item(Arc::clone(&client), pli, fpl.input, errors, resolve_delay, XtreamCluster::Series).await {
                 handle_error_and_return!(write_info_content_to_wal_file(&mut content_writer, provider_id, &content),
                     |err| errors.push(notify_err!(format!("Failed to resolve series, could not write to content wal file {err}"))));
                 processed_info_ids.insert(provider_id, ts);
@@ -208,7 +209,7 @@ async fn process_series_info(
 }
 
 
-pub async fn playlist_resolve_series(cfg: &Config, target: &ConfigTarget,
+pub async fn playlist_resolve_series(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget,
                                      errors: &mut Vec<M3uFilterError>,
                                      pipe: &ProcessingPipe,
                                      provider_fpl: &mut FetchedPlaylist<'_>,
@@ -217,7 +218,7 @@ pub async fn playlist_resolve_series(cfg: &Config, target: &ConfigTarget,
     let (resolve_series, resolve_delay) = get_resolve_series_options(target, processed_fpl);
     if !resolve_series { return; }
 
-    if !playlist_resolve_series_info(cfg, errors, processed_fpl, resolve_delay).await { return; }
+    if !playlist_resolve_series_info(client, cfg, errors, processed_fpl, resolve_delay).await { return; }
     let series_playlist = process_series_info(cfg, provider_fpl, errors).await;
     if series_playlist.is_empty() { return; }
     // original content saved into original list

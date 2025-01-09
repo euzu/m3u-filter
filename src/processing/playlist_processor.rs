@@ -291,7 +291,7 @@ fn is_target_enabled(target: &ConfigTarget, user_targets: &ProcessTargets) -> bo
     (!user_targets.enabled && target.enabled) || (user_targets.enabled && user_targets.has_target(target.id))
 }
 
-async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<TargetStats>, Vec<M3uFilterError>) {
+async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<TargetStats>, Vec<M3uFilterError>) {
     let source = cfg.sources.get(source_idx).unwrap();
     let mut errors = vec![];
     let mut input_stats = HashMap::<u16, InputStats>::new();
@@ -304,11 +304,11 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         let input_id = input.id;
         if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
             let (mut playlistgroups, mut error_list) = match input.input_type {
-                InputType::M3u => download::get_m3u_playlist(&cfg, input, &cfg.working_dir).await,
-                InputType::Xtream => download::get_xtream_playlist(input, &cfg.working_dir).await,
+                InputType::M3u => download::get_m3u_playlist(Arc::clone(&client), &cfg, input, &cfg.working_dir).await,
+                InputType::Xtream => download::get_xtream_playlist(Arc::clone(&client), input, &cfg.working_dir).await,
             };
             let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
-                download::get_xmltv(&cfg, input, &cfg.working_dir).await
+                download::get_xmltv(Arc::clone(&client), &cfg, input, &cfg.working_dir).await
             } else {
                 (None, vec![])
             };
@@ -344,7 +344,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
         debug_if_enabled!("Source has {} groups", source_playlists.iter().map(|fpl| fpl.playlistgroups.len()).sum::<usize>());
         for target in &source.targets {
             if is_target_enabled(target, &user_targets) {
-                match process_playlist_for_target(&mut source_playlists, target, &cfg, &mut input_stats, &mut errors).await {
+                match process_playlist_for_target(Arc::clone(&client), &mut source_playlists, target, &cfg, &mut input_stats, &mut errors).await {
                     Ok(()) => {
                         target_stats.push(TargetStats::success(&target.name));
                     }
@@ -376,7 +376,7 @@ fn create_input_stat(group_count: usize, channel_count: usize, error_count: usiz
     }
 }
 
-async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<SourceStats>, Vec<M3uFilterError>) {
+async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<SourceStats>, Vec<M3uFilterError>) {
     let mut handle_list = vec![];
     let thread_num = config.threads;
     let process_parallel = thread_num > 1 && config.sources.len() > 1;
@@ -398,10 +398,11 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
         let cfg = config.clone();
         let usr_trgts = user_targets.clone();
         if process_parallel {
+            let http_client = Arc::clone(&client);
             let handles = &mut handle_list;
             let process = move || {
                 System::new().block_on(async {
-                    let (input_stats, target_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
+                    let (input_stats, target_stats, mut res_errors) = process_source(Arc::clone(&http_client), cfg, index, usr_trgts).await;
                     shared_errors.lock().await.append(&mut res_errors);
                     let process_stats = SourceStats::new(input_stats, target_stats);
                     shared_stats.lock().await.push(process_stats);
@@ -412,7 +413,7 @@ async fn process_sources(config: Arc<Config>, user_targets: Arc<ProcessTargets>)
                 handles.drain(..).for_each(|handle| { let _ = handle.join(); });
             }
         } else {
-            let (input_stats, target_stats, mut res_errors) = process_source(cfg, index, usr_trgts).await;
+            let (input_stats, target_stats, mut res_errors) = process_source(Arc::clone(&client), cfg, index, usr_trgts).await;
             shared_errors.lock().await.append(&mut res_errors);
             let process_stats = SourceStats::new(input_stats, target_stats);
             shared_stats.lock().await.push(process_stats);
@@ -485,7 +486,8 @@ fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
     sort_order
 }
 
-async fn process_playlist_for_target(playlists: &mut [FetchedPlaylist<'_>],
+async fn process_playlist_for_target(client: Arc<reqwest::Client>,
+                                     playlists: &mut [FetchedPlaylist<'_>],
                                      target: &ConfigTarget,
                                      cfg: &Config,
                                      stats: &mut HashMap<u16, InputStats>,
@@ -497,8 +499,8 @@ async fn process_playlist_for_target(playlists: &mut [FetchedPlaylist<'_>],
     let mut processed_fetched_playlists: Vec<FetchedPlaylist> = vec![];
     for provider_fpl in playlists.iter_mut() {
         let mut processed_fpl = execute_pipe(target, &pipe, provider_fpl, &mut duplicates);
-        playlist_resolve_series(cfg, target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
-        playlist_resolve_vod(cfg, target, errors, &processed_fpl).await;
+        playlist_resolve_series(Arc::clone(&client), cfg, target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
+        playlist_resolve_vod(Arc::clone(&client), cfg, target, errors, &processed_fpl).await;
         // stats
         let input_stats = stats.get_mut(&processed_fpl.input.id);
         if let Some(stat) = input_stats {
@@ -560,9 +562,9 @@ fn process_watch(target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<Playlis
     }
 }
 
-pub async fn exec_processing(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let start_time = Instant::now();
-    let (stats, errors) = process_sources(cfg.clone(), targets.clone()).await;
+    let (stats, errors) = process_sources(client, cfg.clone(), targets.clone()).await;
     // log errors
     for err in &errors {
         error!("{}", err.message);

@@ -9,4 +9,5 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub downloads: Arc<DownloadQueue>,
     pub shared_streams: Arc<Mutex<HashMap<String, SharedStream>>>,
+    pub http_client: Arc<reqwest::Client>,
 }

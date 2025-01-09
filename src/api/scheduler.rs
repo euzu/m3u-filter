@@ -24,7 +24,7 @@ fn datetime_to_instant(datetime: DateTime<FixedOffset>) -> Instant {
     Instant::now() + duration_until
 }
 
-pub async fn start_scheduler(expression: &str, config: Arc<Config>, targets: Arc<ProcessTargets>) -> ! {
+pub async fn start_scheduler(client: Arc<reqwest::Client>, expression: &str, config: Arc<Config>, targets: Arc<ProcessTargets>) -> ! {
     match Schedule::from_str(expression) {
         Ok(schedule) => {
             let offset = *Local::now().offset();
@@ -32,7 +32,7 @@ pub async fn start_scheduler(expression: &str, config: Arc<Config>, targets: Arc
                 let mut upcoming = schedule.upcoming(offset).take(1);
                 if let Some(datetime) = upcoming.next() {
                     actix_web::rt::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
-                    exec_processing(Arc::clone(&config), Arc::clone(&targets)).await;
+                    exec_processing(Arc::clone(&client), Arc::clone(&config), Arc::clone(&targets)).await;
                  }
             }
         }

@@ -1,3 +1,4 @@
+use crate::Arc;
 use std::borrow::Cow;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
@@ -30,10 +31,10 @@ fn prepare_file_path(persist: Option<&str>, working_dir: &str, action: &str) -> 
     }
 }
 
-pub async fn get_m3u_playlist(cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub async fn get_m3u_playlist(client: Arc<reqwest::Client>, cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let url = input.url.clone();
     let persist_file_path = prepare_file_path(input.persist.as_deref(), working_dir, "");
-    match request_utils::get_input_text_content(input, working_dir, &url, persist_file_path).await {
+    match request_utils::get_input_text_content(client, input, working_dir, &url, persist_file_path).await {
         Ok(text) => {
             (m3u_parser::parse_m3u(cfg, input, text.lines()), vec![])
         }
@@ -64,12 +65,19 @@ pub fn get_xtream_player_api_info_url(input: &ConfigInput, cluster: XtreamCluste
 }
 
 
-pub async fn get_xtream_stream_info_content(info_url: &str, input: &ConfigInput) -> Result<String, Error> {
-    request_utils::download_text_content(input, info_url, None).await
+pub async fn get_xtream_stream_info_content(client: Arc<reqwest::Client>, info_url: &str, input: &ConfigInput) -> Result<String, Error> {
+    request_utils::download_text_content(client, input, info_url, None).await
 }
 
-pub async fn get_xtream_stream_info<P>(config: &Config,  user: &ProxyUserCredentials, input: &ConfigInput, target: &ConfigTarget,
-                                       pli: &P, info_url: &str, cluster: XtreamCluster) -> Result<String, Error>
+#[allow(clippy::too_many_arguments)]
+pub async fn get_xtream_stream_info<P>(client: Arc<reqwest::Client>,
+                                       config: &Config,
+                                       user: &ProxyUserCredentials,
+                                       input: &ConfigInput,
+                                       target: &ConfigTarget,
+                                       pli: &P,
+                                       info_url: &str,
+                                       cluster: XtreamCluster) -> Result<String, Error>
 where
     P: PlaylistEntry,
 {
@@ -104,7 +112,7 @@ where
         }
     }
 
-    if let Ok(content) = get_xtream_stream_info_content(info_url, input).await {
+    if let Ok(content) = get_xtream_stream_info_content(client, info_url, input).await {
         return match cluster {
             XtreamCluster::Live => Ok(content),
             XtreamCluster::Video => xtream_repository::write_and_get_xtream_vod_info(config, target, pli, user, &content).await,
@@ -141,7 +149,7 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Video, "get_vod_categories", "get_vod_streams"),
     (XtreamCluster::Series, "get_series_categories", "get_series")];
 
-pub async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub async fn get_xtream_playlist(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let mut playlist_groups: Vec<PlaylistGroup> = Vec::with_capacity(128);
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
@@ -158,8 +166,8 @@ pub async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec
             let stream_file_path = prepare_file_path(input.persist.as_deref(), working_dir, format!("{stream}_").as_str());
 
             match futures::join!(
-                request_utils::get_input_json_content(input, category_url.as_str(), category_file_path),
-                request_utils::get_input_json_content(input, stream_url.as_str(), stream_file_path)
+                request_utils::get_input_json_content(Arc::clone(&client), input, category_url.as_str(), category_file_path),
+                request_utils::get_input_json_content(Arc::clone(&client), input, stream_url.as_str(), stream_file_path)
             ) {
                 (Ok(category_content), Ok(stream_content)) => {
                     match xtream_parser::parse_xtream(input,
@@ -189,7 +197,7 @@ pub async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec
     (playlist_groups, errors)
 }
 
-pub async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Option<TVGuide>, Vec<M3uFilterError>) {
+pub async fn get_xmltv(client: Arc<reqwest::Client>, _cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Option<TVGuide>, Vec<M3uFilterError>) {
     match &input.epg_url {
         None => (None, vec![]),
         Some(url) => {
@@ -197,7 +205,7 @@ pub async fn get_xmltv(_cfg: &Config, input: &ConfigInput, working_dir: &str) ->
             let persist_file_path = prepare_file_path(input.persist.as_deref(), working_dir, "")
                 .map(|path| file_utils::add_prefix_to_filename(&path, "epg_", Some("xml")));
 
-            match request_utils::get_input_text_content_as_file(input, working_dir, url, persist_file_path).await {
+            match request_utils::get_input_text_content_as_file(client, input, working_dir, url, persist_file_path).await {
                 Ok(file) => {
                     (Some(TVGuide { file }), vec![])
                 }

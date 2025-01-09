@@ -1,5 +1,6 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
+use crate::Arc;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
@@ -407,7 +408,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
                 // Redirect is only possible for live streams, vod and series info needs to be modified
                 if user.proxy == ProxyType::Redirect && cluster == XtreamCluster::Live {
                     return HttpResponse::Found().insert_header(("Location", info_url)).finish();
-                } else if let Ok(content) = download::get_xtream_stream_info(&app_state.config, user, input, target, &pli, info_url.as_str(), cluster).await {
+                } else if let Ok(content) = download::get_xtream_stream_info(Arc::clone(&app_state.http_client), &app_state.config, user, input, target, &pli, info_url.as_str(), cluster).await {
                     return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content);
                 }
             }
@@ -440,7 +441,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                         return HttpResponse::Found().insert_header(("Location", info_url)).finish();
                     }
 
-                    return match request_utils::download_text_content(input, info_url.as_str(), None).await {
+                    return match request_utils::download_text_content(Arc::clone(&app_state.http_client), input, info_url.as_str(), None).await {
                         Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
                         Err(err) => {
                             error!("Failed to download epg {}", mask_sensitive_info(err.to_string().as_str()));
@@ -481,7 +482,7 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)).await);
     let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id));
     let info_url = try_option_bad_request!(download::get_xtream_player_api_action_url(input, ACTION_GET_CATCHUP_TABLE).map(|action_url| format!("{action_url}&{TAG_STREAM_ID}={}&start={start}&end={end}", pli.provider_id)));
-    let content = try_result_bad_request!(download::get_xtream_stream_info_content(info_url.as_str(), input).await);
+    let content = try_result_bad_request!(download::get_xtream_stream_info_content(Arc::clone(&app_state.http_client), info_url.as_str(), input).await);
     let mut doc: Map<String, Value> = try_result_bad_request!(serde_json::from_str(&content));
     let epg_listings = try_option_bad_request!(doc.get_mut(TAG_EPG_LISTINGS).and_then(Value::as_array_mut));
     let target_path = try_option_bad_request!(get_target_storage_path(&app_state.config, target.name.as_str()));

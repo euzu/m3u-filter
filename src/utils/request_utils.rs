@@ -1,3 +1,4 @@
+use crate::Arc;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
@@ -27,10 +28,10 @@ pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
 }
 
-pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
+pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
     debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
     if url_str.parse::<url::Url>().is_ok() {
-        match download_text_content_as_file(input, url_str, working_dir, persist_filepath).await {
+        match download_text_content_as_file(client, input, url_str, working_dir, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", mask_sensitive_info(url_str), mask_sensitive_info(e.to_string().as_str()));
@@ -73,11 +74,11 @@ pub async fn get_input_text_content_as_file(input: &ConfigInput, working_dir: &s
 }
 
 
-pub async fn get_input_text_content(input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
+pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
     debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
 
     if url_str.parse::<url::Url>().is_ok() {
-        match download_text_content(input, url_str, persist_filepath).await {
+        match download_text_content(client, input, url_str, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", mask_sensitive_info(url_str), mask_sensitive_info(e.to_string().as_str()));
@@ -119,8 +120,8 @@ pub async fn get_input_text_content(input: &ConfigInput, working_dir: &str, url_
     }
 }
 
-pub fn get_client_request(headers: Option<&HashMap<String, String>>, url: &Url, custom_headers: Option<&HashMap<String, Vec<u8>>>) -> reqwest::RequestBuilder {
-    let request = reqwest::Client::new().get(url.clone());
+pub fn get_client_request(client: &Arc<reqwest::Client>, headers: Option<&HashMap<String, String>>, url: &Url, custom_headers: Option<&HashMap<String, Vec<u8>>>) -> reqwest::RequestBuilder {
+    let request = client.get(url.clone());
     let headers = get_request_headers(headers, custom_headers);
     request.headers(headers)
 }
@@ -176,9 +177,9 @@ fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
 }
 
 
-async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &Path) -> Result<PathBuf, std::io::Error> {
+async fn get_remote_content_as_file(client: Arc<reqwest::Client>, input: &ConfigInput, url: &Url, file_path: &Path) -> Result<PathBuf, std::io::Error> {
     let start_time = Instant::now();
-    let request = get_client_request(Some(&input.headers), url, None);
+    let request = get_client_request(&client, Some(&input.headers), url, None);
     match request.send().await {
         Ok(response) => {
             if response.status().is_success() {
@@ -209,9 +210,9 @@ async fn get_remote_content_as_file(input: &ConfigInput, url: &Url, file_path: &
     }
 }
 
-async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Error> {
+async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, url: &Url) -> Result<String, Error> {
     let start_time = Instant::now();
-    let request = get_client_request(Some(&input.headers), url, None);
+    let request = get_client_request(&client, Some(&input.headers), url, None);
     match request.send().await {
         Ok(response) => {
             let is_success = response.status().is_success();
@@ -272,7 +273,7 @@ async fn get_remote_content(input: &ConfigInput, url: &Url) -> Result<String, Er
     }
 }
 
-pub async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, working_dir: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, Error> {
+pub async fn download_text_content_as_file(client: Arc<reqwest::Client>, input: &ConfigInput, url_str: &str, working_dir: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         if url.scheme() == "file" {
             url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {}", mask_sensitive_info(url_str)))), |file_path| if file_path.exists() {
@@ -288,7 +289,7 @@ pub async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, w
                 Err(err) => Err(err)
             }, Ok);
             match file_path {
-                Ok(persist_path) => get_remote_content_as_file(input, &url, &persist_path).await,
+                Ok(persist_path) => get_remote_content_as_file(client, input, &url, &persist_path).await,
                 Err(err) => Err(err)
             }
         }
@@ -298,12 +299,12 @@ pub async fn download_text_content_as_file(input: &ConfigInput, url_str: &str, w
 }
 
 
-pub async fn download_text_content(input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
+pub async fn download_text_content(client: Arc<reqwest::Client>, input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         let result = if url.scheme() == "file" {
             url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Other, format!("Unknown file {}", mask_sensitive_info(url_str)))), |file_path| get_local_file_content(&file_path))
         } else {
-            get_remote_content(input, &url).await
+            get_remote_content(client, input, &url).await
         };
         match result {
             Ok(content) => {
@@ -319,9 +320,9 @@ pub async fn download_text_content(input: &ConfigInput, url_str: &str, persist_f
     }
 }
 
-async fn download_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, Error> {
+async fn download_json_content(client: Arc<reqwest::Client>, input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, Error> {
     debug_if_enabled!("downloading json content from {}", mask_sensitive_info(url));
-    match download_text_content(input, url, persist_filepath).await {
+    match download_text_content(client, input, url, persist_filepath).await {
         Ok(content) => {
             match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(value) => Ok(value),
@@ -332,8 +333,8 @@ async fn download_json_content(input: &ConfigInput, url: &str, persist_filepath:
     }
 }
 
-pub async fn get_input_json_content(input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
-    match download_json_content(input, url, persist_filepath).await {
+pub async fn get_input_json_content(client: Arc<reqwest::Client>, input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
+    match download_json_content(client, input, url, persist_filepath).await {
         Ok(content) => Ok(content),
         Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", mask_sensitive_info(url), mask_sensitive_info(e.to_string().as_str()))
     }

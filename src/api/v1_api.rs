@@ -103,7 +103,7 @@ async fn playlist_update(
     let process_targets = validate_targets(user_targets.as_ref(), &app_state.config.sources);
     match process_targets {
         Ok(valid_targets) => {
-            actix_rt::spawn(playlist_processor::exec_processing(Arc::clone(&app_state.config), Arc::new(valid_targets)));
+            actix_rt::spawn(playlist_processor::exec_processing(Arc::clone(&app_state.http_client), Arc::clone(&app_state.config), Arc::new(valid_targets)));
             HttpResponse::Ok().finish()
         }
         Err(err) => {
@@ -128,13 +128,13 @@ fn create_config_input_for_url(url: &str) -> ConfigInput {
     }
 }
 
-async fn get_playlist(cfg_input: Option<&ConfigInput>, cfg: &Config) -> HttpResponse {
+async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInput>, cfg: &Config) -> HttpResponse {
     match cfg_input {
         Some(input) => {
             let (result, errors) =
                 match input.input_type {
-                    InputType::M3u => download::get_m3u_playlist(cfg, input, &cfg.working_dir).await,
-                    InputType::Xtream => download::get_xtream_playlist(input, &cfg.working_dir).await,
+                    InputType::M3u => download::get_m3u_playlist(client, cfg, input, &cfg.working_dir).await,
+                    InputType::Xtream => download::get_xtream_playlist(client, input, &cfg.working_dir).await,
                 };
             if result.is_empty() {
                 let error_strings: Vec<String> = errors.iter().map(std::string::ToString::to_string).collect();
@@ -152,11 +152,11 @@ async fn playlist(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     if let Some(input_id) = req.input_id {
-        get_playlist(app_state.config.get_input_by_id(input_id), &app_state.config).await
+        get_playlist(Arc::clone(&app_state.http_client), app_state.config.get_input_by_id(input_id), &app_state.config).await
     } else {
         let url = req.url.as_deref().unwrap_or("");
         let input = create_config_input_for_url(url);
-        get_playlist(Some(&input), &app_state.config).await
+        get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await
     }
 }
 

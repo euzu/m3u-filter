@@ -22,7 +22,7 @@ impl SharedStream {
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
     {
         // Create a broadcast channel for the shared stream
-        let (tx, _) = broadcast::channel(100);
+        let (tx, _) = broadcast::channel(10);
         let sender = Arc::new(tx);
 
         // Insert the shared stream into the shared state

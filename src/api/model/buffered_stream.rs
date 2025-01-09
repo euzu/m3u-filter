@@ -1,11 +1,8 @@
 use crate::api::api_utils::get_headers_from_request;
 use crate::model::config::ConfigInput;
-use crate::utils::request_utils;
-use crate::utils::request_utils::mask_sensitive_info;
 use actix_web::{HttpRequest, HttpResponse, HttpResponseBuilder};
 use bytes::Bytes;
 use core::time::Duration;
-use log::debug;
 use reqwest::header::RANGE;
 use reqwest::Error;
 use std::collections::HashMap;
@@ -17,6 +14,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio_stream::Stream;
 use url::Url;
+use crate::utils::request_utils::get_request_headers;
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages.
 const ERR_RETRY_TIMEOUT_SECS: u64 = 10; // If connect status is 4xx or 5xx, we wait until we allow next request from client
@@ -70,20 +68,21 @@ impl<T> Drop for BufferedReceiverStream<T> {
     }
 }
 
-pub fn get_buffered_stream(stream_url: &Url, req: &HttpRequest, input: Option<&ConfigInput>, range_send: bool) -> impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static {
+pub fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url: &Url, req: &HttpRequest, input: Option<&ConfigInput>, range_send: bool) -> impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static {
     let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(STREAM_QUEUE_SIZE);
     let req_headers = get_headers_from_request(req);
     let input_headers = input.map(|i| i.headers.clone());
     let url = stream_url.clone();
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_stream = Arc::clone(&stop_signal);
-    let req_client = request_utils::get_client_request(input_headers.as_ref(), &url, Some(&req_headers));
+    let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
+    let base_client = Arc::clone(http_client);
     actix_rt::spawn(async move {
-        let masked_url = mask_sensitive_info(url.as_str());
+        // let masked_url = mask_sensitive_info(url.as_str());
         let req_bytes = get_request_bytes(&req_headers);
         let bytes_counter = if range_send { Some(AtomicUsize::new(req_bytes)) } else { None };
         while !stop_signal.load(Ordering::Relaxed) {
-            let Some(mut client) = req_client.try_clone() else { break };
+            let mut client = base_client.get(url.clone()).headers(headers.clone());
             let bytes_to_request = bytes_counter.as_ref().map_or(0, |atomic| atomic.load(Ordering::Relaxed));
             if bytes_to_request > 0 {
                 // on reconnect send range header to avoid starting from beginning for vod

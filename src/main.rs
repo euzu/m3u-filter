@@ -1,21 +1,21 @@
 #![allow(clippy::module_name_repetitions)]
+extern crate core;
 extern crate env_logger;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
-extern crate core;
 
+use actix_rt::System;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
-use actix_rt::System;
 
+use crate::auth::password::generate_password;
 use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
-use crate::auth::password::generate_password;
 
-use crate::model::config::{Config, HealthcheckConfig, ProcessTargets, validate_targets};
+use crate::model::config::{validate_targets, Config, HealthcheckConfig, ProcessTargets};
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, file_utils};
@@ -70,7 +70,8 @@ struct Args {
     #[arg(short = None, long = "genpwd", default_value_t = false, default_missing_value = "true")]
     genpwd: bool,
 
-    #[arg(short = None, long = "healthcheck", default_value_t = false, default_missing_value = "true")]
+    #[arg(short = None, long = "healthcheck", default_value_t = false, default_missing_value = "true"
+    )]
     healthcheck: bool,
 
 }
@@ -100,7 +101,7 @@ fn main() {
     let sources_file: String = args.source_file.unwrap_or_else(|| file_utils::get_default_sources_file_path(&config_path));
     let mut cfg = config_reader::read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
 
-    if args.genpwd  {
+    if args.genpwd {
         match generate_password() {
             Ok(pwd) => println!("{pwd}"),
             Err(err) => error!("{err}")
@@ -143,30 +144,30 @@ fn create_directories(cfg: &Config) {
         cfg.video.as_ref().and_then(|v| v.download.as_ref()).and_then(|d| d.directory.clone())
     ];
 
-    let mut paths : Vec<PathBuf>= paths_strings.iter()
+    let mut paths: Vec<PathBuf> = paths_strings.iter()
         .filter_map(|opt| opt.as_ref()) // Get rid of the `Option`
         .map(PathBuf::from).collect();
     let mut temp_path = PathBuf::from(&cfg.working_dir);
     temp_path.push("tmp");
     paths.push(temp_path);
 
-            // Iterate over the paths, filter out `None` values, and process the `Some(path)` values.
+    // Iterate over the paths, filter out `None` values, and process the `Some(path)` values.
     for path in &paths {
-            if !path.exists() {
-                // Create the directory tree if it doesn't exist
-                let path_value = path.to_str().unwrap_or("?");
-                if let Err(e) = std::fs::create_dir_all(path) {
-                    error!("Failed to create directory {path_value}: {e}");
-                } else {
-                    info!("Created directory: {path_value}");
-                }
+        if !path.exists() {
+            // Create the directory tree if it doesn't exist
+            let path_value = path.to_str().unwrap_or("?");
+            if let Err(e) = std::fs::create_dir_all(path) {
+                error!("Failed to create directory {path_value}: {e}");
+            } else {
+                info!("Created directory: {path_value}");
             }
         }
-
+    }
 }
 
 fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    System::new().block_on(async { playlist_processor::exec_processing(cfg, targets).await });
+    let client = Arc::new(reqwest::Client::new());
+    System::new().block_on(async { playlist_processor::exec_processing(client, cfg, targets).await });
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {

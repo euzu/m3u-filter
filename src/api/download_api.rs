@@ -1,17 +1,17 @@
+use crate::api::model::app_state::AppState;
+use crate::api::model::download::{DownloadQueue, FileDownload, FileDownloadRequest};
 use crate::model::config::VideoDownloadConfig;
 use crate::utils::request_utils;
 use actix_web::{web, HttpResponse};
+use async_std::sync::RwLock;
 use futures::stream::TryStreamExt;
 use log::info;
 use serde_json::{json, Value};
 use std::fs::File;
 use std::io::{ErrorKind, Write};
 use std::ops::Deref;
-use std::sync::{Arc};
-use async_std::sync::RwLock;
+use std::sync::Arc;
 use std::{fs, io};
-use crate::api::model::app_state::AppState;
-use crate::api::model::download::{DownloadQueue, FileDownload, FileDownloadRequest};
 
 async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwest::Client) -> Result<(), String> {
     let file_download = { active.read().await.as_ref().unwrap().clone() };

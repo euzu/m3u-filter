@@ -9,6 +9,7 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
 
@@ -63,7 +64,7 @@ fn should_update_vod_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u
     should_update_info(pli, processed_provider_ids, TAG_VOD_INFO_ADDED)
 }
 
-pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) {
+pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) {
     let (resolve_movies, resolve_delay) = get_resolve_vod_options(target, fpl);
     if !resolve_movies { return; }
 
@@ -92,7 +93,7 @@ pub async fn playlist_resolve_vod(cfg: &Config, target: &ConfigTarget, errors: &
     for pli in  vod_info_iter {
         let (should_update, _provider_id, _ts) = should_update_vod_info(pli, &processed_info_ids);
         if should_update {
-            if let Some(content) = playlist_resolve_download_playlist_item(pli, fpl.input, errors, resolve_delay, XtreamCluster::Video).await {
+            if let Some(content) = playlist_resolve_download_playlist_item(Arc::clone(&client), pli, fpl.input, errors, resolve_delay, XtreamCluster::Video).await {
                 if let Some((provider_id, info_record)) = extract_info_record_from_vod_info(&content) {
                     let ts = info_record.ts;
                     handle_error_and_return!(write_info_content_to_wal_file(&mut content_writer, provider_id, &content),

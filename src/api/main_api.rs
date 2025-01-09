@@ -50,15 +50,16 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
             finished: Arc::from(RwLock::new(Vec::new())),
         }),
         shared_streams: Arc::new(Mutex::new(HashMap::new())),
+        http_client: Arc::new(reqwest::Client::new()),
     })
 }
 
-fn exec_update_on_boot(cfg: &Arc<Config>, targets: &Arc<ProcessTargets>) {
+fn exec_update_on_boot(client: Arc<reqwest::Client>, cfg: &Arc<Config>, targets: &Arc<ProcessTargets>) {
     if cfg.update_on_boot {
         let cfg_clone = Arc::clone(cfg);
         let targets_clone = Arc::clone(targets);
         actix_rt::spawn(
-            async move { playlist_processor::exec_processing(cfg_clone, targets_clone).await }
+            async move { playlist_processor::exec_processing(client, cfg_clone, targets_clone).await }
         );
     }
 }
@@ -89,7 +90,7 @@ fn get_process_targets(cfg: &Arc<Config>, process_targets: &Arc<ProcessTargets>,
     Arc::clone(process_targets)
 }
 
-fn exec_scheduler(cfg: &Arc<Config>, targets: &Arc<ProcessTargets>) {
+fn exec_scheduler(client: &Arc<reqwest::Client>, cfg: &Arc<Config>, targets: &Arc<ProcessTargets>) {
     let schedules: Vec<ScheduleConfig> = if let Some(schedules) = &cfg.schedules {
         schedules.clone()
     } else {
@@ -99,8 +100,9 @@ fn exec_scheduler(cfg: &Arc<Config>, targets: &Arc<ProcessTargets>) {
         let expression = schedule.schedule.to_string();
         let exec_targets = get_process_targets(cfg, targets, schedule.targets.as_ref());
         let cfg_clone = Arc::clone(cfg);
+        let http_client = Arc::clone(client);
         actix_rt::spawn(async move {
-            start_scheduler(expression.as_str(), cfg_clone, exec_targets).await;
+            start_scheduler(http_client, expression.as_str(), cfg_clone, exec_targets).await;
         });
     }
 }
@@ -125,11 +127,12 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         Err(err) => return Err(err)
     };
 
-    exec_scheduler(&cfg, &targets);
-    exec_update_on_boot(&cfg, &targets);
+    let shared_data = create_shared_data(&cfg);
+
+    exec_scheduler(&Arc::clone(&shared_data.http_client), &cfg, &targets);
+    exec_update_on_boot(Arc::clone(&shared_data.http_client), &cfg, &targets);
     let web_auth_enabled = is_web_auth_enabled(&cfg, web_ui_enabled, &web_dir_path);
 
-    let shared_data = create_shared_data(&cfg);
     // Web Server
     HttpServer::new(move || {
         App::new()
