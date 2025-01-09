@@ -19,7 +19,6 @@ use tokio_stream::Stream;
 use url::Url;
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages.
-const STREAM_CONNECT_TIMEOUT_SECS: u64 = 5; // Wait timeout secs for connection when server dropped connection, then retry
 const ERR_RETRY_TIMEOUT_SECS: u64 = 10; // If connect status is 4xx or 5xx, we wait until we allow next request from client
 
 fn get_request_bytes(req_headers: &HashMap<String, Vec<u8>>) -> usize {
@@ -78,13 +77,13 @@ pub fn get_buffered_stream(stream_url: &Url, req: &HttpRequest, input: Option<&C
     let url = stream_url.clone();
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_stream = Arc::clone(&stop_signal);
+    let req_client = request_utils::get_client_request(input_headers.as_ref(), &url, Some(&req_headers));
     actix_rt::spawn(async move {
         let masked_url = mask_sensitive_info(url.as_str());
         let req_bytes = get_request_bytes(&req_headers);
         let bytes_counter = if range_send { Some(AtomicUsize::new(req_bytes)) } else { None };
         while !stop_signal.load(Ordering::Relaxed) {
-            let mut client = request_utils::get_client_request(input_headers.as_ref(), &url, Some(&req_headers));
-            client = client.timeout(Duration::from_secs(STREAM_CONNECT_TIMEOUT_SECS));
+            let Some(mut client) = req_client.try_clone() else { break };
             let bytes_to_request = bytes_counter.as_ref().map_or(0, |atomic| atomic.load(Ordering::Relaxed));
             if bytes_to_request > 0 {
                 // on reconnect send range header to avoid starting from beginning for vod
@@ -108,7 +107,7 @@ pub fn get_buffered_stream(stream_url: &Url, req: &HttpRequest, input: Option<&C
                         match response.chunk().await {
                             Ok(Some(chunk)) => {
                                 if chunk.is_empty() {
-                                    // debug!("Stream finished ? {masked_url}");
+                                    // debug!("Download Stream finished ? {masked_url}");
                                     break;
                                 }
                                 if let Ok(permit) = tx.reserve().await {
@@ -118,18 +117,19 @@ pub fn get_buffered_stream(stream_url: &Url, req: &HttpRequest, input: Option<&C
                                         bytes.fetch_add(len, Ordering::Relaxed);
                                     }
                                 } else {
-                                    // debug!("Stream finished, client disconnect ?  {masked_url}");
+                                    // debug!("Client disconnect ?  {masked_url}");
                                     stop_signal.store(true, Ordering::Relaxed);
                                     break;
                                 }
                             }
                             Err(_err) => {
+                                // debug!("Media stream error {masked_url} {_err:?}");
                                 stop_signal.store(true, Ordering::Relaxed);
                                 break;
                             }
                             Ok(None) => {
                                 // no chunk available
-                                // debug!("media stream finished no data available");
+                                // debug!("Media stream finished no data available {masked_url}");
                                 stop_signal.store(true, Ordering::Relaxed);
                                 break;
                             }
@@ -149,7 +149,7 @@ pub fn get_buffered_stream(stream_url: &Url, req: &HttpRequest, input: Option<&C
             }
             actix_web::rt::time::sleep(Duration::from_secs(1)).await;
         }
-        debug!("Reconnecting stream stopped {masked_url}");
+        // debug!("Reconnecting stream stopped {masked_url}");
         drop(tx);
     });
 

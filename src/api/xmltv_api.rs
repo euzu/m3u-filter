@@ -121,10 +121,10 @@ async fn serve_epg(epg_path: &Path, req: &HttpRequest, user: &ProxyUserCredentia
 
 fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> HttpResponse {
     let reader = BufReader::new(epg_file);
-    let encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let encoder = GzEncoder::new(Vec::with_capacity(4096), Compression::default());
     let mut xml_reader = Reader::from_reader(reader);
     let mut xml_writer = Writer::new(encoder);
-    let mut buf = Vec::new();
+    let mut buf = Vec::with_capacity(1024);
     let duration = Duration::minutes(i64::from(offset_minutes));
 
     loop {

@@ -42,8 +42,8 @@ where
     // Detect and return cycles in the graph
     pub fn find_cycles(&self) -> Vec<Vec<K>> {
         let mut visited = HashSet::new();
-        let mut recursion_stack = Vec::new();
-        let mut cycles = Vec::new();
+        let mut recursion_stack = Vec::with_capacity(128);
+        let mut cycles = Vec::with_capacity(128);
 
         for node in self.adjacencies.keys() {
             if !visited.contains(node) {

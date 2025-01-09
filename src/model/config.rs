@@ -949,7 +949,7 @@ impl Config {
         for source in &mut self.sources {
             for target in &mut source.targets {
                 if let Some(mapping_ids) = &target.mapping {
-                    let mut target_mappings = Vec::new();
+                    let mut target_mappings = Vec::with_capacity(128);
                     for mapping_id in mapping_ids {
                         let mapping = mappings_cfg.get_mapping(mapping_id);
                         if let Some(mappings) = mapping {

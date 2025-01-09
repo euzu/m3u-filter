@@ -9,7 +9,7 @@ pub struct MultiFileReader {
 
 impl MultiFileReader {
     pub fn new(paths: &Vec<PathBuf>) -> io::Result<Self> {
-        let mut files = Vec::new();
+        let mut files = Vec::with_capacity(paths.len());
         for path in paths {
             match File::open(path) {
                 Ok(file) => { files.push(file); }

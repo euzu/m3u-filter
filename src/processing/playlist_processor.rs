@@ -42,7 +42,7 @@ fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
 #[allow(clippy::unnecessary_wraps)]
 fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option<Vec<PlaylistGroup>> {
     debug!("Filtering {} groups", playlist.len());
-    let mut new_playlist = Vec::new();
+    let mut new_playlist = Vec::with_capacity(128);
     for pg in playlist.iter_mut() {
         let channels = pg.channels.iter()
             .filter(|&pli| is_valid(pli, target)).cloned().collect::<Vec<PlaylistItem>>();
@@ -151,7 +151,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
     match &target.rename {
         Some(renames) => {
             if !renames.is_empty() {
-                let mut new_playlist: Vec<PlaylistGroup> = Vec::new();
+                let mut new_playlist: Vec<PlaylistGroup> = Vec::with_capacity(playlist.len());
                 for g in playlist {
                     let mut grp = g.clone();
                     for r in renames {
@@ -219,7 +219,7 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
 
         // if the group names are changed, restructure channels to the right groups
         // we use
-        let mut new_groups: Vec<PlaylistGroup> = Vec::new();
+        let mut new_groups: Vec<PlaylistGroup> = Vec::with_capacity(128);
         let mut grp_id: u32 = 0;
         for playlist_group in new_playlist {
             for channel in &playlist_group.channels {
@@ -296,7 +296,7 @@ async fn process_source(cfg: Arc<Config>, source_idx: usize, user_targets: Arc<P
     let mut errors = vec![];
     let mut input_stats = HashMap::<u16, InputStats>::new();
     let mut target_stats = Vec::<TargetStats>::new();
-    let mut source_playlists = Vec::new();
+    let mut source_playlists = Vec::with_capacity(128);
     let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
     // Downlod the sources
     for input in &source.inputs {

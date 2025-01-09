@@ -170,7 +170,8 @@ where
             if size == encoded_bytes.len() {
                 // check if it is equal
                 let mut record_buffer = vec![0; size];
-                record_buffer.resize(size, 0);
+                // record_buffer.resize(size, 0);
+
                 self.main_file.read_exact(&mut record_buffer)?;
                 if record_buffer == encoded_bytes {
                     return Ok(());
@@ -310,7 +311,7 @@ where
                         offsets,
                         index: 0,
                         failed: false,
-                        t_buffer: Vec::new(),
+                        t_buffer: Vec::with_capacity(BLOCK_SIZE),
                         t_type: PhantomData,
                         k_type: PhantomData,
                     })

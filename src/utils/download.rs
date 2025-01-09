@@ -142,7 +142,7 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Series, "get_series_categories", "get_series")];
 
 pub async fn get_xtream_playlist(input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
-    let mut playlist_groups: Vec<PlaylistGroup> = Vec::new();
+    let mut playlist_groups: Vec<PlaylistGroup> = Vec::with_capacity(128);
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
     let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);

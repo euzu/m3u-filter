@@ -319,7 +319,7 @@ macro_rules! handle_expr {
 }
 
 fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, errors: &mut Vec<String>) -> Filter {
-    let mut stmts = Vec::new();
+    let mut stmts = Vec::with_capacity(128);
     let pairs = expr.into_inner();
     let mut bop: Option<BinaryOperator> = None;
     let mut uop: Option<UnaryOperator> = None;
@@ -383,7 +383,7 @@ fn get_parser_binary_op(expr: &Pair<Rule>) -> Result<BinaryOperator, M3uFilterEr
 }
 
 pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -> Result<Filter, M3uFilterError> {
-    let empty_list = Vec::new();
+    let empty_list = Vec::with_capacity(0);
     let template_list: &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
     let source = apply_templates_to_pattern(filter_text, template_list);
 

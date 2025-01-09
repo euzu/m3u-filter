@@ -318,8 +318,7 @@ where
             let bytes_available_on_block = BLOCK_SIZE - read_pos;
             let content_bytes = if values_length > bytes_available_on_block {
                 let mut left_over_bytes = values_length;
-                let mut content_chunk = Vec::new();
-                content_chunk.extend(&buffer[read_pos..read_pos + bytes_available_on_block]);
+                let mut content_chunk = Vec::from(&buffer[read_pos..read_pos + bytes_available_on_block]);
                 left_over_bytes -= bytes_available_on_block;
                 while left_over_bytes > 0 {
                     file.read_exact(buffer)?;
@@ -377,14 +376,14 @@ where
 
 fn decode_content(content_bytes: &Vec<u8>) -> Option<Vec<u8>> {
     if let Ok(mut decoder) = StreamingDecoder::new(&**content_bytes) {
-        let mut result = Vec::new();
+        let mut result = Vec::with_capacity(content_bytes.len());
         if decoder.read_to_end(&mut result).is_ok() {
             return Some(result)
         }
     }
 
     // TODO remove at next deployment, this is only fallback for older compressed files
-    let mut decoder = flate2::write::ZlibDecoder::new(Vec::new());
+    let mut decoder = flate2::write::ZlibDecoder::new(Vec::with_capacity(content_bytes.len()));
     if let Ok(()) = decoder.write_all(content_bytes) {
         if let Ok(decoded) = decoder.finish() {
             return Some(decoded);

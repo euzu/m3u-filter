@@ -308,11 +308,12 @@ impl MappingValueProcessor<'_> {
             .map(|caps| caps.as_str())
             .collect::<Vec<&str>>();
 
+        let mut captured_tag_values: Vec<&str> = Vec::with_capacity(128);
         for tag_capture in tag_captures {
             for mapping_tag in &self.mapper.t_tags {
                 if mapping_tag.name.eq(tag_capture) {
                     // we have the right tag, now get all captured values
-                    let mut captured_tag_values: Vec<&str> = Vec::new();
+                    captured_tag_values.clear();
                     for cap in &mapping_tag.captures {
                         if let Some(cap_value) = captures.get(cap.as_str()) {
                             captured_tag_values.push(cap_value);

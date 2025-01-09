@@ -64,7 +64,7 @@ pub fn json_iter_array<T: DeserializeOwned, R: Read>(
 }
 
 pub fn json_filter_file(file_path: &Path, filter: &HashMap<&str, &str>) -> Vec<serde_json::Value> {
-    let mut filtered: Vec<serde_json::Value> = Vec::new();
+    let mut filtered: Vec<serde_json::Value> = Vec::with_capacity(1024);
     if !file_path.exists() {
         return filtered; // Return early if the file does not exist
     }
