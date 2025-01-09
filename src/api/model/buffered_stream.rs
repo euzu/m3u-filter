@@ -5,7 +5,7 @@ use bytes::Bytes;
 use core::time::Duration;
 use reqwest::header::RANGE;
 use reqwest::Error;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio_stream::Stream;
 use url::Url;
-use crate::utils::request_utils::get_request_headers;
+use crate::utils::request_utils::{get_request_headers};
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages.
 const ERR_RETRY_TIMEOUT_SECS: u64 = 10; // If connect status is 4xx or 5xx, we wait until we allow next request from client
@@ -68,19 +68,26 @@ impl<T> Drop for BufferedReceiverStream<T> {
     }
 }
 
-pub fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url: &Url, req: &HttpRequest, input: Option<&ConfigInput>, range_send: bool) -> impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static {
+const MEDIA_STREAM_HEADERS: &[&str] = &["content-type", "content-length","connection", "accept-ranges", "content-range"];
+
+pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url: &Url,
+                                 req: &HttpRequest, input: Option<&ConfigInput>, range_send: bool) ->
+                                 (impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static, Option<Vec<(String, String)>>) {
     let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(STREAM_QUEUE_SIZE);
-    let req_headers = get_headers_from_request(req);
+    let mut req_headers = get_headers_from_request(req);
+    let req_bytes = get_request_bytes(&req_headers);
+    req_headers.remove("range");
     let input_headers = input.map(|i| i.headers.clone());
     let url = stream_url.clone();
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_stream = Arc::clone(&stop_signal);
     let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
     let base_client = Arc::clone(http_client);
+    let (header_sender, mut header_receiver) = mpsc::channel::<Vec<(String, String)>>(1);
     actix_rt::spawn(async move {
         // let masked_url = mask_sensitive_info(url.as_str());
-        let req_bytes = get_request_bytes(&req_headers);
         let bytes_counter = if range_send { Some(AtomicUsize::new(req_bytes)) } else { None };
+        let mut first_run = true;
         while !stop_signal.load(Ordering::Relaxed) {
             let mut client = base_client.get(url.clone()).headers(headers.clone());
             let bytes_to_request = bytes_counter.as_ref().map_or(0, |atomic| atomic.load(Ordering::Relaxed));
@@ -92,6 +99,13 @@ pub fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url: &Url,
 
             match client.send().await {
                 Ok(mut response) => {
+                    if first_run {
+                        first_run = false;
+                        let headers:  Vec<(String, String)> = response.headers_mut().iter()
+                            .filter(|(key, _)| MEDIA_STREAM_HEADERS.contains(&key.as_str()))
+                            .map(|(key, value)| (key.to_string(), value.to_str().unwrap().to_string())).collect();
+                        let _ = header_sender.send(headers).await;
+                    }
                     let status = response.status();
                     // let mut byte_stream = response.bytes_stream();
                     if !status.is_success() {
@@ -122,7 +136,7 @@ pub fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url: &Url,
                                 }
                             }
                             Err(_err) => {
-                                // debug!("Media stream error {masked_url} {_err:?}");
+                                // debug!("Media stream error {masked_url} {err:?}");
                                 stop_signal.store(true, Ordering::Relaxed);
                                 break;
                             }
@@ -139,10 +153,9 @@ pub fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url: &Url,
                 Err(err) => {
                     if err.is_timeout() {
                         actix_web::rt::time::sleep(Duration::from_secs(1)).await;
-                    } else {
-                        // debug!("Stream finished  {masked_url} {err}");
-                        stop_signal.store(true, Ordering::Relaxed);
                     }
+                    // debug!("Stream finished  {masked_url} {err}");
+                    stop_signal.store(true, Ordering::Relaxed);
                     continue;
                 }
             }
@@ -152,16 +165,33 @@ pub fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url: &Url,
         drop(tx);
     });
 
-    BufferedReceiverStream::new(rx, stop_stream)
+    let header = header_receiver.recv().await;
+    drop(header_receiver);
+    (BufferedReceiverStream::new(rx, stop_stream), header)
 }
 
 
-pub fn get_stream_response_with_headers() -> HttpResponseBuilder {
+pub fn get_stream_response_with_headers(custom: Option<Vec<(String, String)>>) -> HttpResponseBuilder {
     let mut response_builder = HttpResponse::Ok();
-    response_builder.insert_header((actix_web::http::header::CONTENT_TYPE, "application/octet-stream"));
-    response_builder.insert_header((actix_web::http::header::CONTENT_LENGTH, 0));
-    response_builder.insert_header((actix_web::http::header::CONNECTION, "close"));
-    response_builder.insert_header((actix_web::http::header::CACHE_CONTROL, "no-cache"));
+    let mut added_headers: HashSet<String> = HashSet::new();
+    if let Some(custom_headers) = custom {
+        for header in custom_headers {
+            added_headers.insert(header.1.to_string());
+            response_builder.insert_header(header);
+        }
+    }
+    if !added_headers.contains(actix_web::http::header::CONTENT_TYPE.as_str()) {
+        response_builder.insert_header((actix_web::http::header::CONTENT_TYPE, "application/octet-stream"));
+    }
+    if !added_headers.contains(actix_web::http::header::CONTENT_LENGTH.as_str()) {
+        response_builder.insert_header((actix_web::http::header::CONTENT_LENGTH, 0));
+    }
+    if !added_headers.contains(actix_web::http::header::CONNECTION.as_str()) {
+        response_builder.insert_header((actix_web::http::header::CONNECTION, "close"));
+    }
+    if !added_headers.contains(actix_web::http::header::CACHE_CONTROL.as_str()) {
+        response_builder.insert_header((actix_web::http::header::CACHE_CONTROL, "no-cache"));
+    }
 
     response_builder
 }

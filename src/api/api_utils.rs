@@ -75,7 +75,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
 
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url).await {
+        if let Some(value) = shared_stream_response(app_state, stream_url, None).await {
             return value;
         }
     }
@@ -83,18 +83,18 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
     let send_bytes = matches!(item_type, PlaylistItemType::Video  | PlaylistItemType::Series);
 
     if let Ok(url) = Url::parse(stream_url) {
-        let stream = buffered_stream::get_buffered_stream(&app_state.http_client, &url, req, input, send_bytes);
+        let (stream, headers) = buffered_stream::get_buffered_stream(&app_state.http_client, &url, req, input, send_bytes).await;
         return if share_stream {
             SharedStream::register(app_state, stream_url, stream).await;
             if let Some(broadcast_stream) = create_notify_stream(app_state, stream_url).await {
                 let body_stream = actix_web::body::BodyStream::new(broadcast_stream);
-                let mut response_builder = get_stream_response_with_headers();
+                let mut response_builder = get_stream_response_with_headers(headers);
                 response_builder.body(body_stream)
             } else {
                 HttpResponse::BadRequest().finish()
             }
         } else {
-            let mut response_builder = get_stream_response_with_headers();
+            let mut response_builder = get_stream_response_with_headers(headers);
             response_builder.streaming(stream)
         }
     }
@@ -102,11 +102,11 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
     HttpResponse::BadRequest().finish()
 }
 
-async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
+async fn shared_stream_response(app_state: &AppState, stream_url: &str, headers: Option<Vec<(String, String)>>) -> Option<HttpResponse> {
     if let Some(stream) = create_notify_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", mask_sensitive_info(stream_url));
         if app_state.shared_streams.lock().await.get(stream_url).is_some() {
-            let mut response_builder = get_stream_response_with_headers();
+            let mut response_builder = get_stream_response_with_headers(headers);
             let current_date = Utc::now().format("%a, %d %b %Y %H:%M:%S GMT").to_string();
             response_builder.insert_header((DATE, current_date.as_bytes()));
             // response_builder.insert_header((ACCEPT_RANGES, "bytes".as_bytes()));
