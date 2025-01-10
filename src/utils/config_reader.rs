@@ -14,32 +14,38 @@ use crate::model::config::{Config, ConfigDto};
 use crate::model::mapping::Mappings;
 use crate::utils::{file_utils, multi_file_reader};
 
-pub fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<(), M3uFilterError> {
+pub fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<Option<String>, M3uFilterError> {
     let mappings_file: String = args_mapping.unwrap_or_else(|| file_utils::get_default_mappings_path(cfg.t_config_path.as_str()));
 
     match read_mapping(mappings_file.as_str()) {
         Ok(mappings) => {
             match mappings {
-                None => {debug!("no mapping loaded");}
-                Some(mappings_cfg) => {cfg.set_mappings(&mappings_cfg);}
+                None => {
+                    debug!("no mapping loaded");
+                    Ok(Some(mappings_file))
+                }
+                Some(mappings_cfg) => {
+                    cfg.set_mappings(&mappings_cfg);
+                    Ok(None)
+                }
             }
-            Ok(())
         }
         Err(err) => Err(err),
     }
 }
 
-pub fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) {
+pub fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) -> Option<String> {
     let api_proxy_config_file: String = args_api_proxy_config.unwrap_or_else(|| file_utils::get_default_api_proxy_config_path(cfg.t_config_path.as_str()));
     api_proxy_config_file.clone_into(&mut cfg.t_api_proxy_file_path);
     let api_proxy_config = read_api_proxy(api_proxy_config_file.as_str(), true);
     match api_proxy_config {
         None => {
             warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
+            None
         }
         Some(config) => {
-            info!("Api Proxy File: {}", &api_proxy_config_file);
             cfg.set_api_proxy(Some(config));
+            Some(api_proxy_config_file)
         }
     }
 }
@@ -70,7 +76,6 @@ pub fn read_config(config_path: &str, config_file: &str, sources_file: &str) -> 
 pub fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterError> {
     let mapping_file = std::path::PathBuf::from(mapping_file);
     if let Ok(file) = file_utils::open_file(&mapping_file) {
-        info!("Mapping file: {}", mapping_file.to_str().unwrap_or("?"));
         let mapping: Result<Mappings, _> = serde_yaml::from_reader(file);
         match mapping {
             Ok(mut result) => {

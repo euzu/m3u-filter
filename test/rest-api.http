@@ -53,7 +53,7 @@ GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_streams&cat
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_categories
 
 ### xtream vod streams reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_vod_streams&category_id=636
+GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_vod_streams&category_id=29
 
 ### xtream vod streams redirect
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=636
@@ -93,3 +93,7 @@ GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_series_info&se
 
 ### get stream
 {{local}}/m3u-stream/live/xt/xt/667
+
+
+### xtream series_categories redirect
+GET http://10.41.41.41:8902/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=29

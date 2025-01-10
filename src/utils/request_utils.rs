@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use flate2::read::{GzDecoder, ZlibDecoder};
 use futures::StreamExt;
-use log::{debug, error, log_enabled, Level};
+use log::{debug, error, log_enabled, trace, Level};
 use regex::Regex;
 use reqwest::header::CONTENT_ENCODING;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -140,7 +140,7 @@ pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, cu
         for (key, value) in custom {
             let key_lc = key.to_lowercase();
             if "host" == key_lc || header_keys.contains(key_lc.as_str()) {
-                debug_if_enabled!("Ignoring request header '{}={}'", key_lc, String::from_utf8_lossy(value));
+                // debug_if_enabled!("Ignoring request header '{}={}'", key_lc, String::from_utf8_lossy(value));
             } else {
                 headers.insert(
                     HeaderName::from_bytes(key.as_bytes()).unwrap(),
@@ -148,10 +148,10 @@ pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, cu
             }
         }
     }
-    if log_enabled!(Level::Debug) {
+    if log_enabled!(Level::Trace) {
         let he: HashMap<String, String> = headers.iter().map(|(k, v)| (k.to_string(), String::from_utf8_lossy(v.as_bytes()).to_string())).collect();
         if !he.is_empty() {
-            debug!("Request headers {:?}", he);
+            trace!("Request headers {:?}", he);
         }
     }
     headers

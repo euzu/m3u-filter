@@ -11,14 +11,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::auth::password::generate_password;
-use clap::Parser;
-use env_logger::Builder;
-use log::{error, info, LevelFilter};
-
 use crate::model::config::{validate_targets, Config, HealthcheckConfig, ProcessTargets};
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::playlist_processor;
 use crate::utils::{config_reader, file_utils};
+use clap::Parser;
+use env_logger::Builder;
+use log::{error, info, LevelFilter};
 mod m3u_filter_error;
 mod model;
 mod filter;
@@ -28,6 +27,11 @@ mod api;
 mod processing;
 mod utils;
 mod auth;
+
+const LOG_ERROR_LEVEL_MOD: &[&str] = &["actix_web::middleware::logger",
+    "reqwest::async_impl::client", "reqwest::connect", "hyper_util::client", "actix_server::worker",
+    "actix_server::server", "actix_server::builder", "actix_server::accept"];
+
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
@@ -120,16 +124,23 @@ fn main() {
     info!("Config file: {}", &config_file);
     info!("Source file: {}", &sources_file);
 
-    if let Err(err) = config_reader::read_mappings(args.mapping_file, &mut cfg) {
-        exit!("{}", err);
+    match config_reader::read_mappings(args.mapping_file, &mut cfg) {
+        Ok(Some(mapping_file)) => {
+            info!("Mapping file: {mapping_file}");
+        }
+        Ok(None) => {}
+        Err(err) => exit!("{err}"),
     }
+
 
     let mut temp_path = PathBuf::from(&cfg.working_dir);
     temp_path.push("tmp");
     let _ = tempfile::env::override_temp_dir(&temp_path);
 
     if args.server {
-        config_reader::read_api_proxy_config(args.api_proxy, &mut cfg);
+        if let Some(api_proxy_file) = config_reader::read_api_proxy_config(args.api_proxy, &mut cfg) {
+            info!("Api Proxy File: {api_proxy_file}");
+        }
         start_in_server_mode(Arc::new(cfg), Arc::new(targets));
     } else {
         start_in_cli_mode(Arc::new(cfg), Arc::new(targets));
@@ -202,10 +213,9 @@ fn init_logger(log_level: &str) {
         // Set the log level based on the parsed value
         log_builder.filter_level(get_log_level(log_level));
     }
-    log_builder.filter_module("actix_web::middleware::logger", LevelFilter::Error);
-    log_builder.filter_module("reqwest::async_impl::client", LevelFilter::Error);
-    log_builder.filter_module("reqwest::connect", LevelFilter::Error);
-    log_builder.filter_module("hyper_util::client", LevelFilter::Error);
+    for module in LOG_ERROR_LEVEL_MOD {
+        log_builder.filter_module(module, LevelFilter::Error);
+    }
     log_builder.init();
     info!("Log Level {}", get_log_level(log_level));
 }

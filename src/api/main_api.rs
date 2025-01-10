@@ -107,9 +107,8 @@ fn exec_scheduler(client: &Arc<reqwest::Client>, cfg: &Arc<Config>, targets: &Ar
     }
 }
 
-fn is_web_auth_enabled(cfg: &Arc<Config>, web_ui_enabled: bool, web_dir_path: &PathBuf) -> bool {
+fn is_web_auth_enabled(cfg: &Arc<Config>, web_ui_enabled: bool) -> bool {
     if web_ui_enabled {
-        info!("Web root: {:?}", &web_dir_path);
         if let Some(web_auth) = &cfg.web_auth {
             return web_auth.enabled;
         }
@@ -126,12 +125,14 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         Ok(result) => result,
         Err(err) => return Err(err)
     };
-
+    if web_ui_enabled {
+        info!("Web root: {:?}", &web_dir_path);
+    }
     let shared_data = create_shared_data(&cfg);
 
     exec_scheduler(&Arc::clone(&shared_data.http_client), &cfg, &targets);
     exec_update_on_boot(Arc::clone(&shared_data.http_client), &cfg, &targets);
-    let web_auth_enabled = is_web_auth_enabled(&cfg, web_ui_enabled, &web_dir_path);
+    let web_auth_enabled = is_web_auth_enabled(&cfg, web_ui_enabled);
 
     // Web Server
     HttpServer::new(move || {

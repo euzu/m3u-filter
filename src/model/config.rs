@@ -426,7 +426,7 @@ impl ConfigTarget {
 
         match get_filter(&self.filter, templates) {
             Ok(fltr) => {
-                debug!("Filter: {}", fltr);
+                // debug!("Filter: {}", fltr);
                 self.t_filter = Some(fltr);
                 if let Some(renames) = self.rename.as_mut() {
                     handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, renames.iter_mut().map(ConfigRename::prepare));
