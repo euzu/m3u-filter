@@ -19,6 +19,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio_stream::{Stream, StreamExt};
 use url::Url;
 use crate::debug_if_enabled;
+use crate::model::playlist::PlaylistItemType;
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
 const ERR_RETRY_TIMEOUT_SECS: u64 = 5; // If connect status is 4xx or 5xx, we wait until we allow next request from client
@@ -73,8 +74,11 @@ impl<T> Drop for BufferedReceiverStream<T> {
 }
 
 #[allow(clippy::too_many_lines)]
-pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url: &Url,
-                                 req: &HttpRequest, input: Option<&ConfigInput>) ->
+pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
+                                 stream_url: &Url,
+                                 req: &HttpRequest,
+                                 input: Option<&ConfigInput>,
+                                 item_type: PlaylistItemType) ->
                                  (impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static, Option<(Vec<(String, String)>, StatusCode)>) {
     let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(STREAM_QUEUE_SIZE);
     let mut req_headers = get_headers_from_request(req);
@@ -172,12 +176,16 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>, stream_url:
                             }
                             Some(Err(err)) => {
                                 debug!("Provider stream error {masked_url} {err:?}");
-                                stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
+                                if item_type != PlaylistItemType::Live {
+                                    stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
+                                }
                                 break;
                             }
                             None => {
                                 debug!("Provider stream finished no data available {masked_url}");
-                                stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
+                                if item_type != PlaylistItemType::Live {
+                                    stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
+                                }
                                 break;
                             }
                         }

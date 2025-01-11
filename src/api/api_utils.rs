@@ -81,7 +81,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
     }
 
     if let Ok(url) = Url::parse(stream_url) {
-        let (stream, provider_response) = buffered_stream::get_buffered_stream(&app_state.http_client, &url, req, input).await;
+        let (stream, provider_response) = buffered_stream::get_buffered_stream(&app_state.http_client, &url, req, input, item_type).await;
         return if share_stream {
             SharedStream::register(app_state, stream_url, stream).await;
             if let Some(broadcast_stream) = create_notify_stream(app_state, stream_url).await {
