@@ -21,9 +21,8 @@ use url::Url;
 use crate::debug_if_enabled;
 use crate::model::playlist::PlaylistItemType;
 
+// TODO make this configurable
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
-const ERR_RETRY_TIMEOUT_SECS: u64 = 5; // If connect status is 4xx or 5xx, we wait until we allow next request from client
-
 const MEDIA_STREAM_HEADERS: &[&str] = &["content-type", "content-length", "connection", "accept-ranges", "content-range", "vary"];
 
 fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Option<usize> {
@@ -54,7 +53,7 @@ impl<T> BufferedReceiverStream<T> {
     }
 
     pub fn close(&mut self) {
-        self.stop_signal.store(true, Ordering::Relaxed);
+        self.stop_signal.store(false, Ordering::Relaxed);
         self.inner.close();
     }
 }
@@ -91,9 +90,9 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
     // The stream url, we need to clone it because of move to async block.
     let url = stream_url.clone();
     // We need an atomic to for signalling the end of the loop,
-    let stop_signal_on_provider_disconnect = Arc::new(AtomicBool::new(false));
+    let continue_retry_signal = Arc::new(AtomicBool::new(true));
     // We need a copy for the stream to send a stop signal when client disconnects,
-    let stop_signal_on_client_disconnect = Arc::clone(&stop_signal_on_provider_disconnect);
+    let continue_retry_signal_on_client_disconnect = Arc::clone(&continue_retry_signal);
     // We merge configured input headers with the headers from the request.
     let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
     let request_client = Arc::clone(http_client);
@@ -123,7 +122,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
             }
         };
 
-        while !stop_signal_on_provider_disconnect.load(Ordering::Relaxed) {
+        while continue_retry_signal.load(Ordering::Relaxed) {
             let (client, partial_content) = prepare_client();
             match client.send().await {
                 Ok(mut response) => {
@@ -132,8 +131,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                         debug!("Failed to connect to provider stream. Status:{status} {masked_url}");
                         if status.is_client_error() || status.is_server_error() {
                             // We stop reconnecting, it seems the stream is not available
-                            stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
-                            actix_web::rt::time::sleep(Duration::from_secs(ERR_RETRY_TIMEOUT_SECS)).await;
+                            continue_retry_signal.store(false, Ordering::Relaxed);
                         }
                         continue;
                     }
@@ -153,7 +151,8 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                         let _ = first_run_response_sender.send(Some((headers, status))).await;
                     }
                     let mut byte_stream = response.bytes_stream();
-                    while !stop_signal_on_provider_disconnect.load(Ordering::Relaxed) {
+                    while continue_retry_signal.load(Ordering::Relaxed) {
+                        std::hint::spin_loop();
                         match byte_stream.next().await {
                             Some(Ok(chunk)) => {
                                 if chunk.is_empty() {
@@ -170,21 +169,21 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                                     }
                                 } else {
                                     debug!("Client has disconnected from stream {masked_url}");
-                                    stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
+                                    continue_retry_signal.store(false, Ordering::Relaxed);
                                     break;
                                 }
                             }
                             Some(Err(err)) => {
                                 debug!("Provider stream error {masked_url} {err:?}");
                                 if item_type != PlaylistItemType::Live {
-                                    stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
+                                    continue_retry_signal.store(false, Ordering::Relaxed);
                                 }
                                 break;
                             }
                             None => {
                                 debug!("Provider stream finished no data available {masked_url}");
                                 if item_type != PlaylistItemType::Live {
-                                    stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
+                                    continue_retry_signal.store(false, Ordering::Relaxed);
                                 }
                                 break;
                             }
@@ -193,15 +192,14 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                     drop(byte_stream);
                 }
                 Err(err) => {
-                    if err.is_timeout() {
-                        actix_web::rt::time::sleep(Duration::from_secs(1)).await;
-                    }
                     debug!("Provider stream finished with error {masked_url} {err}");
-                    stop_signal_on_provider_disconnect.store(true, Ordering::Relaxed);
+                    if item_type != PlaylistItemType::Live {
+                        continue_retry_signal.store(false, Ordering::Relaxed);
+                    }
                     continue;
                 }
             }
-            actix_web::rt::time::sleep(Duration::from_secs(1)).await;
+            actix_web::rt::time::sleep(Duration::from_millis(100)).await;
         }
         debug!("Streaming stopped and no reconnect  for {masked_url}");
         drop(tx);
@@ -220,7 +218,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
 
     let provider_response = provider_response_receiver.recv().await.and_then(|o| o);
     drop(provider_response_receiver);
-    (BufferedReceiverStream::new(rx, stop_signal_on_client_disconnect), provider_response)
+    (BufferedReceiverStream::new(rx, continue_retry_signal_on_client_disconnect), provider_response)
 }
 
 pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, StatusCode)>, stream_url: &str) -> HttpResponseBuilder {

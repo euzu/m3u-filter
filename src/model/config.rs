@@ -528,7 +528,7 @@ impl FromStr for InputType {
         } else if s.eq("xtream") {
             Ok(Self::Xtream)
         } else {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unkown InputType: {}", s)
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown InputType: {}", s)
         }
     }
 }
