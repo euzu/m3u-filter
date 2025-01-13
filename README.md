@@ -75,6 +75,7 @@ Top level entries in the config files are:
 * `update_on_boot` _optional_
 * `web_ui_enabled` _optional_
 * `web_auth` _optional_
+* `reverse_proxy` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -175,21 +176,46 @@ schedules:
 - schedule: "0  0  20  *  *  *  *"
 ```
 
-
-
 At the given times the complete processing is started. Do not start it every second or minute.
 You could be banned from your server. Twice a day should be enough.
 
-### 1.6 `backup_dir`
+### 1.6 `reverse_proxy`
+
+This configuration is only used for reverse proxy mode. The Reverse Proxy mode can be activated for each user individually.
+
+#### 1.6.1 `stream`
+Contains settings for the streaming.
+- The `retry`option is for transparent reconnections to the provider on provider disconnects or stream errors.
+- `buffer`: When buffer is `enabled`, the stream is buffered with the configured `size`.
+`size` is the amount of `8092byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.  
+
+#### 1.6.2 `cache`
+LRU-Cache is for resources. If it is `enabled`, the resources/images are persisted in the given `dir`. If the cache size exceeds `size`,
+In an LRU cache, the least recently used items are evicted to make room for new items if the cache `size`is exceeded.
+
+```yaml
+reverse_proxy:
+  stream:
+    retry: true
+    buffer:
+      enabled: true
+      size: 1024
+  cache:
+    enabled: true
+    size: 1GB
+    dir: ./cache
+```
+
+### 1.7 `backup_dir`
 is the directory where the backup configuration files written, when saved from the ui.
 
-### 1.7 `update_on_boot`
+### 1.8 `update_on_boot`
 if set to true, an update is started when the application starts.
 
-### 1.8 `web_ui_enabled`
+### 1.9 `web_ui_enabled`
 default is true, if set to false the web_ui is disabled
 
-### 1.9 `web_auth`
+### 1.10 `web_auth`
 Web UI Authentication can be enabled if `web_ui_enabled` is `true`.
 
 ```yaml
