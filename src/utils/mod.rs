@@ -10,7 +10,8 @@ pub mod file_lock_manager;
 pub mod compressed_file_reader;
 mod compression_utils;
 pub mod directed_graph;
-mod lru_cache;
+pub mod lru_cache;
+pub mod size_utils;
 
 #[macro_export]
 macro_rules! debug_if_enabled {

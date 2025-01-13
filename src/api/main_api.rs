@@ -3,10 +3,10 @@ use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use async_std::sync::{Mutex, RwLock};
-use log::info;
+use log::{error, info};
 use std::collections::{HashMap, VecDeque};
 use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::path::{PathBuf};
 use std::sync::Arc;
 
 use crate::api::m3u_api::m3u_api_register;
@@ -20,6 +20,7 @@ use crate::api::xtream_api::xtream_api_register;
 use crate::model::config::{validate_targets, Config, ProcessTargets, ScheduleConfig};
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::playlist_processor;
+use crate::utils::lru_cache::{LRUResourceCache};
 use crate::VERSION;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -42,6 +43,19 @@ async fn healthcheck() -> HttpResponse {
 }
 
 fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
+    let lru_cache = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()).and_then(|c| if c.enabled  {
+        Some(Mutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
+    } else { None} );
+    let cache = Arc::new(lru_cache);
+    let cache_scanner = Arc::clone(&cache);
+    actix_rt::spawn(async move {
+        if let Some(m) = cache_scanner.as_ref() {
+            let mut c = m.lock().await;
+            if let Err(err) = (*c).scan().await {
+                error!("Failed to scan cache {err}");
+            }
+        }
+    });
     Data::new(AppState {
         config: Arc::clone(cfg),
         downloads: Arc::from(DownloadQueue {
@@ -51,6 +65,7 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
         }),
         shared_streams: Arc::new(Mutex::new(HashMap::new())),
         http_client: Arc::new(reqwest::Client::new()),
+        cache,
     })
 }
 

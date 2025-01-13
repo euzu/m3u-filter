@@ -15,7 +15,6 @@ use path_clean::PathClean;
 use url::Url;
 
 use crate::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
-use crate::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
@@ -24,6 +23,8 @@ use crate::model::mapping::Mappings;
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
 use crate::utils::file_lock_manager::FileLockManager;
 use crate::utils::{config_reader, file_utils};
+use crate::{exit, info_err};
+use crate::utils::size_utils::parse_size;
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
@@ -34,6 +35,8 @@ pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
 
 pub const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 pub const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
+
+const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
 
 #[macro_export]
 macro_rules! valid_property {
@@ -82,7 +85,6 @@ macro_rules! handle_m3u_filter_error_result {
         }
     }
 }
-
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
 pub enum TargetType {
@@ -856,6 +858,94 @@ pub struct ScheduleConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct CacheConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub size: Option<String>,
+    #[serde(default)]
+    pub dir: Option<String>,
+    #[serde(skip)]
+    pub t_size: usize,
+}
+
+impl CacheConfig {
+    fn prepare(&mut self,  working_dir: &str, resolve_var: bool) {
+        if self.enabled {
+            let work_path = PathBuf::from(working_dir);
+            if self.dir.is_none() {
+                self.dir = Some(work_path.join("cache").to_string_lossy().to_string());
+            } else {
+                let mut cache_dir = if resolve_var { config_reader::resolve_env_var(self.dir.as_ref().unwrap()) } else { self.dir.as_ref().unwrap().to_string() };
+                if PathBuf::from(&cache_dir).is_relative() {
+                    cache_dir = work_path.join(&cache_dir).clean().to_string_lossy().to_string();
+                }
+                self.dir = Some(cache_dir.to_string());
+            }
+            match self.size.as_ref() {
+                None => self.t_size = 1024,
+                Some(val) => match parse_size(val) {
+                    Ok(size) => self.t_size = usize::try_from(size).unwrap_or(0),
+                    Err(err) => { exit!("{err}") }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct StreamBufferConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub size: usize,
+}
+
+impl StreamBufferConfig {
+    fn prepare(&mut self) {
+        if self.enabled && self.size == 0 {
+            self.size = STREAM_QUEUE_SIZE;
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct StreamConfig {
+    #[serde(default)]
+    pub retry: bool,
+    #[serde(default)]
+    pub buffer: Option<StreamBufferConfig>,
+}
+
+impl StreamConfig {
+    fn prepare(&mut self) {
+        if let Some(buffer) = self.buffer.as_mut() {
+            buffer.prepare();
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct ReverseProxyConfig {
+    #[serde(default)]
+    pub stream: Option<StreamConfig>,
+    #[serde(default)]
+    pub cache: Option<CacheConfig>,
+}
+
+impl ReverseProxyConfig {
+    fn prepare(&mut self, working_dir: &str, resolve_var: bool) {
+        if let Some(stream) = self.stream.as_mut() {
+            stream.prepare();
+        }
+        if let Some(cache) = self.cache.as_mut() {
+            cache.prepare(working_dir, resolve_var);
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub threads: u8,
@@ -878,15 +968,16 @@ pub struct Config {
     pub web_auth: Option<WebAuthConfig>,
     #[serde(default)]
     pub messaging: Option<MessagingConfig>,
-    #[serde(skip_serializing, skip_deserializing)]
+    pub reverse_proxy: Option<ReverseProxyConfig>,
+    #[serde(skip)]
     pub t_api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     pub t_config_path: String,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     pub t_config_file_path: String,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     pub t_sources_file_path: String,
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     pub t_api_proxy_file_path: String,
     #[serde(skip)]
     pub file_locks: Arc<FileLockManager>,
@@ -966,17 +1057,13 @@ impl Config {
         let work_dir = if resolve_var { &config_reader::resolve_env_var(&self.working_dir) } else { &self.working_dir };
         self.working_dir = file_utils::get_working_path(work_dir);
         if self.backup_dir.is_none() {
-            self.backup_dir = Some(PathBuf::from(&self.working_dir).join(".backup").into_os_string().to_string_lossy().to_string());
+            self.backup_dir = Some(PathBuf::from(&self.working_dir).join("backup").clean().to_string_lossy().to_string());
         } else {
             let backup_dir = if resolve_var { &config_reader::resolve_env_var(self.backup_dir.as_ref().unwrap()) } else { self.backup_dir.as_ref().unwrap() };
             self.backup_dir = Some(backup_dir.to_string());
         }
-        let backupdir = PathBuf::from(self.backup_dir.as_ref().unwrap());
-        if !backupdir.exists() {
-            match std::fs::create_dir(backupdir) {
-                Ok(()) => {}
-                Err(err) => { error!("Could not create backup dir {} {}", self.backup_dir.as_ref().unwrap(), err) }
-            }
+        if let Some(reverse_proxy) = self.reverse_proxy.as_mut() {
+            reverse_proxy.prepare(&self.working_dir, resolve_var);
         }
         self.api.prepare();
         self.prepare_api_web_root(resolve_var);

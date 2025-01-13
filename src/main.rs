@@ -123,6 +123,11 @@ fn main() {
     info!("Config dir: {:?}", &cfg.t_config_path);
     info!("Config file: {}", &config_file);
     info!("Source file: {}", &sources_file);
+    if let Some(cache) = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()) {
+        if cache.enabled {
+            info!("Cache dir: {}", cache.dir.as_ref().unwrap_or(&String::new()));
+        }
+    }
 
     match config_reader::read_mappings(args.mapping_file, &mut cfg) {
         Ok(Some(mapping_file)) => {
@@ -152,7 +157,8 @@ fn create_directories(cfg: &Config) {
     let paths_strings = [
         Some(cfg.working_dir.clone()),
         cfg.backup_dir.clone(),
-        cfg.video.as_ref().and_then(|v| v.download.as_ref()).and_then(|d| d.directory.clone())
+        cfg.video.as_ref().and_then(|v| v.download.as_ref()).and_then(|d| d.directory.clone()),
+        cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref().and_then(|c| if c.enabled { c.dir.clone() } else { None }))
     ];
 
     let mut paths: Vec<PathBuf> = paths_strings.iter()

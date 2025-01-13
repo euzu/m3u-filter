@@ -1,4 +1,6 @@
 use crate::api::model::app_state::AppState;
+use crate::api::model::buffered_stream;
+use crate::api::model::buffered_stream::get_stream_response_with_headers;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::shared_stream::SharedStream;
 use crate::debug_if_enabled;
@@ -7,6 +9,8 @@ use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::playlist::PlaylistItemType;
 use crate::utils::request_utils;
 use crate::utils::request_utils::mask_sensitive_info;
+use actix_files::NamedFile;
+use actix_web::body::{BodyStream};
 use actix_web::http::header::DATE;
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
@@ -14,11 +18,12 @@ use bytes::Bytes;
 use chrono::Utc;
 use log::{error, log_enabled, trace};
 use std::collections::HashMap;
-use std::path::Path;
-use tokio_stream::wrappers::{BroadcastStream};
+use std::path::{Path};
+use std::sync::Arc;
+use async_std::sync::Mutex;
+use tokio_stream::wrappers::BroadcastStream;
 use url::Url;
-use crate::api::model::buffered_stream;
-use crate::api::model::buffered_stream::get_stream_response_with_headers;
+use crate::api::model::persist_pipe_stream::PersistPipeStream;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
@@ -71,7 +76,7 @@ async fn create_notify_stream(
 }
 
 pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>, item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
-    if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", mask_sensitive_info(stream_url));}
+    if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", mask_sensitive_info(stream_url)); }
 
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
@@ -85,7 +90,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
         return if share_stream {
             SharedStream::register(app_state, stream_url, stream).await;
             if let Some(broadcast_stream) = create_notify_stream(app_state, stream_url).await {
-                let body_stream = actix_web::body::BodyStream::new(broadcast_stream);
+                let body_stream = BodyStream::new(broadcast_stream);
                 let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
                 response_builder.body(body_stream)
             } else {
@@ -94,7 +99,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
         } else {
             let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
             response_builder.streaming(stream)
-        }
+        };
     }
     error!("Url is malformed {}", mask_sensitive_info(stream_url));
     HttpResponse::BadRequest().finish()
@@ -108,7 +113,7 @@ async fn shared_stream_response(app_state: &AppState, stream_url: &str, headers:
             let current_date = Utc::now().format("%a, %d %b %Y %H:%M:%S GMT").to_string();
             response_builder.insert_header((DATE, current_date.as_bytes()));
             // response_builder.insert_header((ACCEPT_RANGES, "bytes".as_bytes()));
-            return Some(response_builder.body(actix_web::body::BodyStream::new(stream)));
+            return Some(response_builder.body(BodyStream::new(stream)));
         }
     }
     None
@@ -131,8 +136,16 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
         return HttpResponse::NoContent().finish();
     }
     let req_headers = get_headers_from_request(req);
-    debug_if_enabled!("Try to open resource {}", mask_sensitive_info(resource_url));
-
+    if let Some(cache) = app_state.cache.as_ref() {
+        let mut guard = cache.lock().await;
+        if let Some(resource_path) = guard.get_content(resource_url).await {
+            if let Ok(named_file) = NamedFile::open_async(resource_path).await {
+                debug_if_enabled!("Cached resource {}", mask_sensitive_info(resource_url));
+                return named_file.into_response(req);
+            }
+        }
+    }
+    debug_if_enabled!("Try to fetch resource {}", mask_sensitive_info(resource_url));
     if let Ok(url) = Url::parse(resource_url) {
         let client = request_utils::get_client_request(&app_state.http_client, input.map(|i| &i.headers), &url, Some(&req_headers));
         match client.send().await {
@@ -143,7 +156,32 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                     response.headers().iter().for_each(|(k, v)| {
                         response_builder.insert_header((k.as_str(), v.as_ref()));
                     });
-                    return response_builder.body(actix_web::body::BodyStream::new(response.bytes_stream()));
+
+                    let byte_stream = response.bytes_stream();
+                    if let Some(cache) = app_state.cache.as_ref() {
+                       let resource_path = {
+                            let guard = cache.lock().await;
+                            guard.store_path(resource_url)
+                        };
+                        if let Ok(file) = tokio::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&resource_path).await {
+                            let writer = Arc::new(Mutex::new(file));
+                            let cache = Arc::clone(&app_state.cache);
+                            let res_url = resource_url.to_string();
+                            let add_cache_content: Arc<Box<dyn Fn(usize)>> = Arc::new(Box::new(move|size| {
+                                let cache = Arc::clone(&cache);
+                                let res_url = res_url.clone();
+                                    actix_rt::spawn(async move {
+                                        if let Some(cache) = cache.as_ref() {
+                                        let mut guard = cache.lock().await;
+                                        let _ = guard.add_content(&res_url, size).await;
+                                        }
+                                    });
+                            }));
+                            let stream = PersistPipeStream::new(byte_stream, writer, add_cache_content);
+                            return response_builder.body(BodyStream::new(stream));
+                        }
+                    }
+                   return response_builder.body(BodyStream::new(byte_stream));
                 }
                 debug_if_enabled!("Failed to open resource got status {} for {}", status, mask_sensitive_info(resource_url));
             }

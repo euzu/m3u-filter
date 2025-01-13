@@ -215,3 +215,20 @@ pub fn rename_or_copy(src: &Path, dest: &Path, remove_old: bool) -> std::io::Res
 
     Ok(())
 }
+
+pub fn traverse_dir<F>(path: &Path, visit: &mut F) -> std::io::Result<()>
+where
+    F: FnMut(&std::fs::DirEntry, &std::fs::Metadata),
+{
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let metadata = entry.metadata()?;
+        if metadata.is_dir() {
+            traverse_dir(&entry.path(), visit)?;
+        } else {
+            visit(&entry, &metadata);
+        }
+    }
+
+    Ok(())
+}

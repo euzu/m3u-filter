@@ -6,6 +6,17 @@ update_on_boot: false
 # sec  min   hour   day of month   month   day of week   year
 schedules:
   - schedule: "0  0  8,12,16,20,22,1  *  *  *  *"
+reverse_proxy:
+  stream:
+    retry: true
+    buffer:
+      enabled: true
+      size: 1024
+  cache:
+    size: 100KB
+    enabled: true
+    dir: /home/m3u-filter/cache
+
 web_ui_enabled: true
 web_auth:
   enabled: false
