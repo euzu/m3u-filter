@@ -191,7 +191,6 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                     }
                     let mut byte_stream = response.bytes_stream();
                     while continue_retry_signal.load(Ordering::Relaxed) {
-                        std::hint::spin_loop();
                         match byte_stream.next().await {
                             Some(Ok(chunk)) => {
                                 if chunk.is_empty() {
