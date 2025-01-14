@@ -72,7 +72,7 @@ impl<T> Drop for BufferedReceiverStream<T> {
     }
 }
 
-type ProviderStreamResponse = (Option<Pin<Box<dyn tokio_stream::Stream<Item = Result<Bytes, reqwest::Error>> + Unpin + 'static>>>, Option<(Vec<(String, String)>, StatusCode)>);
+type ProviderStreamResponse = (Option<Pin<Box<dyn tokio_stream::Stream<Item=Result<Bytes, reqwest::Error>> + Unpin + 'static>>>, Option<(Vec<(String, String)>, StatusCode)>);
 
 pub async fn get_provider_stream(http_client: &Arc<reqwest::Client>,
                                  stream_url: &Url,
@@ -181,7 +181,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                         // We need some header information from the provider, we extract the neccessary headers and forard them to the client
                         debug_if_enabled!("Provider response headers: {:?}", response.headers_mut());
                         first_run = false;
-                        let response_headers: Vec<(String, String)> =  get_response_headers(&mut response);
+                        let response_headers: Vec<(String, String)> = get_response_headers(&mut response);
                         // debug!("First  headers {headers:?} {} {}", mask_sensitive_info(url.as_str()));
                         let mut status = response.status();
                         if partial_content && status.is_success() {
@@ -195,8 +195,8 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                         match byte_stream.next().await {
                             Some(Ok(chunk)) => {
                                 if chunk.is_empty() {
-                                    debug!("Provider finished stream {masked_url}");
-                                    break;
+                                    actix_web::rt::time::sleep(Duration::from_millis(20)).await;
+                                    continue;
                                 }
                                 // this is for backpressure, we fill the buffer and wait for the receiver
                                 if let Ok(permit) = tx.reserve().await {

@@ -2,7 +2,7 @@ use crate::repository::storage::hash_string_as_hex;
 use crate::utils::file_utils::traverse_dir;
 use crate::utils::size_utils::human_readable_byte_size;
 use async_std::sync::RwLock;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -60,7 +60,7 @@ impl LRUResourceCache {
                 {  // insert_to_cache
                     let mut path = self.cache_dir.clone();
                     path.push(&key);
-                    debug!("Added file to cache: {}", &path.to_string_lossy());
+                    trace!("Added file to cache: {}", &path.to_string_lossy());
                     self.cache.insert(key.clone(), (path.clone(), file_size));
                     self.usage_order.push_back(key);
                     self.current_size += file_size;
