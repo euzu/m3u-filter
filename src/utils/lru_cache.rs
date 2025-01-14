@@ -21,7 +21,6 @@ use std::path::{Path, PathBuf};
 /// - `cache`: A `HashMap` that maps a unique key to a tuple containing the file path and its size.
 /// - `usage_order`: A `VecDeque` that tracks the access order of keys, with the oldest at the front.
 /// - `lock`: An `RwLock` to ensure thread-safe access to the cache during read and write operations.
-
 pub struct LRUResourceCache {
     capacity: usize,  // Maximum size in bytes
     cache_dir: PathBuf,
@@ -50,7 +49,7 @@ impl LRUResourceCache {
 
     /// - Scans the cache directory and populates the internal data structures with existing files and their sizes.
     /// - Updates the `current_size` and `usage_order` fields based on the scanned files.
-    /// The use/access order is not restored!!!
+    ///   The use/access order is not restored!!!
     pub async fn scan(&mut self) -> std::io::Result<()> {
         let _write_lock = self.lock.write().await;
         let mut visit = |entry: &std::fs::DirEntry, metadata: &std::fs::Metadata| {

@@ -20,7 +20,6 @@ use tokio_stream::Stream;
 ///   - Updates the size tracker.
 /// - When the stream is exhausted:
 ///   - Calls `on_complete()` to finalize the operation and trigger the callback.
-
 pub struct PersistPipeStream<S, W> {
     inner: S,
     completed: bool,

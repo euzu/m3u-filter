@@ -1,6 +1,6 @@
 use crate::api::model::app_state::AppState;
 use crate::api::model::buffered_stream;
-use crate::api::model::buffered_stream::get_stream_response_with_headers;
+use crate::api::model::buffered_stream::{get_provider_stream, get_stream_response_with_headers};
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::shared_stream::SharedStream;
 use crate::debug_if_enabled;
@@ -60,13 +60,12 @@ pub fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a AppState)
     get_user_target_by_credentials(username, password, api_req, app_state)
 }
 
-/// Creates a notify stream for the given URL if a shared stream exists.
-async fn create_notify_stream(
+/// Creates a broadcast notify stream for the given URL if a shared stream exists.
+async fn create_broadcast_stream(
     app_state: &AppState,
     stream_url: &str,
 ) -> Option<BroadcastStream<Bytes>> {
     let notify_stream_url = stream_url.to_string();
-
     // Acquire lock and check for existing stream
     let shared_streams = app_state.shared_streams.lock().await;
     if let Some(shared_stream) = shared_streams.get(&notify_stream_url) {
@@ -77,7 +76,9 @@ async fn create_notify_stream(
     }
 }
 
-pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpRequest, input: Option<&ConfigInput>, item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
+pub async fn stream_response(app_state: &AppState, stream_url: &str,
+                             req: &HttpRequest, input: Option<&ConfigInput>,
+                             item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
     if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", mask_sensitive_info(stream_url)); }
 
     let share_stream = is_stream_share_enabled(item_type, target);
@@ -87,28 +88,51 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str, req: &HttpR
         }
     }
 
+    let (stream_retry, buffer_enabled, buffer_size) = app_state
+        .config
+        .reverse_proxy
+        .as_ref()
+        .and_then(|reverse_proxy| reverse_proxy.stream.as_ref())
+        .map_or((false, false, 0), |stream| {
+            let (buffer_enabled, buffer_size) = stream
+                .buffer
+                .as_ref()
+                .map_or((false, 0), |buffer| (buffer.enabled, buffer.size));
+            (stream.retry, buffer_enabled, buffer_size)
+        });
+
+
     if let Ok(url) = Url::parse(stream_url) {
-        let (stream, provider_response) = buffered_stream::get_buffered_stream(&app_state.http_client, &url, req, input, item_type).await;
-        return if share_stream {
-            SharedStream::register(app_state, stream_url, stream).await;
-            if let Some(broadcast_stream) = create_notify_stream(app_state, stream_url).await {
-                let body_stream = BodyStream::new(broadcast_stream);
-                let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
-                response_builder.body(body_stream)
-            } else {
-                HttpResponse::BadRequest().finish()
-            }
+        let direct_pipe_provider_stream = !stream_retry && !buffer_enabled;
+        let (stream_opt, provider_response) = if direct_pipe_provider_stream {
+            get_provider_stream(&app_state.http_client, &url, req, input).await
         } else {
-            let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
-            response_builder.streaming(stream)
+            let buffer_stream_options = (item_type, stream_retry, buffer_enabled, buffer_size);
+            buffered_stream::get_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
         };
+        if let Some(stream) = stream_opt {
+            let use_buffer = !buffer_enabled || direct_pipe_provider_stream;
+            return if share_stream {
+                SharedStream::register(app_state, stream_url, stream, use_buffer).await;
+                if let Some(broadcast_stream) = create_broadcast_stream(app_state, stream_url).await {
+                    let body_stream = BodyStream::new(broadcast_stream);
+                    let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
+                    response_builder.body(body_stream)
+                } else {
+                    HttpResponse::BadRequest().finish()
+                }
+            } else {
+                let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
+                response_builder.streaming(stream)
+            };
+        }
     }
     error!("Url is malformed {}", mask_sensitive_info(stream_url));
     HttpResponse::BadRequest().finish()
 }
 
 async fn shared_stream_response(app_state: &AppState, stream_url: &str, headers: Option<(Vec<(String, String)>, reqwest::StatusCode)>) -> Option<HttpResponse> {
-    if let Some(stream) = create_notify_stream(app_state, stream_url).await {
+    if let Some(stream) = create_broadcast_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", mask_sensitive_info(stream_url));
         if app_state.shared_streams.lock().await.get(stream_url).is_some() {
             let mut response_builder = get_stream_response_with_headers(headers, stream_url);

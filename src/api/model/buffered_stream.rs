@@ -1,28 +1,28 @@
 use crate::api::api_utils::get_headers_from_request;
+use crate::debug_if_enabled;
 use crate::model::config::ConfigInput;
+use crate::model::playlist::PlaylistItemType;
 use crate::utils::request_utils::{get_request_headers, mask_sensitive_info};
 use actix_web::http::header::{HeaderName, HeaderValue};
 use actix_web::{HttpRequest, HttpResponseBuilder};
 use bytes::Bytes;
 use core::time::Duration;
+use log::{debug, error};
 use reqwest::header::RANGE;
-use reqwest::{Error, StatusCode};
+use reqwest::{Error, Response, StatusCode};
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use log::debug;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio_stream::{Stream, StreamExt};
 use url::Url;
-use crate::debug_if_enabled;
-use crate::model::playlist::PlaylistItemType;
 
 // TODO make this configurable
-const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
+pub const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
 const MEDIA_STREAM_HEADERS: &[&str] = &["content-type", "content-length", "connection", "accept-ranges", "content-range", "vary"];
 
 fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Option<usize> {
@@ -72,14 +72,55 @@ impl<T> Drop for BufferedReceiverStream<T> {
     }
 }
 
+type ProviderStreamResponse = (Option<Pin<Box<dyn tokio_stream::Stream<Item = Result<Bytes, reqwest::Error>> + Unpin + 'static>>>, Option<(Vec<(String, String)>, StatusCode)>);
+
+pub async fn get_provider_stream(http_client: &Arc<reqwest::Client>,
+                                 stream_url: &Url,
+                                 req: &HttpRequest,
+                                 input: Option<&ConfigInput>) -> ProviderStreamResponse {
+    let req_headers = get_headers_from_request(req, &None);
+    debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
+    // These are the configured headers for this input.
+    let input_headers = input.map(|i| i.headers.clone());
+    // The stream url, we need to clone it because of move to async block.
+    // We merge configured input headers with the headers from the request.
+    let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
+    let client = http_client.get(stream_url.clone()).headers(headers.clone());
+    match client.send().await {
+        Ok(mut response) => {
+            let response_headers = get_response_headers(&mut response);
+            // debug!("First  headers {headers:?} {} {}", mask_sensitive_info(url.as_str()));
+            let status = response.status();
+            if status.is_success() {
+                (Some(Box::pin(response.bytes_stream())), Some((response_headers, status)))
+            } else {
+                (None, Some((response_headers, status)))
+            }
+        }
+        Err(err) => {
+            let masked_url = mask_sensitive_info(stream_url.as_str());
+            error!("Failed to open stream {masked_url} {err}");
+            (None, None)
+        }
+    }
+}
+
+fn get_response_headers(response: &mut Response) -> Vec<(String, String)> {
+    let response_headers: Vec<(String, String)> = response.headers_mut().iter()
+        .filter(|(key, _)| MEDIA_STREAM_HEADERS.contains(&key.as_str()))
+        .map(|(key, value)| (key.to_string(), value.to_str().unwrap().to_string())).collect();
+    response_headers
+}
+
 #[allow(clippy::too_many_lines)]
 pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                                  stream_url: &Url,
                                  req: &HttpRequest,
                                  input: Option<&ConfigInput>,
-                                 item_type: PlaylistItemType) ->
-                                 (impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static, Option<(Vec<(String, String)>, StatusCode)>) {
-    let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(STREAM_QUEUE_SIZE);
+                                 options: (PlaylistItemType, bool, bool, usize)) -> ProviderStreamResponse {
+    let (item_type, retry_enabled, buffer_enabled, buffer_size) = options;
+    let channel_size = if buffer_enabled { if buffer_size > 0 { buffer_size } else { STREAM_QUEUE_SIZE } } else { 1 };
+    let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(channel_size);
     let mut req_headers = get_headers_from_request(req, &None);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
     // we need the range bytes from client request for seek ing to the right position
@@ -129,7 +170,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                     let status = response.status();
                     if !status.is_success() {
                         debug!("Failed to connect to provider stream. Status:{status} {masked_url}");
-                        if status.is_client_error() || status.is_server_error() {
+                        if !retry_enabled || status.is_client_error() || status.is_server_error() {
                             // We stop reconnecting, it seems the stream is not available
                             continue_retry_signal.store(false, Ordering::Relaxed);
                         }
@@ -140,15 +181,13 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                         // We need some header information from the provider, we extract the neccessary headers and forard them to the client
                         debug_if_enabled!("Provider response headers: {:?}", response.headers_mut());
                         first_run = false;
-                        let headers: Vec<(String, String)> = response.headers_mut().iter()
-                            .filter(|(key, _)| MEDIA_STREAM_HEADERS.contains(&key.as_str()))
-                            .map(|(key, value)| (key.to_string(), value.to_str().unwrap().to_string())).collect();
+                        let response_headers: Vec<(String, String)> =  get_response_headers(&mut response);
                         // debug!("First  headers {headers:?} {} {}", mask_sensitive_info(url.as_str()));
                         let mut status = response.status();
                         if partial_content && status.is_success() {
                             status = StatusCode::PARTIAL_CONTENT;
                         }
-                        let _ = first_run_response_sender.send(Some((headers, status))).await;
+                        let _ = first_run_response_sender.send(Some((response_headers, status))).await;
                     }
                     let mut byte_stream = response.bytes_stream();
                     while continue_retry_signal.load(Ordering::Relaxed) {
@@ -175,14 +214,14 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                             }
                             Some(Err(err)) => {
                                 debug!("Provider stream error {masked_url} {err:?}");
-                                if item_type != PlaylistItemType::Live {
+                                if !retry_enabled || item_type != PlaylistItemType::Live {
                                     continue_retry_signal.store(false, Ordering::Relaxed);
                                 }
                                 break;
                             }
                             None => {
                                 debug!("Provider stream finished no data available {masked_url}");
-                                if item_type != PlaylistItemType::Live {
+                                if !retry_enabled || item_type != PlaylistItemType::Live {
                                     continue_retry_signal.store(false, Ordering::Relaxed);
                                 }
                                 break;
@@ -193,13 +232,17 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                 }
                 Err(err) => {
                     debug!("Provider stream finished with error {masked_url} {err}");
-                    if item_type != PlaylistItemType::Live {
+                    if !retry_enabled || item_type != PlaylistItemType::Live {
                         continue_retry_signal.store(false, Ordering::Relaxed);
                     }
                     continue;
                 }
             }
-            actix_web::rt::time::sleep(Duration::from_millis(100)).await;
+            if retry_enabled {
+                actix_web::rt::time::sleep(Duration::from_millis(100)).await;
+            } else {
+                continue_retry_signal.store(false, Ordering::Relaxed);
+            }
         }
         debug!("Streaming stopped and no reconnect  for {masked_url}");
         drop(tx);
@@ -218,7 +261,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
 
     let provider_response = provider_response_receiver.recv().await.and_then(|o| o);
     drop(provider_response_receiver);
-    (BufferedReceiverStream::new(rx, continue_retry_signal_on_client_disconnect), provider_response)
+    (Some(Box::pin(BufferedReceiverStream::new(rx, continue_retry_signal_on_client_disconnect))), provider_response)
 }
 
 pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, StatusCode)>, stream_url: &str) -> HttpResponseBuilder {
