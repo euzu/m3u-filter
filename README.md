@@ -187,7 +187,12 @@ This configuration is only used for reverse proxy mode. The Reverse Proxy mode c
 Contains settings for the streaming.
 - The `retry`option is for transparent reconnections to the provider on provider disconnects or stream errors.
 - `buffer`: When buffer is `enabled`, the stream is buffered with the configured `size`.
-`size` is the amount of `8092byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.  
+`size` is the amount of `8092 byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.  
+
+- *a.* if `retry` is `false` and `buffer.enabled` is `false`  the provider stream is piped as is to the client.
+- *b.* if `retry` is `true` or  `buffer.enabled` is `true` the provider stream is processed and send to the client.
+
+- The key difference: the `b.` approach is based on complex stream handling and more memory footprint.
 
 #### 1.6.2 `cache`
 LRU-Cache is for resources. If it is `enabled`, the resources/images are persisted in the given `dir`. If the cache size exceeds `size`,
