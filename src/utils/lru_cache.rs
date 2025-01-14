@@ -1,4 +1,3 @@
-use crate::debug_if_enabled;
 use crate::repository::storage::hash_string_as_hex;
 use crate::utils::file_utils::traverse_dir;
 use crate::utils::size_utils::human_readable_byte_size;
@@ -69,7 +68,7 @@ impl LRUResourceCache {
             }
         };
         let result = traverse_dir(&self.cache_dir, &mut visit);
-        info!("Cache scanned, current size {}", human_readable_byte_size(self.current_size as u64));
+        info!("Cache scanned, current size {} / {}", human_readable_byte_size(self.current_size as u64), human_readable_byte_size(self.capacity as u64));
         result
     }
 

@@ -24,7 +24,7 @@ use crate::utils::default_utils::{default_as_default, default_as_true, default_a
 use crate::utils::file_lock_manager::FileLockManager;
 use crate::utils::{config_reader, file_utils};
 use crate::{exit, info_err};
-use crate::utils::size_utils::parse_size;
+use crate::utils::size_utils::parse_size_base_2;
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
@@ -884,7 +884,7 @@ impl CacheConfig {
             }
             match self.size.as_ref() {
                 None => self.t_size = 1024,
-                Some(val) => match parse_size(val) {
+                Some(val) => match parse_size_base_2(val) {
                     Ok(size) => self.t_size = usize::try_from(size).unwrap_or(0),
                     Err(err) => { exit!("{err}") }
                 }
