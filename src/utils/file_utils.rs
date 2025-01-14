@@ -182,10 +182,10 @@ pub fn append_or_crate_file(path: &Path) -> std::io::Result<File> {
     OpenOptions::new().create(true).append(true).open(path)
 }
 
-// #[inline]
-// pub fn create_new_file_for_write(path: &Path) -> std::io::Result<File> {
-//     OpenOptions::new().write(true).create(true).truncate(true).open(path)
-// }
+#[inline]
+pub fn create_new_file_for_write(path: &Path) -> std::io::Result<File> {
+    OpenOptions::new().write(true).create(true).truncate(true).open(path)
+}
 
 #[inline]
 pub fn create_new_file_for_read_write(path: &Path) -> std::io::Result<File> {

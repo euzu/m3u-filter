@@ -24,6 +24,8 @@ use async_std::sync::Mutex;
 use tokio_stream::wrappers::BroadcastStream;
 use url::Url;
 use crate::api::model::persist_pipe_stream::PersistPipeStream;
+use crate::utils::file_utils::create_new_file_for_write;
+use crate::utils::lru_cache::LRUResourceCache;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
@@ -123,19 +125,40 @@ pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarge
     item_type == PlaylistItemType::Live && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
 }
 
-
-pub fn get_headers_from_request(req: &HttpRequest) -> HashMap<String, Vec<u8>> {
+pub type HeaderFilter = Option<Box<dyn Fn(&str) -> bool>>;
+pub fn get_headers_from_request(req: &HttpRequest, filter: &HeaderFilter) -> HashMap<String, Vec<u8>> {
     req.headers()
         .iter()
+        .filter(|(k, _)| match &filter {
+            None => true,
+            Some(predicate) => predicate(k.as_str())
+        })
         .map(|(k, v)| (k.as_str().to_string(), v.as_bytes().to_vec()))
         .collect()
+}
+
+fn get_add_cache_content(res_url: &str, cache: &Arc<Option<Mutex<LRUResourceCache>>>) -> Box<dyn Fn(usize)> {
+    let resource_url = String::from(res_url);
+    let cache = Arc::clone(cache);
+    let add_cache_content: Box<dyn Fn(usize)> = Box::new(move|size| {
+        let res_url = resource_url.clone();
+        let cache = Arc::clone(&cache);
+        actix_rt::spawn(async move {
+            if let Some(cache) = cache.as_ref() {
+                let mut guard = cache.lock().await;
+                let _ = guard.add_content(&res_url, size).await;
+            }
+        });
+    });
+    add_cache_content
 }
 
 pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
     if resource_url.is_empty() {
         return HttpResponse::NoContent().finish();
     }
-    let req_headers = get_headers_from_request(req);
+    let filter: HeaderFilter = Some(Box::new(|key| key != "if-none-match" && key != "if-modified-since"));
+    let req_headers = get_headers_from_request(req, &filter);
     if let Some(cache) = app_state.cache.as_ref() {
         let mut guard = cache.lock().await;
         if let Some(resource_path) = guard.get_content(resource_url).await {
@@ -163,20 +186,9 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                             let guard = cache.lock().await;
                             guard.store_path(resource_url)
                         };
-                        if let Ok(file) = tokio::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&resource_path).await {
-                            let writer = Arc::new(Mutex::new(file));
-                            let cache = Arc::clone(&app_state.cache);
-                            let res_url = resource_url.to_string();
-                            let add_cache_content: Arc<Box<dyn Fn(usize)>> = Arc::new(Box::new(move|size| {
-                                let cache = Arc::clone(&cache);
-                                let res_url = res_url.clone();
-                                    actix_rt::spawn(async move {
-                                        if let Some(cache) = cache.as_ref() {
-                                        let mut guard = cache.lock().await;
-                                        let _ = guard.add_content(&res_url, size).await;
-                                        }
-                                    });
-                            }));
+                        if let Ok(file) = create_new_file_for_write(&resource_path) {
+                            let writer = Arc::new(file);
+                            let add_cache_content = get_add_cache_content(resource_url, &app_state.cache);
                             let stream = PersistPipeStream::new(byte_stream, writer, add_cache_content);
                             return response_builder.body(BodyStream::new(stream));
                         }

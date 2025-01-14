@@ -80,7 +80,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                                  item_type: PlaylistItemType) ->
                                  (impl Stream<Item=Result<Bytes, Error>> + Unpin + 'static, Option<(Vec<(String, String)>, StatusCode)>) {
     let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(STREAM_QUEUE_SIZE);
-    let mut req_headers = get_headers_from_request(req);
+    let mut req_headers = get_headers_from_request(req, &None);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
     // we need the range bytes from client request for seek ing to the right position
     let req_range_start_bytes = get_request_range_start_bytes(&req_headers);

@@ -120,7 +120,10 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
     }
 }
 
-pub fn get_client_request(client: &Arc<reqwest::Client>, headers: Option<&HashMap<String, String>>, url: &Url, custom_headers: Option<&HashMap<String, Vec<u8>>>) -> reqwest::RequestBuilder {
+pub fn get_client_request(client: &Arc<reqwest::Client>,
+                          headers: Option<&HashMap<String, String>>,
+                          url: &Url,
+                          custom_headers: Option<&HashMap<String, Vec<u8>>>) -> reqwest::RequestBuilder {
     let request = client.get(url.clone());
     let headers = get_request_headers(headers, custom_headers);
     request.headers(headers)

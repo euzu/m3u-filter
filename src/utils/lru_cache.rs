@@ -1,12 +1,26 @@
+use crate::debug_if_enabled;
 use crate::repository::storage::hash_string_as_hex;
 use crate::utils::file_utils::traverse_dir;
+use crate::utils::size_utils::human_readable_byte_size;
 use async_std::sync::RwLock;
 use log::{debug, error};
 use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::debug_if_enabled;
-use crate::utils::size_utils::human_readable_byte_size;
+
+/// `LRUResourceCache`
+///
+/// A least-recently-used (LRU) file-based resource cache that stores files in a directory on disk,
+/// automatically managing their lifecycle based on a specified maximum cache size. The cache evicts
+/// the least recently used files when the size limit is exceeded.
+///
+/// # Fields
+/// - `capacity`: The maximum cache size in bytes. Once the cache size exceeds this value, files are evicted.
+/// - `cache_dir`: The directory where cached files are stored.
+/// - `current_size`: The current total size of all files in the cache, in bytes.
+/// - `cache`: A `HashMap` that maps a unique key to a tuple containing the file path and its size.
+/// - `usage_order`: A `VecDeque` that tracks the access order of keys, with the oldest at the front.
+/// - `lock`: An `RwLock` to ensure thread-safe access to the cache during read and write operations.
 
 pub struct LRUResourceCache {
     capacity: usize,  // Maximum size in bytes
@@ -18,6 +32,11 @@ pub struct LRUResourceCache {
 }
 
 impl LRUResourceCache {
+    ///   - Creates a new `LRUResourceCache` instance.
+    ///   - Arguments:
+    ///     - `capacity`: The maximum size of the cache in bytes.
+    ///     - `cache_dir`: The directory path where cached files are stored.
+    ///
     pub fn new(capacity: usize, cache_dir: &Path) -> Self {
         Self {
             capacity,
@@ -29,34 +48,59 @@ impl LRUResourceCache {
         }
     }
 
+    /// - Scans the cache directory and populates the internal data structures with existing files and their sizes.
+    /// - Updates the `current_size` and `usage_order` fields based on the scanned files.
+    /// The use/access order is not restored!!!
     pub async fn scan(&mut self) -> std::io::Result<()> {
         let _write_lock = self.lock.write().await;
         let mut visit = |entry: &std::fs::DirEntry, metadata: &std::fs::Metadata| {
-            self.current_size += usize::try_from(metadata.len()).unwrap_or(0);
-            self.usage_order.push_back(entry.file_name().to_string_lossy().to_string());
+            let path = entry.path();
+            if let Some(file_name) = path.file_name() {
+                let key = String::from(file_name.to_string_lossy());
+                let file_size = usize::try_from(metadata.len()).unwrap_or(0);
+                // we need to duplicate because of closure we cant call insert_to_cache
+                {  // insert_to_cache
+                    let mut path = self.cache_dir.clone();
+                    path.push(&key);
+                    debug!("Added file to cache: {}", &path.to_string_lossy());
+                    self.cache.insert(key.clone(), (path.clone(), file_size));
+                    self.usage_order.push_back(key);
+                    self.current_size += file_size;
+                }
+            }
         };
         let result = traverse_dir(&self.cache_dir, &mut visit);
         debug_if_enabled!("Cache scanned, current size {}", human_readable_byte_size(self.current_size as u64));
         result
     }
 
+    ///   - Adds a new file to the cache.
+    ///   - Evicts the least recently used files if the cache size exceeds the capacity after the addition.
+    ///   - Arguments:
+    ///     - `url`: The unique identifier for the file.
+    ///     - `file_size`: The size of the file in bytes.
+    ///   - Returns:
+    ///     - The `PathBuf` where the file is stored.
     pub async fn add_content(&mut self, url: &str, file_size: usize) -> std::io::Result<PathBuf> {
         let key = hash_string_as_hex(url);
-        {
-            let mut path = self.cache_dir.clone();
-            path.push(&key);
-            {
-                let _write_lock = self.lock.write().await;
-                debug!("Added file to cache: {}", &path.to_string_lossy());
-                self.cache.insert(key.clone(), (path.clone(), file_size));
-                self.usage_order.push_back(key);
-                self.current_size += file_size;
-            }
-            if self.current_size > self.capacity {
-                self.evict_if_needed().await;
-            }
-            Ok(path)
+        let path = {
+            self.insert_to_cache(key, file_size).await
+        };
+        if self.current_size > self.capacity {
+            self.evict_if_needed().await;
         }
+        Ok(path)
+    }
+
+    async fn insert_to_cache(&mut self, key: String, file_size: usize) -> PathBuf {
+        let _write_lock = self.lock.write().await;
+        let mut path = self.cache_dir.clone();
+        path.push(&key);
+        debug!("Added file to cache: {}", &path.to_string_lossy());
+        self.cache.insert(key.clone(), (path.clone(), file_size));
+        self.usage_order.push_back(key);
+        self.current_size += file_size;
+        path
     }
 
     pub fn store_path(&self, url: &str) -> PathBuf {
@@ -66,6 +110,12 @@ impl LRUResourceCache {
         path
     }
 
+    ///   - Retrieves a file from the cache if it exists.
+    ///   - Moves the file's key to the end of the usage queue to mark it as recently used.
+    ///   - Arguments:
+    ///     - `url`: The unique identifier for the file.
+    ///   - Returns:
+    ///     - The `PathBuf` of the file if it exists; `None` otherwise.
     pub async fn get_content(&mut self, url: &str) -> Option<PathBuf> {
         let key = hash_string_as_hex(url);
         {
@@ -107,55 +157,3 @@ impl LRUResourceCache {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::utils::lru_cache::LRUResourceCache;
-//     use std::fs::File;
-//     use std::future::Future;
-//     use std::io;
-//     use std::io::BufWriter;
-//     use std::path::PathBuf;
-//
-//     const PHOTO_URL: &str = "https://dummyimage.com/";
-//     const PHOTOS: &[&str] = &["300x200/000/fff", "300x200/f00/0ff", "300x200/0f0/f0f"];
-//
-//     fn download_file(url: &str, key: &str) -> io::Result<(PathBuf, usize)> {
-//         match reqwest::blocking::get(url) {
-//             Ok(mut response) => {
-//                 println!("Downloaded file {url}");
-//                 let mut path = PathBuf::from("/tmp");
-//                 path.push(key);
-//                 let mut writer = BufWriter::new(File::create(&path)?);
-//                 let size = response.copy_to(&mut writer).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-//                 Ok((path, size as usize))
-//             }
-//             Err(err) => Err(io::Error::new(io::ErrorKind::Other, err.to_string())),
-//         }
-//     }
-//
-//     #[cfg(target_os = "linux")]
-//     #[test]
-//     fn test_1() {
-//         actix_rt::task::spawn_blocking(move ||{
-//             let mut cache = LRUResourceCache::new(1000, &PathBuf::from("/tmp"), Box::new(download_file));
-//             for photo in PHOTOS {
-//                 match cache.get_content(format!("{PHOTO_URL}{photo}").as_str()).await {
-//                     Ok(path) => {
-//                         println!("path {path:?}");
-//                     }
-//                     Err(err) => { println!("Failed {err}") }
-//                 }
-//             }
-//
-//             for photo in PHOTOS {
-//                 match cache.get_content(format!("{PHOTO_URL}{photo}").as_str()).await {
-//                     Ok(path) => {
-//                         println!("path {path:?}");
-//                     }
-//                     Err(err) => { println!("Failed {err}") }
-//                 }
-//             }
-//         });
-//
-//     }
-// }

@@ -1,26 +1,45 @@
-use async_std::sync::Mutex;
+use std::io::Write;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
 use bytes::Bytes;
 use reqwest::Error;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_stream::Stream;
+
+/// `PersistPipeStream`
+///
+/// A stream wrapper that pipes data from an input stream to a writer while tracking
+/// the total number of bytes processed. Upon completion, it triggers a user-provided
+/// callback with the total size of the data written.
+/// - `callback`: A user-provided function that is called with the total size of the processed data once the stream is completed.
+///
+/// # Stream Implementation
+/// - Implements the `Stream` trait to poll the underlying stream for data.
+/// - For each chunk of data:
+///   - Writes it to the writer.
+///   - Updates the size tracker.
+/// - When the stream is exhausted:
+///   - Calls `on_complete()` to finalize the operation and trigger the callback.
+
 pub struct PersistPipeStream<S, W> {
     inner: S,
     completed: bool,
-    writer: Arc<Mutex<W>>,
+    writer: W,
     size: AtomicUsize,
-    callback: Arc<Box<dyn Fn(usize)>>,
+    callback: Box<dyn Fn(usize)>,
 }
 
 impl<S, W> PersistPipeStream<S, W>
 where
     S: Stream + Unpin,
-    W: AsyncWrite + Unpin + 'static,
+    W: Write + Unpin + 'static,
 {
-    pub fn new(inner: S, writer: Arc<Mutex<W>>, callback: Arc<Box<dyn Fn(usize)>>) -> Self {
+    ///   - Creates a new `PersistPipeStream` instance.
+    ///   - Arguments:
+    ///     - `inner`: The input stream providing the data.
+    ///     - `writer`: The writer to which the data is written.
+    ///     - `callback`: A callback function to be called with the total size upon stream completion.
+    pub fn new(inner: S, writer: W, callback: Box<dyn Fn(usize)>) -> Self {
         Self {
             inner,
             completed: false,
@@ -33,29 +52,20 @@ where
     fn on_complete(&mut self) {
         if !self.completed {
             self.completed = true;
-            let writer = self.writer.clone();
             let size = self.size.load(Ordering::Relaxed);
-            let callback = Arc::clone(&self.callback);
-            actix_rt::spawn(async move {
-                let mut guard = writer.lock().await;
-                if (*guard).flush().await.is_ok() {
-                    callback(size);
-                }
-            });
+            if self.writer.flush().is_ok() {
+                (self.callback)(size);
+            }
         }
     }
 
     fn on_data(&mut self, data: &Result<Bytes, Error>) {
         if let Ok(bytes) = data {
             self.size.fetch_add(bytes.len(), Ordering::Relaxed);
-            let writer = self.writer.clone();
             let bytes_to_write = bytes.clone();
-            actix_rt::spawn(async move {
-                let mut guard = writer.lock().await;
-                if let Err(e) = (*guard).write_all(&bytes_to_write).await {
-                    eprintln!("Error writing to resource file: {e}");
-                }
-            });
+            if let Err(e) = self.writer.write_all(&bytes_to_write) {
+                eprintln!("Error writing to resource file: {e}");
+            }
         }
     }
 }
@@ -63,7 +73,7 @@ where
 impl<S, W> Stream for PersistPipeStream<S, W>
 where
     S: Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Unpin,
-    W: AsyncWrite + Unpin + 'static,
+    W: Write + Unpin + 'static,
 {
     type Item = Result<Bytes, Error>;
 
