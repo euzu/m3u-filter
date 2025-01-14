@@ -118,7 +118,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                                  req: &HttpRequest,
                                  input: Option<&ConfigInput>,
                                  options: (PlaylistItemType, bool, bool, usize)) -> ProviderStreamResponse {
-    let (item_type, retry_enabled, buffer_enabled, buffer_size) = options;
+    let (_item_type, retry_enabled, buffer_enabled, buffer_size) = options;
     let channel_size = if buffer_enabled { if buffer_size > 0 { buffer_size } else { STREAM_QUEUE_SIZE } } else { 1 };
     let (tx, rx) = mpsc::channel::<Result<Bytes, Error>>(channel_size);
     let mut req_headers = get_headers_from_request(req, &None);
@@ -213,14 +213,14 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                             }
                             Some(Err(err)) => {
                                 debug!("Provider stream error {masked_url} {err:?}");
-                                if !retry_enabled || item_type != PlaylistItemType::Live {
+                                if !retry_enabled {
                                     continue_retry_signal.store(false, Ordering::Relaxed);
                                 }
                                 break;
                             }
                             None => {
-                                debug!("Provider stream finished no data available {masked_url}");
-                                if !retry_enabled || item_type != PlaylistItemType::Live {
+                                debug!("Provider stream no data available {masked_url}");
+                                if !retry_enabled {
                                     continue_retry_signal.store(false, Ordering::Relaxed);
                                 }
                                 break;
@@ -231,7 +231,7 @@ pub async fn get_buffered_stream(http_client: &Arc<reqwest::Client>,
                 }
                 Err(err) => {
                     debug!("Provider stream finished with error {masked_url} {err}");
-                    if !retry_enabled || item_type != PlaylistItemType::Live {
+                    if !retry_enabled {
                         continue_retry_signal.store(false, Ordering::Relaxed);
                     }
                     continue;
