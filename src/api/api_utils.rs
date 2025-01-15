@@ -1,6 +1,6 @@
 use crate::api::model::app_state::AppState;
-use crate::api::model::buffered_stream;
-use crate::api::model::buffered_stream::{get_provider_stream, get_stream_response_with_headers};
+use crate::api::model::provider_stream;
+use crate::api::model::provider_stream::{get_provider_pipe_stream};
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::shared_stream::SharedStream;
 use crate::debug_if_enabled;
@@ -23,6 +23,7 @@ use std::sync::Arc;
 use async_std::sync::Mutex;
 use tokio_stream::wrappers::BroadcastStream;
 use url::Url;
+use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::persist_pipe_stream::PersistPipeStream;
 use crate::utils::file_utils::create_new_file_for_write;
 use crate::utils::lru_cache::LRUResourceCache;
@@ -105,10 +106,10 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
     if let Ok(url) = Url::parse(stream_url) {
         let direct_pipe_provider_stream = !stream_retry && !buffer_enabled;
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
-            get_provider_stream(&app_state.http_client, &url, req, input).await
+            get_provider_pipe_stream(&app_state.http_client, &url, req, input).await
         } else {
             let buffer_stream_options = (item_type, stream_retry, buffer_enabled, buffer_size);
-            buffered_stream::get_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
+            provider_stream::get_provider_reconnect_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {
             let use_buffer = !buffer_enabled || direct_pipe_provider_stream;

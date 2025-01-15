@@ -4,11 +4,11 @@ use std::time::Duration;
 use async_std::prelude::{Stream, StreamExt};
 use tokio::sync::broadcast;
 use crate::api::model::app_state::AppState;
-use crate::api::model::buffered_stream::STREAM_QUEUE_SIZE;
+use crate::api::model::provider_stream_factory::STREAM_QUEUE_SIZE;
 use crate::debug_if_enabled;
 use crate::utils::request_utils::mask_sensitive_info;
 
-const MIN_STREAM_QUEUE_SIZE: usize = 10;
+const MIN_STREAM_QUEUE_SIZE: usize = 1024;
 
 pub struct SharedStream {
     pub data_stream: Arc<tokio::sync::broadcast::Sender<Bytes>>,
