@@ -12,6 +12,7 @@ use serde_json::{Map, Value};
 
 pub const INFO_RESOURCE_PREFIX: &str = "nfo_";
 pub const INFO_RESOURCE_PREFIX_EPISODE: &str = "nfo_ep_";
+pub const SEASON_RESOURCE_PREFIX: &str = "ssn_";
 
 pub const PROP_BACKDROP_PATH: &str = "backdrop_path";
 pub const PROP_COVER: &str = "cover";

@@ -24,11 +24,11 @@ use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH};
+use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH, SEASON_RESOURCE_PREFIX};
 use crate::repository::storage::{get_target_storage_path, hash_string};
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository;
-use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA};
+use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::utils::json_utils::get_u32_from_serde_value;
 use crate::utils::request_utils::{extract_extension_from_url, mask_sensitive_info};
 use crate::utils::{download, json_utils, request_utils};
@@ -220,12 +220,23 @@ async fn xtream_player_api_stream(
     stream_response(app_state, &stream_url, req, Some(input), pli.item_type, target).await
 }
 
-fn get_episode_id_and_field_name(input: &str) -> Option<(u32, &str)> {
+fn get_doc_id_and_field_name(input: &str) -> Option<(u32, &str)> {
     if let Some(pos) = input.find('_') {
         let (number_part, rest) = input.split_at(pos);
         let field = &rest[1..]; // cut _
         if let Ok(number) = number_part.parse::<u32>() {
             return Some((number, field));
+        }
+    }
+    None
+}
+
+fn get_doc_resource_field_value(field: &str, doc: Option<&Value>) -> Option<Rc<String>> {
+    if let Some(Value::Object(info_data)) = doc {
+        if field.starts_with(PROP_BACKDROP_PATH) {
+            return get_backdrop_path_value(field, info_data.get(PROP_BACKDROP_PATH));
+        } else if let Some(Value::String(url)) = info_data.get(field) {
+            return Some(Rc::new(url.to_string()));
         }
     }
     None
@@ -244,7 +255,7 @@ async fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem,
     if let Some(content) = info_content {
         let doc: Map<String, Value> = serde_json::from_str(&content)?;
         let (field, possible_episode_id) = if let Some(field_name_with_episode_id) = resource.strip_prefix(INFO_RESOURCE_PREFIX_EPISODE) {
-            if let Some((episode_id, field_name)) = get_episode_id_and_field_name(field_name_with_episode_id) {
+            if let Some((episode_id, field_name)) = get_doc_id_and_field_name(field_name_with_episode_id) {
                 (field_name, Some(episode_id))
             } else {
                 return Ok(None);
@@ -263,12 +274,8 @@ async fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem,
             XtreamCluster::Live => None,
         };
 
-        if let Some(Value::Object(info_data)) = info_doc {
-            if field.starts_with(PROP_BACKDROP_PATH) {
-                return Ok(get_backdrop_path_value(field, info_data.get(PROP_BACKDROP_PATH)));
-            } else if let Some(Value::String(url)) = info_data.get(field) {
-                return Ok(Some(Rc::new(url.to_string())));
-            }
+        if let Some(value) = get_doc_resource_field_value(field, info_doc) {
+            return Ok(Some(value));
         }
     }
     Ok(None)
@@ -294,6 +301,50 @@ fn get_episode_info_doc(doc: &Map<String, Value>, episode_id: u32) -> Option<&Va
     None
 }
 
+fn get_season_info_doc(doc: &Vec<Value>, season_id: u32) -> Option<&Value> {
+    for season in doc {
+        if let Value::Object(season_doc) = season {
+            if let Some(season_id_value) = season_doc.get(TAG_ID) {
+                if let Some(doc_season_id) = get_u32_from_serde_value(season_id_value) {
+                    if doc_season_id == season_id {
+                        return Some(season);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+
+async fn xtream_get_season_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<Rc<String>>, serde_json::Error> {
+    let info_content = match pli.xtream_cluster {
+        XtreamCluster::Series => {
+            xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()).await
+        }
+        XtreamCluster::Video | XtreamCluster::Live => None,
+    };
+    if let Some(content) = info_content {
+        let doc: Map<String, Value> = serde_json::from_str(&content)?;
+
+        if let Some(field_name_with_season_id) = resource.strip_prefix(SEASON_RESOURCE_PREFIX) {
+            if let Some((season_id, field)) = get_doc_id_and_field_name(field_name_with_season_id) {
+                let seasons_doc = match pli.xtream_cluster {
+                    XtreamCluster::Series => doc.get(TAG_SEASONS_DATA),
+                    XtreamCluster::Video | XtreamCluster::Live => None,
+                };
+
+                if let Some(Value::Array(seasons)) = seasons_doc {
+                    if let Some(value) = get_doc_resource_field_value(field, get_season_info_doc(seasons, season_id)) {
+                        return Ok(Some(value));
+                    }
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
 async fn xtream_player_api_resource(
     req: &HttpRequest,
     api_req: &web::Query<UserApiRequest>,
@@ -311,6 +362,8 @@ async fn xtream_player_api_resource(
     let pli = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let stream_url = if resource.starts_with(INFO_RESOURCE_PREFIX) {
         try_result_bad_request!(xtream_get_info_resource_url(&app_state.config, &pli, target, resource).await)
+    } else if resource.starts_with(SEASON_RESOURCE_PREFIX) {
+        try_result_bad_request!(xtream_get_season_resource_url(&app_state.config, &pli, target, resource).await)
     } else {
         pli.get_field(resource)
     };
@@ -631,7 +684,6 @@ fn xtream_create_content_stream(xtream_iter: impl Iterator<Item=String>) -> impl
             Ok::<Bytes, String>(Bytes::from(line))
         })).chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
 }
-
 
 async fn xtream_player_api_get(req: HttpRequest,
                                api_req: web::Query<UserApiRequest>,
