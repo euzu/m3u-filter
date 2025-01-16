@@ -128,7 +128,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
             };
         }
     }
-    error!("Url is malformed {}", mask_sensitive_info(stream_url));
+    error!("Cant open stream {}", mask_sensitive_info(stream_url));
     HttpResponse::BadRequest().finish()
 }
 
