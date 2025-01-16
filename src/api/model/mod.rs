@@ -11,3 +11,4 @@ mod buffered_stream;
 pub mod model_utils;
 mod client_stream;
 pub mod stream_error;
+mod broadcast_stream;

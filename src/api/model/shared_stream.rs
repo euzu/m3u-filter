@@ -1,20 +1,28 @@
-use bytes::Bytes;
-use std::sync::Arc;
-use std::time::Duration;
-use async_std::prelude::{Stream, StreamExt};
-use tokio::sync::broadcast;
 use crate::api::model::app_state::AppState;
 use crate::api::model::provider_stream_factory::STREAM_QUEUE_SIZE;
 use crate::debug_if_enabled;
 use crate::utils::request_utils::mask_sensitive_info;
+use bytes::Bytes;
+use std::sync::Arc;
+use std::time::Duration;
+use futures::stream::BoxStream;
+use futures::{Stream, StreamExt};
+use log::error;
+use crate::api::model::broadcast_stream::BroadcastStream;
+use crate::api::model::stream_error::StreamError;
 
 const MIN_STREAM_QUEUE_SIZE: usize = 1024;
 
 pub struct SharedStream {
-    pub data_stream: Arc<tokio::sync::broadcast::Sender<Bytes>>,
+    // pub sender: flume::Sender<Bytes>,
+    pub receiver: async_broadcast::Receiver<Bytes>,
 }
 
 impl SharedStream {
+
+    pub(crate)fn get_receiver(&self) -> BoxStream<'static, Result<Bytes, StreamError>> {
+         BroadcastStream::new(self.receiver.clone()).boxed()
+    }
 
     /// Creates a shared stream and stores it in the shared state.
     pub(crate) async fn register<S, E>(
@@ -26,8 +34,8 @@ impl SharedStream {
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
     {
         // Create a broadcast channel for the shared stream
-        let (tx, _) = broadcast::channel(if use_buffer { STREAM_QUEUE_SIZE } else { MIN_STREAM_QUEUE_SIZE });
-        let sender = Arc::new(tx);
+        let (tx, rx) = async_broadcast::broadcast(if use_buffer { STREAM_QUEUE_SIZE } else { MIN_STREAM_QUEUE_SIZE });
+        let sender = tx.clone();
 
         // Insert the shared stream into the shared state
         app_state
@@ -37,7 +45,8 @@ impl SharedStream {
             .insert(
                 stream_url.to_string(),
                 SharedStream {
-                    data_stream: sender.clone(),
+                    // sender: sender.clone(),
+                    receiver: rx
                 },
             );
 
@@ -49,11 +58,11 @@ impl SharedStream {
             while let Some(item) = source_stream.next().await {
                 if let Ok(data) = item {
                     if sender.receiver_count() > 0 {
-                        // if let Err(err) = sender.send(data) {
-                        //     debug!("{err}")
-                        // }
-                        if sender.send(data).is_err() {
-                            // ignore
+                        match sender.broadcast(data).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                error!("Broadcast channel send {err}");
+                            }
                         }
                         actix_web::rt::time::sleep(Duration::from_millis(20)).await;
                     } else {

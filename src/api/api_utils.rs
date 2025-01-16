@@ -21,8 +21,8 @@ use std::collections::HashMap;
 use std::path::{Path};
 use std::sync::Arc;
 use async_std::sync::Mutex;
-use futures::TryStreamExt;
-use tokio_stream::wrappers::BroadcastStream;
+use futures::stream::BoxStream;
+use futures::{TryStreamExt};
 use url::Url;
 use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::persist_pipe_stream::PersistPipeStream;
@@ -68,13 +68,12 @@ pub fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a AppState)
 async fn create_broadcast_stream(
     app_state: &AppState,
     stream_url: &str,
-) -> Option<BroadcastStream<Bytes>> {
+) -> Option<BoxStream<'static, Result<Bytes, StreamError>>> {
     let notify_stream_url = stream_url.to_string();
     // Acquire lock and check for existing stream
     let shared_streams = app_state.shared_streams.lock().await;
     if let Some(shared_stream) = shared_streams.get(&notify_stream_url) {
-        let rx = shared_stream.data_stream.subscribe();
-        Some(BroadcastStream::new(rx))
+        Some(shared_stream.get_receiver())
     } else {
         None
     }
@@ -208,7 +207,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                         response_builder.insert_header((k.as_str(), v.as_ref()));
                     });
 
-                    let byte_stream = response.bytes_stream().map_err(StreamError::Reqwest);
+                    let byte_stream = response.bytes_stream().map_err(|err|StreamError::reqwest(&err));
                     if let Some(cache) = app_state.cache.as_ref() {
                        let resource_path = {
                             let guard = cache.lock().await;

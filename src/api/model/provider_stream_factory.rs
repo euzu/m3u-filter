@@ -205,7 +205,7 @@ async fn provider_request(request_client: Arc<reqwest::Client>, initial_info: bo
                 } else {
                     None
                 };
-                return Ok(Some((response.bytes_stream().map_err(StreamError::Reqwest).boxed(), response_info)));
+                return Ok(Some((response.bytes_stream().map_err(|err|StreamError::reqwest(&err)).boxed(), response_info)));
             }
             Err(status)
         }
@@ -228,7 +228,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
             Ok(response) => {
                 let status = response.status();
                 if status.is_success() {
-                    return Some(response.bytes_stream().map_err(StreamError::Reqwest).boxed());
+                    return Some(response.bytes_stream().map_err(|err|StreamError::reqwest(&err)).boxed());
                 }
                 if status.is_client_error() {
                     return None;

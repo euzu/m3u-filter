@@ -33,7 +33,7 @@ pub async fn get_provider_pipe_stream(http_client: &Arc<reqwest::Client>,
             let response_headers = get_response_headers(&mut response);
             let status = response.status();
             if status.is_success() {
-                (Some(Box::pin(response.bytes_stream().map_err(StreamError::Reqwest))), Some((response_headers, status)))
+                (Some(Box::pin(response.bytes_stream().map_err(|err|StreamError::reqwest(&err)))), Some((response_headers, status)))
             } else {
                 (None, Some((response_headers, status)))
             }
