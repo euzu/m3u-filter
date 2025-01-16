@@ -163,7 +163,7 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
             if let Ok(file) = File::open(col_path) {
                 let reader = BufReader::new(file);
                 for entry in json_iter_array::<Value, BufReader<File>>(reader).flatten() {
-                    if let Some(category_id) = entry.get(TAG_CATEGORY_ID).and_then(|v| get_u32_from_serde_value(v)) {
+                    if let Some(category_id) = entry.get(TAG_CATEGORY_ID).and_then(get_u32_from_serde_value) {
                         if let Value::Object(item) = entry {
                             if let Some(category_name) = get_map_item_as_str(&item, TAG_CATEGORY_NAME) {
                                 result.insert(category_name, category_id);
@@ -668,7 +668,7 @@ async fn rewrite_xtream_series_info<P>(
         if let Some(Value::Array(seasons_data)) = doc.get_mut(TAG_SEASONS_DATA) {
             for season_value in seasons_data {
                 if let Value::Object(season_doc) = season_value {
-                    if let Some(season_provider_id) = season_doc.get(TAG_ID).and_then(|v| get_u32_from_serde_value(v)) {
+                    if let Some(season_provider_id) = season_doc.get(TAG_ID).and_then(get_u32_from_serde_value) {
                         let field_prefix = format!("{SEASON_RESOURCE_PREFIX}{season_provider_id}_");
                         rewrite_doc_urls(resource_url.as_ref(), season_doc, INFO_REWRITE_FIELDS, &field_prefix);
                     }
@@ -689,7 +689,7 @@ async fn rewrite_xtream_series_info<P>(
         let provider_url = pli.get_provider_url();
         for episode_list in episodes.values_mut().filter_map(Value::as_array_mut) {
             for episode in episode_list.iter_mut().filter_map(Value::as_object_mut) {
-                if let Some(episode_provider_id) = episode.get(TAG_ID).and_then(|v| get_u32_from_serde_value(v))
+                if let Some(episode_provider_id) = episode.get(TAG_ID).and_then(get_u32_from_serde_value)
                 {
                     let uuid = hash_string(&format!("{provider_url}/{episode_provider_id}"));
                     let episode_virtual_id = target_id_mapping.insert_entry(
