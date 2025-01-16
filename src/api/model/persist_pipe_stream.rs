@@ -3,8 +3,9 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
 use bytes::Bytes;
-use reqwest::Error;
+use log::error;
 use tokio_stream::Stream;
+use crate::api::model::stream_error::StreamError;
 
 /// `PersistPipeStream`
 ///
@@ -58,12 +59,12 @@ where
         }
     }
 
-    fn on_data(&mut self, data: &Result<Bytes, Error>) {
+    fn on_data(&mut self, data: &Result<Bytes, StreamError>) {
         if let Ok(bytes) = data {
             self.size.fetch_add(bytes.len(), Ordering::Relaxed);
             let bytes_to_write = bytes.clone();
             if let Err(e) = self.writer.write_all(&bytes_to_write) {
-                eprintln!("Error writing to resource file: {e}");
+                error!("Error writing to resource file: {e}");
             }
         }
     }
@@ -71,10 +72,10 @@ where
 
 impl<S, W> Stream for PersistPipeStream<S, W>
 where
-    S: Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Unpin,
+    S: Stream<Item = Result<bytes::Bytes, StreamError>> + Unpin,
     W: Write + Unpin + 'static,
 {
-    type Item = Result<Bytes, Error>;
+    type Item = Result<Bytes, StreamError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();

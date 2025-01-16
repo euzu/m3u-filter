@@ -1,8 +1,7 @@
 use crate::api::api_utils::get_headers_from_request;
-use crate::api::model::provider_stream_factory::{create_provider_stream};
+use crate::api::model::provider_stream_factory::{create_provider_stream, BufferStreamOptions};
 use crate::debug_if_enabled;
 use crate::model::config::ConfigInput;
-use crate::model::playlist::PlaylistItemType;
 use crate::utils::request_utils::{get_request_headers, mask_sensitive_info};
 use actix_web::{HttpRequest};
 use bytes::Bytes;
@@ -10,10 +9,12 @@ use futures::stream::BoxStream;
 use log::error;
 use reqwest::StatusCode;
 use std::sync::Arc;
+use futures::TryStreamExt;
 use url::Url;
 use crate::api::model::model_utils::get_response_headers;
+use crate::api::model::stream_error::StreamError;
 
-type ProviderStreamResponse = (Option<BoxStream<'static, Result<Bytes, reqwest::Error>>>, Option<(Vec<(String, String)>, StatusCode)>);
+type ProviderStreamResponse = (Option<BoxStream<'static, Result<Bytes, StreamError>>>, Option<(Vec<(String, String)>, StatusCode)>);
 
 pub async fn get_provider_pipe_stream(http_client: &Arc<reqwest::Client>,
                                       stream_url: &Url,
@@ -32,7 +33,7 @@ pub async fn get_provider_pipe_stream(http_client: &Arc<reqwest::Client>,
             let response_headers = get_response_headers(&mut response);
             let status = response.status();
             if status.is_success() {
-                (Some(Box::pin(response.bytes_stream())), Some((response_headers, status)))
+                (Some(Box::pin(response.bytes_stream().map_err(StreamError::Reqwest))), Some((response_headers, status)))
             } else {
                 (None, Some((response_headers, status)))
             }
@@ -49,7 +50,7 @@ pub async fn get_provider_reconnect_buffered_stream(http_client: &Arc<reqwest::C
                                                     stream_url: &Url,
                                                     req: &HttpRequest,
                                                     input: Option<&ConfigInput>,
-                                                    options: (PlaylistItemType, bool, bool, usize)) -> ProviderStreamResponse {
+                                                    options: BufferStreamOptions) -> ProviderStreamResponse {
     match create_provider_stream(Arc::clone(http_client), stream_url, req, input, options).await {
         None => (None, None),
         Some((stream, info)) => {

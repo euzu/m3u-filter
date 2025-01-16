@@ -1,18 +1,18 @@
+use crate::api::model::provider_stream_factory::ResponseStream;
+use crate::utils::request_utils::mask_sensitive_info;
 use futures::{stream::Stream, task::{Context, Poll}, StreamExt};
+use log::debug;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     pin::Pin,
     sync::Arc,
 };
-use std::sync::atomic::{AtomicBool, Ordering};
-use log::debug;
-use tokio::sync::mpsc::{channel};
+use tokio::sync::mpsc::channel;
 use tokio_stream::wrappers::ReceiverStream;
-use crate::api::model::provider_stream_factory::ResponseStream;
-use crate::utils::request_utils::mask_sensitive_info;
+use crate::api::model::stream_error::StreamError;
 
-pub struct BufferedStream
-{
-    stream: ReceiverStream<Result<bytes::Bytes, reqwest::Error>>,
+pub(in crate::api::model) struct BufferedStream {
+    stream: ReceiverStream<Result<bytes::Bytes, StreamError>>,
 }
 
 impl BufferedStream {
@@ -33,11 +33,10 @@ impl BufferedStream {
                             break;
                         }
                     }
-                    Some(Err(_err)) => {
-                    },
+                    Some(Err(_err)) => {}
                     None => {
-                         break
-                    },
+                        break
+                    }
                 }
             }
         });
@@ -48,32 +47,10 @@ impl BufferedStream {
     }
 }
 
-impl Stream for BufferedStream
-{
-    type Item = Result<bytes::Bytes, reqwest::Error>;
+impl Stream for BufferedStream {
+    type Item = Result<bytes::Bytes, StreamError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.stream.poll_next_unpin(cx)
     }
 }
-
-
-// #[tokio::main]
-// async fn main() {
-//     use futures::stream;
-//
-//     // A slow source stream that produces items with a delay
-//     let source_stream = stream::iter(vec![1, 2, 3, 4, 5, 6])
-//         .throttle(tokio::time::Duration::from_millis(500));
-//
-//     // Create a buffered stream with a maximum buffer size of 3
-//     let buffered_stream = BufferedStream::new(source_stream, 3);
-//
-//     // Consume the buffered stream
-//     tokio::pin!(buffered_stream); // Pin the stream for asynchronous use
-//
-//     while let Some(item) = buffered_stream.next().await {
-//         println!("Read: {}", item);
-//         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await; // Simulate slower processing
-//     }
-// }

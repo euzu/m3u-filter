@@ -21,10 +21,13 @@ use std::collections::HashMap;
 use std::path::{Path};
 use std::sync::Arc;
 use async_std::sync::Mutex;
+use futures::TryStreamExt;
 use tokio_stream::wrappers::BroadcastStream;
 use url::Url;
 use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::persist_pipe_stream::PersistPipeStream;
+use crate::api::model::provider_stream_factory::BufferStreamOptions;
+use crate::api::model::stream_error::StreamError;
 use crate::utils::file_utils::create_new_file_for_write;
 use crate::utils::lru_cache::LRUResourceCache;
 
@@ -108,7 +111,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
             get_provider_pipe_stream(&app_state.http_client, &url, req, input).await
         } else {
-            let buffer_stream_options = (item_type, stream_retry, buffer_enabled, buffer_size);
+            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size);
             provider_stream::get_provider_reconnect_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {
@@ -205,7 +208,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                         response_builder.insert_header((k.as_str(), v.as_ref()));
                     });
 
-                    let byte_stream = response.bytes_stream();
+                    let byte_stream = response.bytes_stream().map_err(StreamError::Reqwest);
                     if let Some(cache) = app_state.cache.as_ref() {
                        let resource_path = {
                             let guard = cache.lock().await;

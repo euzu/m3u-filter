@@ -1,6 +1,8 @@
 use crate::api::api_utils::get_headers_from_request;
 use crate::api::model::buffered_stream::BufferedStream;
+use crate::api::model::client_stream::ClientStream;
 use crate::api::model::model_utils::get_response_headers;
+use crate::api::model::stream_error::StreamError;
 use crate::debug_if_enabled;
 use crate::model::config::ConfigInput;
 use crate::model::playlist::PlaylistItemType;
@@ -8,60 +10,134 @@ use crate::utils::request_utils::{get_request_headers, mask_sensitive_info};
 use actix_web::HttpRequest;
 use bytes::Bytes;
 use futures::stream::{self, BoxStream};
-use futures::{Stream, StreamExt};
+use futures::{StreamExt, TryStreamExt};
+use log::warn;
 use reqwest::header::{HeaderMap, RANGE};
 use reqwest::StatusCode;
 use std::collections::HashMap;
-use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::task::Poll;
 use std::time::{Duration, Instant};
 use url::Url;
 
 // TODO make this configurable
 pub const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
 
-pub type ResponseStream = BoxStream<'static, Result<Bytes, reqwest::Error>>;
+pub type ResponseStream = BoxStream<'static, Result<Bytes, StreamError>>;
 type ResponseInfo = Option<(Vec<(String, String)>, StatusCode)>;
 type ProviderStreamResponse = (ResponseStream, ResponseInfo);
 
-
-struct ClientStream {
-    inner: ResponseStream,
-    close_signal: Arc<AtomicBool>,
-    total_bytes: Arc<Option<AtomicUsize>>,
+pub struct BufferStreamOptions {
+    #[allow(dead_code)]
+    item_type: PlaylistItemType,
+    reconnect_enabled: bool,
+    buffer_enabled: bool,
+    buffer_size: usize,
 }
 
-impl ClientStream {
-    fn new(inner: ResponseStream, close_signal: Arc<AtomicBool>, total_bytes: Arc<Option<AtomicUsize>>) -> Self {
-        Self { inner, close_signal, total_bytes }
-    }
-}
-
-impl Stream for ClientStream
-{
-    type Item = Result<Bytes, reqwest::Error>;
-
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        match Pin::new(&mut self.inner).poll_next(cx) {
-            Poll::Ready(Some(Ok(bytes))) => {
-                if let Some(counter) = self.total_bytes.as_ref() {
-                    counter.fetch_add(bytes.len(), Ordering::Relaxed);
-                }
-                Poll::Ready(Some(Ok(bytes)))
-            }
-            other => other,
+impl BufferStreamOptions {
+    pub(crate) fn new(
+        item_type: PlaylistItemType,
+        reconnect_enabled: bool,
+        buffer_enabled: bool,
+        buffer_size: usize,
+    ) -> Self {
+        Self {
+            item_type,
+            reconnect_enabled,
+            buffer_enabled,
+            buffer_size,
         }
     }
+
+    #[inline]
+    fn is_buffer_enabled(&self) -> bool {
+        self.buffer_enabled
+    }
+
+    // #[inline]
+    // fn get_buffer_size(&self) -> usize {
+    //     self.buffer_size
+    // }
+
+    #[inline]
+    fn is_reconnect_enabled(&self) -> bool {
+        self.reconnect_enabled
+    }
+
+    #[inline]
+    pub(crate) fn get_stream_buffer_size(&self) -> usize {
+        if self.buffer_size > 0 { self.buffer_size } else { STREAM_QUEUE_SIZE }
+    }
 }
 
-impl Drop for ClientStream {
-    fn drop(&mut self) {
-        self.close_signal.store(false, Ordering::Relaxed);
+
+#[derive(Debug, Clone)]
+struct ProviderStreamOptions {
+    buffer_size: usize,
+    continue_flag: Arc<AtomicBool>,
+    url: Url,
+    reconnect: bool,
+    headers: HeaderMap,
+    range_bytes: Arc<Option<AtomicUsize>>,
+}
+
+impl ProviderStreamOptions {
+    #[inline]
+    pub fn is_buffered(&self) -> bool {
+        self.buffer_size > 0
+    }
+    #[inline]
+    pub fn get_buffer_size(&self) -> usize {
+        self.buffer_size
+    }
+    #[inline]
+    pub fn get_continue_flag_clone(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.continue_flag)
+    }
+
+    // #[inline]
+    // pub fn get_continue_flag(&self) -> &Arc<AtomicBool> {
+    //     &self.continue_flag
+    // }
+
+    #[inline]
+    pub fn cancel_reconnect(&self) {
+        self.continue_flag.store(false, Ordering::Relaxed);
+    }
+
+    #[inline]
+    pub fn get_url(&self) -> &Url {
+        &self.url
+    }
+
+    #[inline]
+    pub fn should_reconnect(&self) -> bool {
+        self.reconnect
+    }
+
+    #[inline]
+    pub fn get_headers(&self) -> &HeaderMap {
+        &self.headers
+    }
+
+    #[inline]
+    pub fn get_total_bytes_send(&self) -> usize {
+        self.range_bytes.as_ref().as_ref().map_or(0, |atomic| atomic.load(Ordering::Relaxed))
+    }
+
+    // pub fn get_range_bytes(&self) -> &Arc<Option<AtomicUsize>> {
+    //     &self.range_bytes
+    // }
+
+    #[inline]
+    pub fn get_range_bytes_clone(&self) -> Arc<Option<AtomicUsize>> {
+        Arc::clone(&self.range_bytes)
+    }
+
+    #[inline]
+    pub fn should_continue(&self) -> bool {
+        self.continue_flag.load(Ordering::Relaxed)
     }
 }
 
@@ -85,10 +161,9 @@ fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Opti
 fn get_client_stream_request_params(
     req: &HttpRequest,
     input: Option<&ConfigInput>,
-    options: (PlaylistItemType, bool, bool, usize)) -> (usize, Option<usize>, bool, HeaderMap)
+    options: &BufferStreamOptions) -> (usize, Option<usize>, bool, HeaderMap)
 {
-    let (_item_type, retry_enabled, buffer_enabled, buffer_size) = options;
-    let stream_buffer_size = if buffer_enabled { if buffer_size > 0 { buffer_size } else { STREAM_QUEUE_SIZE } } else { 1 };
+    let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 1 };
     let mut req_headers = get_headers_from_request(req, &None);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
     // we need the range bytes from client request for seek ing to the right position
@@ -99,7 +174,7 @@ fn get_client_stream_request_params(
     // We merge configured input headers with the headers from the request.
     let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
 
-    (stream_buffer_size, req_range_start_bytes, retry_enabled, headers)
+    (stream_buffer_size, req_range_start_bytes, options.is_reconnect_enabled(), headers)
 }
 
 fn prepare_client(request_client: &Arc<reqwest::Client>, url: &Url, headers: &HeaderMap, range_start_bytes_to_request: usize) -> (reqwest::RequestBuilder, bool) {
@@ -114,8 +189,8 @@ fn prepare_client(request_client: &Arc<reqwest::Client>, url: &Url, headers: &He
     }
 }
 
-async fn provider_request(request_client: Arc<reqwest::Client>, url: &Url, initial_info: bool, headers: &HeaderMap, range: usize) -> Option<ProviderStreamResponse> {
-    let (client, _partial_content) = prepare_client(&request_client, url, headers, range);
+async fn provider_request(request_client: Arc<reqwest::Client>, initial_info: bool, stream_options: &ProviderStreamOptions) -> Result<Option<ProviderStreamResponse>, StatusCode> {
+    let (client, _partial_content) = prepare_client(&request_client, stream_options.get_url(), stream_options.get_headers(), stream_options.get_total_bytes_send());
     match client.send().await {
         Ok(mut response) => {
             let status = response.status();
@@ -130,23 +205,30 @@ async fn provider_request(request_client: Arc<reqwest::Client>, url: &Url, initi
                 } else {
                     None
                 };
-                return Some((response.bytes_stream().boxed(), response_info));
+                return Ok(Some((response.bytes_stream().map_err(StreamError::Reqwest).boxed(), response_info)));
             }
+            Err(status)
         }
-        Err(_err) => {}
+        Err(_err) => {
+            Err(StatusCode::SERVICE_UNAVAILABLE)
+        }
     }
-    None
 }
 
-async fn stream_provider(client: Arc<reqwest::Client>, url: &Url, continue_signal: Arc<AtomicBool>, headers: HeaderMap, range: usize) -> Option<ResponseStream> {
-    while continue_signal.load(Ordering::Relaxed) {
+
+async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderStreamOptions) -> Option<ResponseStream> {
+    let url = stream_options.get_url();
+    let range_start = stream_options.get_total_bytes_send();
+    let headers = stream_options.get_headers();
+
+    while stream_options.should_continue() {
         debug_if_enabled!("Reconnecting stream {}", mask_sensitive_info(url.as_str()));
-        let (client, _) = prepare_client(&client, url, &headers, range);
+        let (client, _) = prepare_client(&client, url, headers, range_start);
         match client.send().await {
             Ok(response) => {
                 let status = response.status();
                 if status.is_success() {
-                    return Some(response.bytes_stream().boxed());
+                    return Some(response.bytes_stream().map_err(StreamError::Reqwest).boxed());
                 }
                 if status.is_client_error() {
                     return None;
@@ -156,80 +238,110 @@ async fn stream_provider(client: Arc<reqwest::Client>, url: &Url, continue_signa
                         StatusCode::INTERNAL_SERVER_ERROR |
                         StatusCode::BAD_GATEWAY |
                         StatusCode::SERVICE_UNAVAILABLE |
-                        StatusCode::GATEWAY_TIMEOUT => {},
+                        StatusCode::GATEWAY_TIMEOUT => {}
                         _ => return None
                     }
                 }
             }
             Err(_err) => {}
         }
-        if !continue_signal.load(Ordering::Relaxed) {
+        if !stream_options.should_continue() {
             return None;
         }
         actix_web::rt::time::sleep(Duration::from_millis(100)).await;
     }
+    debug_if_enabled!("Stopped seconnecting stream {}", mask_sensitive_info(url.as_str()));
     None
 }
 
-async fn get_initial_stream(client: Arc<reqwest::Client>, url: &Url, reconnect: &Arc<AtomicBool>, headers: &HeaderMap, range: usize) -> Option<ProviderStreamResponse> {
+const RETRY_SECONDS: u64 = 5;
+const ERR_MAX_RETRY_COUNT: u32 = 5;
+async fn get_initial_stream(client: Arc<reqwest::Client>, stream_options: &ProviderStreamOptions) -> Option<ProviderStreamResponse> {
     let start = Instant::now();
-    while reconnect.load(Ordering::Relaxed) {
-        if let Some(value) = provider_request(Arc::clone(&client), url, true, headers, range).await {
-            return Some(value);
+    let mut connect_err: u32 = 1;
+    while stream_options.should_continue() {
+        match provider_request(Arc::clone(&client), true, stream_options).await {
+            Ok(Some(value)) => return Some(value),
+            Ok(None) => {
+                if connect_err > ERR_MAX_RETRY_COUNT {
+                    warn!("The stream could be unavailable. {}", mask_sensitive_info(stream_options.get_url().as_str()));
+                }
+            }
+            Err(status) => {
+                if connect_err > ERR_MAX_RETRY_COUNT {
+                    warn!("The stream could be unavailable. ({status}) {}", mask_sensitive_info(stream_options.get_url().as_str()));
+                }
+            }
+        };
+        if connect_err > ERR_MAX_RETRY_COUNT {
+            break;
         }
-        if start.elapsed().as_secs() > 5 {
-            return None;
+        if start.elapsed().as_secs() > RETRY_SECONDS {
+            warn!("The stream could be unavailable. Giving up after {RETRY_SECONDS} seconds. {}", mask_sensitive_info(stream_options.get_url().as_str()));
+            break;
         }
+        connect_err += 1;
         actix_web::rt::time::sleep(Duration::from_millis(100)).await;
     }
+    stream_options.cancel_reconnect();
     None
 }
+
+fn create_provider_stream_options(stream_url: &Url,
+                                  req: &HttpRequest,
+                                  input: Option<&ConfigInput>,
+                                  options: &BufferStreamOptions) -> ProviderStreamOptions {
+    let (buffer_size, req_range_start_bytes, reconnect, headers) = get_client_stream_request_params(req, input, options);
+    let url = stream_url.clone();
+    let range_bytes = Arc::new(req_range_start_bytes.map(AtomicUsize::new));
+    let continue_flag = Arc::new(AtomicBool::new(true));
+
+    ProviderStreamOptions {
+        buffer_size,
+        continue_flag,
+        url,
+        reconnect,
+        headers,
+        range_bytes,
+    }
+}
+
 
 // options: (PlaylistItemType, reconnect: bool, buffer: bool, buffer_size: usize)
 pub async fn create_provider_stream(client: Arc<reqwest::Client>,
                                     stream_url: &Url,
                                     req: &HttpRequest,
                                     input: Option<&ConfigInput>,
-                                    options: (PlaylistItemType, bool, bool, usize)) -> Option<ProviderStreamResponse> {
-    let (buffer_size, req_range_start_bytes, reconnect_enabled, headers) = get_client_stream_request_params(req, input, options);
-    let range = req_range_start_bytes.map(AtomicUsize::new);
-    let url = stream_url.clone();
-
-    let total_bytes_count = range.as_ref().map_or(0, |atomic| atomic.load(Ordering::Relaxed));
-    let range_bytes = Arc::new(range);
-    let range_bytes_client = Arc::clone(&range_bytes);
-
-    // continue until flag is set to false
-    let continue_flag = Arc::new(AtomicBool::new(true));
+                                    options: BufferStreamOptions) -> Option<ProviderStreamResponse> {
+    let stream_options = create_provider_stream_options(stream_url, req, input, &options);
 
     let client_stream_factory = |stream, reconnect, range_cnt| {
-        let stream = ClientStream::new(stream, reconnect, range_cnt).boxed();
-        if buffer_size > 0 {
-            BufferedStream::new(stream, buffer_size, Arc::clone(&continue_flag), stream_url.as_str()).boxed()
+        let stream = ClientStream::new(stream, reconnect, range_cnt, stream_options.get_url().as_str()).boxed();
+        if stream_options.is_buffered() {
+            BufferedStream::new(stream, stream_options.get_buffer_size(), stream_options.get_continue_flag_clone(), stream_url.as_str()).boxed()
         } else {
             stream
         }
     };
 
-    match get_initial_stream(Arc::clone(&client), &url, &continue_flag, &headers, total_bytes_count).await {
+    match get_initial_stream(Arc::clone(&client), &stream_options).await {
         Some((init_stream, info)) => {
-            let continue_signal = Arc::clone(&continue_flag);
-            if reconnect_enabled {
+            let continue_signal = stream_options.get_continue_flag_clone();
+            if stream_options.should_reconnect() {
                 let client_signal = Arc::clone(&continue_signal);
+                let stream_options_provider = stream_options.clone();
                 let unfold: ResponseStream = stream::unfold((), move |()| {
-                    let url = url.clone();
                     let client = Arc::clone(&client);
-                    let provider_continue_signal = Arc::clone(&continue_signal);
-                    let total_bytes_count = range_bytes_client.as_ref().as_ref().map_or(0, |atomic| atomic.load(Ordering::Relaxed));
-                    let headers = headers.clone();
+                    let stream_opts = stream_options_provider.clone();
+
                     async move {
-                        let stream = stream_provider(client, &url, Arc::clone(&provider_continue_signal), headers, total_bytes_count).await?;
+                        let stream = stream_provider(client, stream_opts).await?;
                         Some((stream, ()))
                     }
                 }).flatten().boxed();
-                Some((client_stream_factory(init_stream.chain(unfold).boxed(), Arc::clone(&client_signal), Arc::clone(&range_bytes)).boxed(), info))
+                Some((client_stream_factory(init_stream.chain(unfold).boxed(), Arc::clone(&client_signal), stream_options.get_range_bytes_clone()).boxed(), info))
             } else {
-                Some((client_stream_factory(init_stream.boxed(), Arc::clone(&continue_signal), Arc::clone(&range_bytes)).boxed(), info))
+                Some((client_stream_factory(init_stream.boxed(), Arc::clone(&continue_signal), stream_options.get_range_bytes_clone()).boxed(), info))
             }
         }
         None => None
@@ -238,32 +350,30 @@ pub async fn create_provider_stream(client: Arc<reqwest::Client>,
 
 #[cfg(test)]
 mod tests {
-    use crate::api::model::provider_stream_factory::create_provider_stream;
     use crate::api::model::provider_stream_factory::PlaylistItemType;
+    use crate::api::model::provider_stream_factory::{create_provider_stream, BufferStreamOptions};
     use actix_web::test;
     use actix_web::test::TestRequest;
     use actix_web::web;
     use actix_web::App;
     use actix_web::{HttpRequest, HttpResponse};
     use futures::StreamExt;
-    use reqwest::Url;
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
 
     #[actix_rt::test]
     async fn test_stream() {
-        let req = TestRequest::get().uri("/test").to_request();
         let app = App::new().route("/test", web::get().to(test_stream_handler));
         let server = test::init_service(app).await;
-        let response = test::call_service(&server, req).await;
+        let req = TestRequest::get().uri("/test").to_request();
+        let _response = test::call_service(&server, req).await;
     }
     async fn test_stream_handler(req: HttpRequest) -> HttpResponse {
         let mut counter = 5;
         let client = Arc::new(reqwest::Client::new());
-        let url = url::Url::parse("http://10.41.41.41").unwrap();
+        let url = url::Url::parse("https://info.cern.ch/hypertext/WWW/TheProject.html").unwrap();
         let input = None;
 
-        let options = (PlaylistItemType::Live, true, true, 0);
+        let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0);
         'outer: while let Some((mut stream, info)) = create_provider_stream(Arc::clone(&client), &url, &req, input, options).await {
             if info.is_some() {
                 println!("{:?}", info.unwrap());
@@ -271,9 +381,8 @@ mod tests {
             while let Some(result) = stream.next().await {
                 match result {
                     Ok(bytes) => {
-                        println!("Received {} bytes", bytes.len());
+                        println!("Received {} bytes  {bytes:?}", bytes.len());
                         counter -= 1;
-                        println!("{bytes:?}");
                         if counter < 0 {
                             break 'outer;
                         }
