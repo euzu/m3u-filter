@@ -26,12 +26,13 @@ if [ ! -f "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" ]; then
 fi
 
 # Prepare Docker build context
+BIN_FILE=${WORKING_DIR}/target/${TARGET}/release/m3u-filter
 cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${WORKING_DIR}/frontend/build" "${DOCKER_DIR}/web"
 
 # Get the version from the binary
-VERSION=$(./m3u-filter -V | sed 's/m3u-filter *//')
+VERSION=$("$BIN_FILE" -V | sed 's/m3u-filter *//')
 if [ -z "${VERSION}" ]; then
     echo "Error: Failed to determine the version from the binary."
     exit 1
