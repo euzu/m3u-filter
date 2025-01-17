@@ -314,14 +314,14 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
             };
             errors.append(&mut error_list);
             errors.append(&mut tvguide_errors);
-            let input_name = input.name.as_ref().map_or_else(|| mask_sensitive_info(input.url.as_str()), std::string::ToString::to_string);
             let group_count = playlistgroups.len();
             let channel_count = playlistgroups.iter()
                 .map(|group| group.channels.len())
                 .sum();
+            let input_name = input.name.as_ref().map_or_else(|| mask_sensitive_info(input.url.as_str()), std::string::ToString::to_string);
             if playlistgroups.is_empty() {
-                info!("source is empty {}", input.url);
-                errors.push(notify_err!(format!("source is empty {input_name}")));
+                info!("Source is empty {input_name}");
+                errors.push(notify_err!(format!("Source is empty {input_name}")));
             } else {
                 playlistgroups.iter_mut().for_each(PlaylistGroup::on_load);
                 source_playlists.push(
