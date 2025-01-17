@@ -23,7 +23,7 @@ clap = { version = "4", features = ["derive"] }
 url = "2.5"
 reqwest = { version = "0", features = ["blocking", "json", "stream", "rustls-tls"] }
 chrono = "0.4"
-cron = "0.14"
+cron = "0.15"
 actix-web = "4.9"
 actix-server = "2.5"
 actix-files = "0"

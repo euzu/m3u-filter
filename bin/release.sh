@@ -2,10 +2,12 @@
 set -e
 set -o pipefail
 
+WORKING_DIR=$(pwd)
+
 rustup target add x86_64-unknown-linux-musl
 rustup target add x86_64-pc-windows-gnu
 rustup target add armv7-unknown-linux-musleabihf
-rustup add aarch64-unknown-linux-musl
+rustup target add aarch64-unknown-linux-musl
 
 if ! command -v cargo-set-version &> /dev/null
 then
@@ -14,12 +16,17 @@ then
 fi
 
 cd ./frontend || (echo "cant find frontend directory" && exit)
+
 if [ "$1" = "m" ]; then
-  NEW_VERSION=$(yarn version --no-git-tag-version --major --patch | grep "New version" | grep -Po "(\d+\.)+\d+")
+  NEW_VERSION=$(yarn version --no-git-tag-version --major | grep "New version" | grep -Po "(\d+\.)+\d+")
+elif [ "$1" = "p" ]; then
+  NEW_VERSION=$(yarn version --no-git-tag-version --minor | grep "New version" | grep -Po "(\d+\.)+\d+")
 else
   NEW_VERSION=$(yarn version --no-git-tag-version --patch | grep "New version" | grep -Po "(\d+\.)+\d+")
 fi
-cd ..
+
+cd "$WORKING_DIR"
+
 cargo set-version "$NEW_VERSION"
 
 VERSION=v$NEW_VERSION
@@ -47,13 +54,16 @@ declare -A BINARIES=(
     [RASPI4]=aarch64-unknown-linux-musl/release/m3u-filter
 )
 
-WORKING_DIR=$(pwd)
-
+cd "$WORKING_DIR"
 # Build binaries
 ./bin/build_lin_static.sh
+cd "$WORKING_DIR"
 ./bin/build_raspi.sh
+cd "$WORKING_DIR"
 ./bin/build_win.sh
+cd "$WORKING_DIR"
 ./bin/build_fe.sh
+cd "$WORKING_DIR"
 
 cd target
 

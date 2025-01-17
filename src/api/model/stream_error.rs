@@ -1,11 +1,10 @@
-use async_broadcast::RecvError;
 
 #[derive(Debug, Clone)]
 pub enum StreamError {
     Reqwest(String),
     // StdIo(std::io::Error),
     ReceiverClosed,
-    ReceiverError(RecvError),
+    // ReceiverError(RecvError),
 }
 
 impl StreamError {
@@ -25,7 +24,7 @@ impl std::fmt::Display for StreamError {
             StreamError::Reqwest(e) => write!(f, "Reqwest error: {e}"),
             // StreamError::StdIo(e) => write!(f, "IO error: {e}"),
             StreamError::ReceiverClosed =>  write!(f, "Receiver closed"),
-            StreamError::ReceiverError(e) =>  write!(f, "Receiver error {e}"),
+            // StreamError::ReceiverError(e) =>  write!(f, "Receiver error {e}"),
         }
     }
 }

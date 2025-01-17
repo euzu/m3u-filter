@@ -1,5 +1,5 @@
 # Changelog
-# 2.0.11 (2025-01-xx)
+# 2.1.0 (2025-01-17)
 - Watch files are now moved inside the `target` folder. Move them manually from `watch_<target_name>_<watched_group>.bin` to `<target_name>/watch_<watched_group>.bin` 
 - No error log for xtream api when content is skipped with options `xtream_skip_[live|vod|series]`
 - _experimental_:  added live channel connection sharing in reverse proxy mode. To activate set `share_live_streams` in target options.
@@ -25,6 +25,7 @@ schedules:
 - Prevent simultaneous updates
 - Added target options `remove_duplicates` to remove entries with same `url`.
 - Added reverse Proxy config to `config.yml`
+- `config.yml` `backup_dir` is now default `backup`. If you want to keep the old name set `backup_dir: .backup`
 ```yaml
 reverse_proxy:
   stream:

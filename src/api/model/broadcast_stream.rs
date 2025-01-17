@@ -1,6 +1,6 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use async_broadcast::{Receiver, RecvError};
+use async_broadcast::{Receiver};
 use bytes::Bytes;
 use futures::{Stream};
 use log::error;
