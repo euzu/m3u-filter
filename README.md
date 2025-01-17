@@ -444,6 +444,8 @@ each series info entry needs to be fetched one by one and the provider can ban y
 - `xtream_resolve_series_delay` to avoid a provider ban you can set the seconds between series_info_request's. Default is 2 seconds.
   But be aware that the more series entries there are, the longer the process takes.
 
+For `xtream_resolve_(vod|series)` the files are only fetched one for each input and cached. Only new and modified ones are updated.
+
 The `kodi` format for movies can contain the `tmdb-id` (_optional_). Because xtream api delivers the data only on request,
 we need to fetch this info for each movie entry. But be aware the provider can ban you if you are doing request too frequently.
 - `xtream_resolve_vod` if is set to `true` and you have xtream input, the movies info are fetched and stored.
