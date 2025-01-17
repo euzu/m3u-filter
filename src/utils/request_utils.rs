@@ -15,7 +15,7 @@ use reqwest::header::CONTENT_ENCODING;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use url::Url;
 
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
 use crate::model::stats::format_elapsed_time;
 use crate::repository::storage::get_input_storage_path;
@@ -169,7 +169,7 @@ fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
                 let mut decode_buffer = String::new();
                 match decoder.read_to_string(&mut decode_buffer) {
                     Ok(_) => return Ok(decode_buffer),
-                    Err(err) => return Err(Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
+                    Err(err) => return Err(str_to_io_error(&format!("failed to decode gzip content {err}")))
                 };
             }
             return Ok(String::from_utf8_lossy(&content).parse().unwrap());
@@ -196,7 +196,7 @@ async fn get_remote_content_as_file(client: Arc<reqwest::Client>, input: &Config
                             file.write_all(&bytes)?;
                         }
                         Err(err) => {
-                            return Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to read chunk: {err}")));
+                            return Err(str_to_io_error(&format!("Failed to read chunk: {err}")));
                         }
                     }
                 }
@@ -206,10 +206,10 @@ async fn get_remote_content_as_file(client: Arc<reqwest::Client>, input: &Config
                 debug!("File downloaded successfully to {file_path:?}, took:{}", format_elapsed_time(elapsed));
                 Ok(file_path.to_path_buf())
             } else {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed with status {} {}", response.status(), mask_sensitive_info(url.as_str()))))
+                Err(str_to_io_error(&format!("Request failed with status {} {}", response.status(), mask_sensitive_info(url.as_str()))))
             }
         }
-        Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Request failed: {} {err}", mask_sensitive_info(url.as_str())))),
+        Err(err) => Err(str_to_io_error(&format!("Request failed: {} {err}", mask_sensitive_info(url.as_str())))),
     }
 }
 
@@ -239,14 +239,14 @@ async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, u
                                     let mut decoder = GzDecoder::new(&bytes[..]);
                                     match decoder.read_to_string(&mut decode_buffer) {
                                         Ok(_) => {}
-                                        Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode gzip content {err}")))
+                                        Err(err) => return Err(str_to_io_error(&format!("failed to decode gzip content {err}")))
                                     };
                                 }
                                 ENCODING_DEFLATE => {
                                     let mut decoder = ZlibDecoder::new(&bytes[..]);
                                     match decoder.read_to_string(&mut decode_buffer) {
                                         Ok(_) => {}
-                                        Err(err) => return Err(std::io::Error::new(ErrorKind::Other, format!("failed to decode zlib content {err}")))
+                                        Err(err) => return Err(str_to_io_error(&format!("failed to decode zlib content {err}")))
                                     }
                                 }
                                 _ => {}
@@ -259,20 +259,20 @@ async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, u
                                     debug_if_enabled!("Request took:{} {}", format_elapsed_time(start_time.elapsed().as_secs()), mask_sensitive_info(url.as_str()));
                                     Ok(decoded_content)
                                 }
-                                Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to plain text content {err}")))
+                                Err(err) => Err(str_to_io_error(&format!("failed to plain text content {err}")))
                             }
                         } else {
                             debug_if_enabled!("Request took:{},  {}", format_elapsed_time(start_time.elapsed().as_secs()), mask_sensitive_info(url.as_str()));
                             Ok(decode_buffer)
                         }
                     }
-                    Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("failed to read response {} {err}", mask_sensitive_info(url.as_str()))))
+                    Err(err) => Err(str_to_io_error(&format!("failed to read response {} {err}", mask_sensitive_info(url.as_str()))))
                 }
             } else {
-                Err(std::io::Error::new(ErrorKind::Other, format!("Request failed with status {} {}", response.status(), mask_sensitive_info(url.as_str()))))
+                Err(str_to_io_error(&format!("Request failed with status {} {}", response.status(), mask_sensitive_info(url.as_str()))))
             }
         }
-        Err(err) => Err(std::io::Error::new(ErrorKind::Other, format!("Request failed {} {err}", mask_sensitive_info(url.as_str()))))
+        Err(err) => Err(str_to_io_error(&format!("Request failed {} {err}", mask_sensitive_info(url.as_str()))))
     }
 }
 
@@ -305,7 +305,7 @@ pub async fn download_text_content_as_file(client: Arc<reqwest::Client>, input: 
 pub async fn download_text_content(client: Arc<reqwest::Client>, input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         let result = if url.scheme() == "file" {
-            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Other, format!("Unknown file {}", mask_sensitive_info(url_str)))), |file_path| get_local_file_content(&file_path))
+            url.to_file_path().map_or_else(|()| Err(str_to_io_error(&format!("Unknown file {}", mask_sensitive_info(url_str)))), |file_path| get_local_file_content(&file_path))
         } else {
             get_remote_content(client, input, &url).await
         };
@@ -319,7 +319,7 @@ pub async fn download_text_content(client: Arc<reqwest::Client>, input: &ConfigI
             Err(err) => Err(err)
         }
     } else {
-        Err(std::io::Error::new(ErrorKind::Other, format!("Malformed URL {}", mask_sensitive_info(url_str))))
+        Err(str_to_io_error(&format!("Malformed URL {}", mask_sensitive_info(url_str))))
     }
 }
 
@@ -329,7 +329,7 @@ async fn download_json_content(client: Arc<reqwest::Client>, input: &ConfigInput
         Ok(content) => {
             match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(value) => Ok(value),
-                Err(err) => Err(Error::new(ErrorKind::Other, format!("Failed to parse json {err}")))
+                Err(err) => Err(str_to_io_error(&format!("Failed to parse json {err}")))
             }
         }
         Err(err) => Err(err)

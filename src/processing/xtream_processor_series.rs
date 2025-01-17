@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
 use crate::model::xtream::{XtreamSeriesEpisode, XtreamSeriesInfoEpisode};
+use crate::utils::file_utils::file_writer;
 
 const TAG_SERIES_INFO_LAST_MODIFIED: &str = "last_modified";
 
@@ -62,8 +63,8 @@ async fn playlist_resolve_series_info(client: Arc<reqwest::Client>, cfg: &Config
     let Some((wal_content_file, wal_record_file, wal_content_path, wal_record_path)) = create_resolve_info_wal_files(cfg, fpl.input, XtreamCluster::Series)
     else { return !processed_info_ids.is_empty(); };
 
-    let mut content_writer = BufWriter::new(&wal_content_file);
-    let mut record_writer = BufWriter::new(&wal_record_file);
+    let mut content_writer = file_writer(&wal_content_file);
+    let mut record_writer = file_writer(&wal_record_file);
     let mut content_updated = false;
 
     let series_info_iter = fpl.playlistgroups.iter()
@@ -149,7 +150,7 @@ async fn process_series_info(
         errors.push(notify_err!("Could not create wal file for series episodes record".to_string()));
         return result;
     };
-    let mut wal_writer = BufWriter::new(&wal_file);
+    let mut wal_writer = file_writer(&wal_file);
 
     for plg in fpl
         .playlistgroups

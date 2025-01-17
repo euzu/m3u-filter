@@ -7,7 +7,6 @@ use quick_xml::{Reader, Writer};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use quick_xml::events::{BytesStart, Event};
-use std::io::{BufReader};
 use chrono::{Duration, NaiveDateTime, TimeDelta};
 
 use crate::api::api_utils::{get_user_target, serve_file};
@@ -20,6 +19,7 @@ use crate::repository::m3u_repository::m3u_get_epg_file_path;
 use crate::repository::storage::get_target_storage_path;
 use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
 use crate::utils::{file_utils};
+use crate::utils::file_utils::file_reader;
 
 fn time_correct(date_time: &str, correction: &TimeDelta) -> String {
     // Split the dateTime string into date and time parts
@@ -120,7 +120,7 @@ async fn serve_epg(epg_path: &Path, req: &HttpRequest, user: &ProxyUserCredentia
 }
 
 fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> HttpResponse {
-    let reader = BufReader::new(epg_file);
+    let reader = file_reader(epg_file);
     let encoder = GzEncoder::new(Vec::with_capacity(4096), Compression::default());
     let mut xml_reader = Reader::from_reader(reader);
     let mut xml_writer = Writer::new(encoder);

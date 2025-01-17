@@ -102,7 +102,7 @@ struct FilterParser;
 
 #[derive(Debug, Clone)]
 pub enum UnaryOperator {
-    Not
+    Not,
 }
 
 #[derive(Debug, Clone)]
@@ -155,33 +155,29 @@ impl Filter {
             Self::TypeComparison(field, item_type) => {
                 let value = provider.call(field);
                 get_filter_item_type(value.as_str()).is_some_and(|pli_type| {
-                        let is_match = pli_type.eq(item_type);
-                        if log_enabled!(Level::Trace) {
-                            if is_match {
-                                debug!("Match found: {:?} {}", &field, value);
-                            } else {
-                                debug!("Match failed: {self}: {:?} {}", &field, &value);
-                            }
+                    let is_match = pli_type.eq(item_type);
+                    if log_enabled!(Level::Trace) {
+                        if is_match {
+                            debug!("Match found: {:?} {}", &field, value);
+                        } else {
+                            debug!("Match failed: {self}: {:?} {}", &field, &value);
                         }
-                        is_match
-                    })
+                    }
+                    is_match
+                })
             }
-            Self::Group(expr) => {
-                expr.filter(provider, processor)
-            }
-            Self::UnaryExpression(op, expr) => {
-                match op {
-                    UnaryOperator::Not => !expr.filter(provider, processor),
+            Self::Group(expr) => expr.filter(provider, processor),
+            Self::UnaryExpression(op, expr) => match op {
+                UnaryOperator::Not => !expr.filter(provider, processor),
+            },
+            Self::BinaryExpression(left, op, right) => match op {
+                BinaryOperator::And => {
+                    left.filter(provider, processor) && right.filter(provider, processor)
                 }
-            }
-            Self::BinaryExpression(left, op, right) => {
-                match op {
-                    BinaryOperator::And => left.filter(provider, processor)
-                        && right.filter(provider, processor),
-                    BinaryOperator::Or => left.filter(provider, processor)
-                        || right.filter(provider, processor),
+                BinaryOperator::Or => {
+                    left.filter(provider, processor) || right.filter(provider, processor)
                 }
-            }
+            },
         }
     }
 }
@@ -235,7 +231,10 @@ fn get_parser_item_field(expr: &Pair<Rule>) -> Result<ItemField, M3uFilterError>
     create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
 }
 
-fn get_parser_regexp(expr: &Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<RegexWithCaptures, M3uFilterError> {
+fn get_parser_regexp(
+    expr: &Pair<Rule>,
+    templates: &Vec<PatternTemplate>,
+) -> Result<RegexWithCaptures, M3uFilterError> {
     if expr.as_rule() == Rule::regexp {
         let mut parsed_text = String::from(expr.as_str());
         parsed_text.pop();
@@ -246,8 +245,12 @@ fn get_parser_regexp(expr: &Pair<Rule>, templates: &Vec<PatternTemplate>) -> Res
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
         }
         let regexp = re.unwrap();
-        let captures = regexp.capture_names()
-            .flatten().map(String::from).filter(|x| !x.is_empty()).collect::<Vec<String>>();
+        let captures = regexp
+            .capture_names()
+            .flatten()
+            .map(String::from)
+            .filter(|x| !x.is_empty())
+            .collect::<Vec<String>>();
         if log_enabled!(Level::Trace) {
             trace!("Created regex: {} with captures: [{}]", regstr, captures.join(", "));
         }
@@ -260,23 +263,27 @@ fn get_parser_regexp(expr: &Pair<Rule>, templates: &Vec<PatternTemplate>) -> Res
     create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
 }
 
-fn get_parser_field_comparison(expr: Pair<Rule>, templates: &Vec<PatternTemplate>) -> Result<Filter, M3uFilterError> {
+fn get_parser_field_comparison(
+    expr: Pair<Rule>,
+    templates: &Vec<PatternTemplate>,
+) -> Result<Filter, M3uFilterError> {
     let mut expr_inner = expr.into_inner();
     match get_parser_item_field(&expr_inner.next().unwrap()) {
-        Ok(field) => {
-            match get_parser_regexp(&expr_inner.next().unwrap(), templates) {
-                Ok(regexp) => Ok(Filter::FieldComparison(field, regexp)),
-                Err(err) => Err(err),
-            }
-        }
-        Err(err) => Err(err)
+        Ok(field) => match get_parser_regexp(&expr_inner.next().unwrap(), templates) {
+            Ok(regexp) => Ok(Filter::FieldComparison(field, regexp)),
+            Err(err) => Err(err),
+        },
+        Err(err) => Err(err),
     }
 }
 
 fn get_filter_item_type(text_item_type: &str) -> Option<PlaylistItemType> {
     if text_item_type.eq_ignore_ascii_case("live") {
         Some(PlaylistItemType::Live)
-    } else if text_item_type.eq_ignore_ascii_case("movie") || text_item_type.eq_ignore_ascii_case("video") || text_item_type.eq_ignore_ascii_case("vod") {
+    } else if text_item_type.eq_ignore_ascii_case("movie")
+        || text_item_type.eq_ignore_ascii_case("video")
+        || text_item_type.eq_ignore_ascii_case("vod")
+    {
         Some(PlaylistItemType::Video)
     } else if text_item_type.eq_ignore_ascii_case("series") {
         Some(PlaylistItemType::Series)
@@ -297,28 +304,30 @@ fn get_parser_type_comparison(expr: Pair<Rule>) -> Result<Filter, M3uFilterError
 }
 
 macro_rules! handle_expr {
-    ($bop: expr, $uop: expr, $stmts: expr, $exp: expr) => {
-        {
-            let result = match $bop {
-                Some(binop) => {
-                    let lhs = $stmts.pop().unwrap();
-                    $bop = None;
-                    Filter::BinaryExpression(Box::new(lhs), binop.clone(), Box::new($exp))
+    ($bop: expr, $uop: expr, $stmts: expr, $exp: expr) => {{
+        let result = match $bop {
+            Some(binop) => {
+                let lhs = $stmts.pop().unwrap();
+                $bop = None;
+                Filter::BinaryExpression(Box::new(lhs), binop.clone(), Box::new($exp))
+            }
+            _ => match $uop {
+                Some(unop) => {
+                    $uop = None;
+                    Filter::UnaryExpression(unop.clone(), Box::new($exp))
                 }
-                _ => match $uop {
-                    Some(unop) => {
-                        $uop = None;
-                        Filter::UnaryExpression(unop.clone(), Box::new($exp))
-                    }
-                    _ => $exp
-                }
-            };
-            $stmts.push(result);
-        }
-    }
+                _ => $exp,
+            },
+        };
+        $stmts.push(result);
+    }};
 }
 
-fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, errors: &mut Vec<String>) -> Filter {
+fn get_parser_expression(
+    expr: Pair<Rule>,
+    templates: &Vec<PatternTemplate>,
+    errors: &mut Vec<String>,
+) -> Filter {
     let mut stmts = Vec::with_capacity(128);
     let pairs = expr.into_inner();
     let mut bop: Option<BinaryOperator> = None;
@@ -349,16 +358,14 @@ fn get_parser_expression(expr: Pair<Rule>, templates: &Vec<PatternTemplate>, err
             Rule::not => {
                 uop = Some(UnaryOperator::Not);
             }
-            Rule::bool_op => {
-                match get_parser_binary_op(&pair.into_inner().next().unwrap()) {
-                    Ok(binop) => {
-                        bop = Some(binop);
-                    }
-                    Err(err) => {
-                        errors.push(format!("{err}"));
-                    }
+            Rule::bool_op => match get_parser_binary_op(&pair.into_inner().next().unwrap()) {
+                Ok(binop) => {
+                    bop = Some(binop);
                 }
-            }
+                Err(err) => {
+                    errors.push(format!("{err}"));
+                }
+            },
             _ => {
                 errors.push(format!("did not expect rule: {pair:?}"));
             }
@@ -378,11 +385,18 @@ fn get_parser_binary_op(expr: &Pair<Rule>) -> Result<BinaryOperator, M3uFilterEr
     match expr.as_rule() {
         Rule::and => Ok(BinaryOperator::And),
         Rule::or => Ok(BinaryOperator::Or),
-        _ => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown binary operator {}", expr.as_str())
+        _ => create_m3u_filter_error_result!(
+            M3uFilterErrorKind::Info,
+            "Unknown binary operator {}",
+            expr.as_str()
+        ),
     }
 }
 
-pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -> Result<Filter, M3uFilterError> {
+pub fn get_filter(
+    filter_text: &str,
+    templates: Option<&Vec<PatternTemplate>>,
+) -> Result<Filter, M3uFilterError> {
     let empty_list = Vec::with_capacity(0);
     let template_list: &Vec<PatternTemplate> = templates.unwrap_or(&empty_list);
     let source = apply_templates_to_pattern(filter_text, template_list);
@@ -398,13 +412,18 @@ pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -
                         for expr in pair.into_inner() {
                             match expr.as_rule() {
                                 Rule::expr => {
-                                    let expr = get_parser_expression(expr, template_list, &mut errors);
+                                    let expr =
+                                        get_parser_expression(expr, template_list, &mut errors);
                                     match &op {
                                         Some(binop) => {
-                                            result = Some(Filter::BinaryExpression(Box::new(result.unwrap()), binop.clone(), Box::new(expr)));
+                                            result = Some(Filter::BinaryExpression(
+                                                Box::new(result.unwrap()),
+                                                binop.clone(),
+                                                Box::new(expr),
+                                            ));
                                             op = None;
                                         }
-                                        _ => result = Some(expr)
+                                        _ => result = Some(expr),
                                     }
                                 }
                                 Rule::bool_op => {
@@ -435,18 +454,30 @@ pub fn get_filter(filter_text: &str, templates: Option<&Vec<PatternTemplate>>) -
                 return Err(info_err!(errors.join("\n")));
             }
 
-            result.map_or_else(|| create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unable to parse filter: {}", &filter_text), Ok)
+            result.map_or_else(
+                || {
+                    create_m3u_filter_error_result!(
+                        M3uFilterErrorKind::Info,
+                        "Unable to parse filter: {}",
+                        &filter_text
+                    )
+                },
+                Ok,
+            )
         }
-        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err)
+        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err),
     }
 }
 
-fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> Result<DirectedGraph<String>, M3uFilterError> {
+fn build_dependency_graph(
+    templates: &Vec<PatternTemplate>,
+) -> Result<DirectedGraph<String>, M3uFilterError> {
     let mut graph = DirectedGraph::<String>::new();
-    let re_template= regex::Regex::new("!(.*?)!").unwrap();
+    let re_template = regex::Regex::new("!(.*?)!").unwrap();
     for template in templates {
         graph.add_node(&template.name);
-        re_template.captures_iter(&template.value)
+        re_template
+            .captures_iter(&template.value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| String::from(caps.as_str()))
@@ -457,18 +488,27 @@ fn build_dependency_graph(templates: &Vec<PatternTemplate>) -> Result<DirectedGr
     }
     let cycles = graph.find_cycles();
     for cyclic in &cycles {
-        error!("Cyclic template dependencies detected [{}]", cyclic.join(" <-> "));
+        error!(
+            "Cyclic template dependencies detected [{}]",
+            cyclic.join(" <-> ")
+        );
     }
     if !cycles.is_empty() {
-        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Cyclic dependencies in templates detected!");
+        return create_m3u_filter_error_result!(
+            M3uFilterErrorKind::Info,
+            "Cyclic dependencies in templates detected!"
+        );
     }
     Ok(graph)
 }
 
-pub fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<PatternTemplate>, M3uFilterError> {
+pub fn prepare_templates(
+    templates: &Vec<PatternTemplate>,
+) -> Result<Vec<PatternTemplate>, M3uFilterError> {
     let graph = build_dependency_graph(templates)?;
     let mut template_values = HashMap::<String, String>::new();
-    let mut template_map: HashMap<String, PatternTemplate> = templates.iter()
+    let mut template_map: HashMap<String, PatternTemplate> = templates
+        .iter()
         .map(|item| {
             template_values.insert(item.name.clone(), item.value.clone());
             (item.name.clone(), item.clone())
@@ -482,7 +522,8 @@ pub fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<Pattern
                     let mut templ_value = template_values.get(&template_name).unwrap().to_string();
                     for dep_templ_name in depends_on {
                         let dep_value = template_values.get(dep_templ_name).unwrap();
-                        templ_value = templ_value.replace(format!("!{dep_templ_name}!").as_str(), dep_value);
+                        templ_value =
+                            templ_value.replace(format!("!{dep_templ_name}!").as_str(), dep_value);
                     }
                     template_values.insert(template_name.clone(), templ_value);
                 }
@@ -500,11 +541,11 @@ pub fn prepare_templates(templates: &Vec<PatternTemplate>) -> Result<Vec<Pattern
 pub fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternTemplate>) -> String {
     let mut new_pattern = pattern.to_string();
     for template in templates {
-        new_pattern = new_pattern.replace(format!("!{}!", &template.name).as_str(), &template.value);
+        new_pattern =
+            new_pattern.replace(format!("!{}!", &template.name).as_str(), &template.value);
     }
     new_pattern
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -522,7 +563,7 @@ mod tests {
                 name: Rc::new(name.to_string()),
                 group: Rc::new(group.to_string()),
                 ..Default::default()
-            })
+            }),
         }
     }
 
@@ -577,26 +618,40 @@ mod tests {
                     create_mock_pli("Entertainment", "US Channels"),
                 ];
                 let mut processor = MockValueProcessor {};
-                let filtered: Vec<&PlaylistItem> = channels.iter().filter(|&chan| {
-                    let provider = ValueProvider { pli: RefCell::new(chan) };
-                    filter.filter(&provider, &mut processor)
-                }).collect();
+                let filtered: Vec<&PlaylistItem> = channels
+                    .iter()
+                    .filter(|&chan| {
+                        let provider = ValueProvider {
+                            pli: RefCell::new(chan),
+                        };
+                        filter.filter(&provider, &mut processor)
+                    })
+                    .collect();
                 assert_eq!(filtered.len(), 2);
-                assert_eq!(filtered.iter().any(|&chan| {
-                    let group = chan.header.borrow().group.to_string();
-                    let name = chan.header.borrow().name.to_string();
-                    name.eq("24/7: Cars") && group.eq("FR Channels")
-                }), true);
-                assert_eq!(filtered.iter().any(|&chan| {
-                    let group = chan.header.borrow().group.to_string();
-                    let name = chan.header.borrow().name.to_string();
-                    name.eq("Entertainment") && group.eq("US Channels")
-                }), true);
-                assert_eq!(filtered.iter().any(|&chan| {
-                    let group = chan.header.borrow().group.to_string();
-                    let name = chan.header.borrow().name.to_string();
-                    name.eq("24/7: Cars") && group.eq("US Channels")
-                }), false);
+                assert_eq!(
+                    filtered.iter().any(|&chan| {
+                        let group = chan.header.borrow().group.to_string();
+                        let name = chan.header.borrow().name.to_string();
+                        name.eq("24/7: Cars") && group.eq("FR Channels")
+                    }),
+                    true
+                );
+                assert_eq!(
+                    filtered.iter().any(|&chan| {
+                        let group = chan.header.borrow().group.to_string();
+                        let name = chan.header.borrow().name.to_string();
+                        name.eq("Entertainment") && group.eq("US Channels")
+                    }),
+                    true
+                );
+                assert_eq!(
+                    filtered.iter().any(|&chan| {
+                        let group = chan.header.borrow().group.to_string();
+                        let name = chan.header.borrow().name.to_string();
+                        name.eq("24/7: Cars") && group.eq("US Channels")
+                    }),
+                    false
+                );
             }
             Err(e) => {
                 panic!("{}", e)
@@ -619,10 +674,15 @@ mod tests {
                     create_mock_pli("NA", "GC"),
                 ];
                 let mut processor = MockValueProcessor {};
-                let filtered: Vec<&PlaylistItem> = channels.iter().filter(|&chan| {
-                    let provider = ValueProvider { pli: RefCell::new(chan) };
-                    filter.filter(&provider, &mut processor)
-                }).collect();
+                let filtered: Vec<&PlaylistItem> = channels
+                    .iter()
+                    .filter(|&chan| {
+                        let provider = ValueProvider {
+                            pli: RefCell::new(chan),
+                        };
+                        filter.filter(&provider, &mut processor)
+                    })
+                    .collect();
                 assert_eq!(filtered.len(), 1);
             }
             Err(e) => {

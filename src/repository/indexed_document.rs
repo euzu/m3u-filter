@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use std::fs::{File};
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
@@ -9,7 +9,8 @@ use crate::utils::file_utils;
 use log::error;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
-use crate::utils::file_utils::{create_new_file_for_read_write, open_read_write_file, open_readonly_file, rename_or_copy};
+use crate::m3u_filter_error::{str_to_io_error, to_io_error};
+use crate::utils::file_utils::{create_new_file_for_read_write, file_reader, file_writer, open_read_write_file, open_readonly_file, rename_or_copy};
 
 const BLOCK_SIZE: usize = 4096;
 const LEN_SIZE: usize = 4;
@@ -100,7 +101,7 @@ where
         // Retrieve file size and convert to `u32` for `main_offset`, if possible
         let mut main_offset = main_file
             .metadata()
-            .and_then(|meta| SizeType::try_from(meta.len()).map_err(|err| Error::new(ErrorKind::Other, err)))
+            .and_then(|meta| SizeType::try_from(meta.len()).map_err(to_io_error))
             .unwrap_or(0);
 
         let mut fragmented = false;
@@ -196,18 +197,18 @@ where
 
         self.dirty = true;
 
-        let encoded_bytes_len = SizeType::try_from(encoded_bytes.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
+        let encoded_bytes_len = SizeType::try_from(encoded_bytes.len()).map_err(to_io_error)?;
         self.main_file.write_all(&encoded_bytes_len.to_le_bytes())?;
         match file_utils::check_write(&self.main_file.write_all(&encoded_bytes)) {
             Ok(()) => {
                 if new_record_appended {
                     self.index_tree.insert(doc_id, self.main_offset);
-                    let written_bytes = SizeType::try_from(encoded_bytes.len() + LEN_SIZE).map_err(|err| Error::new(ErrorKind::Other, err))?;
+                    let written_bytes = SizeType::try_from(encoded_bytes.len() + LEN_SIZE).map_err(to_io_error)?;
                     self.main_offset += written_bytes;
                 }
             }
             Err(err) => {
-                return Err(Error::new(ErrorKind::Other, format!("failed to write document: {} - {}", self.main_path.to_str().unwrap(), err)));
+                return Err(str_to_io_error(&format!("failed to write document: {} - {}", self.main_path.to_str().unwrap(), err)));
             }
         }
         Ok(())
@@ -251,7 +252,7 @@ where
             let index_tree = IndexedDocumentIndex::<K>::load(index_path)?;
 
             Ok(Self {
-                main_file: BufReader::new(main_file),
+                main_file: file_reader(main_file),
                 index_tree,
                 t_type: PhantomData,
             })
@@ -307,7 +308,7 @@ where
                 Ok(file) => {
                     Ok(Self {
                         main_path: main_path.to_path_buf(),
-                        main_file: BufReader::new(file),
+                        main_file: file_reader(file),
                         offsets,
                         index: 0,
                         failed: false,
@@ -354,7 +355,7 @@ where
             Ok(value) => Ok(Some(value)),
             Err(err) => {
                 self.failed = true;
-                Err(Error::new(ErrorKind::Other, format!("Failed to deserialize document {err}")))
+                Err(str_to_io_error(&format!("Failed to deserialize document {err}")))
             }
         }
     }
@@ -402,7 +403,7 @@ impl IndexedDocumentDirectAccess {
                 return Ok(item);
             }
         }
-        Err(Error::new(ErrorKind::Other, format!("Failed to read item for id {:?} - {}", doc_id, main_path.to_str().unwrap())))
+        Err(str_to_io_error(&format!("Failed to read item for id {:?} - {}", doc_id, main_path.to_str().unwrap())))
     }
 }
 
@@ -432,7 +433,7 @@ where
             // Retrieve file size and convert to `u32` for `main_file`, if possible
             let size = main_file
                 .metadata()
-                .and_then(|meta| SizeType::try_from(meta.len()).map_err(|err| Error::new(ErrorKind::Other, err)))
+                .and_then(|meta| SizeType::try_from(meta.len()).map_err(to_io_error))
                 .unwrap_or(0);
             if size < 1 {
                 return Err(Error::new(ErrorKind::UnexpectedEof, format!("File empty main:{main_path:?}")));
@@ -465,7 +466,7 @@ where
             self.index_tree.traverse(|keys, values| {
                 keys.iter().zip(values.iter()).for_each(|(key, &offset)| key_offset.push((key.clone(), offset)));
             });
-            let mut gc_writer = BufWriter::new(&gc_file);
+            let mut gc_writer = file_writer(&gc_file);
 
             let fragmented_byte = 0u8.to_le_bytes();
             gc_writer.write_all(&fragmented_byte)?;
@@ -488,7 +489,7 @@ where
                 gc_writer.write_all(&size_bytes)?;
                 gc_writer.write_all(&buffer[0..buf_size])?;
 
-                let pointer = OffsetPointer::try_from(gc_offset).map_err(|err| Error::new(ErrorKind::Other, err))?;
+                let pointer = OffsetPointer::try_from(gc_offset).map_err(to_io_error)?;
                 self.index_tree.insert(key, pointer);
                 gc_offset += size_bytes.len() + buf_size; // gc_file.stream_position();
             }

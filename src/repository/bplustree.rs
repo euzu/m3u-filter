@@ -1,6 +1,5 @@
-use std::array::TryFromSliceError;
 use std::fs::{File};
-use std::io::{self, BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::path::Path;
@@ -10,7 +9,8 @@ use ruzstd::decoding::StreamingDecoder;
 use ruzstd::encoding::{compress_to_vec, CompressionLevel};
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
-use crate::utils::file_utils::{open_read_write_file, rename_or_copy};
+use crate::m3u_filter_error::{str_to_io_error, to_io_error};
+use crate::utils::file_utils::{file_reader, file_writer, open_read_write_file, rename_or_copy};
 
 const BLOCK_SIZE: usize = 4096;
 const BINCODE_OVERHEAD: usize = 8;
@@ -36,7 +36,7 @@ fn is_file_valid(file: File) -> io::Result<File> {
 
 #[inline]
 fn u32_from_bytes(bytes: &[u8]) -> io::Result<u32> {
-    Ok(u32::from_le_bytes(bytes.try_into().map_err(|e: TryFromSliceError| io::Error::new(io::ErrorKind::Other, e.to_string()))?))
+    Ok(u32::from_le_bytes(bytes.try_into().map_err(to_io_error)?))
 }
 
 #[inline]
@@ -44,7 +44,7 @@ fn bincode_serialize<T>(value: &T) -> io::Result<Vec<u8>>
 where
     T: ?Sized + serde::Serialize,
 {
-    bincode::serialize(value).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+    bincode::serialize(value).map_err(to_io_error)
 }
 
 #[inline]
@@ -52,7 +52,7 @@ fn bincode_deserialize<T>(value: &[u8]) -> io::Result<T>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
-    bincode::deserialize(value).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+    bincode::deserialize(value).map_err(to_io_error)
 }
 
 
@@ -221,7 +221,7 @@ where
         // Serialize and write keys
         let keys_encoded = bincode_serialize(&self.keys)?;
         let keys_bytes_len = keys_encoded.len();
-        buffer_slice[write_pos..write_pos + LEN_SIZE].copy_from_slice(&(u32::try_from(keys_bytes_len).map_err(|err| Error::new(ErrorKind::Other, err))?).to_le_bytes());
+        buffer_slice[write_pos..write_pos + LEN_SIZE].copy_from_slice(&(u32::try_from(keys_bytes_len).map_err(to_io_error)?).to_le_bytes());
         write_pos += LEN_SIZE;
         buffer_slice[write_pos..write_pos + keys_bytes_len].copy_from_slice(&keys_encoded);
         write_pos += keys_bytes_len;
@@ -243,7 +243,7 @@ where
                 values_encoded
             };
             let values_bytes_len = content_bytes.len();
-            buffer_slice[write_pos..write_pos + LEN_SIZE].copy_from_slice(&(u32::try_from(values_bytes_len).map_err(|err| Error::new(ErrorKind::Other, err))?).to_le_bytes());
+            buffer_slice[write_pos..write_pos + LEN_SIZE].copy_from_slice(&(u32::try_from(values_bytes_len).map_err(to_io_error)?).to_le_bytes());
             write_pos += LEN_SIZE;
 
             let mut value_bytes_to_write = values_bytes_len;
@@ -284,7 +284,7 @@ where
             }
 
             let pointer_encoded = bincode_serialize(&pointer)?;
-            let pointer_bytes_len = u32::try_from(pointer_encoded.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
+            let pointer_bytes_len = u32::try_from(pointer_encoded.len()).map_err(to_io_error)?;
 
             file.seek(SeekFrom::Start(pointer_offset))?;
             file.write_all(&pointer_bytes_len.to_le_bytes())?;
@@ -466,14 +466,14 @@ where
     pub fn store(&mut self, filepath: &Path) -> io::Result<u64> {
         if self.dirty {
             let tempfile = NamedTempFile::new()?;
-            let mut file = BufWriter::new(&tempfile); //create_new_file_for_write(&tempfile)?);
+            let mut file = file_writer(&tempfile); //create_new_file_for_write(&tempfile)?);
             let mut buffer = vec![0u8; BLOCK_SIZE];
             match self.root.serialize_to_block(&mut file, &mut buffer, 0u64) {
                 Ok(result) => {
                     file.flush()?;
                     drop(file);
                     if let Err(err) = rename_or_copy(tempfile.path(), filepath, false) {
-                        return Err(Error::new(io::ErrorKind::Other, format!("Temp file rename/copy did not work {} {err}", tempfile.path().to_string_lossy())));
+                        return Err(str_to_io_error(&format!("Temp file rename/copy did not work {} {err}", tempfile.path().to_string_lossy())));
                     }
                     self.dirty = false;
                     Ok(result)
@@ -489,7 +489,7 @@ where
 
     pub fn load(filepath: &Path) -> io::Result<Self> {
         let file = is_file_valid(File::open(filepath)?)?;
-        let mut reader = BufReader::new(file);
+        let mut reader = file_reader(file);
         let mut buffer = vec![0u8; BLOCK_SIZE];
         let (root, _) = BPlusTreeNode::deserialize_from_block(&mut reader, &mut buffer, 0, true)?;
         Ok(Self::new_with_root(root))
@@ -574,7 +574,7 @@ where
     pub fn try_from_file(file: File) -> io::Result<Self> {
         let file = is_file_valid(file)?;
         Ok(Self {
-            file: BufReader::new(file),
+            file: file_reader(file),
             _marker_k: PhantomData,
             _marker_v: PhantomData,
         })
@@ -621,7 +621,7 @@ where
     }
 
     pub fn query(&mut self, key: &K) -> Option<V> {
-        let mut reader = BufReader::new(&mut self.file);
+        let mut reader = file_reader(&mut self.file);
         query_tree(&mut reader, key)
     }
 
@@ -635,7 +635,7 @@ where
     pub fn update(&mut self, key: &K, value: V) -> io::Result<u64> {
         let mut offset = 0;
         let mut buffer = vec![0u8; BLOCK_SIZE];
-        let mut reader = BufReader::new(&mut self.file);
+        let mut reader = file_reader(&mut self.file);
         loop {
             match BPlusTreeNode::<K, V>::deserialize_from_block(&mut reader, &mut buffer, offset, false) {
                 Ok((mut node, pointers)) => {

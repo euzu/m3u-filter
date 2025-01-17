@@ -6,9 +6,8 @@ use chrono::Local;
 use log::{debug, error, info, warn};
 use regex::Regex;
 use serde::Serialize;
-
-use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::{create_m3u_filter_error, create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err};
+use crate::m3u_filter_error::{to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::{Config, ConfigDto};
 use crate::model::mapping::Mappings;
@@ -127,13 +126,12 @@ fn write_config_file<T>(file_path: &str, backup_dir: &str, config: &T, default_n
         Err(err) => { error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err) }
     }
     info!("Saving file to {}", &path.to_str().unwrap_or("?"));
-    match File::create(&path) {
-        Ok(f) => {
-            serde_yaml::to_writer(f, &config).unwrap();
-            Ok(())
-        }
-        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not write file {}: {}", &path.to_str().unwrap_or("?"), err)
-    }
+
+    File::create(&path)
+        .and_then(|f| serde_yaml::to_writer(f, &config).map_err(to_io_error))
+        .map_err(|err| create_m3u_filter_error!(M3uFilterErrorKind::Info, "Could not write file {}: {}", &path.to_str().unwrap_or("?"), err))
+
+
 }
 
 pub fn save_api_proxy(file_path: &str, backup_dir: &str, config: &ApiProxyConfig) -> Result<(), M3uFilterError> {

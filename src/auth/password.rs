@@ -1,5 +1,5 @@
-use std::io::ErrorKind;
 use rand::{Rng, distributions::Alphanumeric, rngs::OsRng};
+use crate::m3u_filter_error::str_to_io_error;
 
 fn generate_salt(length: usize) -> String {
     let rng = OsRng;
@@ -33,14 +33,14 @@ pub fn generate_password() -> std::io::Result<String> {
     match rpassword::prompt_password("password> ") {
         Ok(pwd1) => {
             if pwd1.len() < 8 {
-                return Err(std::io::Error::new(ErrorKind::Other, "Password too short min length 8"))
+                return Err(str_to_io_error("Password too short min length 8"))
             }
             match rpassword::prompt_password("retype password> ") {
                 Ok(pwd2) => {
                     if pwd1.eq(&pwd2) {
-                        hash(pwd1.as_bytes()).map_or_else(|| Err(std::io::Error::new(ErrorKind::Other, "Failed to generate hash")), Ok)
+                        hash(pwd1.as_bytes()).map_or_else(|| Err(str_to_io_error("Failed to generate hash")), Ok)
                     } else {
-                        Err(std::io::Error::new(ErrorKind::Other, "Passwords don't match"))
+                        Err(str_to_io_error("Passwords don't match"))
                     }
                 }
                 Err(err) => Err(err)

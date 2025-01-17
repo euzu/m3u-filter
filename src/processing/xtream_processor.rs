@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::m3u_filter_error::{str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::storage::get_input_storage_path;
@@ -7,7 +7,7 @@ use crate::{info_err, notify_err};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufWriter, Error, ErrorKind, Write};
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -73,7 +73,7 @@ pub(in crate::processing) async fn playlist_resolve_download_playlist_item(clien
 }
 
 pub(in crate::processing) fn write_info_content_to_wal_file(writer: &mut BufWriter<&File>, provider_id: u32, content: &str) -> std::io::Result<()> {
-    let length = u32::try_from(content.len()).map_err(|err| Error::new(ErrorKind::Other, err))?;
+    let length = u32::try_from(content.len()).map_err(to_io_error)?;
     if length > 0 {
         writer.write_all(&provider_id.to_le_bytes())?;
         writer.write_all(&length.to_le_bytes())?;
@@ -131,7 +131,7 @@ where
     let mut processed_info_ids = HashMap::new();
 
     let file_path = match get_input_storage_path(fpl.input, &cfg.working_dir)
-        .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type)).and_then(|opt| opt.ok_or_else(|| Error::new(ErrorKind::Other, "Not supported".to_string())))
+        .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type)).and_then(|opt| opt.ok_or_else(|| str_to_io_error("Not supported")))
     {
         Ok(file_path) => file_path,
         Err(err) => {

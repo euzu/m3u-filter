@@ -4,6 +4,7 @@ use chrono::{Local, Duration};
 use jsonwebtoken::{Algorithm, DecodingKey, encode, decode, EncodingKey, Header, Validation};
 use crate::model::config::WebAuthConfig;
 use crate::api::model::app_state::AppState;
+use crate::m3u_filter_error::to_io_error;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Claims {
@@ -25,7 +26,7 @@ pub fn create_jwt(web_auth_config: &WebAuthConfig) -> Result<String, std::io::Er
     };
     match encode(&header, &claims, &EncodingKey::from_secret(web_auth_config.secret.as_bytes())) {
         Ok(jwt) => Ok(jwt),
-        Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, err.to_string()))
+        Err(err) => Err(to_io_error(err))
     }
 }
 

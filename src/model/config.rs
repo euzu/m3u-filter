@@ -24,6 +24,7 @@ use crate::utils::default_utils::{default_as_default, default_as_true, default_a
 use crate::utils::file_lock_manager::FileLockManager;
 use crate::utils::{config_reader, file_utils};
 use crate::{exit, info_err};
+use crate::utils::file_utils::file_reader;
 use crate::utils::size_utils::parse_size_base_2;
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
@@ -818,7 +819,7 @@ impl WebAuthConfig {
 
         if let Ok(file) = File::open(&userfile_path) {
             let mut users = vec![];
-            let reader = std::io::BufReader::new(file);
+            let reader = file_reader(file);
             for credentials in reader.lines().map_while(Result::ok) {
                 let mut parts = credentials.split(':');
                 if let (Some(username), Some(password)) = (parts.next(), parts.next()) {

@@ -3,7 +3,6 @@
 use crate::Arc;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -19,7 +18,7 @@ use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, res
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
@@ -514,7 +513,7 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
         ACTION_GET_LIVE_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_LIVE),
         ACTION_GET_VOD_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_VOD),
         ACTION_GET_SERIES_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_SERIES),
-        _ => Err(Error::new(ErrorKind::Other, ""))
+        _ => Err(str_to_io_error(""))
     } {
         if let Some(file_path) = path {
             let category_id = category_id.trim();

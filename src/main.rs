@@ -18,20 +18,26 @@ use crate::utils::{config_reader, file_utils};
 use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
-mod m3u_filter_error;
-mod model;
-mod filter;
-mod repository;
-mod messaging;
 mod api;
-mod processing;
-mod utils;
 mod auth;
+mod filter;
+mod m3u_filter_error;
+mod messaging;
+mod model;
+mod processing;
+mod repository;
+mod utils;
 
-const LOG_ERROR_LEVEL_MOD: &[&str] = &["actix_web::middleware::logger",
-    "reqwest::async_impl::client", "reqwest::connect", "hyper_util::client", "actix_server::worker",
-    "actix_server::server", "actix_server::builder", "actix_server::accept"];
-
+const LOG_ERROR_LEVEL_MOD: &[&str] = &[
+    "actix_web::middleware::logger",
+    "reqwest::async_impl::client",
+    "reqwest::connect",
+    "hyper_util::client",
+    "actix_server::worker",
+    "actix_server::server",
+    "actix_server::builder",
+    "actix_server::accept",
+];
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
@@ -77,7 +83,6 @@ struct Args {
     #[arg(short = None, long = "healthcheck", default_value_t = false, default_missing_value = "true"
     )]
     healthcheck: bool,
-
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -108,7 +113,7 @@ fn main() {
     if args.genpwd {
         match generate_password() {
             Ok(pwd) => println!("{pwd}"),
-            Err(err) => error!("{err}")
+            Err(err) => error!("{err}"),
         }
         return;
     }
@@ -136,7 +141,6 @@ fn main() {
         Ok(None) => {}
         Err(err) => exit!("{err}"),
     }
-
 
     let mut temp_path = PathBuf::from(&cfg.working_dir);
     temp_path.push("tmp");

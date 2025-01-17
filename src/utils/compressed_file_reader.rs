@@ -2,7 +2,7 @@ use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 use flate2::bufread::{GzDecoder, ZlibDecoder};
 use crate::utils::compression_utils::{is_deflate, is_gzip};
-use crate::utils::file_utils::open_readonly_file;
+use crate::utils::file_utils::{file_reader, open_readonly_file};
 
 pub struct CompressedFileReader {
     reader: BufReader<Box<dyn Read>>,
@@ -12,20 +12,22 @@ impl CompressedFileReader {
     pub fn new(path: &Path) -> std::io::Result<Self> {
         let file = open_readonly_file(path)?;
 
-        let mut buffered_file = BufReader::new(file);
+        let mut buffered_file = file_reader(file);
         let mut header = [0u8; 2];
         buffered_file.read_exact(&mut header)?;
         buffered_file.seek(SeekFrom::Start(0))?;
 
-        let reader: BufReader<Box<dyn Read>> = if is_gzip(&header) {
-            BufReader::new(Box::new(GzDecoder::new(buffered_file)) as Box<dyn Read>)
+        let reader: Box<dyn Read> = if is_gzip(&header) {
+            Box::new(GzDecoder::new(buffered_file))
         } else if is_deflate(&header) {
-            BufReader::new(Box::new(ZlibDecoder::new(buffered_file)) as Box<dyn Read>)
+            Box::new(ZlibDecoder::new(buffered_file))
         } else {
-            BufReader::new(Box::new(buffered_file) as Box<dyn Read>)
+            Box::new(buffered_file)
         };
 
-        Ok(Self { reader })
+        Ok(Self {
+            reader: BufReader::new(reader),
+        })
     }
 }
 

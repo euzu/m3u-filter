@@ -12,6 +12,7 @@ use std::io::{BufWriter, Write};
 use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
+use crate::utils::file_utils::file_writer;
 
 const TAG_VOD_INFO_INFO: &str = "info";
 const TAG_VOD_INFO_MOVIE_DATA: &str = "movie_data";
@@ -75,8 +76,8 @@ pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, ta
     else { return; };
 
     let mut processed_info_ids = read_processed_vod_info_ids(cfg, errors, fpl).await;
-    let mut content_writer = BufWriter::new(&wal_content_file);
-    let mut record_writer = BufWriter::new(&wal_record_file);
+    let mut content_writer = file_writer(&wal_content_file);
+    let mut record_writer = file_writer(&wal_record_file);
     let mut content_updated = false;
 
     let vod_info_iter = fpl.playlistgroups.iter()

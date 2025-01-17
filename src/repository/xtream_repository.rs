@@ -1,3 +1,5 @@
+use crate::m3u_filter_error::str_to_io_error;
+use crate::file_utils::file_reader;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
@@ -161,7 +163,7 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
         let col_path = get_collection_path(path, cat);
         if col_path.exists() {
             if let Ok(file) = File::open(col_path) {
-                let reader = BufReader::new(file);
+                let reader = file_reader(file);
                 for entry in json_iter_array::<Value, BufReader<File>>(reader).flatten() {
                     if let Some(category_id) = entry.get(TAG_CATEGORY_ID).and_then(get_u32_from_serde_value) {
                         if let Value::Object(item) = entry {
@@ -335,10 +337,7 @@ pub fn xtream_get_collection_path(
             return Ok((Some(col_path), None));
         }
     }
-    Err(Error::new(
-        ErrorKind::Other,
-        format!("Cant find collection: {target_name}/{collection_name}"),
-    ))
+    Err(str_to_io_error(&format!("Cant find collection: {target_name}/{collection_name}")))
 }
 
 async fn xtream_read_item_for_stream_id(
@@ -370,7 +369,7 @@ macro_rules! try_cluster {
     ($xtream_cluster:expr, $item_type:expr, $virtual_id:expr) => {
         $xtream_cluster
             .or_else(|| XtreamCluster::try_from($item_type).ok())
-            .ok_or_else(|| Error::new(ErrorKind::Other, format!("Could not determine cluster for xtream item with stream-id {}",$virtual_id)))
+            .ok_or_else(|| str_to_io_error(&format!("Could not determine cluster for xtream item with stream-id {}",$virtual_id)))
     };
 }
 
@@ -380,14 +379,14 @@ pub async fn xtream_get_item_for_stream_id(
     target: &ConfigTarget,
     xtream_cluster: Option<XtreamCluster>,
 ) -> Result<XtreamPlaylistItem, Error> {
-    let target_path = get_target_storage_path(config, target.name.as_str()).ok_or_else(|| Error::new(ErrorKind::Other, format!("Could not find path for target {}", &target.name)))?;
-    let storage_path = xtream_get_storage_path(config, target.name.as_str()).ok_or_else(|| Error::new(ErrorKind::Other, format!("Could not find path for target {} xtream output", &target.name)))?;
+    let target_path = get_target_storage_path(config, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {}", &target.name)))?;
+    let storage_path = xtream_get_storage_path(config, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {} xtream output", &target.name)))?;
     {
         let target_id_mapping_file = get_target_id_mapping_file(&target_path);
-        let _file_lock = config.file_locks.read_lock(&target_id_mapping_file).await.map_err(|err| Error::new(ErrorKind::Other, format!("Could not get lock for id mapping for target {} err:{err}", target.name)))?;
+        let _file_lock = config.file_locks.read_lock(&target_id_mapping_file).await.map_err(|err|str_to_io_error(&format!("Could not get lock for id mapping for target {} err:{err}", target.name)))?;
 
-        let mut target_id_mapping = BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| Error::new(ErrorKind::Other, format!("Could not load id mapping for target {} err:{err}", target.name)))?;
-        let mapping = target_id_mapping.query(&virtual_id).ok_or_else(|| Error::new(ErrorKind::Other, format!("Could not find mapping for target {} and id {}", target.name, virtual_id)))?;
+        let mut target_id_mapping = BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| str_to_io_error(&format!("Could not load id mapping for target {} err:{err}", target.name)))?;
+        let mapping = target_id_mapping.query(&virtual_id).ok_or_else(|| str_to_io_error(&format!("Could not find mapping for target {} and id {}", target.name, virtual_id)))?;
         match mapping.item_type {
             PlaylistItemType::SeriesInfo => {
                 xtream_read_series_item_for_stream_id(config, virtual_id, &storage_path).await
@@ -440,7 +439,7 @@ pub async fn xtream_write_series_info(
     {
         let _file_lock = config.file_locks.write_lock(&info_path).await?;
         let mut writer = IndexedDocumentWriter::new_append(info_path, idx_path)?;
-        writer.write_doc(series_info_id, content).map_err(|_| Error::new(ErrorKind::Other, format!("failed to write xtream series info for target {target_name}")))?;
+        writer.write_doc(series_info_id, content).map_err(|_| str_to_io_error(&format!("failed to write xtream series info for target {target_name}")))?;
         writer.store()?;
     }
     {
@@ -468,7 +467,7 @@ pub async fn xtream_write_vod_info(
     {
         let _file_lock = config.file_locks.write_lock(&info_path).await?;
         let mut writer = IndexedDocumentWriter::new_append(info_path, idx_path)?;
-        writer.write_doc(virtual_id, content).map_err(|_| Error::new(ErrorKind::Other, format!("failed to write xtream vod info for target {target_name}")))?;
+        writer.write_doc(virtual_id, content).map_err(|_| str_to_io_error(&format!("failed to write xtream vod info for target {target_name}")))?;
         writer.store()?;
     }
     Ok(())
@@ -488,11 +487,11 @@ async fn xtream_get_info_mapping(config: &Config, target_name: &str, info_id: u3
     let target_id_mapping_file = get_target_id_mapping_file(&target_path);
     let _file_lock = config.file_locks.read_lock(&target_id_mapping_file).await.map_err(|err| {
         error!("Could not lock id mapping for target {target_name}: {}", err);
-        Error::new(ErrorKind::Other, format!("ID mapping load error for target {target_name}"))
+        str_to_io_error(&format!("ID mapping load error for target {target_name}"))
     }).ok()?;
     BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| {
         error!("Could not load id mapping for target {target_name}: {}", err);
-        Error::new(ErrorKind::Other, format!("ID mapping load error for target {target_name}"))
+        str_to_io_error(&format!("ID mapping load error for target {target_name}"))
     }).ok().map(|mut tree| tree.query(&info_id))?
 }
 
@@ -512,7 +511,7 @@ pub async fn xtream_load_series_info(
         {
             let _file_lock = config.file_locks.read_lock(&info_path).await.map_err(|err| {
                 error!("Could not lock document {:?}: {}", info_path, err);
-                Error::new(ErrorKind::Other, format!("Document Reader error for target {target_name}"))
+                str_to_io_error(&format!("Document Reader error for target {target_name}"))
             }).ok()?;
             return match IndexedDocumentDirectAccess::read_indexed_item::<u32, String>(&info_path, &idx_path, &series_id) {
                 Ok(content) => Some(content),
@@ -553,7 +552,7 @@ pub async fn xtream_load_vod_info(
         {
             let _file_lock = config.file_locks.read_lock(&info_path).await.map_err(|err| {
                 error!("Could not lock document {:?}: {}", info_path, err);
-                Error::new(ErrorKind::Other, format!("Document Reader error for target {target_name}"))
+                str_to_io_error(&format!("Document Reader error for target {target_name}"))
             }).ok()?;
             return match IndexedDocumentDirectAccess::read_indexed_item::<u32, String>(&info_path, &idx_path, &vod_id) {
                 Ok(content) => Some(content),
@@ -608,7 +607,7 @@ fn rewrite_xtream_vod_info<P>(
             );
         }
     }
-    let result = serde_json::to_string(&doc).map_err(|_| Error::new(ErrorKind::Other, "Failed to serialize vod info"))?;
+    let result = serde_json::to_string(&doc).map_err(|_| str_to_io_error("Failed to serialize vod info"))?;
 
     Ok(result)
 }
@@ -622,7 +621,7 @@ pub fn rewrite_xtream_vod_info_content<P>(
 ) -> Result<String, Error> where
     P: PlaylistEntry,
 {
-    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
     rewrite_xtream_vod_info(config, target, pli, user, &mut doc)
 }
 
@@ -635,7 +634,7 @@ pub async fn write_and_get_xtream_vod_info<P>(
 ) -> Result<String, Error> where
     P: PlaylistEntry,
 {
-    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
     xtream_write_vod_info(config, target.name.as_str(), pli.get_virtual_id(), content).await.ok();
     rewrite_xtream_vod_info(config, target, pli, user, &mut doc)
 }
@@ -649,7 +648,7 @@ async fn rewrite_xtream_series_info<P>(
 ) -> Result<String, Error> where
     P: PlaylistEntry,
 {
-    let target_path = get_target_storage_path(config, target.name.as_str()).ok_or_else(|| Error::new(ErrorKind::Other, format!("Could not find path for target {}", target.name)))?;
+    let target_path = get_target_storage_path(config, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {}", target.name)))?;
 
     let resource_url = match user.proxy {
         ProxyType::Reverse => {
@@ -677,12 +676,12 @@ async fn rewrite_xtream_series_info<P>(
         }
     }
 
-    let episodes = doc.get_mut(TAG_EPISODES).and_then(Value::as_object_mut).ok_or_else(|| Error::new(ErrorKind::Other, "No episodes found in content"))?;
+    let episodes = doc.get_mut(TAG_EPISODES).and_then(Value::as_object_mut).ok_or_else(|| str_to_io_error("No episodes found in content"))?;
 
     let virtual_id = pli.get_virtual_id();
     {
         let target_id_mapping_file = get_target_id_mapping_file(&target_path);
-        let _file_lock = config.file_locks.write_lock(&target_id_mapping_file).await.map_err(|err| Error::new(ErrorKind::Other, format!("Could not load id mapping for target {} err:{err}", target.name)))?;
+        let _file_lock = config.file_locks.write_lock(&target_id_mapping_file).await.map_err(|err| str_to_io_error(&format!("Could not load id mapping for target {} err:{err}", target.name)))?;
         let mut target_id_mapping = TargetIdMapping::new(&target_id_mapping_file);
         let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
 
@@ -715,7 +714,7 @@ async fn rewrite_xtream_series_info<P>(
 
         drop(target_id_mapping);
     }
-    let result = serde_json::to_string(&doc).map_err(|_| Error::new(ErrorKind::Other, "Failed to serialize updated series info"))?;
+    let result = serde_json::to_string(&doc).map_err(|_| str_to_io_error("Failed to serialize updated series info"))?;
 
     Ok(result)
 }
@@ -729,7 +728,7 @@ pub async fn rewrite_xtream_series_info_content<P>(
 ) -> Result<String, Error> where
     P: PlaylistEntry,
 {
-    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
     rewrite_xtream_series_info(config, target, pli_series_info, user, &mut doc).await
 }
 
@@ -742,7 +741,7 @@ pub async fn write_and_get_xtream_series_info<P>(
 ) -> Result<String, Error> where
     P: PlaylistEntry,
 {
-    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| Error::new(ErrorKind::Other, "Failed to parse JSON content"))?;
+    let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
     let virtual_id = pli_series_info.get_virtual_id();
     xtream_write_series_info(config, target.name.as_str(), virtual_id, content).await.ok();
     rewrite_xtream_series_info(config, target, pli_series_info, user, &mut doc).await
@@ -775,7 +774,7 @@ pub async fn xtream_update_input_info_file(
         Ok(Some((info_path, idx_path))) => {
             match cfg.file_locks.write_lock(&info_path).await {
                 Ok(_file_lock) => {
-                    let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read {cluster} info {err}")))?);
+                    let mut reader = file_reader(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read {cluster} info {err}")))?);
                     match IndexedDocumentWriter::<u32>::new_append(info_path, idx_path) {
                         Ok(mut writer) => {
                             let mut provider_id_bytes = [0u8; 4];
@@ -822,7 +821,7 @@ pub async fn xtream_update_input_vod_record_from_wal_file(
 
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read vod wal info {err}")))?);
+            let mut reader = file_reader(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read vod wal info {err}")))?);
             let mut provider_id_bytes = [0u8; 4];
             let mut tmdb_id_bytes = [0u8; 4];
             let mut ts_bytes = [0u8; 8];
@@ -863,7 +862,7 @@ pub async fn xtream_update_input_series_record_from_wal_file(
         .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series wal info {err}")))?);
+            let mut reader = file_reader(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series wal info {err}")))?);
             let mut provider_id_bytes = [0u8; 4];
             let mut ts_bytes = [0u8; 8];
             let mut tree_record_index: BPlusTree<u32, u64> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());
@@ -900,7 +899,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
         .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
-            let mut reader = BufReader::new(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series episode wal info {err}")))?);
+            let mut reader = file_reader(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series episode wal info {err}")))?);
             let mut provider_id_bytes = [0u8; 4];
             let mut len_bytes = [0u8; 4];
             let mut tree_record_index: BPlusTree<u32, XtreamSeriesEpisode> = BPlusTree::load(&record_path).unwrap_or_else(|_| BPlusTree::new());

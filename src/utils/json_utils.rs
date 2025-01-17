@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{self, BufReader, BufWriter, Error, Read, Write};
+use std::io::{self, BufReader, Error, Read, Write};
 use std::path::Path;
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Deserializer, Value};
+use crate::utils::file_utils::{file_reader, file_writer};
 
 fn read_skipping_ws(mut reader: impl Read) -> io::Result<u8> {
     loop {
@@ -73,7 +74,7 @@ pub fn json_filter_file(file_path: &Path, filter: &HashMap<&str, &str>) -> Vec<s
         return filtered;
     };
 
-    let reader = BufReader::new(file);
+    let reader = file_reader(file);
     for entry in json_iter_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
         if let Some(item) = entry.as_object() {
             if filter.iter().all(|(&key, &value)| {
@@ -95,17 +96,10 @@ pub fn json_write_documents_to_file<T>(file: &Path, value: &T) -> Result<(), Err
 where
     T: ?Sized + Serialize,
 {
-    match File::create(file) {
-        Ok(file) => {
-            let mut writer = BufWriter::new(file);
-            serde_json::to_writer(&mut writer, value)?;
-            match writer.flush() {
-                Ok(()) => Ok(()),
-                Err(e) => Err(e),
-            }
-        }
-        Err(e) => Err(e),
-    }
+    let file = File::create(file)?;
+    let mut writer = file_writer(&file);
+    serde_json::to_writer(&mut writer, value)?;
+    writer.flush()
 }
 
 pub fn string_or_number_u32<'de, D>(deserializer: D) -> Result<u32, D::Error>

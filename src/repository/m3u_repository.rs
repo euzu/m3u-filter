@@ -1,10 +1,10 @@
 use std::fs::File;
-use std::io::{BufWriter, Error, ErrorKind, Write};
+use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
 use log::error;
 
 use crate::{create_m3u_filter_error, info_err};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
@@ -12,6 +12,7 @@ use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDo
 use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
 use crate::repository::storage::{FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::utils::file_utils;
+use crate::utils::file_utils::file_writer;
 
 const FILE_M3U: &str = "m3u";
 macro_rules! cant_write_result {
@@ -36,7 +37,7 @@ fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlis
         if let Some(m3u_filename) = file_utils::get_file_path(&cfg.working_dir, Some(PathBuf::from(filename))) {
             match File::create(&m3u_filename) {
                 Ok(file) => {
-                    let mut buf_writer = BufWriter::new(file);
+                    let mut buf_writer = file_writer(&file);
                     let _ = buf_writer.write(b"#EXTM3U\n");
                     for m3u in m3u_playlist {
                         let _ = buf_writer.write(m3u.to_m3u(target.options.as_ref(), None).as_bytes());
@@ -90,7 +91,7 @@ pub async fn m3u_load_rewrite_playlist(
 
 pub async  fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
     if stream_id < 1 {
-        return Err(Error::new(ErrorKind::Other, "id should start with 1"));
+        return Err(str_to_io_error("id should start with 1"));
     }
     {
         let _file_lock = cfg.file_locks.read_lock(m3u_path).await?;

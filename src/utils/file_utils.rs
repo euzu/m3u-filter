@@ -1,10 +1,11 @@
 use std::fs;
 use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
 use log::{debug, error};
 use path_clean::PathClean;
+use crate::m3u_filter_error::str_to_io_error;
 
 const USER_FILE: &str = "user.txt";
 const CONFIG_PATH: &str = "config";
@@ -19,6 +20,18 @@ macro_rules! exit {
         error!($($arg)*);
         std::process::exit(1);
     }};
+}
+
+pub fn file_writer<W>(w: W) -> BufWriter<W>
+where W:  Write
+{
+    BufWriter::with_capacity(131_072, w)
+}
+
+pub fn file_reader<R>(r: R) -> BufReader<R>
+where R:  Read
+{
+    BufReader::with_capacity(131_072, r)
 }
 
 pub fn get_exe_path() -> PathBuf {
@@ -159,7 +172,7 @@ pub fn path_exists(file_path: &Path) -> bool {
 pub fn check_write(res: &std::io::Result<()>) -> Result<(), std::io::Error> {
     match res {
         Ok(()) => Ok(()),
-        Err(_) => Err(std::io::Error::new(std::io::ErrorKind::Other, "Unable to write file")),
+        Err(_) => Err(str_to_io_error("Unable to write file")),
     }
 }
 

@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{self, BufReader, ErrorKind, Read};
 use std::path::{PathBuf};
+use crate::utils::file_utils::file_reader;
 
 pub struct MultiFileReader {
     files: Vec<File>,
@@ -33,7 +34,7 @@ impl Read for MultiFileReader {
                 if self.files.is_empty() {
                     return Ok(0);
                 }
-                self.current_reader = Some(BufReader::new(self.files.pop().unwrap()));
+                self.current_reader = Some(file_reader(self.files.pop().unwrap()));
                 // we put a newline if the config does not have one
                 if !buf.is_empty() && buf[0] != b'\n' {
                     buf[0] = b'\n';

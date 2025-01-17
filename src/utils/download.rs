@@ -1,6 +1,6 @@
 use crate::Arc;
 use std::borrow::Cow;
-use crate::m3u_filter_error::M3uFilterError;
+use crate::m3u_filter_error::{str_to_io_error, M3uFilterError};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, XtreamCluster};
 use crate::model::xmltv::TVGuide;
@@ -10,7 +10,7 @@ use crate::repository::xtream_repository;
 use crate::utils::{file_utils, request_utils};
 use log::{debug, info};
 use std::cmp::Ordering;
-use std::io::{Error, ErrorKind};
+use std::io::{Error};
 use std::path::PathBuf;
 use crate::debug_if_enabled;
 use crate::model::api_proxy::{ProxyUserCredentials};
@@ -120,7 +120,7 @@ where
         };
     }
 
-    Err(Error::new(ErrorKind::Other, format!("Cant find stream with id: {}/{}/{}",
+    Err(str_to_io_error(&format!("Cant find stream with id: {}/{}/{}",
                                              target.name.replace(' ', "_").as_str(), &cluster, pli.get_virtual_id())))
 }
 

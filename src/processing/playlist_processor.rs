@@ -300,9 +300,9 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
     let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
     // Downlod the sources
     for input in &source.inputs {
-        let start_time = Instant::now();
         let input_id = input.id;
         if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
+            let start_time = Instant::now();
             let (mut playlistgroups, mut error_list) = match input.input_type {
                 InputType::M3u => download::get_m3u_playlist(Arc::clone(&client), &cfg, input, &cfg.working_dir).await,
                 InputType::Xtream => download::get_xtream_playlist(Arc::clone(&client), input, &cfg.working_dir).await,

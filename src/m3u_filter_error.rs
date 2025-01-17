@@ -7,18 +7,19 @@ macro_rules! get_errors_notify_message {
         if $errors.is_empty() {
             None
         } else {
-            let text = $errors.iter()
-                        .filter(|&err| err.kind == M3uFilterErrorKind::Notify)
-                        .map(|err| err.message.as_str())
-                        .collect::<Vec<&str>>()
-                        .join("\n");
-            if $size > 0 && text.len() > std::cmp::max($size-3, 3) {
+            let text = $errors
+                .iter()
+                .filter(|&err| err.kind == M3uFilterErrorKind::Notify)
+                .map(|err| err.message.as_str())
+                .collect::<Vec<&str>>()
+                .join("\n");
+            if $size > 0 && text.len() > std::cmp::max($size - 3, 3) {
                 Some(format!("{}...", text.get(0..$size).unwrap()))
             } else {
                 Some(text)
             }
         }
-    }
+    };
 }
 
 #[macro_export]
@@ -46,15 +47,11 @@ pub enum M3uFilterErrorKind {
 pub struct M3uFilterError {
     pub kind: M3uFilterErrorKind,
     pub message: String,
-
 }
 
 impl M3uFilterError {
     pub const fn new(kind: M3uFilterErrorKind, message: String) -> Self {
-        Self {
-            kind,
-            message,
-        }
+        Self { kind, message }
     }
 }
 
@@ -66,3 +63,11 @@ impl Display for M3uFilterError {
 
 impl Error for M3uFilterError {}
 
+pub fn to_io_error<E>(err: E) -> std::io::Error
+where E: std::error::Error {
+    std::io::Error::new(std::io::ErrorKind::Other, err.to_string())
+}
+
+pub fn str_to_io_error(err: &str) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::Other, err.to_string())
+}

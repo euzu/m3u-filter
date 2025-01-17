@@ -8,10 +8,11 @@ use futures::stream::TryStreamExt;
 use log::info;
 use serde_json::{json, Value};
 use std::fs::File;
-use std::io::{ErrorKind, Write};
+use std::io::{Write};
 use std::ops::Deref;
 use std::sync::Arc;
-use std::{fs, io};
+use std::{fs};
+use crate::m3u_filter_error::to_io_error;
 
 async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwest::Client) -> Result<(), String> {
     let file_download = { active.read().await.as_ref().unwrap().clone() };
@@ -24,7 +25,7 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
                         match File::create(&file_download.file_path) {
                             Ok(mut file) => {
                                 let mut downloaded: u64 = 0;
-                                let mut stream = response.bytes_stream().map_err(|err| io::Error::new(ErrorKind::Other, err));
+                                let mut stream = response.bytes_stream().map_err(to_io_error);
                                 loop {
                                     match stream.try_next().await {
                                         Ok(item) => {
