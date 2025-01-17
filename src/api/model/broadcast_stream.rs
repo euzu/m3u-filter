@@ -22,6 +22,9 @@ impl Stream for BroadcastStream {
     type Item = Result<Bytes, StreamError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.inner.is_closed() {
+            return Poll::Ready(None);
+        }
         match Pin::new(&mut self.inner).poll_recv(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(item)) => {
