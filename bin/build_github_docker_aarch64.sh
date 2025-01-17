@@ -1,37 +1,46 @@
 #!/bin/bash
 set -euo pipefail
-
 source "${HOME}/.ghcr.io"
 
-PLATFORM=aarch64-unknown-linux-musl
-
-# Check if the binary exists
-if [ ! -f "./target/${PLATFORM}/release/m3u-filter" ]; then
-    echo "Error: Static binary '../target/${PLATFORM}/release/m3u-filter' does not exist."
+WORKING_DIR=$(pwd)
+DOCKER_DIR="${WORKING_DIR}/docker"
+FRONTEND_DIR="${WORKING_DIR}/frontend"
+TARGET=aarch64-unknown-linux-musl
+VERSION=$(grep -Po '^version\s*=\s*"\K[0-9\.]+' Cargo.toml)
+if [ -z "${VERSION}" ]; then
+    echo "Error: Failed to determine the version from Cargo.toml."
     exit 1
 fi
+
+cd "$FRONTEND_DIR" && rm -rf build && yarn  && yarn build
+cd "$WORKING_DIR"
 
 # Check if the frontend build directory exists
-if [ ! -d "./frontend/build" ]; then
-    echo "Error: Web directory '../frontend/build' does not exist."
+if [ ! -d "$FRONTEND_DIR/build" ]; then
+    echo "Error: Web directory '$FRONTEND_DIR/build' does not exist."
     exit 1
 fi
+
+cargo clean
+env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$TARGET"
+
+# Check if the binary exists
+if [ ! -f "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" ]; then
+    echo "Error: Static binary '${WORKING_DIR}/target/${TARGET}/release/m3u-filter' does not exist."
+    exit 1
+fi
+
 
 # Prepare Docker build context
-cd ./docker
-cp ../target/${PLATFORM}/release/m3u-filter .
-rm -rf ./web
-cp -r ../frontend/build ./web
+cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
+rm -rf "${DOCKER_DIR}/web"
+cp -r "${WORKING_DIR}/frontend/build" "${DOCKER_DIR}/web"
 
 # Get the version from the binary
-VERSION=$(./m3u-filter -V | sed 's/m3u-filter *//')
-if [ -z "${VERSION}" ]; then
-    echo "Error: Failed to determine the version from the binary."
-    exit 1
-fi
+# VERSION=$(./m3u-filter -V | sed 's/m3u-filter *//')
 
+cd "${DOCKER_DIR}"
 echo "Building Docker images for version ${VERSION}"
-
 SCRATCH_IMAGE_NAME=m3u-filter-aarch64
 
 # Build scratch image and tag as "latest"
@@ -47,7 +56,7 @@ docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
 
 # Clean up
 echo "Cleaning up build artifacts..."
-rm -rf ./web
-rm -f ./m3u-filter
+rm -rf "${DOCKER_DIR}/web"
+rm -f "${DOCKER_DIR}/m3u-filter"
 
-echo "Docker images for version ${VERSION} have been successfully built, tagged, and pushed."
+echo "Docker images ghcr.io/euzu/${SCRATCH_IMAGE_NAME}${VERSION} have been successfully built, tagged, and pushed."

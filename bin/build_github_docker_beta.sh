@@ -3,9 +3,11 @@ set -euo pipefail
 
 source "${HOME}/.ghcr.io"
 
+TARGET=x86_64-unknown-linux-musl
+
 # Check if the binary exists
-if [ ! -f "./target/x86_64-unknown-linux-musl/release/m3u-filter" ]; then
-    echo "Error: Static binary '../target/x86_64-unknown-linux-musl/release/m3u-filter' does not exist."
+if [ ! -f "./target/${TARGET}/release/m3u-filter" ]; then
+    echo "Error: Static binary '../target/${TARGET}/release/m3u-filter' does not exist."
     exit 1
 fi
 
@@ -17,7 +19,7 @@ fi
 
 # Prepare Docker build context
 cd ./docker
-cp ../target/x86_64-unknown-linux-musl/release/m3u-filter .
+cp "../target/${TARGET}/release/m3u-filter" .
 rm -rf ./web
 cp -r ../frontend/build ./web
 
