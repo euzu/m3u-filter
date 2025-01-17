@@ -57,5 +57,9 @@ paste = "1.0"
 tempfile = "3.15"
 ruzstd = "0"
 async-broadcast = "0"
+#[cfg(target_os = "macos")]
+libc = "0"
+#[cfg(target_os = "windows")]
+winapi = "0"
 # [target.'cfg(not(target_env = "msvc"))'.dependencies]
 # tikv-jemallocator =  { version = "*", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }

@@ -12,6 +12,7 @@ mod compression_utils;
 pub mod directed_graph;
 pub mod lru_cache;
 pub mod size_utils;
+pub mod sys;
 
 #[macro_export]
 macro_rules! debug_if_enabled {

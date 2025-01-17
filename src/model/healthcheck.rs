@@ -3,4 +3,5 @@ pub struct Healthcheck {
     pub status: String,
     pub version: String,
     pub time: String,
+    pub mem: String,
 }

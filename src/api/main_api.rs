@@ -21,6 +21,8 @@ use crate::model::config::{validate_targets, Config, ProcessTargets, ScheduleCon
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::playlist_processor;
 use crate::utils::lru_cache::{LRUResourceCache};
+use crate::utils::size_utils::human_readable_byte_size;
+use crate::utils::sys;
 use crate::VERSION;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -39,6 +41,7 @@ async fn healthcheck() -> HttpResponse {
         status: "ok".to_string(),
         version: VERSION.to_string(),
         time: ts,
+        mem: sys::get_memory_usage().map_or(String::from("?"), human_readable_byte_size)
     })
 }
 
@@ -167,6 +170,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
                     srvcfg.configure(v1_api_register(web_auth_enabled));
                 }
                 srvcfg.service(web::resource("/healthcheck").route(web::get().to(healthcheck)));
+                srvcfg.service(web::resource("/status").route(web::get().to(healthcheck)));
             })
             .configure(xtream_api_register)
             .configure(m3u_api_register)

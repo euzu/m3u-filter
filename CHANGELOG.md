@@ -1,4 +1,8 @@
 # Changelog
+# 2.1.1 (2025-01-xx)
+- added new path `/status` which is an alias to `healthcheck`
+- added memory usage to `/status`
+
 # 2.1.0 (2025-01-17)
 - Watch files are now moved inside the `target` folder. Move them manually from `watch_<target_name>_<watched_group>.bin` to `<target_name>/watch_<watched_group>.bin` 
 - No error log for xtream api when content is skipped with options `xtream_skip_[live|vod|series]`
