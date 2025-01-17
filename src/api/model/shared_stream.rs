@@ -14,7 +14,6 @@ use crate::api::model::stream_error::StreamError;
 const MIN_STREAM_QUEUE_SIZE: usize = 1024;
 
 pub struct SharedStream {
-    // pub sender: flume::Sender<Bytes>,
     pub receiver: async_broadcast::Receiver<Bytes>,
 }
 

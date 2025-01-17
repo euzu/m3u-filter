@@ -1,8 +1,9 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use async_broadcast::{Receiver};
+use async_broadcast::{Receiver, RecvError};
 use bytes::Bytes;
 use futures::{Stream};
+use log::error;
 use crate::api::model::stream_error::StreamError;
 
 #[derive(Debug)]
@@ -24,7 +25,13 @@ impl Stream for BroadcastStream {
         match Pin::new(&mut self.inner).poll_recv(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(item)) => {
-                Poll::Ready(Some(item.map_err(StreamError::ReceiverError)))
+                match item {
+                    Ok(data) => Poll::Ready(Some(Ok(data))),
+                    Err(err) => {
+                        error!("Shared stream client error {err}");
+                        Poll::Pending
+                    }
+                }
             }
             Poll::Ready(None) => Poll::Ready(Some(Err(StreamError::ReceiverClosed))),
 
