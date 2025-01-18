@@ -29,7 +29,7 @@ pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, S
 
     let default_headers = vec![
         (actix_web::http::header::CONTENT_TYPE, HeaderValue::from_str("application/octet-stream").unwrap()),
-        (actix_web::http::header::CONTENT_LENGTH, HeaderValue::from(0)),
+        // (actix_web::http::header::CONTENT_LENGTH, HeaderValue::from(0)),
         (actix_web::http::header::CONNECTION, HeaderValue::from_str("keep-alive").unwrap()),
         //(actix_web::http::header::CACHE_CONTROL, HeaderValue::from_str("no-cache").unwrap()),
         (actix_web::http::header::VARY, HeaderValue::from_str("accept-encoding").unwrap())
@@ -44,9 +44,10 @@ pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, S
     headers.push((actix_web::http::header::DATE, HeaderValue::from_str(&chrono::Utc::now().to_rfc2822()).unwrap()));
 
     let mut response_builder = actix_web::HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap());
-    debug_if_enabled!("Opening stream {} with status {status}, headers {headers:?}", mask_sensitive_info(stream_url));
+    debug_if_enabled!("Responding stream {} with status {status}, headers {headers:?}", mask_sensitive_info(stream_url));
     for header in headers {
         response_builder.insert_header(header);
     }
+
     response_builder
 }

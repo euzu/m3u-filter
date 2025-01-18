@@ -198,7 +198,7 @@ async fn provider_request(request_client: Arc<reqwest::Client>, initial_info: bo
                 let response_info = if initial_info {
                     // Unfortunately, the HEAD request does not work, so we need this workaround.
                     // We need some header information from the provider, we extract the necessary headers and forward them to the client
-                    debug_if_enabled!("Provider response headers: {:?}", response.headers_mut());
+                    debug_if_enabled!("Provider response  status: '{}' headers: {:?}", response.status(), response.headers_mut());
                     let response_headers: Vec<(String, String)> = get_response_headers(&mut response);
                     // debug!("First  headers {headers:?} {} {}", mask_sensitive_info(url.as_str()));
                     Some((response_headers, response.status()))
