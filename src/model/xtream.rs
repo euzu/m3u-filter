@@ -22,14 +22,14 @@ const LIVE_STREAM_FIELDS: &[&str] = &[];
 const VIDEO_STREAM_FIELDS: &[&str] = &[
     "release_date", "cast",
     "director", "episode_run_time", "genre",
-    "stream_type", "title", "year", "youtube_trailer",
+    "stream_type", "title", "year", "youtube_trailer", "trailer",
     "plot", "rating_5based", "stream_icon", "container_extension"
 ];
 
 const SERIES_STREAM_FIELDS: &[&str] = &[
     PROP_BACKDROP_PATH, "cast", PROP_COVER, "director", "episode_run_time", "genre",
     "last_modified", "name", "plot", "rating_5based",
-    "stream_type", "title", "year", "youtube_trailer",
+    "stream_type", "title", "year", "youtube_trailer", "trailer"
 ];
 
 const XTREAM_VOD_REWRITE_URL_PROPS: &[&str] = &[PROP_COVER];
@@ -183,12 +183,9 @@ pub struct XtreamStream {
     pub title: Option<Rc<String>>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
     pub year: Option<Rc<String>>,
-    #[serde(
-        default,
-        alias = "youtube_trailer",
-        alias = "trailer",
-        deserialize_with = "deserialize_as_option_rc_string"
-    )]
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
+    pub trailer: Option<Rc<String>>,
+    #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
     pub youtube_trailer: Option<Rc<String>>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
     pub epg_channel_id: Option<Rc<String>>,
@@ -280,7 +277,7 @@ impl XtreamStream {
         add_rc_str_property_if_exists!(result, self.stream_type, "stream_type");
         add_rc_str_property_if_exists!(result, self.title, "title");
         add_rc_str_property_if_exists!(result, self.year, "year");
-        add_rc_str_property_if_exists!(result, self.youtube_trailer, "trailer");
+        add_rc_str_property_if_exists!(result, self.trailer, "trailer");
         add_rc_str_property_if_exists!(result, self.youtube_trailer, "youtube_trailer");
         add_rc_str_property_if_exists!(result, self.epg_channel_id, "epg_channel_id");
         add_opt_i64_property_if_exists!(result, self.tv_archive, "tv_archive");
@@ -345,6 +342,8 @@ pub struct XtreamSeriesInfoInfo {
     rating_5based: f64,
     #[serde(default, deserialize_with = "deserialize_as_string_array")]
     pub backdrop_path: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "string_default_on_null")]
+    trailer: String,
     #[serde(default, deserialize_with = "string_default_on_null")]
     youtube_trailer: String,
     #[serde(default, deserialize_with = "string_default_on_null")]
