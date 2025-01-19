@@ -1,11 +1,11 @@
 use crate::api::model::provider_stream_factory::ResponseStream;
-use async_std::prelude::Stream;
 use bytes::Bytes;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::task::Poll;
+use std::sync::{Arc};
+use std::task::{Poll};
 use log::debug;
+use futures::{Stream};
 use crate::api::model::stream_error::StreamError;
 use crate::utils::request_utils::mask_sensitive_info;
 
@@ -23,26 +23,36 @@ impl ClientStream {
         Self { inner, close_signal, total_bytes, url: url.to_string() }
     }
 }
-
-impl Stream for ClientStream
-{
+impl Stream for ClientStream {
     type Item = Result<Bytes, StreamError>;
 
     fn poll_next(
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        match Pin::new(&mut self.inner).poll_next(cx) {
-            Poll::Ready(Some(Ok(bytes))) => {
-                if let Some(counter) = self.total_bytes.as_ref() {
-                    counter.fetch_add(bytes.len(), Ordering::Relaxed);
+        loop {
+            match Pin::as_mut(&mut self.inner).poll_next(cx) {
+                Poll::Ready(Some(Ok(bytes))) => {
+                    if bytes.is_empty() {
+                        continue;
+                    }
+
+                    if let Some(counter) = self.total_bytes.as_ref() {
+                        counter.fetch_add(bytes.len(), Ordering::Relaxed);
+                    }
+
+                    return Poll::Ready(Some(Ok(bytes)));
                 }
-                Poll::Ready(Some(Ok(bytes)))
+                Poll::Ready(None) => {
+                    self.close_signal.store(false, Ordering::Relaxed);
+                    return Poll::Ready(None);
+                }
+                other => return other,
             }
-            other => other,
         }
     }
 }
+
 
 impl Drop for ClientStream {
     fn drop(&mut self) {
