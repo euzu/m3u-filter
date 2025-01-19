@@ -1,7 +1,5 @@
 use crate::api::model::provider_stream_factory::ResponseStream;
-use crate::utils::request_utils::mask_sensitive_info;
 use futures::{stream::Stream, task::{Context, Poll}, StreamExt};
-use log::debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     pin::Pin,
@@ -16,9 +14,8 @@ pub(in crate::api::model) struct BufferedStream {
 }
 
 impl BufferedStream {
-    pub fn new(stream: ResponseStream, buffer_size: usize, client_close_signal: Arc<AtomicBool>, url: &str) -> Self {
+    pub fn new(stream: ResponseStream, buffer_size: usize, client_close_signal: Arc<AtomicBool>, _url: &str) -> Self {
         let (tx, rx) = channel(buffer_size);
-        let masked_url = mask_sensitive_info(url);
         actix_rt::spawn(async move {
             let mut stream = stream;
             loop {
@@ -28,7 +25,6 @@ impl BufferedStream {
                         if let Ok(permit) = tx.reserve().await {
                             permit.send(Ok(chunk));
                         } else {
-                            debug!("Client has disconnected from stream {masked_url}");
                             client_close_signal.store(false, Ordering::Relaxed);
                             break;
                         }

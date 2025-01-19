@@ -122,8 +122,8 @@ impl ProviderStreamOptions {
     }
 
     #[inline]
-    pub fn get_total_bytes_send(&self) -> usize {
-        self.range_bytes.as_ref().as_ref().map_or(0, |atomic| atomic.load(Ordering::Relaxed))
+    pub fn get_total_bytes_send(&self) -> Option<usize> {
+        self.range_bytes.as_ref().as_ref().map_or(None, |atomic| Some(atomic.load(Ordering::Relaxed)))
     }
 
     // pub fn get_range_bytes(&self) -> &Arc<Option<AtomicUsize>> {
@@ -177,11 +177,11 @@ fn get_client_stream_request_params(
     (stream_buffer_size, req_range_start_bytes, options.is_reconnect_enabled(), headers)
 }
 
-fn prepare_client(request_client: &Arc<reqwest::Client>, url: &Url, headers: &HeaderMap, range_start_bytes_to_request: usize) -> (reqwest::RequestBuilder, bool) {
+fn prepare_client(request_client: &Arc<reqwest::Client>, url: &Url, headers: &HeaderMap, range_start_bytes_to_request: Option<usize>) -> (reqwest::RequestBuilder, bool) {
     let mut client = request_client.get(url.clone()).headers(headers.clone());
-    if range_start_bytes_to_request > 0 {
+    if let Some(range) = range_start_bytes_to_request {
         // on reconnect send range header to avoid starting from beginning for vod
-        let range = format!("bytes={range_start_bytes_to_request}-", );
+        let range = format!("bytes={range}-",);
         client = client.header(RANGE, range);
         (client, true) // partial content
     } else {
