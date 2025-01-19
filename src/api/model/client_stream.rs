@@ -7,7 +7,7 @@ use std::task::{Poll};
 use log::debug;
 use futures::{Stream};
 use crate::api::model::stream_error::StreamError;
-use crate::utils::atomic_flag::AtomicOnceFlag;
+use crate::utils::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::request_utils::mask_sensitive_info;
 
 /// This stream counts the send bytes for reconnecting to the actual position and
@@ -45,7 +45,7 @@ impl Stream for ClientStream {
                     return Poll::Ready(Some(Ok(bytes)));
                 }
                 Poll::Ready(None) => {
-                    self.close_signal.disable();
+                    self.close_signal.notify();
                     return Poll::Ready(None);
                 }
                 other => return other,
@@ -58,6 +58,6 @@ impl Stream for ClientStream {
 impl Drop for ClientStream {
     fn drop(&mut self) {
         debug!("Client disconnected {}", mask_sensitive_info(&self.url));
-        self.close_signal.disable();
+        self.close_signal.notify();
     }
 }

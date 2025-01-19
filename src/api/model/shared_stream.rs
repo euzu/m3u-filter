@@ -29,6 +29,7 @@ impl SharedStream {
         stream_url: &str,
         bytes_stream: S,
         use_buffer: bool,
+        headers: Vec<(String, String)>,
     ) where
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
     {
@@ -43,10 +44,7 @@ impl SharedStream {
             .await
             .insert(
                 stream_url.to_string(),
-                SharedStream {
-                    // sender: sender.clone(),
-                    receiver: rx
-                },
+                (headers, SharedStream {receiver: rx, }),
             );
 
         let shared_streams_map = Arc::clone(&app_state.shared_streams);

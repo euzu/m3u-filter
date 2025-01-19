@@ -29,9 +29,7 @@ pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, S
 
     let default_headers = vec![
         (actix_web::http::header::CONTENT_TYPE, HeaderValue::from_str("application/octet-stream").unwrap()),
-        // (actix_web::http::header::CONTENT_LENGTH, HeaderValue::from(0)),
         (actix_web::http::header::CONNECTION, HeaderValue::from_str("keep-alive").unwrap()),
-        //(actix_web::http::header::CACHE_CONTROL, HeaderValue::from_str("no-cache").unwrap()),
         (actix_web::http::header::VARY, HeaderValue::from_str("accept-encoding").unwrap())
     ];
 

@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use url::Url;
-use crate::utils::atomic_flag::AtomicOnceFlag;
+use crate::utils::atomic_once_flag::AtomicOnceFlag;
 
 // TODO make this configurable
 pub const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
@@ -104,7 +104,7 @@ impl ProviderStreamOptions {
 
     #[inline]
     pub fn cancel_reconnect(&self) {
-        self.continue_flag.disable();
+        self.continue_flag.notify();
     }
 
     #[inline]
@@ -317,12 +317,12 @@ pub async fn create_provider_stream(client: Arc<reqwest::Client>,
     let stream_options = create_provider_stream_options(stream_url, req, input, &options);
 
     let client_stream_factory = |stream, reconnect, range_cnt| {
-        let stream = ClientStream::new(stream, reconnect, range_cnt, stream_options.get_url().as_str()).boxed();
-        if stream_options.is_buffered() {
+        let stream = if stream_options.is_buffered() {
             BufferedStream::new(stream, stream_options.get_buffer_size(), stream_options.get_continue_flag_clone(), stream_url.as_str()).boxed()
         } else {
             stream
-        }
+        };
+        ClientStream::new(stream, reconnect, range_cnt, stream_options.get_url().as_str()).boxed()
     };
 
     match get_initial_stream(Arc::clone(&client), &stream_options).await {

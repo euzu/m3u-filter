@@ -23,6 +23,7 @@ use std::sync::Arc;
 use async_std::sync::Mutex;
 use futures::stream::BoxStream;
 use futures::{TryStreamExt};
+use reqwest::StatusCode;
 use url::Url;
 use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::persist_pipe_stream::PersistPipeStream;
@@ -72,7 +73,7 @@ async fn create_broadcast_stream(
     let notify_stream_url = stream_url.to_string();
     // Acquire lock and check for existing stream
     let shared_streams = app_state.shared_streams.lock().await;
-    if let Some(shared_stream) = shared_streams.get(&notify_stream_url) {
+    if let Some((_, shared_stream)) = shared_streams.get(&notify_stream_url) {
         Some(shared_stream.get_receiver())
     } else {
         None
@@ -86,7 +87,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
 
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url, None).await {
+        if let Some(value) = shared_stream_response(app_state, stream_url).await {
             return value;
         }
     }
@@ -116,7 +117,8 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         if let Some(stream) = stream_opt {
             let use_buffer = !buffer_enabled || direct_pipe_provider_stream;
             return if share_stream {
-                SharedStream::register(app_state, stream_url, stream, use_buffer).await;
+                let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
+                SharedStream::register(app_state, stream_url, stream, use_buffer, shared_headers).await;
                 if let Some(broadcast_stream) = create_broadcast_stream(app_state, stream_url).await {
                     let body_stream = BodyStream::new(broadcast_stream);
                     let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
@@ -134,11 +136,11 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
     HttpResponse::BadRequest().finish()
 }
 
-async fn shared_stream_response(app_state: &AppState, stream_url: &str, headers: Option<(Vec<(String, String)>, reqwest::StatusCode)>) -> Option<HttpResponse> {
+async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
     if let Some(stream) = create_broadcast_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", mask_sensitive_info(stream_url));
-        if app_state.shared_streams.lock().await.get(stream_url).is_some() {
-            let mut response_builder = get_stream_response_with_headers(headers, stream_url);
+        if let Some((headers,_)) = app_state.shared_streams.lock().await.get(stream_url) {
+            let mut response_builder = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
             let current_date = Utc::now().format("%a, %d %b %Y %H:%M:%S GMT").to_string();
             response_builder.insert_header((DATE, current_date.as_bytes()));
             // response_builder.insert_header((ACCEPT_RANGES, "bytes".as_bytes()));

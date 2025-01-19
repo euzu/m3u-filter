@@ -37,7 +37,7 @@ impl AtomicOnceFlag {
     /// Disables the flag. After calling this method, `is_active()` will always return `false`.
     ///
     /// This operation is atomic and uses the specified memory ordering.
-    pub fn disable(&self) {
+    pub fn notify(&self) {
         self.enabled.store(false, self.ordering);
     }
 

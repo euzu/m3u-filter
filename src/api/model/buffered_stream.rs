@@ -7,7 +7,7 @@ use std::{
 use tokio::sync::mpsc::channel;
 use tokio_stream::wrappers::ReceiverStream;
 use crate::api::model::stream_error::StreamError;
-use crate::utils::atomic_flag::AtomicOnceFlag;
+use crate::utils::atomic_once_flag::AtomicOnceFlag;
 
 pub(in crate::api::model) struct BufferedStream {
     stream: ReceiverStream<Result<bytes::Bytes, StreamError>>,
@@ -26,7 +26,7 @@ impl BufferedStream {
                             permit.send(Ok(chunk));
                         } else {
                             // receiver closed.
-                            client_close_signal.disable();
+                            client_close_signal.notify();
                             break;
                         }
                     }
