@@ -16,7 +16,7 @@ if [ ! -d "$FRONTEND_DIR/build" ]; then
     exit 1
 fi
 
-cargo clean
+cargo clean || true
 env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$TARGET"
 
 # Check if the binary exists

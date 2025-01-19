@@ -56,7 +56,13 @@ mkdir -p "$RELEASE_DIR"
 # Clean previous builds
 cargo clean || true
 
-cd "$FRONTEND_DIR" &&  yarn build
+cd "$FRONTEND_DIR" && rm -rf build && yarn  && yarn build
+# Check if the frontend build directory exists
+if [ ! -d "$FRONTEND_DIR/build" ]; then
+    echo "Error: Web directory '$FRONTEND_DIR/build' does not exist."
+    exit 1
+fi
+
 cd "$WORKING_DIR"
 
 # Build binaries
