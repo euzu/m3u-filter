@@ -54,7 +54,10 @@ cd "$WORKING_DIR"
 mkdir -p "$RELEASE_DIR"
 
 # Clean previous builds
-cargo clean
+cargo clean || true
+
+cd "$FRONTEND_DIR" &&  yarn build
+cd "$WORKING_DIR"
 
 # Build binaries
 for PLATFORM in "${!TARGETS[@]}"; do
@@ -72,7 +75,7 @@ for PLATFORM in "${!TARGETS[@]}"; do
 
     # Build for each platform
     cd "$WORKING_DIR"
-    cargo clean # Clean before each build to avoid conflicts
+    cargo clean || true # Clean before each build to avoid conflicts
     env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$TARGET"
 
     # Create directories and copy binaries and config files

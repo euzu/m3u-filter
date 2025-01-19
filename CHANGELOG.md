@@ -1,10 +1,11 @@
 # Changelog
-# 2.1.1 (2025-01-xx)
+# 2.1.1 (2025-01-19)
 - added new path `/status` which is an alias to `healthcheck`
 - added memory usage to `/status`
 - fixed VLC seeking problem when reconnect stream was enabled.
 - duplicate field problem for xtream series/vod info fixed.
 - fixed docker/build scripts
+- fixed xtream live stream redirect bug
 
 # 2.1.0 (2025-01-17)
 - Watch files are now moved inside the `target` folder. Move them manually from `watch_<target_name>_<watched_group>.bin` to `<target_name>/watch_<watched_group>.bin` 

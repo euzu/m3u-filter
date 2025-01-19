@@ -20,21 +20,21 @@ fn get_memory_usage_linux() -> std::io::Result<u64> {
 }
 
 #[cfg(target_os = "windows")]
-fn get_memory_usage_windows() -> u64 {
+fn get_memory_usage_windows() -> Option<u64> {
     use winapi::um::psapi::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
-    use winapi::um::processenv::GetCurrentProcess;
+    use winapi::um::processthreadsapi::GetCurrentProcess;
     use winapi::shared::minwindef::DWORD;
 
     unsafe {
         let mut counters: PROCESS_MEMORY_COUNTERS = std::mem::zeroed();
         let process = GetCurrentProcess();
         GetProcessMemoryInfo(process, &mut counters, std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as DWORD);
-        counters.WorkingSetSize as u64
+        Some(counters.WorkingSetSize as u64)
     }
 }
 
 #[cfg(target_os = "macos")]
-fn get_memory_usage_macos() -> u64 {
+fn get_memory_usage_macos() -> Option<u64> {
     use libc::{sysctl, CTL_KERN, KERN_PROC, KERN_PROC_PID};
     use std::ptr;
 
@@ -46,7 +46,7 @@ fn get_memory_usage_macos() -> u64 {
 
         sysctl(mib.as_mut_ptr(), mib.len() as libc::c_uint, &mut info as *mut _ as *mut _, &mut len, ptr::null_mut(), 0);
 
-        info.ru_maxrss as u64 * 1024
+        Some(info.ru_maxrss as u64 * 1024)
     }
 }
 
