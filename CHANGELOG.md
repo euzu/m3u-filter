@@ -42,7 +42,7 @@ reverse_proxy:
       enabled: true
       size: 1024
   cache:
-    size: 100KB
+    size: 500MB
     enabled: true
     dir: ./cache
 ```
