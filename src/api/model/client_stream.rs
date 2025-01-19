@@ -1,25 +1,26 @@
 use crate::api::model::provider_stream_factory::ResponseStream;
 use bytes::Bytes;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc};
 use std::task::{Poll};
 use log::debug;
 use futures::{Stream};
 use crate::api::model::stream_error::StreamError;
+use crate::utils::atomic_flag::AtomicOnceFlag;
 use crate::utils::request_utils::mask_sensitive_info;
 
 /// This stream counts the send bytes for reconnecting to the actual position and
 /// sets the `close_signal`  if the client drops the connection.
 pub(in crate::api::model) struct ClientStream {
     inner: ResponseStream,
-    close_signal: Arc<AtomicBool>,
+    close_signal: Arc<AtomicOnceFlag>,
     total_bytes: Arc<Option<AtomicUsize>>,
     url: String,
 }
 
 impl ClientStream {
-    pub(crate) fn new(inner: ResponseStream, close_signal: Arc<AtomicBool>, total_bytes: Arc<Option<AtomicUsize>>, url: &str) -> Self {
+    pub(crate) fn new(inner: ResponseStream, close_signal: Arc<AtomicOnceFlag>, total_bytes: Arc<Option<AtomicUsize>>, url: &str) -> Self {
         Self { inner, close_signal, total_bytes, url: url.to_string() }
     }
 }
@@ -44,7 +45,7 @@ impl Stream for ClientStream {
                     return Poll::Ready(Some(Ok(bytes)));
                 }
                 Poll::Ready(None) => {
-                    self.close_signal.store(false, Ordering::Relaxed);
+                    self.close_signal.disable();
                     return Poll::Ready(None);
                 }
                 other => return other,
@@ -57,6 +58,6 @@ impl Stream for ClientStream {
 impl Drop for ClientStream {
     fn drop(&mut self) {
         debug!("Client disconnected {}", mask_sensitive_info(&self.url));
-        self.close_signal.store(false, Ordering::Relaxed);
+        self.close_signal.disable();
     }
 }

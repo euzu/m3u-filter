@@ -15,10 +15,11 @@ use log::warn;
 use reqwest::header::{HeaderMap, RANGE};
 use reqwest::StatusCode;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use url::Url;
+use crate::utils::atomic_flag::AtomicOnceFlag;
 
 // TODO make this configurable
 pub const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
@@ -75,7 +76,7 @@ impl BufferStreamOptions {
 #[derive(Debug, Clone)]
 struct ProviderStreamOptions {
     buffer_size: usize,
-    continue_flag: Arc<AtomicBool>,
+    continue_flag: Arc<AtomicOnceFlag>,
     url: Url,
     reconnect: bool,
     headers: HeaderMap,
@@ -92,18 +93,18 @@ impl ProviderStreamOptions {
         self.buffer_size
     }
     #[inline]
-    pub fn get_continue_flag_clone(&self) -> Arc<AtomicBool> {
+    pub fn get_continue_flag_clone(&self) -> Arc<AtomicOnceFlag> {
         Arc::clone(&self.continue_flag)
     }
 
     // #[inline]
-    // pub fn get_continue_flag(&self) -> &Arc<AtomicBool> {
+    // pub fn get_continue_flag(&self) -> &Arc<AtomicFlag> {
     //     &self.continue_flag
     // }
 
     #[inline]
     pub fn cancel_reconnect(&self) {
-        self.continue_flag.store(false, Ordering::Relaxed);
+        self.continue_flag.disable();
     }
 
     #[inline]
@@ -123,7 +124,7 @@ impl ProviderStreamOptions {
 
     #[inline]
     pub fn get_total_bytes_send(&self) -> Option<usize> {
-        self.range_bytes.as_ref().as_ref().map_or(None, |atomic| Some(atomic.load(Ordering::Relaxed)))
+        self.range_bytes.as_ref().as_ref().map(|atomic| atomic.load(Ordering::Relaxed))
     }
 
     // pub fn get_range_bytes(&self) -> &Arc<Option<AtomicUsize>> {
@@ -137,7 +138,7 @@ impl ProviderStreamOptions {
 
     #[inline]
     pub fn should_continue(&self) -> bool {
-        self.continue_flag.load(Ordering::Relaxed)
+        self.continue_flag.is_active()
     }
 }
 
@@ -294,7 +295,7 @@ fn create_provider_stream_options(stream_url: &Url,
     let (buffer_size, req_range_start_bytes, reconnect, headers) = get_client_stream_request_params(req, input, options);
     let url = stream_url.clone();
     let range_bytes = Arc::new(req_range_start_bytes.map(AtomicUsize::new));
-    let continue_flag = Arc::new(AtomicBool::new(true));
+    let continue_flag = Arc::new(AtomicOnceFlag::new());
 
     ProviderStreamOptions {
         buffer_size,

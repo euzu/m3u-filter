@@ -1,6 +1,5 @@
 use crate::api::model::provider_stream_factory::ResponseStream;
 use futures::{stream::Stream, task::{Context, Poll}, StreamExt};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     pin::Pin,
     sync::Arc,
@@ -8,13 +7,14 @@ use std::{
 use tokio::sync::mpsc::channel;
 use tokio_stream::wrappers::ReceiverStream;
 use crate::api::model::stream_error::StreamError;
+use crate::utils::atomic_flag::AtomicOnceFlag;
 
 pub(in crate::api::model) struct BufferedStream {
     stream: ReceiverStream<Result<bytes::Bytes, StreamError>>,
 }
 
 impl BufferedStream {
-    pub fn new(stream: ResponseStream, buffer_size: usize, client_close_signal: Arc<AtomicBool>, _url: &str) -> Self {
+    pub fn new(stream: ResponseStream, buffer_size: usize, client_close_signal: Arc<AtomicOnceFlag>, _url: &str) -> Self {
         let (tx, rx) = channel(buffer_size);
         actix_rt::spawn(async move {
             let mut stream = stream;
@@ -25,7 +25,8 @@ impl BufferedStream {
                         if let Ok(permit) = tx.reserve().await {
                             permit.send(Ok(chunk));
                         } else {
-                            client_close_signal.store(false, Ordering::Relaxed);
+                            // receiver closed.
+                            client_close_signal.disable();
                             break;
                         }
                     }
