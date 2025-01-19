@@ -199,7 +199,7 @@ async fn xtream_player_api_stream(
 
     if user.proxy == ProxyType::Redirect {
         debug_if_enabled!("Redirecting stream request to {}", mask_sensitive_info(&pli.url));
-        return HttpResponse::Found().insert_header(("Location", mask_sensitive_info(pli.url.as_str()))).finish();
+        return HttpResponse::Found().insert_header(("Location", pli.url.as_str())).finish();
     }
 
     let extension = stream_ext.unwrap_or_else(
