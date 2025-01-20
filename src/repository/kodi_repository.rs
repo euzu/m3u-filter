@@ -1,7 +1,7 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
-use crate::model::playlist::{FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType};
+use crate::model::playlist::{FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::model::xtream::XtreamSeriesEpisode;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
@@ -366,11 +366,13 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                 };
 
                 let url = get_strm_url(credentials_and_server_info.as_ref(), &str_item_info);
+                let seekable = pli.header.borrow().xtream_cluster != XtreamCluster::Live;
 
                 let file_path = output_path.join(format!("{strm_file_name}.strm"));
                 match File::create(&file_path) {
                     Ok(mut strm_file) => {
-                        match file_utils::check_write(&strm_file.write_all(url.as_bytes())) {
+                        let content = format!("#KODIPROP:seekable={seekable}\n#KODIPROP:inputstream=inputstream.ffmpeg\n#KODIPROP:http-reconnect=true\n{url}");
+                        match file_utils::check_write(&strm_file.write_all(content.as_bytes())) {
                             Ok(()) => {}
                             Err(err) => {
                                 error!("failed to write strm playlist: {err}");
