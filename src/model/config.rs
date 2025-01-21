@@ -220,17 +220,20 @@ impl ProcessTargets {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigSortGroup {
     pub order: SortOrder,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigSortChannel {
     pub field: ItemField,
     // channel field
     pub group_pattern: String,
     // match against group title
     pub order: SortOrder,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sequence: Option<Vec<String>>,
     #[serde(skip_serializing, skip_deserializing)]
     pub re: Option<regex::Regex>,
@@ -248,12 +251,13 @@ impl ConfigSortChannel {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigSort {
     #[serde(default)]
     pub match_as_ascii: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub groups: Option<ConfigSortGroup>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channels: Option<Vec<ConfigSortChannel>>,
 }
 
@@ -267,6 +271,7 @@ impl ConfigSort {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigRename {
     pub field: ItemField,
     pub pattern: String,
@@ -297,6 +302,8 @@ pub struct ConfigTargetOptions {
     pub cleanup: bool,
     #[serde(default)]
     pub kodi_style: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strm_props: Option<Vec<String>>,
     #[serde(default = "default_as_true")]
     pub xtream_skip_live_direct_source: bool,
     #[serde(default = "default_as_true")]
@@ -333,6 +340,7 @@ pub struct TargetOutput {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigTarget {
     #[serde(skip)]
     pub id: u16,
@@ -468,6 +476,7 @@ impl ConfigTarget {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigSource {
     pub inputs: Vec<ConfigInput>,
     pub targets: Vec<ConfigTarget>,
@@ -494,6 +503,7 @@ impl ConfigSource {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct InputAffix {
     pub field: String,
     pub value: String,
@@ -554,6 +564,7 @@ pub struct InputUserInfo {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigInput {
     #[serde(skip)]
     pub id: u16,
@@ -653,6 +664,7 @@ impl ConfigInput {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigApi {
     pub host: String,
     pub port: u16,
@@ -669,35 +681,39 @@ impl ConfigApi {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TelegramMessagingConfig {
     pub bot_token: String,
     pub chat_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RestMessagingConfig {
     pub url: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct MessagingConfig {
     #[serde(default)]
     pub notify_on: Vec<MsgKind>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub telegram: Option<TelegramMessagingConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rest: Option<RestMessagingConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct VideoDownloadConfig {
     #[serde(default)]
     pub headers: HashMap<String, String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub directory: Option<String>,
     #[serde(default)]
     pub organize_into_directories: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub episode_pattern: Option<String>,
     #[serde(default, skip_serializing, skip_deserializing)]
     pub t_re_episode_pattern: Option<regex::Regex>,
@@ -708,6 +724,7 @@ pub struct VideoDownloadConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct VideoConfig {
     #[serde(default)]
     pub extensions: Vec<String>,
@@ -748,20 +765,29 @@ impl VideoConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigDto {
     #[serde(default)]
     pub threads: u8,
     pub api: ConfigApi,
     #[serde(default)]
     pub working_dir: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_dir: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub video: Option<VideoConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<Vec<ScheduleConfig>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub messaging: Option<MessagingConfig>,
+    #[serde(default)]
+    pub update_on_boot: bool,
+    #[serde(default = "default_as_true")]
+    pub web_ui_enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub web_auth: Option<WebAuthConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reverse_proxy: Option<ReverseProxyConfig>,
 }
 
 impl ConfigDto {
@@ -787,11 +813,13 @@ impl ConfigDto {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WebAuthConfig {
     #[serde(default = "default_as_true")]
     pub enabled: bool,
     pub issuer: String,
     pub secret: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub userfile: Option<String>,
     #[serde(skip_serializing, skip_deserializing)]
     pub t_users: Option<Vec<UserCredential>>,
@@ -851,20 +879,22 @@ impl WebAuthConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ScheduleConfig {
     #[serde(default)]
     pub schedule: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub targets: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CacheConfig {
     #[serde(default)]
     pub enabled: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dir: Option<String>,
     #[serde(skip)]
     pub t_size: usize,
@@ -895,6 +925,7 @@ impl CacheConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct StreamBufferConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -912,10 +943,11 @@ impl StreamBufferConfig {
 
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct StreamConfig {
     #[serde(default)]
     pub retry: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub buffer: Option<StreamBufferConfig>,
 }
 
@@ -928,10 +960,11 @@ impl StreamConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ReverseProxyConfig {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stream: Option<StreamConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache: Option<CacheConfig>,
 }
 
@@ -947,28 +980,30 @@ impl ReverseProxyConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
     pub threads: u8,
     pub api: ConfigApi,
     pub sources: Vec<ConfigSource>,
     pub working_dir: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_dir: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub templates: Option<Vec<PatternTemplate>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub video: Option<VideoConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<Vec<ScheduleConfig>>,
     #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]
     pub web_ui_enabled: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub web_auth: Option<WebAuthConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub messaging: Option<MessagingConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reverse_proxy: Option<ReverseProxyConfig>,
     #[serde(skip)]
     pub t_api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
@@ -1231,6 +1266,7 @@ pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigS
 
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HealthcheckConfig {
     pub api: ConfigApi,
 }

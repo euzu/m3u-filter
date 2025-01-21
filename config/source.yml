@@ -24,7 +24,6 @@ sources:
         password: test
     targets:
       - name: pl1
-        filename: playlist_1.m3u
         type: m3u
         filter: '!ALL_CHAN!'
         options: { ignore_logo: true }
@@ -42,7 +41,6 @@ sources:
         watch:
           - 'FR - Movies'
       - name: plxtream
-        filename: playlist_1
         type: xtream
         filter: '!ALL_CHAN!'
         options: { ignore_logo: true, xtream_skip_live_direct_source: true, , xtream_skip_video_direct_source: true, xtream_skip_series_direct_source: true}

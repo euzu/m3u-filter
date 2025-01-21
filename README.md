@@ -427,6 +427,9 @@ Target options are:
 - `underscore_whitespace` replaces all whitespaces with `_` in the path.
 - `cleanup` deletes the directory given at `filename`.
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
+- `strm_props` is a list of properties written to the strm file.
+If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is added. If `strm_props` is not given `#KODIPROP:inputstream=inputstream.ffmpeg`, `"#KODIPROP:http-reconnect=true` are set too for `kody_style`.
+
 
 `m3u` output has additional options
 - `m3u_include_type_in_url`, default false, if true adds the stream type `live`, `movie`, `series` to the url of the stream.

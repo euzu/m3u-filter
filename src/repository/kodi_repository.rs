@@ -340,6 +340,9 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
         let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&output.filename.as_ref().unwrap()))) else {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Failed to get file path for {}", output.filename.as_deref().unwrap_or(""));
         };
+
+        let strm_props = target.options.as_ref().and_then(|o| o.strm_props.as_ref());
+
         prepare_strm_output_directory(cleanup, &path)?;
         let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
         for pg in new_playlist {
@@ -367,12 +370,19 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
 
                 let url = get_strm_url(credentials_and_server_info.as_ref(), &str_item_info);
                 let seekable = pli.header.borrow().xtream_cluster != XtreamCluster::Live;
-
                 let file_path = output_path.join(format!("{strm_file_name}.strm"));
                 match File::create(&file_path) {
                     Ok(mut strm_file) => {
-                        let content = format!("#KODIPROP:seekable={seekable}\n#KODIPROP:inputstream=inputstream.ffmpeg\n#KODIPROP:http-reconnect=true\n{url}");
-                        match file_utils::check_write(&strm_file.write_all(content.as_bytes())) {
+                        let mut content =  strm_props.map_or_else(Vec::new, std::clone::Clone::clone);
+                        if kodi_style {
+                            content.push(format!("#KODIPROP:seekable={seekable}"));
+                            if strm_props.is_none() {
+                                content.push("#KODIPROP:inputstream=inputstream.ffmpeg".to_string());
+                                content.push("#KODIPROP:http-reconnect=true".to_string());
+                            }
+                        }
+                        content.push(url);
+                        match file_utils::check_write(&strm_file.write_all(content.join("\n").as_bytes())) {
                             Ok(()) => {}
                             Err(err) => {
                                 error!("failed to write strm playlist: {err}");

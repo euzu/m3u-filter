@@ -58,10 +58,13 @@ impl FromStr for ProxyType {
 pub struct ProxyUserCredentials {
     pub username: String,
     pub password: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
     #[serde(default = "ProxyType::default")]
     pub proxy: ProxyType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub server: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub epg_timeshift: Option<String>,
 }
 

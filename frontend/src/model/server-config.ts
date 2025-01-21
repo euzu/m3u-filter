@@ -157,14 +157,46 @@ export interface Schedule {
     targets: string[];
 }
 
+export interface WebAuthConfig {
+    enabled: boolean,
+    issuer: string,
+    secret: string,
+    userfile?: string,
+}
+
+export interface StreamBufferConfig {
+    enabled: boolean,
+    size: number,
+}
+
+export interface StreamConfig {
+    retry: boolean,
+    buffer?: StreamBufferConfig,
+}
+
+export interface CacheConfig {
+    enabled: boolean,
+    size?: string,
+    dir?: string,
+}
+
+export interface ReverseProxyConfig {
+    stream?: StreamConfig,
+    cache?: CacheConfig,
+}
+
 export interface ServerMainConfig {
-    api: ServerApiConfig;
     threads: number;
+    api: ServerApiConfig;
     working_dir: string;
     backup_dir: string;
-    schedules: Schedule[];
+    schedules?: Schedule[];
     messaging?: MessagingConfig;
     video?: VideoConfig;
+    update_on_boot: boolean,
+    web_ui_enabled: boolean,
+    web_auth?: WebAuthConfig,
+    reverse_proxy?: ReverseProxyConfig,
 }
 
 export default interface ServerConfig extends ServerMainConfig {
