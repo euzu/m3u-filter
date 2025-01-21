@@ -3,7 +3,8 @@ import './main-config-view.scss';
 import ServerConfig, {
     MessagingConfig,
     ServerApiConfig,
-    ServerMainConfig, TelegramConfig,
+    ServerMainConfig,
+    TelegramConfig,
     VideoConfig,
     VideoDownloadConfig
 } from "../../model/server-config";
@@ -90,7 +91,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
             let telegramConfigAvailable = telegramConfig?.bot_token?.trim().length && telegramConfig?.chat_ids?.length;
             const cfgMessaging: MessagingConfig = {
                 notify_on: messagingConfig.notify_on,
-                telegram:   telegramConfigAvailable ? telegramConfig : null,
+                telegram: telegramConfigAvailable ? telegramConfig : null,
             };
 
             const cfgVideo = {
@@ -106,6 +107,10 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 threads: mainConfig.threads,
                 messaging: cfgMessaging,
                 video: cfgVideo,
+                update_on_boot: mainConfig.update_on_boot,
+                web_ui_enabled: mainConfig.web_ui_enabled,
+                web_auth: mainConfig.web_auth,
+                reverse_proxy: mainConfig.reverse_proxy,
             };
 
             services.config().saveMainConfig(cfgMain).subscribe({
