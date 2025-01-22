@@ -6,7 +6,7 @@ use std::collections::{HashSet};
 use std::str::FromStr;
 use crate::utils::request_utils::mask_sensitive_info;
 
-const MEDIA_STREAM_HEADERS: &[&str] = &["content-type", "content-length", "connection", "accept-ranges", "content-range", "vary", "transfer-encoding", "access-control-allow-credentials"];
+const MEDIA_STREAM_HEADERS: &[&str] = &["accept", "content-type", "content-length", "connection", "accept-ranges", "content-range", "vary", "transfer-encoding", "access-control-allow-origin", "access-control-allow-credentials", "icy-metadata"];
 
 pub fn get_response_headers(response: &mut Response) -> Vec<(String, String)> {
     let response_headers: Vec<(String, String)> = response.headers_mut().iter()
