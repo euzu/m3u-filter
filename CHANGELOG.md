@@ -2,6 +2,7 @@
 # 2.1.2 (2025-01-xx)
 - `Strm` output has an additional option `strm_props`. These props are written to the strm file.
 If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is added. If `strm_props` is not given `#KODIPROP:inputstream=inputstream.ffmpeg`, `"#KODIPROP:http-reconnect=true` are set too for `kody_style`.
+- Fixed xtream affix-processed output.
 
 # 2.1.1 (2025-01-19)
 - added new path `/status` which is an alias to `healthcheck`

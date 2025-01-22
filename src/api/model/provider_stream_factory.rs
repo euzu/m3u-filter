@@ -375,9 +375,11 @@ mod tests {
         let input = None;
 
         let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0);
-        'outer: while let Some((mut stream, info)) = create_provider_stream(Arc::clone(&client), &url, &req, input, options).await {
+        let value = create_provider_stream(Arc::clone(&client), &url, &req, input, options);
+        let mut values = value.await;
+        'outer: while let Some((ref mut stream, info)) = values.as_mut() {
             if info.is_some() {
-                println!("{:?}", info.unwrap());
+                println!("{:?}", info.as_ref().unwrap());
             }
             while let Some(result) = stream.next().await {
                 match result {

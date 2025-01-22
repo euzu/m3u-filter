@@ -481,7 +481,7 @@ pub struct PlaylistItem {
     pub header: RefCell<PlaylistItemHeader>,
 }
 
-generate_field_accessor_impl_for_xtream_playlist_item!(name, logo, logo_small, group,title, parent_code, rec, url;);
+generate_field_accessor_impl_for_xtream_playlist_item!(name, logo, logo_small, group, title, parent_code, rec, url;);
 
 impl PlaylistItem {
     pub fn to_m3u(&self) -> M3uPlaylistItem {

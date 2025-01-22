@@ -44,7 +44,7 @@ GET {{local}}/player_api.php?username=xt&password=xt
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_categories
 
 ### xtream live_streams reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_live_streams&category_id=102
+GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_live_streams&category_id=2
 
 ### xtream live_streams redirect
 GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_streams&category_id=102

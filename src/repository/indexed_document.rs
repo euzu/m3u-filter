@@ -510,7 +510,7 @@ mod tests {
     use std::path::PathBuf;
 
     use serde::{Deserialize, Serialize};
-
+    use crate::model::playlist::XtreamPlaylistItem;
     use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
 
     // Example usage with a simple struct
@@ -580,6 +580,17 @@ mod tests {
             assert_eq!(501, i, "Wrong number of elements");
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_xt() -> io::Result<()> {
+        let main_path = PathBuf::from("/tmp/live.db");
+        let index_path = PathBuf::from("/tmp/live.idx");
+        let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&main_path, &index_path)?;
+        for doc in reader {
+            println!("{doc:?}");
+        }
         Ok(())
     }
 }

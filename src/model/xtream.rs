@@ -605,7 +605,9 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
 
     if let Some(ref add_props) = props {
         for (field_name, field_value) in add_props {
-            document.insert(field_name.to_string(), field_value.to_owned());
+            if !document.contains_key(field_name) {
+              document.insert(field_name.to_string(), field_value.to_owned());
+            }
         }
     }
 
