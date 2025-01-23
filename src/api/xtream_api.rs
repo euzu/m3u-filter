@@ -29,7 +29,7 @@ use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository;
 use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::utils::json_utils::get_u32_from_serde_value;
-use crate::utils::request_utils::{extract_extension_from_url, mask_sensitive_info};
+use crate::utils::request_utils::{extract_extension_from_url, sanitize_sensitive_info};
 use crate::utils::{download, json_utils, request_utils};
 use crate::{debug_if_enabled, info_err};
 
@@ -193,12 +193,12 @@ async fn xtream_player_api_stream(
 
     if pli.item_type == PlaylistItemType::LiveHls {
         let stream_url = pli.url.to_string();
-        debug_if_enabled!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
+        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&stream_url));
         return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
     }
 
     if user.proxy == ProxyType::Redirect {
-        debug_if_enabled!("Redirecting stream request to {}", mask_sensitive_info(&pli.url));
+        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
         return HttpResponse::Found().insert_header(("Location", pli.url.as_str())).finish();
     }
 
@@ -215,7 +215,7 @@ async fn xtream_player_api_stream(
         stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()),
         true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}",
         stream_req.context));
-    debug_if_enabled!("Streaming stream request from {}", mask_sensitive_info(&stream_url));
+    debug_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
     stream_response(app_state, &stream_url, req, Some(input), pli.item_type, target).await
 }
 
@@ -371,10 +371,10 @@ async fn xtream_player_api_resource(
         None => HttpResponse::NotFound().finish(),
         Some(url) => {
             if user.proxy == ProxyType::Redirect {
-                debug!("Redirecting resource request to {}", mask_sensitive_info(&url));
+                debug!("Redirecting resource request to {}", sanitize_sensitive_info(&url));
                 HttpResponse::Found().insert_header(("Location", url.as_str())).finish()
             } else {
-                debug_if_enabled!("Resource request to {}", mask_sensitive_info(&url));
+                debug_if_enabled!("Resource request to {}", sanitize_sensitive_info(&url));
                 resource_response(app_state, url.as_str(), req, None).await
             }
         }
@@ -496,7 +496,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                     return match request_utils::download_text_content(Arc::clone(&app_state.http_client), input, info_url.as_str(), None).await {
                         Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
                         Err(err) => {
-                            error!("Failed to download epg {}", mask_sensitive_info(err.to_string().as_str()));
+                            error!("Failed to download epg {}", sanitize_sensitive_info(err.to_string().as_str()));
                             HttpResponse::NoContent().finish()
                         }
                     };

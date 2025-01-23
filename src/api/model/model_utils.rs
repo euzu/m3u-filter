@@ -4,7 +4,7 @@ use actix_web::{HttpResponseBuilder};
 use reqwest::{Response, StatusCode};
 use std::collections::{HashSet};
 use std::str::FromStr;
-use crate::utils::request_utils::mask_sensitive_info;
+use crate::utils::request_utils::sanitize_sensitive_info;
 
 const MEDIA_STREAM_HEADERS: &[&str] = &["accept", "content-type", "content-length", "connection", "accept-ranges", "content-range", "vary", "transfer-encoding", "access-control-allow-origin", "access-control-allow-credentials", "icy-metadata"];
 
@@ -52,7 +52,7 @@ pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, S
     }
 
     let mut response_builder = actix_web::HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap());
-    debug_if_enabled!("Responding stream {} with status {status}, headers {headers:?}", mask_sensitive_info(stream_url));
+    debug_if_enabled!("Responding stream {} with status {status}, headers {headers:?}", sanitize_sensitive_info(stream_url));
     for header in headers {
         response_builder.insert_header(header);
     }

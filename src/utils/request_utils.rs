@@ -4,6 +4,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::LazyLock;
 use std::time::Instant;
 
@@ -29,12 +30,12 @@ pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
 }
 
 pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
-    debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
+    debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, sanitize_sensitive_info(url_str));
     if url_str.parse::<url::Url>().is_ok() {
         match download_text_content_as_file(client, input, url_str, working_dir, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
-                error!("cant download input url: {}  => {}", mask_sensitive_info(url_str), mask_sensitive_info(e.to_string().as_str()));
+                error!("cant download input url: {}  => {}", sanitize_sensitive_info(url_str), sanitize_sensitive_info(e.to_string().as_str()));
                 create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
             }
         }
@@ -66,7 +67,7 @@ pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input:
         };
 
         result.map_or_else(|| {
-            let msg = format!("cant read input url: {}", mask_sensitive_info(url_str));
+            let msg = format!("cant read input url: {}", sanitize_sensitive_info(url_str));
             error!("{}", msg);
             create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
         }, Ok)
@@ -75,13 +76,13 @@ pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input:
 
 
 pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
-    debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, mask_sensitive_info(url_str));
+    debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, sanitize_sensitive_info(url_str));
 
     if url_str.parse::<url::Url>().is_ok() {
         match download_text_content(client, input, url_str, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
-                error!("cant download input url: {}  => {}", mask_sensitive_info(url_str), mask_sensitive_info(e.to_string().as_str()));
+                error!("cant download input url: {}  => {}", sanitize_sensitive_info(url_str), sanitize_sensitive_info(e.to_string().as_str()));
                 create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
             }
         }
@@ -113,7 +114,7 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
             None => None
         };
         result.map_or_else(|| {
-            let msg = format!("cant read input url: {}", mask_sensitive_info(url_str));
+            let msg = format!("cant read input url: {}", sanitize_sensitive_info(url_str));
             error!("{}", msg);
             create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
         }, Ok)
@@ -206,10 +207,10 @@ async fn get_remote_content_as_file(client: Arc<reqwest::Client>, input: &Config
                 debug!("File downloaded successfully to {file_path:?}, took:{}", format_elapsed_time(elapsed));
                 Ok(file_path.to_path_buf())
             } else {
-                Err(str_to_io_error(&format!("Request failed with status {} {}", response.status(), mask_sensitive_info(url.as_str()))))
+                Err(str_to_io_error(&format!("Request failed with status {} {}", response.status(), sanitize_sensitive_info(url.as_str()))))
             }
         }
-        Err(err) => Err(str_to_io_error(&format!("Request failed: {} {err}", mask_sensitive_info(url.as_str())))),
+        Err(err) => Err(str_to_io_error(&format!("Request failed: {} {err}", sanitize_sensitive_info(url.as_str())))),
     }
 }
 
@@ -256,30 +257,30 @@ async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, u
                         if decode_buffer.is_empty() {
                             match String::from_utf8(bytes.to_vec()) {
                                 Ok(decoded_content) => {
-                                    debug_if_enabled!("Request took:{} {}", format_elapsed_time(start_time.elapsed().as_secs()), mask_sensitive_info(url.as_str()));
+                                    debug_if_enabled!("Request took:{} {}", format_elapsed_time(start_time.elapsed().as_secs()), sanitize_sensitive_info(url.as_str()));
                                     Ok(decoded_content)
                                 }
                                 Err(err) => Err(str_to_io_error(&format!("failed to plain text content {err}")))
                             }
                         } else {
-                            debug_if_enabled!("Request took:{},  {}", format_elapsed_time(start_time.elapsed().as_secs()), mask_sensitive_info(url.as_str()));
+                            debug_if_enabled!("Request took:{},  {}", format_elapsed_time(start_time.elapsed().as_secs()), sanitize_sensitive_info(url.as_str()));
                             Ok(decode_buffer)
                         }
                     }
-                    Err(err) => Err(str_to_io_error(&format!("failed to read response {} {err}", mask_sensitive_info(url.as_str()))))
+                    Err(err) => Err(str_to_io_error(&format!("failed to read response {} {err}", sanitize_sensitive_info(url.as_str()))))
                 }
             } else {
-                Err(str_to_io_error(&format!("Request failed with status {} {}", response.status(), mask_sensitive_info(url.as_str()))))
+                Err(str_to_io_error(&format!("Request failed with status {} {}", response.status(), sanitize_sensitive_info(url.as_str()))))
             }
         }
-        Err(err) => Err(str_to_io_error(&format!("Request failed {} {err}", mask_sensitive_info(url.as_str()))))
+        Err(err) => Err(str_to_io_error(&format!("Request failed {} {err}", sanitize_sensitive_info(url.as_str()))))
     }
 }
 
 pub async fn download_text_content_as_file(client: Arc<reqwest::Client>, input: &ConfigInput, url_str: &str, working_dir: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         if url.scheme() == "file" {
-            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {}", mask_sensitive_info(url_str)))), |file_path| if file_path.exists() {
+            url.to_file_path().map_or_else(|()| Err(Error::new(ErrorKind::Unsupported, format!("Unknown file {}", sanitize_sensitive_info(url_str)))), |file_path| if file_path.exists() {
                 Ok(file_path)
             } else {
                 Err(Error::new(ErrorKind::NotFound, format!("Unknown file {file_path:?}")))
@@ -297,7 +298,7 @@ pub async fn download_text_content_as_file(client: Arc<reqwest::Client>, input: 
             }
         }
     } else {
-        Err(std::io::Error::new(ErrorKind::Unsupported, format!("Malformed URL {}", mask_sensitive_info(url_str))))
+        Err(std::io::Error::new(ErrorKind::Unsupported, format!("Malformed URL {}", sanitize_sensitive_info(url_str))))
     }
 }
 
@@ -305,7 +306,7 @@ pub async fn download_text_content_as_file(client: Arc<reqwest::Client>, input: 
 pub async fn download_text_content(client: Arc<reqwest::Client>, input: &ConfigInput, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, Error> {
     if let Ok(url) = url_str.parse::<url::Url>() {
         let result = if url.scheme() == "file" {
-            url.to_file_path().map_or_else(|()| Err(str_to_io_error(&format!("Unknown file {}", mask_sensitive_info(url_str)))), |file_path| get_local_file_content(&file_path))
+            url.to_file_path().map_or_else(|()| Err(str_to_io_error(&format!("Unknown file {}", sanitize_sensitive_info(url_str)))), |file_path| get_local_file_content(&file_path))
         } else {
             get_remote_content(client, input, &url).await
         };
@@ -319,12 +320,12 @@ pub async fn download_text_content(client: Arc<reqwest::Client>, input: &ConfigI
             Err(err) => Err(err)
         }
     } else {
-        Err(str_to_io_error(&format!("Malformed URL {}", mask_sensitive_info(url_str))))
+        Err(str_to_io_error(&format!("Malformed URL {}", sanitize_sensitive_info(url_str))))
     }
 }
 
 async fn download_json_content(client: Arc<reqwest::Client>, input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, Error> {
-    debug_if_enabled!("downloading json content from {}", mask_sensitive_info(url));
+    debug_if_enabled!("downloading json content from {}", sanitize_sensitive_info(url));
     match download_text_content(client, input, url, persist_filepath).await {
         Ok(content) => {
             match serde_json::from_str::<serde_json::Value>(&content) {
@@ -339,7 +340,7 @@ async fn download_json_content(client: Arc<reqwest::Client>, input: &ConfigInput
 pub async fn get_input_json_content(client: Arc<reqwest::Client>, input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
     match download_json_content(client, input, url, persist_filepath).await {
         Ok(content) => Ok(content),
-        Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", mask_sensitive_info(url), mask_sensitive_info(e.to_string().as_str()))
+        Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", sanitize_sensitive_info(url), sanitize_sensitive_info(e.to_string().as_str()))
     }
 }
 //
@@ -360,13 +361,22 @@ static PASSWORD_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(p
 static TOKEN_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(token=)[^&]*").unwrap());
 static STREAM_URL: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(.*://).*/(live|video|movie|series|m3u-stream)/\w+/\w+").unwrap());
 
-pub fn mask_sensitive_info(query: &str) -> String {
-    // Replace with "***"
-    let masked_query = USERNAME_REGEX.replace_all(query, "$1***");
-    let masked_query = PASSWORD_REGEX.replace_all(&masked_query, "$1***");
-    let masked_query = TOKEN_REGEX.replace_all(&masked_query, "$1***");
-    let masked_query =STREAM_URL.replace_all(&masked_query, "$1***/$2/***");
-    masked_query.to_string()
+static SANITIZE_SENSITIVE_INFO: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(true));
+
+pub fn set_sanitize_sensitive_info(value: bool) {
+    SANITIZE_SENSITIVE_INFO.store(value, Ordering::Relaxed);
+}
+pub fn sanitize_sensitive_info(query: &str) -> String {
+    if SANITIZE_SENSITIVE_INFO.load(Ordering::Relaxed) {
+        // Replace with "***"
+        let masked_query = USERNAME_REGEX.replace_all(query, "$1***");
+        let masked_query = PASSWORD_REGEX.replace_all(&masked_query, "$1***");
+        let masked_query = TOKEN_REGEX.replace_all(&masked_query, "$1***");
+        let masked_query = STREAM_URL.replace_all(&masked_query, "$1***/$2/***");
+        masked_query.to_string()
+    } else {
+        query.to_string()
+    }
 }
 
 pub fn extract_extension_from_url(url: &str) -> Option<&str> {

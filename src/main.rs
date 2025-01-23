@@ -18,6 +18,8 @@ use crate::utils::{config_reader, file_utils};
 use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
+use crate::utils::request_utils::set_sanitize_sensitive_info;
+
 mod api;
 mod auth;
 mod filter;
@@ -109,6 +111,8 @@ fn main() {
 
     let sources_file: String = args.source_file.unwrap_or_else(|| file_utils::get_default_sources_file_path(&config_path));
     let mut cfg = config_reader::read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
+
+    set_sanitize_sensitive_info(cfg.log_sanitize_sensitive_info);
 
     if args.genpwd {
         match generate_password() {

@@ -12,7 +12,7 @@ use crate::model::playlist::FieldGetAccessor;
 use crate::repository::m3u_playlist_iterator::{M3U_STREAM_PATH, M3U_RESOURCE_PATH};
 use crate::repository::m3u_repository::{m3u_get_file_paths, m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
 use crate::repository::storage::get_target_storage_path;
-use crate::utils::request_utils::mask_sensitive_info;
+use crate::utils::request_utils::sanitize_sensitive_info;
 
 async fn m3u_api(
     api_req: &UserApiRequest,
@@ -29,7 +29,7 @@ async fn m3u_api(
                         .streaming(content_stream)
                 }
                 Err(err) => {
-                    error!("{}", mask_sensitive_info(err.to_string().as_str()));
+                    error!("{}", sanitize_sensitive_info(err.to_string().as_str()));
                     HttpResponse::NoContent().finish()
                 }
             }
@@ -73,14 +73,14 @@ async fn m3u_api_stream(
     let m3u_item = match m3u_get_item_for_stream_id(&app_state.config, m3u_stream_id, &m3u_path, &idx_path).await {
         Ok(item) => item,
         Err(err) => {
-            error!("Failed to get m3u url: {}", mask_sensitive_info(err.to_string().as_str()));
+            error!("Failed to get m3u url: {}", sanitize_sensitive_info(err.to_string().as_str()));
             return HttpResponse::BadRequest().finish();
         }
     };
 
     if user.proxy == ProxyType::Redirect {
         let stream_url = m3u_item.url;
-        debug!("Redirecting stream request to {}", mask_sensitive_info(&stream_url));
+        debug!("Redirecting stream request to {}", sanitize_sensitive_info(&stream_url));
         return HttpResponse::Found().insert_header(("Location", stream_url.to_string())).finish();
     }
 
@@ -110,7 +110,7 @@ async fn m3u_api_resource(
     let m3u_item = match m3u_get_item_for_stream_id(&app_state.config, m3u_stream_id, &m3u_path, &idx_path).await {
         Ok(item) => item,
         Err(err) => {
-            error!("Failed to get m3u url: {}", mask_sensitive_info(err.to_string().as_str()));
+            error!("Failed to get m3u url: {}", sanitize_sensitive_info(err.to_string().as_str()));
             return HttpResponse::BadRequest().finish();
         }
     };
@@ -120,7 +120,7 @@ async fn m3u_api_resource(
         None => HttpResponse::NotFound().finish(),
         Some(url) => {
             if user.proxy == ProxyType::Redirect {
-                debug!("Redirecting stream request to {}", mask_sensitive_info(&url));
+                debug!("Redirecting stream request to {}", sanitize_sensitive_info(&url));
                 HttpResponse::Found().insert_header(("Location", url.as_str())).finish()
             } else {
                 resource_response(&app_state, url.as_str(), &req, None).await

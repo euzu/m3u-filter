@@ -6,7 +6,7 @@ use crate::api::model::stream_error::StreamError;
 use crate::debug_if_enabled;
 use crate::model::config::ConfigInput;
 use crate::model::playlist::PlaylistItemType;
-use crate::utils::request_utils::{get_request_headers, mask_sensitive_info};
+use crate::utils::request_utils::{get_request_headers, sanitize_sensitive_info};
 use actix_web::HttpRequest;
 use bytes::Bytes;
 use futures::stream::{self, BoxStream};
@@ -201,7 +201,7 @@ async fn provider_request(request_client: Arc<reqwest::Client>, initial_info: bo
                     // We need some header information from the provider, we extract the necessary headers and forward them to the client
                     debug_if_enabled!("Provider response  status: '{}' headers: {:?}", response.status(), response.headers_mut());
                     let response_headers: Vec<(String, String)> = get_response_headers(&mut response);
-                    // debug!("First  headers {headers:?} {} {}", mask_sensitive_info(url.as_str()));
+                    // debug!("First  headers {headers:?} {} {}", sanitize_sensitive_info(url.as_str()));
                     Some((response_headers, response.status()))
                 } else {
                     None
@@ -223,7 +223,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
     let headers = stream_options.get_headers();
 
     while stream_options.should_continue() {
-        debug_if_enabled!("Reconnecting stream {}", mask_sensitive_info(url.as_str()));
+        debug_if_enabled!("Reconnecting stream {}", sanitize_sensitive_info(url.as_str()));
         let (client, _) = prepare_client(&client, url, headers, range_start);
         match client.send().await {
             Ok(response) => {
@@ -251,7 +251,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
         }
         actix_web::rt::time::sleep(Duration::from_millis(100)).await;
     }
-    debug_if_enabled!("Stopped seconnecting stream {}", mask_sensitive_info(url.as_str()));
+    debug_if_enabled!("Stopped seconnecting stream {}", sanitize_sensitive_info(url.as_str()));
     None
 }
 
@@ -265,12 +265,12 @@ async fn get_initial_stream(client: Arc<reqwest::Client>, stream_options: &Provi
             Ok(Some(value)) => return Some(value),
             Ok(None) => {
                 if connect_err > ERR_MAX_RETRY_COUNT {
-                    warn!("The stream could be unavailable. {}", mask_sensitive_info(stream_options.get_url().as_str()));
+                    warn!("The stream could be unavailable. {}", sanitize_sensitive_info(stream_options.get_url().as_str()));
                 }
             }
             Err(status) => {
                 if connect_err > ERR_MAX_RETRY_COUNT {
-                    warn!("The stream could be unavailable. ({status}) {}", mask_sensitive_info(stream_options.get_url().as_str()));
+                    warn!("The stream could be unavailable. ({status}) {}", sanitize_sensitive_info(stream_options.get_url().as_str()));
                 }
             }
         };
@@ -278,7 +278,7 @@ async fn get_initial_stream(client: Arc<reqwest::Client>, stream_options: &Provi
             break;
         }
         if start.elapsed().as_secs() > RETRY_SECONDS {
-            warn!("The stream could be unavailable. Giving up after {RETRY_SECONDS} seconds. {}", mask_sensitive_info(stream_options.get_url().as_str()));
+            warn!("The stream could be unavailable. Giving up after {RETRY_SECONDS} seconds. {}", sanitize_sensitive_info(stream_options.get_url().as_str()));
             break;
         }
         connect_err += 1;

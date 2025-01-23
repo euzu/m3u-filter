@@ -193,6 +193,7 @@ export interface ServerMainConfig {
     schedules?: Schedule[];
     messaging?: MessagingConfig;
     video?: VideoConfig;
+    log_sanitize_sensitive_info: boolean,
     update_on_boot: boolean,
     web_ui_enabled: boolean,
     web_auth?: WebAuthConfig,

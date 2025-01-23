@@ -8,7 +8,7 @@ use log::debug;
 use futures::{Stream};
 use crate::api::model::stream_error::StreamError;
 use crate::utils::atomic_once_flag::AtomicOnceFlag;
-use crate::utils::request_utils::mask_sensitive_info;
+use crate::utils::request_utils::sanitize_sensitive_info;
 
 /// This stream counts the send bytes for reconnecting to the actual position and
 /// sets the `close_signal`  if the client drops the connection.
@@ -57,7 +57,7 @@ impl Stream for ClientStream {
 
 impl Drop for ClientStream {
     fn drop(&mut self) {
-        debug!("Client disconnected {}", mask_sensitive_info(&self.url));
+        debug!("Client disconnected {}", sanitize_sensitive_info(&self.url));
         self.close_signal.notify();
     }
 }

@@ -31,7 +31,7 @@ use crate::processing::xtream_processor_vod::playlist_resolve_vod;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
-use crate::utils::request_utils::mask_sensitive_info;
+use crate::utils::request_utils::sanitize_sensitive_info;
 use crate::{debug_if_enabled, get_errors_notify_message, model::config, notify_err, Config};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
@@ -318,7 +318,7 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
             let channel_count = playlistgroups.iter()
                 .map(|group| group.channels.len())
                 .sum();
-            let input_name = input.name.as_ref().map_or_else(|| mask_sensitive_info(input.url.as_str()), std::string::ToString::to_string);
+            let input_name = input.name.as_ref().map_or_else(|| sanitize_sensitive_info(input.url.as_str()), std::string::ToString::to_string);
             if playlistgroups.is_empty() {
                 info!("Source is empty {input_name}");
                 errors.push(notify_err!(format!("Source is empty {input_name}")));

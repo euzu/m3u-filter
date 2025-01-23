@@ -107,6 +107,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 threads: mainConfig.threads,
                 messaging: cfgMessaging,
                 video: cfgVideo,
+                log_sanitize_sensitive_info: mainConfig.log_sanitize_sensitive_info,
                 update_on_boot: mainConfig.update_on_boot,
                 web_ui_enabled: mainConfig.web_ui_enabled,
                 web_auth: mainConfig.web_auth,

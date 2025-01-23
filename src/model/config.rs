@@ -780,6 +780,8 @@ pub struct ConfigDto {
     pub schedules: Option<Vec<ScheduleConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub messaging: Option<MessagingConfig>,
+    #[serde(default = "default_as_true")]
+    pub log_sanitize_sensitive_info: bool,
     #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]
@@ -995,6 +997,8 @@ pub struct Config {
     pub video: Option<VideoConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<Vec<ScheduleConfig>>,
+    #[serde(default = "default_as_true")]
+    pub log_sanitize_sensitive_info: bool,
     #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]

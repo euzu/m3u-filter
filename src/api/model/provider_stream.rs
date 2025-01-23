@@ -2,7 +2,7 @@ use crate::api::api_utils::get_headers_from_request;
 use crate::api::model::provider_stream_factory::{create_provider_stream, BufferStreamOptions};
 use crate::debug_if_enabled;
 use crate::model::config::ConfigInput;
-use crate::utils::request_utils::{get_request_headers, mask_sensitive_info};
+use crate::utils::request_utils::{get_request_headers, sanitize_sensitive_info};
 use actix_web::{HttpRequest};
 use bytes::Bytes;
 use futures::stream::BoxStream;
@@ -39,7 +39,7 @@ pub async fn get_provider_pipe_stream(http_client: &Arc<reqwest::Client>,
             }
         }
         Err(err) => {
-            let masked_url = mask_sensitive_info(stream_url.as_str());
+            let masked_url = sanitize_sensitive_info(stream_url.as_str());
             error!("Failed to open stream {masked_url} {err}");
             (None, None)
         }

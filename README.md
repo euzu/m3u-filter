@@ -76,6 +76,7 @@ Top level entries in the config files are:
 * `web_ui_enabled` _optional_
 * `web_auth` _optional_
 * `reverse_proxy` _optional_
+* `log_sanitize_sensitive_info` _optional_, default true 
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.

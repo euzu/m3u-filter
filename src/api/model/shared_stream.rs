@@ -1,7 +1,7 @@
 use crate::api::model::app_state::AppState;
 use crate::api::model::provider_stream_factory::STREAM_QUEUE_SIZE;
 use crate::debug_if_enabled;
-use crate::utils::request_utils::mask_sensitive_info;
+use crate::utils::request_utils::sanitize_sensitive_info;
 use bytes::Bytes;
 use std::sync::Arc;
 use std::time::Duration;
@@ -63,7 +63,7 @@ impl SharedStream {
                         }
                         actix_web::rt::time::sleep(Duration::from_millis(20)).await;
                     } else {
-                        debug_if_enabled!("No active subscribers. Closing stream {}", mask_sensitive_info(&streaming_url));
+                        debug_if_enabled!("No active subscribers. Closing stream {}", sanitize_sensitive_info(&streaming_url));
                         // Cleanup for removing unused shared streams
                         let mut shared_streams = shared_streams_map.lock().await;
                         shared_streams.remove(&streaming_url);

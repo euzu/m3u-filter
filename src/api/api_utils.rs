@@ -8,14 +8,12 @@ use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::playlist::PlaylistItemType;
 use crate::utils::request_utils;
-use crate::utils::request_utils::mask_sensitive_info;
+use crate::utils::request_utils::sanitize_sensitive_info;
 use actix_files::NamedFile;
 use actix_web::body::{BodyStream};
-use actix_web::http::header::DATE;
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
 use bytes::Bytes;
-use chrono::Utc;
 use log::{error, log_enabled, trace};
 use std::collections::HashMap;
 use std::path::{Path};
@@ -83,7 +81,7 @@ async fn create_broadcast_stream(
 pub async fn stream_response(app_state: &AppState, stream_url: &str,
                              req: &HttpRequest, input: Option<&ConfigInput>,
                              item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
-    if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", mask_sensitive_info(stream_url)); }
+    if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", sanitize_sensitive_info(stream_url)); }
 
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
@@ -132,18 +130,15 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
             };
         }
     }
-    error!("Cant open stream {}", mask_sensitive_info(stream_url));
+    error!("Cant open stream {}", sanitize_sensitive_info(stream_url));
     HttpResponse::BadRequest().finish()
 }
 
 async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
     if let Some(stream) = create_broadcast_stream(app_state, stream_url).await {
-        debug_if_enabled!("Using shared channel {}", mask_sensitive_info(stream_url));
+        debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
         if let Some((headers,_)) = app_state.shared_streams.lock().await.get(stream_url) {
             let mut response_builder = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
-            let current_date = Utc::now().format("%a, %d %b %Y %H:%M:%S GMT").to_string();
-            response_builder.insert_header((DATE, current_date.as_bytes()));
-            // response_builder.insert_header((ACCEPT_RANGES, "bytes".as_bytes()));
             return Some(response_builder.body(BodyStream::new(stream)));
         }
     }
@@ -192,12 +187,12 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
         let mut guard = cache.lock().await;
         if let Some(resource_path) = guard.get_content(resource_url).await {
             if let Ok(named_file) = NamedFile::open_async(resource_path).await {
-                debug_if_enabled!("Cached resource {}", mask_sensitive_info(resource_url));
+                debug_if_enabled!("Cached resource {}", sanitize_sensitive_info(resource_url));
                 return named_file.into_response(req);
             }
         }
     }
-    debug_if_enabled!("Try to fetch resource {}", mask_sensitive_info(resource_url));
+    debug_if_enabled!("Try to fetch resource {}", sanitize_sensitive_info(resource_url));
     if let Ok(url) = Url::parse(resource_url) {
         let client = request_utils::get_client_request(&app_state.http_client, input.map(|i| &i.headers), &url, Some(&req_headers));
         match client.send().await {
@@ -224,14 +219,14 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                     }
                    return response_builder.body(BodyStream::new(byte_stream));
                 }
-                debug_if_enabled!("Failed to open resource got status {} for {}", status, mask_sensitive_info(resource_url));
+                debug_if_enabled!("Failed to open resource got status {} for {}", status, sanitize_sensitive_info(resource_url));
             }
             Err(err) => {
-                error!("Received failure from server {}:  {}", mask_sensitive_info(resource_url), err);
+                error!("Received failure from server {}:  {}", sanitize_sensitive_info(resource_url), err);
             }
         }
     } else {
-        error!("Url is malformed {}", mask_sensitive_info(resource_url));
+        error!("Url is malformed {}", sanitize_sensitive_info(resource_url));
     }
     HttpResponse::BadRequest().finish()
 }
