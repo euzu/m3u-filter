@@ -30,7 +30,6 @@ pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, S
     let default_headers = vec![
         (actix_web::http::header::CONTENT_TYPE, HeaderValue::from_str("application/octet-stream").unwrap()),
         (actix_web::http::header::CONNECTION, HeaderValue::from_str("keep-alive").unwrap()),
-        (actix_web::http::header::VARY, HeaderValue::from_str("accept-encoding").unwrap())
     ];
 
     for header in default_headers {
@@ -41,21 +40,10 @@ pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, S
 
     headers.push((actix_web::http::header::DATE, HeaderValue::from_str(&chrono::Utc::now().to_rfc2822()).unwrap()));
 
-
-    // RFC 7230, Section 4.1.2:
-    // A sender MUST NOT generate a trailer that contains a field necessary for message framing (e.g., Transfer-Encoding and Content-Length).
-    if added_headers.contains(actix_web::http::header::TRANSFER_ENCODING.as_str())
-        && (added_headers.contains(actix_web::http::header::CONTENT_LENGTH.as_str())
-        || added_headers.contains(actix_web::http::header::CONTENT_RANGE.as_str()))
-    {
-        headers.retain(|(key, _)| key.as_str() != actix_web::http::header::TRANSFER_ENCODING.as_str());
-    }
-
     let mut response_builder = actix_web::HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap());
     debug_if_enabled!("Responding stream {} with status {status}, headers {headers:?}", sanitize_sensitive_info(stream_url));
     for header in headers {
         response_builder.insert_header(header);
     }
-
     response_builder
 }

@@ -10,7 +10,7 @@ use crate::model::playlist::PlaylistItemType;
 use crate::utils::request_utils;
 use crate::utils::request_utils::sanitize_sensitive_info;
 use actix_files::NamedFile;
-use actix_web::body::{BodyStream};
+use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
 use bytes::Bytes;
@@ -113,21 +113,29 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
             provider_stream::get_provider_reconnect_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {
+            let content_length = provider_response
+                .as_ref()
+                .and_then(|(headers, _)| headers.iter().find(|(h, _)| h.eq(actix_web::http::header::CONTENT_LENGTH.as_str())))
+                .and_then(|(_, val)| val.parse::<u64>().ok())
+                .unwrap_or(0);
+
+
             let use_buffer = !buffer_enabled || direct_pipe_provider_stream;
-            return if share_stream {
+            let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
                 SharedStream::register(app_state, stream_url, stream, use_buffer, shared_headers).await;
                 if let Some(broadcast_stream) = create_broadcast_stream(app_state, stream_url).await {
-                    let body_stream = BodyStream::new(broadcast_stream);
                     let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
-                    response_builder.body(body_stream)
+                    if content_length > 0 { response_builder.body(SizedStream::new(content_length, broadcast_stream)) } else { response_builder.body(BodyStream::new(broadcast_stream)) }
                 } else {
                     HttpResponse::BadRequest().finish()
                 }
             } else {
                 let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
-                response_builder.streaming(stream)
+                if content_length > 0 { response_builder.body(SizedStream::new(content_length, stream)) } else { response_builder.streaming(stream) }
             };
+
+            return stream_resp;
         }
     }
     error!("Cant open stream {}", sanitize_sensitive_info(stream_url));

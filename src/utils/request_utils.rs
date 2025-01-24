@@ -395,9 +395,10 @@ pub fn extract_extension_from_url(url: &str) -> Option<&str> {
     None
 }
 
-
 #[cfg(test)]
 mod tests {
+    // use crate::utils::request_utils::{capitalize_header_name, STREAM_URL};
+
     use crate::utils::request_utils::STREAM_URL;
 
     #[test]
@@ -407,4 +408,5 @@ mod tests {
         let masked_query = STREAM_URL.replace_all(&masked_query, "$1***/$2/***");
         println!("{masked_query}")
     }
+
 }
