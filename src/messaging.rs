@@ -64,7 +64,7 @@ fn send_pushover_message(msg: &str, messaging: &MessagingConfig) {
             let client = reqwest::Client::new();
             match client
                 .post(url)
-                .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                .header(header::CONTENT_TYPE, mime::APPLICATION_WWW_FORM_URLENCODED.to_string())
                 .form(&params)
                 .send()
                 .await
