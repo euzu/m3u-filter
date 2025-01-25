@@ -120,10 +120,10 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
                 .unwrap_or(0);
 
 
-            let use_buffer = !buffer_enabled || direct_pipe_provider_stream;
+            let shared_stream_use_own_buffer = !buffer_enabled || direct_pipe_provider_stream;
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
-                SharedStream::register(app_state, stream_url, stream, use_buffer, shared_headers).await;
+                SharedStream::register(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers).await;
                 if let Some(broadcast_stream) = create_broadcast_stream(app_state, stream_url).await {
                     let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
                     if content_length > 0 { response_builder.body(SizedStream::new(content_length, broadcast_stream)) } else { response_builder.body(BodyStream::new(broadcast_stream)) }

@@ -693,6 +693,14 @@ pub struct RestMessagingConfig {
     pub url: String,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PushoverMessagingConfig {
+    pub(crate) url: Option<String>,
+    pub(crate) token: String,
+    pub(crate) user: String,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MessagingConfig {
@@ -702,6 +710,9 @@ pub struct MessagingConfig {
     pub telegram: Option<TelegramMessagingConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rest: Option<RestMessagingConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pushover: Option<PushoverMessagingConfig>,
+
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
