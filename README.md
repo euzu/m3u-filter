@@ -102,7 +102,7 @@ Messaging is Opt-In, you need to set the `notify_on` message types which are
 - `stats`
 - `error`
 
-`telegram` and `rest` configurations are optional.
+`telegram`, `rest` and `pushover.net` configurations are optional.
 
 ```yaml
 messaging:
@@ -116,6 +116,11 @@ messaging:
       - '<telegram chat id>'
   rest:
     url: '<api url as POST endpoint for json data>'
+
+  pushover:
+    token: <api_token>
+    user: <api_username>
+    url: `optional`, default is `https://api.pushover.net/1/messages.json`
 ```
 
 For more information: [Telegram bots](https://core.telegram.org/bots/tutorial)

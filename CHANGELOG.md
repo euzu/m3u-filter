@@ -4,6 +4,14 @@
 You can add properties like `#KODIPROP:seekable=true|false`, `#KODIPROP:inputstream=inputstream.ffmpeg` or `"#KODIPROP:http-reconnect=true`.
 - Fixed xtream affix-processed output.
 - `log_sanitize_sensitive_info`  added to `config.yml`. Default is `true`.
+- Added `pushover.net` config to messaging.
+```yaml
+messaging:
+   pushover:
+    token: _required_
+    user: _required_
+    url: `optional`, default is https://api.pushover.net/1/messages.json
+```
 
 # 2.1.1 (2025-01-19)
 - added new path `/status` which is an alias to `healthcheck`

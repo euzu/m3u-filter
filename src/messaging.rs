@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::model::config::MessagingConfig;
 use log::{debug, error};
 use reqwest::header;
@@ -54,22 +53,28 @@ fn send_telegram_message(msg: &str, messaging: &MessagingConfig) {
 fn send_pushover_message(msg: &str, messaging: &MessagingConfig) {
     if let Some(pushover) = &messaging.pushover {
         let url = pushover.url.as_deref().unwrap_or("https://api.pushover.net/1/messages.json").to_string();
-        let params = HashMap::from([
-            ("token", pushover.token.to_string()),
-            ("user", pushover.user.to_string()),
-            ("message", msg.to_string()),
-        ]);
+        let encoded_message: String = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("token", pushover.token.as_str())
+            .append_pair("user", pushover.user.as_str())
+            .append_pair("message", msg)
+            .finish();
 
         actix_rt::spawn(async move {
             let client = reqwest::Client::new();
             match client
                 .post(url)
                 .header(header::CONTENT_TYPE, mime::APPLICATION_WWW_FORM_URLENCODED.to_string())
-                .form(&params)
+                .body(encoded_message)
                 .send()
                 .await
             {
-                Ok(_) => debug!("Text message sent successfully to PUSHOVER"),
+                Ok(response) => {
+                    if response.status().is_success() {
+                        debug!("Text message sent successfully to PUSHOVER, status code {}", response.status());
+                    } else {
+                        error!("Failed to send text message to PUSHOVER, status code {}", response.status());
+                    }
+                },
                 Err(e) => error!("Text message wasn't sent to PUSHOVER api because of: {e}"),
             }
         });
