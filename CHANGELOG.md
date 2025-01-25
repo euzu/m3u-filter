@@ -1,7 +1,7 @@
 # Changelog
 # 2.1.2 (2025-01-xx)
 - `Strm` output has an additional option `strm_props`. These props are written to the strm file.
-If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is added. If `strm_props` is not given `#KODIPROP:inputstream=inputstream.ffmpeg`, `"#KODIPROP:http-reconnect=true` are set too for `kody_style`.
+You can add properties like `#KODIPROP:seekable=true|false`, `#KODIPROP:inputstream=inputstream.ffmpeg` or `"#KODIPROP:http-reconnect=true`.
 - Fixed xtream affix-processed output.
 - `log_sanitize_sensitive_info`  added to `config.yml`. Default is `true`.
 

@@ -1,7 +1,7 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
-use crate::model::playlist::{FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
+use crate::model::playlist::{FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::model::xtream::XtreamSeriesEpisode;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::get_input_storage_path;
@@ -369,18 +369,10 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                 };
 
                 let url = get_strm_url(credentials_and_server_info.as_ref(), &str_item_info);
-                let seekable = pli.header.borrow().xtream_cluster != XtreamCluster::Live;
                 let file_path = output_path.join(format!("{strm_file_name}.strm"));
                 match File::create(&file_path) {
                     Ok(mut strm_file) => {
                         let mut content =  strm_props.map_or_else(Vec::new, std::clone::Clone::clone);
-                        if kodi_style {
-                            content.push(format!("#KODIPROP:seekable={seekable}"));
-                            if strm_props.is_none() {
-                                content.push("#KODIPROP:inputstream=inputstream.ffmpeg".to_string());
-                                content.push("#KODIPROP:http-reconnect=true".to_string());
-                            }
-                        }
                         content.push(url);
                         match file_utils::check_write(&strm_file.write_all(content.join("\n").as_bytes())) {
                             Ok(()) => {}

@@ -155,7 +155,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, u
 }
 
 pub fn extract_id_from_url(url: &str) -> Option<String> {
-    if let Some(filename) = url.split('/').last() {
+    if let Some(filename) = url.split('/').next_back() {
         return filename.rfind('.').map_or_else(|| Some(filename.to_string()), |index| Some(filename[..index].to_string()));
     }
     None

@@ -6,7 +6,7 @@ use chrono::Local;
 use log::{debug, error, info, warn};
 use regex::Regex;
 use serde::Serialize;
-use crate::{create_m3u_filter_error, create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err};
+use crate::{create_m3u_filter_error, create_m3u_filter_error_result, exit, handle_m3u_filter_error_result, info_err};
 use crate::m3u_filter_error::{to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::{Config, ConfigDto};
@@ -97,8 +97,7 @@ pub fn read_api_proxy(api_proxy_file: &str, resolve_var: bool) -> Option<ApiProx
                 Ok(mut result) => {
                     match result.prepare(resolve_var) {
                         Err(err) => {
-                            error!("cant read api-proxy-config file: {}", err);
-                            None
+                            exit!("cant read api-proxy-config file: {}", err);
                         }
                         _ => {
                             Some(result)
