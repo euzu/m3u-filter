@@ -117,5 +117,7 @@ git commit -m "release ${VERSION}"
 git tag -a "$VERSION" -m "$VERSION"
 git push
 git push --tags
+git push github
+git push github --tags
 
 echo "Done!"

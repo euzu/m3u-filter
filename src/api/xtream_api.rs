@@ -197,10 +197,7 @@ async fn xtream_player_api_stream(
     }
 
     if user.proxy == ProxyType::Redirect {
-        if pli.item_type == PlaylistItemType::Series {
-            debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
-            return HttpResponse::Found().insert_header(("Location", pli.url.as_str())).finish();
-        } else {
+        if pli.xtream_cluster == XtreamCluster::Series {
             let ext = stream_ext.unwrap_or_else(String::new);
             let url = input.url.as_str();
             let username = input.username.as_ref().map_or("", |v| v);
@@ -208,6 +205,8 @@ async fn xtream_player_api_stream(
             let stream_url = format!("{url}/series/{username}/{password}/{}{ext}", mapping.provider_id);
             return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
         }
+        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
+        HttpResponse::Found().insert_header(("Location", pli.url.as_str())).finish();
     }
 
     let extension = stream_ext.unwrap_or_else(

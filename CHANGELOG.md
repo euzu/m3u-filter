@@ -1,4 +1,7 @@
 # Changelog
+# 2.1.3 (2025-01-26)
+- Hotfix 2.1.2, forgot to update the stream api code.  
+
 # 2.1.2 (2025-01-26)
 - `Strm` output has an additional option `strm_props`. These props are written to the strm file.
 You can add properties like `#KODIPROP:seekable=true|false`, `#KODIPROP:inputstream=inputstream.ffmpeg` or `"#KODIPROP:http-reconnect=true`.
