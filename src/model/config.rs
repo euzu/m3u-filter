@@ -979,6 +979,8 @@ pub struct ReverseProxyConfig {
     pub stream: Option<StreamConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache: Option<CacheConfig>,
+    #[serde(default)]
+    pub resource_rewrite_disabled: bool,
 }
 
 impl ReverseProxyConfig {
@@ -987,6 +989,10 @@ impl ReverseProxyConfig {
             stream.prepare();
         }
         if let Some(cache) = self.cache.as_mut() {
+            if cache.enabled && self.resource_rewrite_disabled {
+                warn!("The cache is disabled because resource rewrite is disabled");
+                cache.enabled = false;
+            }
             cache.prepare(working_dir, resolve_var);
         }
     }
@@ -1037,6 +1043,10 @@ pub struct Config {
 impl Config {
     pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) {
         self.t_api_proxy = Arc::new(RwLock::new(api_proxy));
+    }
+
+    pub fn is_reverse_proxy_resource_rewrite_enabled(&self) -> bool {
+        self.reverse_proxy.as_ref().map_or(true, |r| !r.resource_rewrite_disabled)
     }
 
     fn intern_get_target_for_user(&self, user_target: Option<(ProxyUserCredentials, String)>) -> Option<(ProxyUserCredentials, &ConfigTarget)> {

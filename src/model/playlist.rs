@@ -293,9 +293,9 @@ pub struct M3uPlaylistItem {
 }
 
 impl M3uPlaylistItem {
-    pub fn to_m3u(&self, target_options: Option<&ConfigTargetOptions>, rewrite_urls: Option<&(String, String)>) -> String {
+    pub fn to_m3u(&self, target_options: Option<&ConfigTargetOptions>, rewrite_urls: Option<&(String, Option<String>)>) -> String {
         let (stream_url, resource_url) = rewrite_urls
-            .map_or_else(|| (self.url.as_str(), None), |(su, ru)| (su.as_str(), Some(ru.as_str())));
+            .map_or_else(|| (self.url.as_str(), None), |(su, ru)| (su.as_str(), ru.as_ref().map(String::as_str)));
 
         let options = target_options.as_ref();
         let ignore_logo = options.is_some_and(|o| o.ignore_logo);

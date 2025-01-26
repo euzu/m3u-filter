@@ -1,5 +1,5 @@
-use crate::m3u_filter_error::str_to_io_error;
 use crate::file_utils::file_reader;
+use crate::m3u_filter_error::str_to_io_error;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
@@ -383,7 +383,7 @@ pub async fn xtream_get_item_for_stream_id(
     let storage_path = xtream_get_storage_path(config, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {} xtream output", &target.name)))?;
     {
         let target_id_mapping_file = get_target_id_mapping_file(&target_path);
-        let _file_lock = config.file_locks.read_lock(&target_id_mapping_file).await.map_err(|err|str_to_io_error(&format!("Could not get lock for id mapping for target {} err:{err}", target.name)))?;
+        let _file_lock = config.file_locks.read_lock(&target_id_mapping_file).await.map_err(|err| str_to_io_error(&format!("Could not get lock for id mapping for target {} err:{err}", target.name)))?;
 
         let mut target_id_mapping = BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| str_to_io_error(&format!("Could not load id mapping for target {} err:{err}", target.name)))?;
         let mapping = target_id_mapping.query(&virtual_id).ok_or_else(|| str_to_io_error(&format!("Could not find mapping for target {} and id {}", target.name, virtual_id)))?;
@@ -577,17 +577,19 @@ fn rewrite_xtream_vod_info<P>(
     P: PlaylistEntry,
 {
     // we need to update the info data.
-    if let Some(Value::Object(info_data)) = doc.get_mut(TAG_INFO_DATA) {
-        match user.proxy {
-            ProxyType::Reverse => {
-                let server_info = config.get_user_server_info(user);
-                let url = server_info.get_base_url();
-                let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
-                rewrite_doc_urls(resource_url.as_ref(), info_data, INFO_REWRITE_FIELDS, INFO_RESOURCE_PREFIX);
-                // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
-            }
-            ProxyType::Redirect => {}
-        };
+    if config.is_reverse_proxy_resource_rewrite_enabled() {
+        if let Some(Value::Object(info_data)) = doc.get_mut(TAG_INFO_DATA) {
+            match user.proxy {
+                ProxyType::Reverse => {
+                    let server_info = config.get_user_server_info(user);
+                    let url = server_info.get_base_url();
+                    let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
+                    rewrite_doc_urls(resource_url.as_ref(), info_data, INFO_REWRITE_FIELDS, INFO_RESOURCE_PREFIX);
+                    // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
+                }
+                ProxyType::Redirect => {}
+            };
+        }
     }
 
     // we need to update the movie data with virtual ids.
@@ -597,7 +599,7 @@ fn rewrite_xtream_vod_info<P>(
         movie_data.insert(TAG_STREAM_ID.to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
         movie_data.insert(TAG_CATEGORY_ID.to_string(), Value::Number(serde_json::value::Number::from(category_id)));
         movie_data.insert(TAG_CATEGORY_IDS.to_string(), Value::Array(vec![Value::Number(serde_json::value::Number::from(category_id))]));
-        let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+        let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
         if options.skip_video_direct_source {
             movie_data.insert(TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
         } else {
@@ -650,15 +652,18 @@ async fn rewrite_xtream_series_info<P>(
 {
     let target_path = get_target_storage_path(config, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {}", target.name)))?;
 
-    let resource_url = match user.proxy {
-        ProxyType::Reverse => {
-            let server_info = config.get_user_server_info(user);
-            let url = server_info.get_base_url();
-            Some(format!("{url}/resource/series/{}/{}/{}", user.username, user.password, pli.get_virtual_id()))
+    let resource_url = if config.is_reverse_proxy_resource_rewrite_enabled() {
+        match user.proxy {
+            ProxyType::Reverse => {
+                let server_info = config.get_user_server_info(user);
+                let url = server_info.get_base_url();
+                Some(format!("{url}/resource/series/{}/{}/{}", user.username, user.password, pli.get_virtual_id()))
+            }
+            ProxyType::Redirect => None,
         }
-        ProxyType::Redirect => None,
+    } else {
+        None
     };
-
     if resource_url.is_some() {
         // we need to update the info data.
         if let Some(Value::Object(info_data)) = doc.get_mut(TAG_INFO_DATA) {
@@ -683,7 +688,7 @@ async fn rewrite_xtream_series_info<P>(
         let target_id_mapping_file = get_target_id_mapping_file(&target_path);
         let _file_lock = config.file_locks.write_lock(&target_id_mapping_file).await.map_err(|err| str_to_io_error(&format!("Could not load id mapping for target {} err:{err}", target.name)))?;
         let mut target_id_mapping = TargetIdMapping::new(&target_id_mapping_file);
-        let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+        let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
 
         let provider_url = pli.get_provider_url();
         for episode_list in episodes.values_mut().filter_map(Value::as_array_mut) {

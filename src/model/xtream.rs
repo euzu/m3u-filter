@@ -3,7 +3,7 @@ use std::iter::FromIterator;
 use std::rc::Rc;
 
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::ConfigTargetOptions;
+use crate::model::config::{Config, ConfigTargetOptions};
 use crate::model::playlist::{PlaylistEntry, PlaylistItem, XtreamCluster, XtreamPlaylistItem};
 use crate::utils::json_utils::{opt_string_or_number_u32, string_default_on_null, string_or_number_f64, string_or_number_u32};
 use serde::de::DeserializeOwned;
@@ -484,14 +484,16 @@ impl XtreamSeriesInfoEpisode {
     }
 }
 
+#[allow(clippy::struct_excessive_bools)]
 pub struct XtreamMappingOptions {
     pub skip_live_direct_source: bool,
     pub skip_video_direct_source: bool,
     pub skip_series_direct_source: bool,
+    pub rewrite_resource_url: bool,
 }
 
 impl XtreamMappingOptions {
-    pub fn from_target_options(options: Option<&ConfigTargetOptions>) -> Self {
+    pub fn from_target_options(options: Option<&ConfigTargetOptions>, cfg: &Config) -> Self {
         let (skip_live_direct_source, skip_video_direct_source, skip_series_direct_source) = options
             .map_or((false, false, false), |o| (
                 o.xtream_skip_live_direct_source,
@@ -501,6 +503,7 @@ impl XtreamMappingOptions {
             skip_live_direct_source,
             skip_video_direct_source,
             skip_series_direct_source,
+            rewrite_resource_url: cfg.is_reverse_proxy_resource_rewrite_enabled(),
         }
     }
 }
@@ -557,10 +560,14 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
     let stream_id_value = Value::Number(serde_json::Number::from(pli.virtual_id));
     let (resource_url, logo, logo_small) = match user.proxy {
         ProxyType::Reverse => {
-            let resource_url = format!("{url}/resource/{}/{}/{}/{}", pli.xtream_cluster.as_stream_type(), user.username, user.password, pli.get_virtual_id());
-            let logo_url = if pli.logo.is_empty() { String::new() } else { format!("{resource_url}/logo") };
-            let logo_small_url = if pli.logo_small.is_empty() { String::new() } else { format!("{resource_url}/logo_small") };
-            (Some(resource_url), logo_url, logo_small_url)
+            if options.rewrite_resource_url {
+                let resource_url = format!("{url}/resource/{}/{}/{}/{}", pli.xtream_cluster.as_stream_type(), user.username, user.password, pli.get_virtual_id());
+                let logo_url = if pli.logo.is_empty() { String::new() } else { format!("{resource_url}/logo") };
+                let logo_small_url = if pli.logo_small.is_empty() { String::new() } else { format!("{resource_url}/logo_small") };
+                (Some(resource_url), logo_url, logo_small_url)
+            } else {
+                (None, pli.logo.as_ref().clone(), pli.logo_small.as_ref().clone())
+            }
         }
         ProxyType::Redirect => {
             (None, pli.logo.as_ref().clone(), pli.logo_small.as_ref().clone())

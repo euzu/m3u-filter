@@ -1,7 +1,7 @@
 import React, {useCallback, useMemo, useState} from "react";
 import './main-config-view.scss';
 import ServerConfig, {
-    MessagingConfig,
+    MessagingConfig, PushoverConfig, RestConfig,
     ServerApiConfig,
     ServerMainConfig,
     TelegramConfig,
@@ -44,6 +44,15 @@ const CONFIG_TELEGRAM_FIELDS = [
     {name: 'chat_ids', label: 'Chat Ids', fieldType: FormFieldType.TAGS},
 ];
 
+const CONFIG_REST_FIELDS = [
+    {name: 'url', label: 'Url', fieldType: FormFieldType.TEXT},
+];
+const CONFIG_PUSHOVER_FIELDS = [
+    {name: 'url', label: 'Url', fieldType: FormFieldType.TEXT},
+    {name: 'user', label: 'User', fieldType: FormFieldType.TEXT},
+    {name: 'token', label: 'Token', fieldType: FormFieldType.TEXT},
+];
+
 const CONFIG_VIDEO_FIELDS = [
     {name: 'web_search', label: 'Web Search Url', fieldType: FormFieldType.TEXT},
     {name: 'extensions', label: 'Extensions', fieldType: FormFieldType.TEXT},
@@ -76,6 +85,8 @@ export default function MainConfigView(props: MainConfigViewProps) {
     const mainConfig = useMemo<ServerMainConfig>(() => config, [config]);
     const messagingConfig = useMemo<MessagingConfig>(() => config?.messaging || {} as any, [config]);
     const telegramConfig = useMemo<TelegramConfig>(() => config?.messaging?.telegram || {} as any, [config]);
+    const restConfig = useMemo<RestConfig>(() => config?.messaging?.rest || {} as any, [config]);
+    const pushoverConfig = useMemo<PushoverConfig>(() => config?.messaging?.pushover || {} as any, [config]);
     const videoConfig = useMemo<VideoConfig>(() => config?.video || {} as any, [config]);
     const videoDownloadConfig = useMemo<VideoDownloadConfig>(() => config?.video?.download || {} as any, [config]);
 
@@ -89,9 +100,13 @@ export default function MainConfigView(props: MainConfigViewProps) {
     const handleSave = useCallback(() => {
         if (mainConfig && apiConfig) {
             let telegramConfigAvailable = telegramConfig?.bot_token?.trim().length && telegramConfig?.chat_ids?.length;
+            let restConfigAvailable = restConfig?.url?.trim().length;
+            let pushoverConfigAvailable = pushoverConfig?.user?.trim().length && pushoverConfig?.token?.length;
             const cfgMessaging: MessagingConfig = {
                 notify_on: messagingConfig.notify_on,
                 telegram: telegramConfigAvailable ? telegramConfig : null,
+                rest: restConfigAvailable ? restConfig : null,
+                pushover: pushoverConfigAvailable ? pushoverConfig : null,
             };
 
             const cfgVideo = {
@@ -119,7 +134,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 error: (err: any) => enqueueSnackbar("Failed to save main config!", {variant: 'error'})
             });
         }
-    }, [mainConfig, apiConfig, videoConfig, messagingConfig, telegramConfig,
+    }, [mainConfig, apiConfig, videoConfig, messagingConfig, telegramConfig, restConfig, pushoverConfig,
         videoDownloadConfig, enqueueSnackbar, services]);
 
     const handleTabChange = useCallback((tab: string) => {
@@ -151,6 +166,10 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 <FormView data={messagingConfig} fields={CONFIG_MESSAGING_FIELDS}></FormView>
                 <label className="main-config__content-form__section-title">Telegram</label>
                 <FormView data={telegramConfig} fields={CONFIG_TELEGRAM_FIELDS}></FormView>
+                <label className="main-config__content-form__section-title">Rest</label>
+                <FormView data={restConfig} fields={CONFIG_REST_FIELDS}></FormView>
+                <label className="main-config__content-form__section-title">Pushover</label>
+                <FormView data={pushoverConfig} fields={CONFIG_PUSHOVER_FIELDS}></FormView>
             </div>
             <div className={'main-config__content-form' + ('video' !== activeTab ? ' hidden' : '')}>
                 <FormView data={videoConfig} fields={CONFIG_VIDEO_FIELDS}></FormView>

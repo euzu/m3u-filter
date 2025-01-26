@@ -204,8 +204,14 @@ Contains settings for the streaming.
 LRU-Cache is for resources. If it is `enabled`, the resources/images are persisted in the given `dir`. If the cache size exceeds `size`,
 In an LRU cache, the least recently used items are evicted to make room for new items if the cache `size`is exceeded.
 
+#### 1.6.3 `resource_rewrite_disabled`
+If you have m3u-filter behind a reverse proxy and dont want rewritten resource urls inside responses, you can disable the resource_url rewrite.
+Default value is false.
+If you set it `true` `cache` is disabled! Because the cache cant work without rewritten urls.
+
 ```yaml
 reverse_proxy:
+  resource_rewrite_disabled: false,
   stream:
     retry: true
     buffer:

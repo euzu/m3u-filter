@@ -34,7 +34,7 @@ impl XtreamPlaylistIterator {
             let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&xtream_path, &idx_path)
                 .map_err(|err| info_err!(format!("Could not deserialize file {} - {}", &xtream_path.to_str().unwrap(), err)))?;
 
-            let options = XtreamMappingOptions::from_target_options(target.options.as_ref());
+            let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
             let server_info = config.get_user_server_info(user);
             Ok(Self {
                 reader,

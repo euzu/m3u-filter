@@ -113,9 +113,21 @@ export interface TelegramConfig {
     chat_ids: string[];
 }
 
+export interface RestConfig {
+    url: string;
+}
+
+export interface PushoverConfig {
+    url?: string;
+    token: string;
+    user: string;
+}
+
 export interface MessagingConfig {
     notify_on?: string[];
     telegram?: TelegramConfig;
+    rest?: RestConfig;
+    pushover?: PushoverConfig;
 }
 
 export interface Credentials {
@@ -183,6 +195,7 @@ export interface CacheConfig {
 export interface ReverseProxyConfig {
     stream?: StreamConfig,
     cache?: CacheConfig,
+    resource_rewrite_disabled: boolean,
 }
 
 export interface ServerMainConfig {

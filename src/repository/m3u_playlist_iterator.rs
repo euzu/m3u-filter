@@ -11,6 +11,7 @@ use crate::utils::file_lock_manager::FileReadGuard;
 pub const M3U_STREAM_PATH: &str = "m3u-stream";
 pub const M3U_RESOURCE_PATH: &str = "resource/m3u";
 
+#[allow(clippy::struct_excessive_bools)]
 pub struct M3uPlaylistIterator {
     reader: IndexedDocumentIterator<u32, M3uPlaylistItem>,
     base_url: String,
@@ -19,9 +20,10 @@ pub struct M3uPlaylistIterator {
     target_options: Option<ConfigTargetOptions>,
     mask_redirect_url: bool,
     include_type_in_url: bool,
+    started: bool,
+    rewrite_resource: bool,
     proxy_type: ProxyType,
     _file_lock: FileReadGuard,
-    started: bool,
 }
 
 impl M3uPlaylistIterator {
@@ -56,6 +58,7 @@ impl M3uPlaylistIterator {
             proxy_type: user.proxy.clone(),
             _file_lock: file_lock, // Save lock inside struct
             started: false,
+            rewrite_resource: cfg.is_reverse_proxy_resource_rewrite_enabled(),
         })
     }
 
@@ -109,7 +112,7 @@ impl Iterator for M3uPlaylistIterator {
                     ProxyType::Reverse => true,
                     ProxyType::Redirect => self.mask_redirect_url,
                 } {
-                    Some((self.get_stream_url(&m3u_pli, self.include_type_in_url), self.get_resource_url(&m3u_pli)))
+                    Some((self.get_stream_url(&m3u_pli, self.include_type_in_url), if self.rewrite_resource { Some(self.get_resource_url(&m3u_pli)) } else { None }))
                 } else {
                     None
                 }
