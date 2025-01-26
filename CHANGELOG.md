@@ -1,10 +1,11 @@
 # Changelog
-# 2.1.2 (2025-01-xx)
+# 2.1.2 (2025-01-26)
 - `Strm` output has an additional option `strm_props`. These props are written to the strm file.
 You can add properties like `#KODIPROP:seekable=true|false`, `#KODIPROP:inputstream=inputstream.ffmpeg` or `"#KODIPROP:http-reconnect=true`.
 - Fixed xtream affix-processed output.
 - `log_sanitize_sensitive_info`  added to `config.yml`. Default is `true`.
 - added `resource_rewrite_disabled` to `reverse_proxy` config to disable resource url rewrite.
+- Fixed series redirect proxy mode.
 - Added `pushover.net` config to messaging.
 ```yaml
 messaging:

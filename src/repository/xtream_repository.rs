@@ -378,7 +378,7 @@ pub async fn xtream_get_item_for_stream_id(
     config: &Config,
     target: &ConfigTarget,
     xtream_cluster: Option<XtreamCluster>,
-) -> Result<XtreamPlaylistItem, Error> {
+) -> Result<(XtreamPlaylistItem, VirtualIdRecord), Error> {
     let target_path = get_target_storage_path(config, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {}", &target.name)))?;
     let storage_path = xtream_get_storage_path(config, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {} xtream output", &target.name)))?;
     {
@@ -387,7 +387,7 @@ pub async fn xtream_get_item_for_stream_id(
 
         let mut target_id_mapping = BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| str_to_io_error(&format!("Could not load id mapping for target {} err:{err}", target.name)))?;
         let mapping = target_id_mapping.query(&virtual_id).ok_or_else(|| str_to_io_error(&format!("Could not find mapping for target {} and id {}", target.name, virtual_id)))?;
-        match mapping.item_type {
+        let result = match mapping.item_type {
             PlaylistItemType::SeriesInfo => {
                 xtream_read_series_item_for_stream_id(config, virtual_id, &storage_path).await
             }
@@ -409,7 +409,9 @@ pub async fn xtream_get_item_for_stream_id(
                 let cluster = try_cluster!(xtream_cluster, mapping.item_type, virtual_id)?;
                 xtream_read_item_for_stream_id(config, virtual_id, &storage_path, cluster).await
             }
-        }
+        };
+
+        result.map(|xpli| (xpli, mapping))
     }
 }
 

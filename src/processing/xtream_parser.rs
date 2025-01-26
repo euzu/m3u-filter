@@ -29,7 +29,7 @@ fn map_to_xtream_streams(xtream_cluster: XtreamCluster, streams: &Value) -> Resu
     }
 }
 
-fn create_xtream_series_info_url(url: &str, username: &str, password: &str, episode: &XtreamSeriesInfoEpisode) -> Rc<String> {
+fn create_xtream_series_episode_url(url: &str, username: &str, password: &str, episode: &XtreamSeriesInfoEpisode) -> Rc<String> {
     if episode.direct_source.is_empty() {
         let ext = episode.container_extension.clone();
         let stream_base_url = format!("{url}/series/{username}/{password}/{}.{ext}", episode.id);
@@ -48,7 +48,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
         Ok(series_info) => {
             if let Some(episodes) = &series_info.episodes {
                 let result: Vec<(XtreamSeriesInfoEpisode, PlaylistItem)> = episodes.values().flatten().map(|episode| {
-                    let episode_url = create_xtream_series_info_url(url, username, password, episode);
+                    let episode_url = create_xtream_series_episode_url(url, username, password, episode);
                     (episode.clone(),
                      PlaylistItem {
                          header: RefCell::new(PlaylistItemHeader {

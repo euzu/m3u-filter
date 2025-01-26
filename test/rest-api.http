@@ -18,82 +18,54 @@ Content-Type: application/json
 {"username": "test", "password": "test"}
 
 ### m3u playlist
-GET {{local}}/m3u?username=xt&password=xt
+GET {{local}}/m3u?username={{username}}&password={{password}}
 
 ### m3u playlist - form auth
 POST {{local}}/m3u
 Content-Type: application/x-www-form-urlencoded
 
-username=xt&password=xt
+username={{username}}&password={{password}}
 
 ### m3u playlist reverse
-GET {{local}}/m3u?username=xtr&password=xtr
+GET {{local}}/m3u?username={{username}}&password={{password}}
 
 
 ### m3u playlist
-GET {{local}}/m3u?username=xt&password=xt
-
-### m3u playlist
-GET {{local}}/m3u?username=xt2&password=xt2
-
+GET {{local}}/m3u?username={{username}}&password={{password}}
 
 ### xtream login
-GET {{local}}/player_api.php?username=xt&password=xt
+GET {{local}}/player_api.php?username={{username}}&password={{password}}
 
 ### xtream live_categories
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_categories
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_live_categories
 
-### xtream live_streams reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_live_streams&category_id=2
-
-### xtream live_streams redirect
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_live_streams&category_id=102
+### xtream live_streams
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_live_streams&category_id=102
 
 ### xtream vod_categories
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_categories
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_vod_categories
 
-### xtream vod streams reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_vod_streams&category_id=29
+### xtream vod streams
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_vod_streams&category_id=29
 
-### xtream vod streams redirect
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=636
+### xtream vod info
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_vod_info&vod_id=38497
 
-### xtream vod info reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_vod_info&vod_id=38497
+### xtream series_categories
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_series_categories
 
-### xtream vod info redirect
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_vod_info&vod_id=38497
+### xtream series
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_series
 
-### xtream series_categories reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_series_categories
+### xtream series for category
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_series&category_id=12
 
-### xtream series_categories redirect
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_series_categories
 
-### xtream series reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_series
-
-### xtream series redirect
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_series
-
-### xtream series for category redirect
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_series&category_id=13
-
-### xtream series for category reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_series&category_id=13
-
-### xtream series info redirect
-GET {{local}}/player_api.php?username=xt&password=xt&action=get_series_info&series_id=3
-
-### xtream series info reverse
-GET {{local}}/player_api.php?username=xtr&password=xtr&action=get_series_info&series_id=3
+### xtream series info
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_series_info&series_id=586
 
 ### xtream series stream
- GET {{local}}/series/xt/xt/18137
+ GET {{local}}/series/{{username}}/{{password}}/201422
 
 ### get stream
-{{local}}/m3u-stream/live/xt/xt/667
-
-
-### xtream series_categories redirect
-GET http://10.41.41.41:8902/player_api.php?username=xt&password=xt&action=get_vod_streams&category_id=29
+{{local}}/m3u-stream/live/{{username}}/{{password}}/667
