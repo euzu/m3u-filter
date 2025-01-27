@@ -7,6 +7,12 @@
   @include preferences.prefsToolbar();
   @include preferences.prefsForm();
 
+  &__form {
+    .form-view__col-label {
+       width: 12em;
+    }
+  }
+
   &__content-form {
     display: flex;
     flex-flow: column;
