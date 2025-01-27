@@ -1,9 +1,10 @@
 import React, {useCallback, useMemo, useState} from "react";
 import './main-config-view.scss';
 import ServerConfig, {
-    MessagingConfig, PushoverConfig, RestConfig,
+    CacheConfig,
+    MessagingConfig, PushoverConfig, RestConfig, ReverseProxyConfig,
     ServerApiConfig,
-    ServerMainConfig,
+    ServerMainConfig, StreamBufferConfig, StreamConfig,
     TelegramConfig,
     VideoConfig,
     VideoDownloadConfig
@@ -37,6 +38,28 @@ const CONFIG_FIELDS = [
     {name: 'web_ui_enabled', label: 'Web UI', fieldType: FormFieldType.CHECK, validator: undefined},
     {name: 'schedules', label: 'Schedules', fieldType: FormFieldType.SCHEDULE, validator: undefined},
 ];
+
+const CONFIG_REVERSE_PROXY_FIELDS = [
+    {name: 'resource_rewrite_disabled', label: 'Resource Rewrite disable', fieldType: FormFieldType.CHECK},
+];
+
+const CONFIG_REVERSE_PROXY_STREAM_FIELDS = [
+    {name: 'retry', label: 'Reconnect', fieldType: FormFieldType.CHECK},
+];
+
+const CONFIG_REVERSE_PROXY_STREAM_BUFFER_FIELDS = [
+    {name: 'enabled', label: 'Buffer Enabled', fieldType: FormFieldType.CHECK},
+    {name: 'size', label: 'Buffer Size', fieldType: FormFieldType.NUMBER},
+];
+
+
+
+const CONFIG_REVERSE_PROXY_CACHE_FIELDS = [
+    {name: 'enabled', label: 'Enabled', fieldType: FormFieldType.CHECK},
+    {name: 'size', label: 'Size', fieldType: FormFieldType.TEXT},
+    {name: 'sir', label: 'Cache dir', fieldType: FormFieldType.TEXT},
+];
+
 
 const CONFIG_MESSAGING_FIELDS = [
     {
@@ -74,6 +97,7 @@ const CONFIG_VIDEO_DOWNLOAD_FIELDS = [
 const TABS = [
     {label: 'Api', key: 'api'},
     {label: 'Main', key: 'main'},
+    {label: 'ReverseProxy', key: 'reverseProxy'},
     {label: 'Messaging', key: 'messaging'},
     {label: 'Video', key: 'video'}
 ];
@@ -95,13 +119,14 @@ export default function MainConfigView(props: MainConfigViewProps) {
     const pushoverConfig = useMemo<PushoverConfig>(() => config?.messaging?.pushover || {} as any, [config]);
     const videoConfig = useMemo<VideoConfig>(() => config?.video || {} as any, [config]);
     const videoDownloadConfig = useMemo<VideoDownloadConfig>(() => config?.video?.download || {} as any, [config]);
-
+    const reverseProxyConfig = useMemo<ReverseProxyConfig>(() => config?.reverse_proxy || {} as any, [config]);
+    const reverseProxyStreamConfig = useMemo<StreamConfig>(() => config?.reverse_proxy?.stream || {} as any, [config]);
+    const reverseProxyStreamBufferConfig = useMemo<StreamBufferConfig>(() => config?.reverse_proxy?.stream?.buffer || {} as any, [config]);
+    const reverseProxyCacheConfig = useMemo<CacheConfig>(() => config?.reverse_proxy?.cache || {} as any, [config]);
 
     const scheduleImage = useMemo(() => <svg className={'main-config__content-help-img'} focusable="false"
                                              aria-hidden="true" viewBox='0 0 120 30'>
-        <path
-            d={SCHEDULE_IMG_PATH}/>
-    </svg>, []);
+        <path d={SCHEDULE_IMG_PATH}/> </svg>, []);
 
     const handleSave = useCallback(() => {
         if (mainConfig && apiConfig) {
@@ -113,6 +138,20 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 telegram: telegramConfigAvailable ? telegramConfig : null,
                 rest: restConfigAvailable ? restConfig : null,
                 pushover: pushoverConfigAvailable ? pushoverConfig : null,
+            };
+
+            let cfgReverseProxyStreamBuffer : StreamConfig = {
+                retry: reverseProxyStreamConfig.retry,
+                buffer: {
+                    enabled: reverseProxyStreamBufferConfig.enabled,
+                    size: reverseProxyStreamBufferConfig.size ?? null,
+                }
+            }
+
+            const cfgReverseProxy: ReverseProxyConfig = {
+                resource_rewrite_disabled: reverseProxyConfig.resource_rewrite_disabled,
+                stream: cfgReverseProxyStreamBuffer ?? null,
+                cache: reverseProxyCacheConfig ?? null,
             };
 
             const cfgVideo = {
@@ -127,6 +166,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 schedules: mainConfig.schedules?.filter(s => s.schedule?.trim().length),
                 threads: mainConfig.threads,
                 messaging: cfgMessaging,
+                reverse_proxy: cfgReverseProxy,
                 video: cfgVideo,
                 log_sanitize_sensitive_info: mainConfig.log_sanitize_sensitive_info,
                 update_on_boot: mainConfig.update_on_boot,
@@ -140,7 +180,8 @@ export default function MainConfigView(props: MainConfigViewProps) {
             });
         }
     }, [mainConfig, apiConfig, videoConfig, messagingConfig, telegramConfig, restConfig, pushoverConfig,
-        videoDownloadConfig, enqueueSnackbar, services]);
+        videoDownloadConfig, reverseProxyConfig, enqueueSnackbar, services,
+        reverseProxyCacheConfig, reverseProxyStreamConfig, reverseProxyStreamBufferConfig]);
 
     const handleTabChange = useCallback((tab: string) => {
         setActiveTab(tab);
@@ -166,6 +207,14 @@ export default function MainConfigView(props: MainConfigViewProps) {
                     <span>Schedule example:</span>
                     {scheduleImage}
                 </div>
+            </div>
+            <div className={'main-config__content-form reverse-proxy__form' + ('reverseProxy' !== activeTab ? ' hidden' : '')}>
+                <FormView data={reverseProxyConfig} fields={CONFIG_REVERSE_PROXY_FIELDS}></FormView>
+                <label className="main-config__content-form__section-title">Stream</label>
+                <FormView data={reverseProxyStreamConfig} fields={CONFIG_REVERSE_PROXY_STREAM_FIELDS}></FormView>
+                <FormView data={reverseProxyStreamBufferConfig} fields={CONFIG_REVERSE_PROXY_STREAM_BUFFER_FIELDS}></FormView>
+                <label className="main-config__content-form__section-title">Cache</label>
+                <FormView data={reverseProxyCacheConfig} fields={CONFIG_REVERSE_PROXY_CACHE_FIELDS}></FormView>
             </div>
             <div className={'main-config__content-form' + ('messaging' !== activeTab ? ' hidden' : '')}>
                 <FormView data={messagingConfig} fields={CONFIG_MESSAGING_FIELDS}></FormView>

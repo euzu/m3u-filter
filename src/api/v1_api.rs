@@ -201,6 +201,7 @@ async fn config(
         working_dir: config.working_dir.clone(),
         backup_dir: config.backup_dir.clone(),
         schedules: config.schedules.clone(),
+        reverse_proxy: config.reverse_proxy.clone(),
         messaging: config.messaging.clone(),
         video: config.video.clone(),
         sources: config.sources.iter().map(map_source).collect(),

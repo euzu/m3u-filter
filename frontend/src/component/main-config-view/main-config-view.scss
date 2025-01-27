@@ -1,17 +1,17 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
 
+.main-config__form, .reverse-proxy__form {
+    .form-view__col-label {
+      width: 12em;
+    }
+}
+
 .main-config {
 
   @include preferences.prefsRoot();
   @include preferences.prefsToolbar();
   @include preferences.prefsForm();
-
-  &__form {
-    .form-view__col-label {
-       width: 12em;
-    }
-  }
 
   &__content-form {
     display: flex;

@@ -22,13 +22,12 @@ export default function Checkbox(props: CheckboxProps) {
 
     if (label) {
         return <label className="checkbox-container" onClick={handleSelect}>
-            {label}
-            <input ref={inputRef}  type="checkbox" defaultChecked={checked}/>
+            <input ref={inputRef}  type="checkbox" defaultChecked={checked} checked={checked}/>
             <span className="checkmark"></span>
         </label>;
     } else {
         return <div className="checkbox-container" onClick={handleSelect}>
-            <input ref={inputRef} type="checkbox" defaultChecked={checked}/>
+            <input ref={inputRef} type="checkbox" defaultChecked={checked}  checked={checked}/>
             <span className="checkmark"></span>
         </div>
     }
