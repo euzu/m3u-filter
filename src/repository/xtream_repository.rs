@@ -812,7 +812,7 @@ pub async fn xtream_update_input_info_file(
                 Err(err) => Err(info_err!(format!("{err}"))),
             }
         }
-        Ok(None) => Err(notify_err!(format!("Could not create storage path for input {}", &input.name.as_ref().map_or("?", |v| v)))),
+        Ok(None) => Err(notify_err!(format!("Could not create storage path for input {}", &input.name))),
         Err(err) => Err(notify_err!(format!("Could not create storage path for input {err}"))),
     }
 }
@@ -824,7 +824,7 @@ pub async fn xtream_update_input_vod_record_from_wal_file(
 ) -> Result<(), M3uFilterError> {
     let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::Video))
         .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
-        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
+        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", &input.name))))?;
 
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
@@ -866,7 +866,7 @@ pub async fn xtream_update_input_series_record_from_wal_file(
 ) -> Result<(), M3uFilterError> {
     let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::SeriesInfo))
         .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
-        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
+        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", &input.name))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
             let mut reader = file_reader(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series wal info {err}")))?);
@@ -903,7 +903,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
 ) -> Result<(), M3uFilterError> {
     let record_path = get_input_storage_path(input, &cfg.working_dir).map(|storage_path| xtream_get_record_file_path(&storage_path, PlaylistItemType::Series))
         .map_err(|err| notify_err!(format!("Error accessing storage path: {err}")))
-        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", input.name.clone().unwrap_or_else(|| input.id.to_string())))))?;
+        .and_then(|opt| opt.ok_or_else(|| notify_err!(format!("Error accessing storage path for input: {}", &input.name))))?;
     match cfg.file_locks.write_lock(&record_path).await {
         Ok(_file_lock) => {
             let mut reader = file_reader(open_readonly_file(wal_path).map_err(|err| notify_err!(format!("Could not read series episode wal info {err}")))?);

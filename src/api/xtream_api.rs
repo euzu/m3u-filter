@@ -189,7 +189,7 @@ async fn xtream_player_api_stream(
     let (action_stream_id, stream_ext) = xtream_api_request_separate_number_and_remainder(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let (pli, mapping) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
-    let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
+    let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
     if pli.item_type == PlaylistItemType::LiveHls {
         debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
@@ -461,8 +461,8 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
     };
 
     if let Ok((pli, _)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(cluster)).await {
-        let input_id = pli.input_id;
-        if let Some(input) = app_state.config.get_input_by_id(input_id) {
+        let input_name = Rc::clone(&pli.input_name);
+        if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
             if let Some(info_url) = download::get_xtream_player_api_info_url(input, cluster, pli.provider_id) {
                 // Redirect is only possible for live streams, vod and series info needs to be modified
                 if user.proxy == ProxyType::Redirect && cluster == XtreamCluster::Live {
@@ -489,8 +489,8 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
         };
 
         if let Ok((pli, _)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await {
-            let input_id: u16 = pli.input_id;
-            if let Some(input) = app_state.config.get_input_by_id(input_id) {
+            let input_name = Rc::clone(&pli.input_name);
+            if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
                 if let Some(action_url) = download::get_xtream_player_api_action_url(input, ACTION_GET_SHORT_EPG) {
                     let mut info_url = format!("{action_url}&{TAG_STREAM_ID}={}", pli.provider_id);
                     if !(limit.is_empty() || limit.eq("0")) {
@@ -539,7 +539,7 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
 async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget, stream_id: &str, start: &str, end: &str) -> HttpResponse {
     let virtual_id: u32 = try_result_bad_request!(FromStr::from_str(stream_id));
     let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)).await);
-    let input = try_option_bad_request!(app_state.config.get_input_by_id(pli.input_id));
+    let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()));
     let info_url = try_option_bad_request!(download::get_xtream_player_api_action_url(input, ACTION_GET_CATCHUP_TABLE).map(|action_url| format!("{action_url}&{TAG_STREAM_ID}={}&start={start}&end={end}", pli.provider_id)));
     let content = try_result_bad_request!(download::get_xtream_stream_info_content(Arc::clone(&app_state.http_client), info_url.as_str(), input).await);
     let mut doc: Map<String, Value> = try_result_bad_request!(serde_json::from_str(&content));

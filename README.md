@@ -309,7 +309,7 @@ This will replace all occurrences of `!delimiter!` and `!quality!` in the regexp
 
 Each input has the following attributes:
 
-- `name` is optional, if set it must be unique, should be set for the webui
+- `name` is mandatory, it must be unique.
 - `type` is optional, default is `m3u`. Valid values are `m3u` and `xtream`
 - `enabled` is optional, default is true, if you disable the processing is skipped
 - `persist` is optional, you can skip or leave it blank to avoid persisting the input file. The `{}` in the filename is filled with the current timestamp.

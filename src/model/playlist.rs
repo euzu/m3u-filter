@@ -159,8 +159,7 @@ pub struct PlaylistItemHeader {
     pub item_type: PlaylistItemType,
     #[serde(default)]
     pub category_id: u32,
-    #[serde(default)]
-    pub input_id: u16,
+    pub input_name: Rc<String>,
 }
 
 impl PlaylistItemHeader {
@@ -288,7 +287,7 @@ pub struct M3uPlaylistItem {
     pub rec: Rc<String>,
     pub url: Rc<String>,
     pub epg_channel_id: Option<Rc<String>>,
-    pub input_id: u16,
+    pub input_name: Rc<String>,
     pub item_type: PlaylistItemType,
 }
 
@@ -390,7 +389,7 @@ pub struct XtreamPlaylistItem {
     pub additional_properties: Option<String>,
     pub item_type: PlaylistItemType,
     pub category_id: u32,
-    pub input_id: u16,
+    pub input_name: Rc<String>,
 }
 
 impl XtreamPlaylistItem {
@@ -501,7 +500,7 @@ impl PlaylistItem {
             rec: Rc::clone(&header.rec),
             url: Rc::clone(&header.url),
             epg_channel_id: header.epg_channel_id.clone(),
-            input_id: header.input_id,
+            input_name: Rc::clone(&header.input_name),
             item_type: header.item_type,
         }
     }
@@ -525,7 +524,7 @@ impl PlaylistItem {
             additional_properties: header.additional_properties.as_ref().and_then(|props| serde_json::to_string(props).ok()),
             item_type: header.item_type,
             category_id: header.category_id,
-            input_id: header.input_id,
+            input_name: Rc::clone(&header.input_name),
         }
     }
 }

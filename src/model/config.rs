@@ -22,10 +22,10 @@ use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
 use crate::utils::file_lock_manager::FileLockManager;
-use crate::utils::{config_reader, file_utils};
-use crate::{exit, info_err};
 use crate::utils::file_utils::file_reader;
 use crate::utils::size_utils::parse_size_base_2;
+use crate::utils::{config_reader, file_utils};
+use crate::{exit, info_err};
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
@@ -568,6 +568,7 @@ pub struct InputUserInfo {
 pub struct ConfigInput {
     #[serde(skip)]
     pub id: u16,
+    pub name: String,
     #[serde(default, rename = "type")]
     pub input_type: InputType,
     #[serde(default)]
@@ -585,18 +586,18 @@ pub struct ConfigInput {
     pub prefix: Option<InputAffix>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suffix: Option<InputAffix>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
     #[serde(default = "default_as_true")]
     pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<ConfigInputOptions>,
-
 }
 
 impl ConfigInput {
     pub fn prepare(&mut self, id: u16) -> Result<(), M3uFilterError> {
         self.id = id;
+        if self.name.trim().is_empty() {
+            return Err(info_err!("name for input is mandatory".to_string()));
+        }
         if self.url.trim().is_empty() {
             return Err(info_err!("url for input is mandatory".to_string()));
         }
@@ -914,7 +915,7 @@ pub struct CacheConfig {
 }
 
 impl CacheConfig {
-    fn prepare(&mut self,  working_dir: &str, resolve_var: bool) {
+    fn prepare(&mut self, working_dir: &str, resolve_var: bool) {
         if self.enabled {
             let work_path = PathBuf::from(working_dir);
             if self.dir.is_none() {
@@ -1086,10 +1087,10 @@ impl Config {
         self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| api_proxy.get_user_credentials(username))
     }
 
-    pub fn get_input_by_id(&self, input_id: u16) -> Option<&ConfigInput> {
+    pub fn get_input_by_name(&self, input_name: &str) -> Option<&ConfigInput> {
         for source in &self.sources {
             for input in &source.inputs {
-                if input.id == input_id {
+                if input.name == input_name {
                     return Some(input);
                 }
             }
@@ -1112,6 +1113,60 @@ impl Config {
                 }
             }
         }
+    }
+
+    fn check_unique_input_names(&mut self) -> Result<(), M3uFilterError> {
+        let mut seen_names = HashSet::new();
+        for source in &mut self.sources {
+            for input in &source.inputs {
+                let input_name = input.name.trim().to_string();
+                if input_name.is_empty() {
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input name required");
+                }
+                if seen_names.contains(input_name.as_str()) {
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
+                }
+                seen_names.insert(input_name);
+            }
+        }
+        Ok(())
+    }
+
+    fn check_unique_target_names(&mut self) -> Result<HashSet<String>, M3uFilterError> {
+        let mut seen_names = HashSet::new();
+        let default_target_name = default_as_default();
+        for source in &self.sources {
+            for target in &source.targets {
+                // check target name is unique
+                let target_name = target.name.trim().to_string();
+                if target_name.is_empty() {
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target name required");
+                }
+                if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
+                    if seen_names.contains(target_name.as_str()) {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target names should be unique: {}", target_name);
+                    }
+                    seen_names.insert(target_name);
+                }
+            }
+        }
+        Ok(seen_names)
+    }
+
+
+    fn check_scheduled_targets(&mut self, target_names: &HashSet<String>) -> Result<(), M3uFilterError> {
+        if let Some(schedules) = &self.schedules {
+            for schedule in schedules {
+                if let Some(targets) = &schedule.targets {
+                    for target_name in targets {
+                        if !target_names.contains(target_name) {
+                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown target name in scheduler: {}", target_name);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
@@ -1139,24 +1194,14 @@ impl Config {
             }
         };
         // prepare sources and set id's
-        let mut target_names_check = HashSet::<String>::new();
-        let default_target_name = default_as_default();
         let mut source_index: u16 = 1;
         let mut target_index: u16 = 1;
+        self.check_unique_input_names()?;
+        let target_names = self.check_unique_target_names()?;
+        self.check_scheduled_targets(&target_names)?;
         for source in &mut self.sources {
             source_index = source.prepare(source_index)?;
             for target in &mut source.targets {
-                // check target name is unique
-                let target_name = target.name.trim().to_string();
-                if target_name.is_empty() {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target name required");
-                }
-                if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
-                    if target_names_check.contains(target_name.as_str()) {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target names should be unique: {}", target_name);
-                    }
-                    target_names_check.insert(target_name);
-                }
                 // prepare templates
                 let prepare_result = match &self.templates {
                     Some(templ) => target.prepare(target_index, Some(templ)),
@@ -1164,18 +1209,6 @@ impl Config {
                 };
                 prepare_result?;
                 target_index += 1;
-            }
-
-            if let Some(schedules) = &self.schedules {
-                for schedule in schedules {
-                    if let Some(targets) = &schedule.targets {
-                        for target_name in targets {
-                            if !target_names_check.contains(target_name) {
-                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown target name in scheduler: {}", target_name);
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -1236,7 +1269,7 @@ impl Config {
     pub fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
         let server_info_list = self.t_api_proxy.read().unwrap().as_ref().unwrap().server.clone();
         let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
-        server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), std::clone::Clone::clone)
+        server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), Clone::clone)
     }
 }
 

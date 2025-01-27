@@ -113,9 +113,10 @@ async fn playlist_update(
     }
 }
 
-fn create_config_input_for_url(url: &str) -> ConfigInput {
+fn create_config_input_for_url(name: &str, url: &str) -> ConfigInput {
     ConfigInput {
         id: 0,
+        name: String::from(name),
         input_type: InputType::M3u,
         url: String::from(url),
         enabled: true,
@@ -151,11 +152,12 @@ async fn playlist(
     req: web::Json<PlaylistRequest>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    if let Some(input_id) = req.input_id {
-        get_playlist(Arc::clone(&app_state.http_client), app_state.config.get_input_by_id(input_id), &app_state.config).await
+    if let Some(input_name) = req.input_name.as_ref() {
+        get_playlist(Arc::clone(&app_state.http_client), app_state.config.get_input_by_name(input_name), &app_state.config).await
     } else {
         let url = req.url.as_deref().unwrap_or("");
-        let input = create_config_input_for_url(url);
+        let name = req.input_name.as_deref().unwrap_or("");
+        let input = create_config_input_for_url(name, url);
         get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await
     }
 }
@@ -165,12 +167,12 @@ async fn config(
 ) -> HttpResponse {
     let map_input = |i: &ConfigInput| ServerInputConfig {
         id: i.id,
+        name: i.name.clone(),
         input_type: i.input_type.clone(),
         url: i.url.clone(),
         username: i.username.clone(),
         password: i.password.clone(),
         persist: i.persist.clone(),
-        name: i.name.clone(),
         enabled: i.enabled,
     };
 

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PlaylistRequest {
     pub url: Option<String>,
-    pub input_id: Option<u16>,
+    pub input_name: Option<String>,
 }
 
 impl From<web::Json<Self>> for PlaylistRequest {

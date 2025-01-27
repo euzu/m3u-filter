@@ -132,7 +132,7 @@ async fn kodi_style_rename(cfg: &Config, strm_item_info: &StrmItemInfo, style: &
         .filter(|&series_name| name_4.starts_with(series_name))
         .and_then(|series_name| trim_string_after_pos(&name_3, series_name.len()));
     let tmdb_id = if let Some(value) = match strm_item_info.item_type {
-        PlaylistItemType::Series | PlaylistItemType::Video => get_tmdb_value(cfg, strm_item_info.provider_id, strm_item_info.input_id, input_tmdb_indexes, strm_item_info.item_type).await,
+        PlaylistItemType::Series | PlaylistItemType::Video => get_tmdb_value(cfg, strm_item_info.provider_id, strm_item_info.input_name.as_str(), input_tmdb_indexes, strm_item_info.item_type).await,
         _ => None,
     } {
         match value {
@@ -207,15 +207,15 @@ enum InputTmdbIndexValue {
     Series(XtreamSeriesEpisode),
 }
 
-type InputTmdbIndexMap = HashMap<u16, Option<(FileReadGuard, InputTmdbIndexTree)>>;
-async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_id: u16,
+type InputTmdbIndexMap = HashMap<String, Option<(FileReadGuard, InputTmdbIndexTree)>>;
+async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_name: &str,
                         input_indexes: &mut InputTmdbIndexMap, item_type: PlaylistItemType) -> Option<InputTmdbIndexValue> {
     // the tmdb_ids are stored inside record files for xtream input.
     // we load this record files on request for each input and item_type.
     match provider_id {
         None => None,
         Some(pid) => {
-            match input_indexes.entry(input_id) {
+            match input_indexes.entry(input_name.to_string()) {
                 std::collections::hash_map::Entry::Occupied(entry) => {
                     if let Some((_, tree_value)) = entry.get() {
                         match tree_value {
@@ -227,7 +227,7 @@ async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_id: u16,
                     }
                 }
                 std::collections::hash_map::Entry::Vacant(entry) => {
-                    if let Some(input) = cfg.get_input_by_id(input_id) {
+                    if let Some(input) = cfg.get_input_by_name(input_name) {
                         if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
                             .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type)) {
                             if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
@@ -266,7 +266,7 @@ struct StrmItemInfo {
     item_type: PlaylistItemType,
     provider_id: Option<u32>,
     virtual_id: u32,
-    input_id: u16,
+    input_name: Rc<String>,
     url: Rc<String>,
     series_name: Option<String>,
     release_date: Option<String>,
@@ -281,7 +281,7 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
     let item_type = header.item_type;
     let provider_id = header.get_provider_id();
     let virtual_id = header.virtual_id;
-    let input_id = header.input_id;
+    let input_name = Rc::clone(&header.input_name);
     let url = Rc::clone(&header.url);
     let (series_name, release_date, season, episode) = if header.item_type == PlaylistItemType::Series {
         let series_name = match header.get_field("name") {
@@ -295,7 +295,7 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
         (series_name, release_date, season, episode)
     } else { (None, None, None, None) };
 
-    StrmItemInfo { group, title, item_type, provider_id, virtual_id, input_id, url, series_name, release_date, season, episode }
+    StrmItemInfo { group, title, item_type, provider_id, virtual_id, input_name, url, series_name, release_date, season, episode }
 }
 
 fn prepare_strm_output_directory(cleanup: bool, path: &PathBuf) -> Result<(), M3uFilterError> {

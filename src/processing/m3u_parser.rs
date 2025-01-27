@@ -73,11 +73,11 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
     }
 }
 
-fn create_empty_playlistitem_header(input_id: u16, url: &str) -> PlaylistItemHeader {
+fn create_empty_playlistitem_header(input_name: &str, url: &str) -> PlaylistItemHeader {
     PlaylistItemHeader {
         url: Rc::new(url.to_owned()),
         category_id: 0,
-        input_id,
+        input_name: Rc::new(input_name.to_string()),
         ..Default::default()
     }
 }
@@ -94,7 +94,7 @@ macro_rules! process_header_fields {
 }
 
 fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, url: &str) -> PlaylistItemHeader {
-    let mut plih = create_empty_playlistitem_header(input.id, url);
+    let mut plih = create_empty_playlistitem_header(input.name.as_str(), url);
     let mut it = content.chars();
     let line_token = token_till(&mut it, ':', false);
     if line_token.as_deref() == Some("#EXTINF") {

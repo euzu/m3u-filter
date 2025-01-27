@@ -1,4 +1,7 @@
 # Changelog
+# 2.1.4 (2025-01-xx)
+- !BREAKING CHANGE!  unique `input` `name` is now mandatory, because rearranging the `source.yml` could lead to wrong results without a playlist update.
+
 # 2.1.3 (2025-01-26)
 - Hotfix 2.1.2, forgot to update the stream api code.  
 

@@ -31,7 +31,6 @@ use crate::processing::xtream_processor_vod::playlist_resolve_vod;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::download;
-use crate::utils::request_utils::sanitize_sensitive_info;
 use crate::{debug_if_enabled, get_errors_notify_message, model::config, notify_err, Config};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
@@ -294,14 +293,13 @@ fn is_target_enabled(target: &ConfigTarget, user_targets: &ProcessTargets) -> bo
 async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<TargetStats>, Vec<M3uFilterError>) {
     let source = cfg.sources.get(source_idx).unwrap();
     let mut errors = vec![];
-    let mut input_stats = HashMap::<u16, InputStats>::new();
+    let mut input_stats = HashMap::<String, InputStats>::new();
     let mut target_stats = Vec::<TargetStats>::new();
     let mut source_playlists = Vec::with_capacity(128);
     let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
     // Downlod the sources
     for input in &source.inputs {
-        let input_id = input.id;
-        if is_input_enabled(enabled_inputs, input.enabled, input_id, &user_targets) {
+        if is_input_enabled(enabled_inputs, input.enabled, input.id, &user_targets) {
             let start_time = Instant::now();
             let (mut playlistgroups, mut error_list) = match input.input_type {
                 InputType::M3u => download::get_m3u_playlist(Arc::clone(&client), &cfg, input, &cfg.working_dir).await,
@@ -318,7 +316,7 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
             let channel_count = playlistgroups.iter()
                 .map(|group| group.channels.len())
                 .sum();
-            let input_name = input.name.as_ref().map_or_else(|| sanitize_sensitive_info(input.url.as_str()), std::string::ToString::to_string);
+            let input_name = &input.name;
             if playlistgroups.is_empty() {
                 info!("Source is empty {input_name}");
                 errors.push(notify_err!(format!("Source is empty {input_name}")));
@@ -333,8 +331,8 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
                 );
             }
             let elapsed = start_time.elapsed().as_secs();
-            input_stats.insert(input_id, create_input_stat(group_count, channel_count, error_list.len(),
-                                                           input.input_type.clone(), &input_name, elapsed));
+            input_stats.insert(input_name.to_string(), create_input_stat(group_count, channel_count, error_list.len(),
+                                                           input.input_type.clone(), input_name, elapsed));
         }
     }
     if source_playlists.is_empty() {
@@ -490,7 +488,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
                                      playlists: &mut [FetchedPlaylist<'_>],
                                      target: &ConfigTarget,
                                      cfg: &Config,
-                                     stats: &mut HashMap<u16, InputStats>,
+                                     stats: &mut HashMap<String, InputStats>,
                                      errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
     let pipe = get_processing_pipe(target);
     debug_if_enabled!("Processing order is {}", &target.processing_order);
@@ -502,7 +500,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
         playlist_resolve_series(Arc::clone(&client), cfg, target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
         playlist_resolve_vod(Arc::clone(&client), cfg, target, errors, &processed_fpl).await;
         // stats
-        let input_stats = stats.get_mut(&processed_fpl.input.id);
+        let input_stats = stats.get_mut(&processed_fpl.input.name);
         if let Some(stat) = input_stats {
             stat.processed_stats.group_count = processed_fpl.playlistgroups.len();
             stat.processed_stats.channel_count = processed_fpl.playlistgroups.iter()

@@ -63,7 +63,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
                              xtream_cluster: XtreamCluster::Series,
                              additional_properties: episode.get_additional_properties(&series_info),
                              category_id: 0,
-                             input_id: input.id,
+                             input_name: Rc::new(input.name.to_string()),
                              ..Default::default()
                          })
                      })
@@ -101,7 +101,7 @@ pub fn parse_xtream(input: &ConfigInput,
                     streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
     match map_to_xtream_category(categories) {
         Ok(xtream_categories) => {
-            let input_id = input.id;
+            let input_name = Rc::new(input.name.to_string());
             let url = input.url.as_str();
             let username = input.username.as_ref().map_or("", |v| v);
             let password = input.password.as_ref().map_or("", |v| v);
@@ -136,7 +136,7 @@ pub fn parse_xtream(input: &ConfigInput,
                                 xtream_cluster,
                                 additional_properties: stream.get_additional_properties(),
                                 category_id: 0,
-                                input_id,
+                                input_name: Rc::clone(&input_name),
                                 ..Default::default()
                             }),
                         };

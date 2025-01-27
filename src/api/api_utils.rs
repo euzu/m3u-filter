@@ -1,34 +1,34 @@
 use crate::api::model::app_state::AppState;
+use crate::api::model::model_utils::get_stream_response_with_headers;
+use crate::api::model::persist_pipe_stream::PersistPipeStream;
 use crate::api::model::provider_stream;
-use crate::api::model::provider_stream::{get_provider_pipe_stream};
+use crate::api::model::provider_stream::get_provider_pipe_stream;
+use crate::api::model::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::shared_stream::SharedStream;
+use crate::api::model::stream_error::StreamError;
 use crate::debug_if_enabled;
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::playlist::PlaylistItemType;
+use crate::utils::file_utils::create_new_file_for_write;
+use crate::utils::lru_cache::LRUResourceCache;
 use crate::utils::request_utils;
 use crate::utils::request_utils::sanitize_sensitive_info;
 use actix_files::NamedFile;
 use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
-use bytes::Bytes;
-use log::{error, log_enabled, trace};
-use std::collections::HashMap;
-use std::path::{Path};
-use std::sync::Arc;
 use async_std::sync::Mutex;
+use bytes::Bytes;
 use futures::stream::BoxStream;
-use futures::{TryStreamExt};
+use futures::TryStreamExt;
+use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
 use url::Url;
-use crate::api::model::model_utils::get_stream_response_with_headers;
-use crate::api::model::persist_pipe_stream::PersistPipeStream;
-use crate::api::model::provider_stream_factory::BufferStreamOptions;
-use crate::api::model::stream_error::StreamError;
-use crate::utils::file_utils::create_new_file_for_write;
-use crate::utils::lru_cache::LRUResourceCache;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
@@ -78,18 +78,7 @@ async fn create_broadcast_stream(
     }
 }
 
-pub async fn stream_response(app_state: &AppState, stream_url: &str,
-                             req: &HttpRequest, input: Option<&ConfigInput>,
-                             item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
-    if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", sanitize_sensitive_info(stream_url)); }
-
-    let share_stream = is_stream_share_enabled(item_type, target);
-    if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url).await {
-            return value;
-        }
-    }
-
+fn get_stream_options(app_state: &AppState) -> (bool, bool, usize, bool, bool) {
     let (stream_retry, buffer_enabled, buffer_size) = app_state
         .config
         .reverse_proxy
@@ -102,10 +91,36 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
                 .map_or((false, 0), |buffer| (buffer.enabled, buffer.size));
             (stream.retry, buffer_enabled, buffer_size)
         });
+    let pipe_provider_stream = !stream_retry && !buffer_enabled;
+    let shared_stream_use_own_buffer = !buffer_enabled || pipe_provider_stream;
+    (stream_retry, buffer_enabled, buffer_size, pipe_provider_stream, shared_stream_use_own_buffer)
+}
 
+fn get_stream_content_length(provider_response: Option<&(Vec<(String, String)>, StatusCode)>) -> u64 {
+    let content_length = provider_response
+        .as_ref()
+        .and_then(|(headers, _)| headers.iter().find(|(h, _)| h.eq(actix_web::http::header::CONTENT_LENGTH.as_str())))
+        .and_then(|(_, val)| val.parse::<u64>().ok())
+        .unwrap_or(0);
+    content_length
+}
+
+pub async fn stream_response(app_state: &AppState, stream_url: &str,
+                             req: &HttpRequest, input: Option<&ConfigInput>,
+                             item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
+    if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", sanitize_sensitive_info(stream_url)); }
+
+    let share_stream = is_stream_share_enabled(item_type, target);
+    if share_stream {
+        if let Some(value) = shared_stream_response(app_state, stream_url).await {
+            return value;
+        }
+    }
+
+    let (stream_retry, buffer_enabled, buffer_size, direct_pipe_provider_stream, shared_stream_use_own_buffer) =
+        get_stream_options(app_state);
 
     if let Ok(url) = Url::parse(stream_url) {
-        let direct_pipe_provider_stream = !stream_retry && !buffer_enabled;
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
             get_provider_pipe_stream(&app_state.http_client, &url, req, input).await
         } else {
@@ -113,14 +128,8 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
             provider_stream::get_provider_reconnect_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {
-            let content_length = provider_response
-                .as_ref()
-                .and_then(|(headers, _)| headers.iter().find(|(h, _)| h.eq(actix_web::http::header::CONTENT_LENGTH.as_str())))
-                .and_then(|(_, val)| val.parse::<u64>().ok())
-                .unwrap_or(0);
+            let content_length = get_stream_content_length(provider_response.as_ref());
 
-
-            let shared_stream_use_own_buffer = !buffer_enabled || direct_pipe_provider_stream;
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
                 SharedStream::register(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers).await;
@@ -145,7 +154,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
 async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
     if let Some(stream) = create_broadcast_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
-        if let Some((headers,_)) = app_state.shared_streams.lock().await.get(stream_url) {
+        if let Some((headers, _)) = app_state.shared_streams.lock().await.get(stream_url) {
             let mut response_builder = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
             return Some(response_builder.body(BodyStream::new(stream)));
         }
@@ -172,7 +181,7 @@ pub fn get_headers_from_request(req: &HttpRequest, filter: &HeaderFilter) -> Has
 fn get_add_cache_content(res_url: &str, cache: &Arc<Option<Mutex<LRUResourceCache>>>) -> Box<dyn Fn(usize)> {
     let resource_url = String::from(res_url);
     let cache = Arc::clone(cache);
-    let add_cache_content: Box<dyn Fn(usize)> = Box::new(move|size| {
+    let add_cache_content: Box<dyn Fn(usize)> = Box::new(move |size| {
         let res_url = resource_url.clone();
         let cache = Arc::clone(&cache);
         actix_rt::spawn(async move {
@@ -212,9 +221,9 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                         response_builder.insert_header((k.as_str(), v.as_ref()));
                     });
 
-                    let byte_stream = response.bytes_stream().map_err(|err|StreamError::reqwest(&err));
+                    let byte_stream = response.bytes_stream().map_err(|err| StreamError::reqwest(&err));
                     if let Some(cache) = app_state.cache.as_ref() {
-                       let resource_path = {
+                        let resource_path = {
                             let guard = cache.lock().await;
                             guard.store_path(resource_url)
                         };
@@ -225,7 +234,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                             return response_builder.body(BodyStream::new(stream));
                         }
                     }
-                   return response_builder.body(BodyStream::new(byte_stream));
+                    return response_builder.body(BodyStream::new(byte_stream));
                 }
                 debug_if_enabled!("Failed to open resource got status {} for {}", status, sanitize_sensitive_info(resource_url));
             }

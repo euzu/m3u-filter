@@ -12,7 +12,7 @@ pub struct ServerInputConfig {
     pub username: Option<String>,
     pub password: Option<String>,
     pub persist: Option<String>,
-    pub name: Option<String>,
+    pub name: String,
     pub enabled: bool,
 }
 

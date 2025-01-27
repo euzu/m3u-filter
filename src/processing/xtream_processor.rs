@@ -135,7 +135,7 @@ where
     {
         Ok(file_path) => file_path,
         Err(err) => {
-            let fpl_name = fpl.input.name.as_ref().map_or("?", String::as_str);
+            let fpl_name = &fpl.input.name;
             errors.push(notify_err!(format!("Could not create storage path for input {fpl_name}: {err}")));
             return processed_info_ids;
         }
