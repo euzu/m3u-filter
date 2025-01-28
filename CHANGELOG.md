@@ -1,7 +1,17 @@
 # Changelog
 # 2.1.4 (2025-01-xx)
 - !BREAKING CHANGE!  unique `input` `name` is now mandatory, because rearranging the `source.yml` could lead to wrong results without a playlist update.
-_- Added new option to `input` `xtream_live_stream_without_extension`. Default is `false`.  Some providers don't like `.ts`  extension, some providers need it.
+- !BREAKING_CHANGE! `log_sanitize_sensitive_info`  is now under `log` section  as `sanitize_sensitive_info`
+- Added Active clients count (for reverse proxy mode users) which is now displayed in `/status`  and can be logged with setting
+`active_clients: true` under `log`section in `config.yml`
+```yaml
+log:
+  sanitize_sensitive_info: false
+  active_clients: true
+update_on_boot: false
+web_ui_enabled: true
+```
+- Added new option to `input` `xtream_live_stream_without_extension`. Default is `false`.  Some providers don't like `.ts`  extension, some providers need it.
 Now you can disable or enable it for a provider.
 
 # 2.1.3 (2025-01-26)

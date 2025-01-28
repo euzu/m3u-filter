@@ -16,7 +16,9 @@ reverse_proxy:
     size: 500MB
     enabled: true
     dir: /home/m3u-filter/cache
-
+log:
+  sanitize_sensitive_info: false
+  active_clients: true
 web_ui_enabled: true
 web_auth:
   enabled: false

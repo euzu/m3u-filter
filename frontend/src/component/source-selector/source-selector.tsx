@@ -13,7 +13,7 @@ interface SourceSelectorProps {
 }
 
 export default function SourceSelector(props: SourceSelectorProps) {
-    const textField = useRef<HTMLInputElement>(null);
+    const textField = useRef<HTMLInputElement>(undefined);
     const [popupVisible, setPopupVisible] = useState<{ x: number, y: number }>(undefined);
     const [sources, setSources] = useState<InputConfig[]>([]);
     const [selected, setSelected] = useState<InputConfig>(undefined);
@@ -50,7 +50,7 @@ export default function SourceSelector(props: SourceSelectorProps) {
 
     const handleMenuClick = useCallback((evt: any) => {
         const idx = evt.target.dataset.idx;
-        if (idx != null) {
+        if (idx != undefined) {
             setPopupVisible(undefined);
             setSelected(sources[idx]);
             textField.current.value = sources[idx].name || sources[idx].url;

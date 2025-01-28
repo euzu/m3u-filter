@@ -8,7 +8,7 @@ use std::collections::{HashMap, VecDeque};
 use std::io::ErrorKind;
 use std::path::{PathBuf};
 use std::sync::Arc;
-
+use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::api::m3u_api::m3u_api_register;
 use crate::api::model::app_state::AppState;
 use crate::api::model::download::DownloadQueue;
@@ -35,13 +35,14 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
     Ok(web_dir_path)
 }
 
-async fn healthcheck() -> HttpResponse {
+async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
     let ts = chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     HttpResponse::Ok().json(Healthcheck {
         status: "ok".to_string(),
         version: VERSION.to_string(),
         time: ts,
-        mem: sys::get_memory_usage().map_or(String::from("?"), human_readable_byte_size)
+        mem: sys::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
+        active_clients: app_state.active_clients.as_ref().load(Ordering::Relaxed)
     })
 }
 
@@ -66,6 +67,7 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
             active: Arc::from(RwLock::new(None)),
             finished: Arc::from(RwLock::new(Vec::new())),
         }),
+        active_clients: Arc::new(AtomicUsize::new(0)),
         shared_streams: Arc::new(Mutex::new(HashMap::new())),
         http_client: Arc::new(reqwest::Client::new()),
         cache,

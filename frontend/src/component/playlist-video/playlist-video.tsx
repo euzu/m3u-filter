@@ -9,7 +9,7 @@ interface PlaylistVideoProps {
 
 export default function PlaylistVideo(props: PlaylistVideoProps): JSX.Element {
     const {channel} = props;
-    const playerRef = useRef(null);
+    const playerRef = useRef(undefined);
     const handlePlayerReady = (player: any) => {
         playerRef.current = player;
     };

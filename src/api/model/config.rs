@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::model::api_proxy::ApiProxyConfig;
-use crate::model::config::{ProcessingOrder, ReverseProxyConfig, ScheduleConfig, WebAuthConfig};
+use crate::model::config::{LogConfig, ProcessingOrder, ReverseProxyConfig, ScheduleConfig, WebAuthConfig};
 use crate::model::config::{ConfigApi, ConfigRename, ConfigSort, ConfigTargetOptions, InputType, MessagingConfig, TargetOutput, VideoConfig};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -50,7 +50,7 @@ pub struct ServerConfig {
     pub messaging: Option<MessagingConfig>,
     pub video: Option<VideoConfig>,
     pub api_proxy: Option<ApiProxyConfig>,
-    pub log_sanitize_sensitive_info: bool,
+    pub log: Option<LogConfig>,
     pub update_on_boot: bool,
     pub web_ui_enabled: bool,
     pub web_auth: Option<WebAuthConfig>,

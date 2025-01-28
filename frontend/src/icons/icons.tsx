@@ -8,7 +8,7 @@ export const getIconByName = (name: string): any => {
         // @ts-ignore
         return ICON[name];
     }
-    return null;
+    return undefined;
 }
 
 const DEFAULT_ICONS = {

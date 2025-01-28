@@ -1,7 +1,7 @@
 import React, {useCallback, useMemo, useState} from "react";
 import './main-config-view.scss';
 import ServerConfig, {
-    CacheConfig,
+    CacheConfig, LogConfig,
     MessagingConfig, PushoverConfig, RestConfig, ReverseProxyConfig,
     ServerApiConfig,
     ServerMainConfig, StreamBufferConfig, StreamConfig,
@@ -33,11 +33,18 @@ const CONFIG_FIELDS = [
     {name: 'threads', label: 'Threads', fieldType: FormFieldType.NUMBER, validator: isNumber},
     {name: 'working_dir', label: 'Working dir', fieldType: FormFieldType.TEXT, validator: undefined},
     {name: 'backup_dir', label: 'Backup dir', fieldType: FormFieldType.TEXT, validator: undefined},
-    {name: 'log_sanitize_sensitive_info', label: 'Sanitize sensitive info', fieldType: FormFieldType.CHECK, validator: undefined},
     {name: 'update_on_boot', label: 'Update on boot', fieldType: FormFieldType.CHECK, validator: undefined},
     {name: 'web_ui_enabled', label: 'Web UI', fieldType: FormFieldType.CHECK, validator: undefined},
-    {name: 'schedules', label: 'Schedules', fieldType: FormFieldType.SCHEDULE, validator: undefined},
 ];
+
+const CONFIG_SCHEDULES_FIELDS = [
+    {name: 'schedules', label: 'Schedules', fieldType: FormFieldType.SCHEDULE},
+];
+
+const CONFIG_LOG_FIELDS = [
+    {name: 'sanitize_sensitive_info', label: 'Sanitize sensitive info', fieldType: FormFieldType.CHECK},
+    {name: 'active_clients', label: 'Active Clients', fieldType: FormFieldType.CHECK},
+]
 
 const CONFIG_REVERSE_PROXY_FIELDS = [
     {name: 'resource_rewrite_disabled', label: 'Resource Rewrite disable', fieldType: FormFieldType.CHECK},
@@ -97,6 +104,7 @@ const CONFIG_VIDEO_DOWNLOAD_FIELDS = [
 const TABS = [
     {label: 'Api', key: 'api'},
     {label: 'Main', key: 'main'},
+    {label: 'Schedules', key: 'schedules'},
     {label: 'ReverseProxy', key: 'reverseProxy'},
     {label: 'Messaging', key: 'messaging'},
     {label: 'Video', key: 'video'}
@@ -123,6 +131,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
     const reverseProxyStreamConfig = useMemo<StreamConfig>(() => config?.reverse_proxy?.stream || {} as any, [config]);
     const reverseProxyStreamBufferConfig = useMemo<StreamBufferConfig>(() => config?.reverse_proxy?.stream?.buffer || {} as any, [config]);
     const reverseProxyCacheConfig = useMemo<CacheConfig>(() => config?.reverse_proxy?.cache || {} as any, [config]);
+    const logConfig = useMemo<LogConfig>(() => config?.log || {} as any, [config]);
 
     const scheduleImage = useMemo(() => <svg className={'main-config__content-help-img'} focusable="false"
                                              aria-hidden="true" viewBox='0 0 120 30'>
@@ -135,29 +144,33 @@ export default function MainConfigView(props: MainConfigViewProps) {
             let pushoverConfigAvailable = pushoverConfig?.user?.trim().length && pushoverConfig?.token?.length;
             const cfgMessaging: MessagingConfig = {
                 notify_on: messagingConfig.notify_on,
-                telegram: telegramConfigAvailable ? telegramConfig : null,
-                rest: restConfigAvailable ? restConfig : null,
-                pushover: pushoverConfigAvailable ? pushoverConfig : null,
+                telegram: telegramConfigAvailable ? telegramConfig : undefined,
+                rest: restConfigAvailable ? restConfig : undefined,
+                pushover: pushoverConfigAvailable ? pushoverConfig : undefined,
             };
 
             let cfgReverseProxyStreamBuffer : StreamConfig = {
                 retry: reverseProxyStreamConfig.retry,
                 buffer: {
                     enabled: reverseProxyStreamBufferConfig.enabled,
-                    size: reverseProxyStreamBufferConfig.size ?? null,
+                    size: reverseProxyStreamBufferConfig.size ?? undefined,
                 }
             }
 
             const cfgReverseProxy: ReverseProxyConfig = {
                 resource_rewrite_disabled: reverseProxyConfig.resource_rewrite_disabled,
-                stream: cfgReverseProxyStreamBuffer ?? null,
-                cache: reverseProxyCacheConfig ?? null,
+                stream: cfgReverseProxyStreamBuffer ?? undefined,
+                cache: reverseProxyCacheConfig ?? undefined,
             };
 
             const cfgVideo = {
                 ...videoConfig,
                 download: videoDownloadConfig
-            }
+            };
+
+            const cfgLog = {
+                ...logConfig
+            };
 
             const cfgMain: ServerMainConfig = {
                 api: apiConfig,
@@ -168,7 +181,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 messaging: cfgMessaging,
                 reverse_proxy: cfgReverseProxy,
                 video: cfgVideo,
-                log_sanitize_sensitive_info: mainConfig.log_sanitize_sensitive_info,
+                log: cfgLog,
                 update_on_boot: mainConfig.update_on_boot,
                 web_ui_enabled: mainConfig.web_ui_enabled,
                 web_auth: mainConfig.web_auth,
@@ -180,7 +193,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
             });
         }
     }, [mainConfig, apiConfig, videoConfig, messagingConfig, telegramConfig, restConfig, pushoverConfig,
-        videoDownloadConfig, reverseProxyConfig, enqueueSnackbar, services,
+        videoDownloadConfig, reverseProxyConfig, enqueueSnackbar, services, logConfig,
         reverseProxyCacheConfig, reverseProxyStreamConfig, reverseProxyStreamBufferConfig]);
 
     const handleTabChange = useCallback((tab: string) => {
@@ -202,13 +215,20 @@ export default function MainConfigView(props: MainConfigViewProps) {
             </div>
             <div className={'main-config__content-form main-config__form' + ('main' !== activeTab ? ' hidden' : '')}>
                 <FormView data={mainConfig} fields={CONFIG_FIELDS}></FormView>
+                <label className="main-config__content-form__section-title">Log</label>
+                <FormView data={logConfig} fields={CONFIG_LOG_FIELDS}></FormView>
                 <div className={'main-config__content-help'}>
                     <span>Threads: keep it 0 if you have no problems. Increase it if you have multiple providers. Accessing you provider parallel can cause a ban.</span>
                     <span>Schedule example:</span>
                     {scheduleImage}
                 </div>
             </div>
-            <div className={'main-config__content-form reverse-proxy__form' + ('reverseProxy' !== activeTab ? ' hidden' : '')}>
+            <div
+                className={'main-config__content-form schedules__form' + ('schedules' !== activeTab ? ' hidden' : '')}>
+                <FormView data={mainConfig} fields={CONFIG_SCHEDULES_FIELDS}></FormView>
+            </div>
+            <div
+                className={'main-config__content-form reverse-proxy__form' + ('reverseProxy' !== activeTab ? ' hidden' : '')}>
                 <FormView data={reverseProxyConfig} fields={CONFIG_REVERSE_PROXY_FIELDS}></FormView>
                 <label className="main-config__content-form__section-title">Stream</label>
                 <FormView data={reverseProxyStreamConfig} fields={CONFIG_REVERSE_PROXY_STREAM_FIELDS}></FormView>

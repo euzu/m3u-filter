@@ -720,6 +720,15 @@ pub struct MessagingConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
+pub struct LogConfig {
+    #[serde(default = "default_as_true")]
+    pub sanitize_sensitive_info: bool,
+    #[serde(default)]
+    pub active_clients: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct VideoDownloadConfig {
     #[serde(default)]
     pub headers: HashMap<String, String>,
@@ -794,8 +803,8 @@ pub struct ConfigDto {
     pub schedules: Option<Vec<ScheduleConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub messaging: Option<MessagingConfig>,
-    #[serde(default = "default_as_true")]
-    pub log_sanitize_sensitive_info: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log: Option<LogConfig>,
     #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]
@@ -1017,8 +1026,8 @@ pub struct Config {
     pub video: Option<VideoConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<Vec<ScheduleConfig>>,
-    #[serde(default = "default_as_true")]
-    pub log_sanitize_sensitive_info: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log: Option<LogConfig>,
     #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]

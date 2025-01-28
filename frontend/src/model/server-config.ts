@@ -130,6 +130,11 @@ export interface MessagingConfig {
     pushover?: PushoverConfig;
 }
 
+export interface LogConfig {
+    sanitize_sensitive_info: boolean,
+    active_clients: boolean,
+}
+
 export interface Credentials {
     username: string;
     password: string;
@@ -206,7 +211,7 @@ export interface ServerMainConfig {
     schedules?: Schedule[];
     messaging?: MessagingConfig;
     video?: VideoConfig;
-    log_sanitize_sensitive_info: boolean,
+    log?: LogConfig,
     update_on_boot: boolean,
     web_ui_enabled: boolean,
     web_auth?: WebAuthConfig,

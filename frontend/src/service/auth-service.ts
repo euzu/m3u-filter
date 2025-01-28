@@ -33,7 +33,7 @@ export default class AuthService {
         if (this.token) {
             return this.authApiService.refresh().pipe(map(auth => {
                 this.token = auth.token;
-                return auth.token != null
+                return auth.token != undefined
             }), tap(data => {
                 this.subject.next(data);
             }), catchError((error: any) => {
@@ -47,14 +47,14 @@ export default class AuthService {
     authenticate(username: string, password: string): Observable<boolean> {
         return this.authApiService.authenticate(username, password).pipe(map(auth => {
             this.token = auth.token;
-            return auth.token != null
+            return auth.token != undefined
         }), tap(data => {
             this.subject.next(data);
         }), catchError(() => of(false)));
     }
 
     isAuthenticated(): boolean {
-        return this.token != null;
+        return this.token != undefined;
     }
 
     getToken(): string {

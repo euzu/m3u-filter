@@ -22,8 +22,8 @@ interface MapEditorProps {
 export default function MapEditor(props: MapEditorProps) {
     const {name, values, onChange} = props;
     const uuid = useMemo(() => genUuid(), []);
-    const keyRef = useRef<HTMLInputElement>(null);
-    const valRef = useRef<HTMLInputElement>(null);
+    const keyRef = useRef<HTMLInputElement>(undefined);
+    const valRef = useRef<HTMLInputElement>(undefined);
     const [data, setData] = useState<KeyValue[]>([]);
 
     useEffect(() => {

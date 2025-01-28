@@ -13,12 +13,12 @@ function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: bool
     if (playlist) {
         return playlist.filter(group => filter[group.id] !== true)
     }
-    return null;
+    return undefined;
 }
 
 function textMatch(text: string, searchRequest: SearchRequest): boolean {
     if (searchRequest.regexp) {
-        return text.toLowerCase().match(searchRequest.filter) != null;
+        return text.toLowerCase().match(searchRequest.filter) != undefined;
     } else {
         return (text.toLowerCase().indexOf(searchRequest.filter) > -1);
     }
@@ -103,7 +103,7 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
     useEffect(() => {
         const sub = searchChannel.subscribe((searchRequest: SearchRequest) => {
             let criteria = searchRequest.filter;
-            if (criteria == null || !criteria.length || !criteria.trim().length) {
+            if (criteria == undefined || !criteria.length || !criteria.trim().length) {
                 setData(playlist);
             } else {
                 const trimmedCrit = criteria.trim();

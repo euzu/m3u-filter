@@ -7,8 +7,8 @@ const checkUserPwd = (username: string, password: string) => username.trim().len
 
 export default function Login(): JSX.Element {
 
-    const usernameRef = useRef<HTMLInputElement>(null);
-    const passwordRef = useRef<HTMLInputElement>(null);
+    const usernameRef = useRef<HTMLInputElement>(undefined);
+    const passwordRef = useRef<HTMLInputElement>(undefined);
     const services = useServices();
     const [authorized, setAuthorized] = useState(true);
 

@@ -11,7 +11,7 @@ interface CheckboxProps {
 export default function Checkbox(props: CheckboxProps) {
 
     const {label, value, onSelect, checked} = props;
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(undefined);
 
     const handleSelect = useCallback((evt: any) => {
         evt.preventDefault();

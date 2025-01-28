@@ -6,6 +6,7 @@ use crate::api::model::stream_error::StreamError;
 use crate::debug_if_enabled;
 use crate::model::config::ConfigInput;
 use crate::model::playlist::PlaylistItemType;
+use crate::utils::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::request_utils::{get_request_headers, sanitize_sensitive_info};
 use actix_web::HttpRequest;
 use bytes::Bytes;
@@ -19,7 +20,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use url::Url;
-use crate::utils::atomic_once_flag::AtomicOnceFlag;
 
 // TODO make this configurable
 pub const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
@@ -182,7 +182,7 @@ fn prepare_client(request_client: &Arc<reqwest::Client>, url: &Url, headers: &He
     let mut client = request_client.get(url.clone()).headers(headers.clone());
     if let Some(range) = range_start_bytes_to_request {
         // on reconnect send range header to avoid starting from beginning for vod
-        let range = format!("bytes={range}-",);
+        let range = format!("bytes={range}-", );
         client = client.header(RANGE, range);
         (client, true) // partial content
     } else {
@@ -206,7 +206,7 @@ async fn provider_request(request_client: Arc<reqwest::Client>, initial_info: bo
                 } else {
                     None
                 };
-                return Ok(Some((response.bytes_stream().map_err(|err|StreamError::reqwest(&err)).boxed(), response_info)));
+                return Ok(Some((response.bytes_stream().map_err(|err| StreamError::reqwest(&err)).boxed(), response_info)));
             }
             Err(status)
         }
@@ -229,7 +229,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
             Ok(response) => {
                 let status = response.status();
                 if status.is_success() {
-                    return Some(response.bytes_stream().map_err(|err|StreamError::reqwest(&err)).boxed());
+                    return Some(response.bytes_stream().map_err(|err| StreamError::reqwest(&err)).boxed());
                 }
                 if status.is_client_error() {
                     return None;
@@ -308,7 +308,6 @@ fn create_provider_stream_options(stream_url: &Url,
 }
 
 
-// options: (PlaylistItemType, reconnect: bool, buffer: bool, buffer_size: usize)
 pub async fn create_provider_stream(client: Arc<reqwest::Client>,
                                     stream_url: &Url,
                                     req: &HttpRequest,

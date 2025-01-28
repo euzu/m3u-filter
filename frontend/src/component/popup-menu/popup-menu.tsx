@@ -11,7 +11,7 @@ interface PopupMenuProps {
 
 export default function PopupMenu(props: PopupMenuProps) {
     const {position, onHide} = props;
-    const popupRef = useRef(null);
+    const popupRef = useRef(undefined);
     const [popupPosition, setPopupPosition] = useState<any>({top: 0, left: -2000})
 
     useEffect(() => {

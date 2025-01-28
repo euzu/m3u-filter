@@ -6,7 +6,7 @@ use crate::processing::{xtream_parser};
 use crate::repository::xtream_repository::{rewrite_xtream_series_info_content, rewrite_xtream_vod_info_content, xtream_get_input_info};
 use crate::repository::xtream_repository;
 use crate::utils::{request_utils};
-use log::{info};
+use log::{info, warn};
 use std::cmp::Ordering;
 use std::io::{Error};
 use crate::model::api_proxy::{ProxyUserCredentials};
@@ -18,7 +18,6 @@ const ACTION_GET_LIVE_INFO: &str = "get_live_info";
 pub fn get_xtream_stream_url_base(url: &str, username: &str, password: &str) -> String {
     format!("{url}/player_api.php?username={username}&password={password}")
 }
-
 
 pub fn get_xtream_player_api_action_url(input: &ConfigInput, action: &str) -> Option<String> {
     if let Some(user_info) = input.get_user_info() {
@@ -128,11 +127,18 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Series, "get_series_categories", "get_series")];
 
 pub async fn get_xtream_playlist(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
-    let mut playlist_groups: Vec<PlaylistGroup> = Vec::with_capacity(128);
+
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
     let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);
 
+    if let Err(err) = request_utils::get_input_json_content(Arc::clone(&client), input, base_url.as_str(), None).await {
+        warn!("Failed to login xtream account {username} {err}");
+        return (Vec::with_capacity(0), vec![err]);
+    };
+
+
+    let mut playlist_groups: Vec<PlaylistGroup> = Vec::with_capacity(128);
     let skip_cluster = get_skip_cluster(input);
 
     let mut errors = vec![];

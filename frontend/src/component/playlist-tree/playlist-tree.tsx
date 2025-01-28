@@ -23,7 +23,7 @@ interface PlaylistTreeProps {
 export default function PlaylistTree(props: PlaylistTreeProps) {
     const {serverConfig, state, data, onCopy, onPlay, onDownload, onWebSearch} = props;
 
-    const [, setForceUpdate] = useState(null);
+    const [, setForceUpdate] = useState(undefined);
     const expanded = useRef<PlaylistTreeState>({});
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [videoExtensions, setVideoExtensions] = useState<string[]>([]);

@@ -22,13 +22,14 @@ use actix_web::{HttpRequest, HttpResponse};
 use async_std::sync::Mutex;
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use futures::TryStreamExt;
+use futures::{TryStreamExt};
 use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use url::Url;
+use crate::api::model::active_client_stream::ActiveClientStream;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
@@ -121,6 +122,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         get_stream_options(app_state);
 
     if let Ok(url) = Url::parse(stream_url) {
+        let active_clients = Arc::clone(&app_state.active_clients);
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
             get_provider_pipe_stream(&app_state.http_client, &url, req, input).await
         } else {
@@ -129,7 +131,8 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         };
         if let Some(stream) = stream_opt {
             let content_length = get_stream_content_length(provider_response.as_ref());
-
+            let log_active_clients = app_state.config.log.as_ref().map_or(false, |l| l.active_clients);
+            let stream = ActiveClientStream::new(stream, active_clients, log_active_clients);
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
                 SharedStream::register(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers).await;

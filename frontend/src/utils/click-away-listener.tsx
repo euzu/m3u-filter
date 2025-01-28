@@ -35,8 +35,8 @@ const ClickAwayListener: FunctionComponent<Props> = ({
                                                          mouseEvent = 'click',
                                                          touchEvent = 'touchend'
                                                      }) => {
-    const node = useRef<HTMLElement | null>(null);
-    const bubbledEventTarget = useRef<EventTarget | null>(null);
+    const node = useRef<HTMLElement | undefined>(undefined);
+    const bubbledEventTarget = useRef<EventTarget | undefined>(undefined);
     const mountedRef = useRef(false);
 
     /**

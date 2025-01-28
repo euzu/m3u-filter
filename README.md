@@ -76,7 +76,7 @@ Top level entries in the config files are:
 * `web_ui_enabled` _optional_
 * `web_auth` _optional_
 * `reverse_proxy` _optional_
-* `log_sanitize_sensitive_info` _optional_, default true 
+* `log` _optional
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -229,10 +229,21 @@ is the directory where the backup configuration files written, when saved from t
 ### 1.8 `update_on_boot`
 if set to true, an update is started when the application starts.
 
-### 1.9 `web_ui_enabled`
+### 1.9 `log`
+`log` has two attributes
+- `sanitize_sensitive_info` default true
+- `active_clients` default false, if set to true reverse proxy client count is printed as info log.
+
+```yaml
+log:
+  sanitize_sensitive_info: false
+  active_clients: true
+```
+
+### 1.10 `web_ui_enabled`
 default is true, if set to false the web_ui is disabled
 
-### 1.10 `web_auth`
+### 1.11 `web_auth`
 Web UI Authentication can be enabled if `web_ui_enabled` is `true`.
 
 ```yaml
@@ -439,11 +450,10 @@ Target options are:
 
 `strm` output has additional options
 - `underscore_whitespace` replaces all whitespaces with `_` in the path.
-- `cleanup` deletes the directory given at `filename`.
+- `cleanup` deletes the directory given at `filename`. Don't point at existing media folder or everything will be deleted.
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 - `strm_props` is a list of properties written to the strm file.
 If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is added. If `strm_props` is not given `#KODIPROP:inputstream=inputstream.ffmpeg`, `"#KODIPROP:http-reconnect=true` are set too for `kody_style`.
-
 
 `m3u` output has additional options
 - `m3u_include_type_in_url`, default false, if true adds the stream type `live`, `movie`, `series` to the url of the stream.

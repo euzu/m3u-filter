@@ -52,7 +52,7 @@ export default function ScheduleEditor(props: ScheduleEditorProps) {
 
   const handleScheduleAdd = useCallback((evt: any) => {
     setSchedules(data => {
-      let newData = [...data, {schedule: '', targets: null}];
+      let newData = [...data, {schedule: '', targets: undefined}];
       onChange(name, newData);
       return newData;
     });
