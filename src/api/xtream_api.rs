@@ -30,7 +30,7 @@ use crate::repository::xtream_repository;
 use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::utils::json_utils::get_u32_from_serde_value;
 use crate::utils::request_utils::{extract_extension_from_url, sanitize_sensitive_info};
-use crate::utils::{download, json_utils, request_utils};
+use crate::utils::{json_utils, request_utils, xtream_utils};
 use crate::{debug_if_enabled, info_err};
 
 const ACTION_GET_SERIES_INFO: &str = "get_series_info";
@@ -463,11 +463,11 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
     if let Ok((pli, _)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(cluster)).await {
         let input_name = Rc::clone(&pli.input_name);
         if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
-            if let Some(info_url) = download::get_xtream_player_api_info_url(input, cluster, pli.provider_id) {
+            if let Some(info_url) = xtream_utils::get_xtream_player_api_info_url(input, cluster, pli.provider_id) {
                 // Redirect is only possible for live streams, vod and series info needs to be modified
                 if user.proxy == ProxyType::Redirect && cluster == XtreamCluster::Live {
                     return HttpResponse::Found().insert_header(("Location", info_url)).finish();
-                } else if let Ok(content) = download::get_xtream_stream_info(Arc::clone(&app_state.http_client), &app_state.config, user, input, target, &pli, info_url.as_str(), cluster).await {
+                } else if let Ok(content) = xtream_utils::get_xtream_stream_info(Arc::clone(&app_state.http_client), &app_state.config, user, input, target, &pli, info_url.as_str(), cluster).await {
                     return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content);
                 }
             }
@@ -491,7 +491,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
         if let Ok((pli, _)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await {
             let input_name = Rc::clone(&pli.input_name);
             if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
-                if let Some(action_url) = download::get_xtream_player_api_action_url(input, ACTION_GET_SHORT_EPG) {
+                if let Some(action_url) = xtream_utils::get_xtream_player_api_action_url(input, ACTION_GET_SHORT_EPG) {
                     let mut info_url = format!("{action_url}&{TAG_STREAM_ID}={}", pli.provider_id);
                     if !(limit.is_empty() || limit.eq("0")) {
                         info_url = format!("{info_url}&limit={limit}");
@@ -540,8 +540,8 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     let virtual_id: u32 = try_result_bad_request!(FromStr::from_str(stream_id));
     let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)).await);
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()));
-    let info_url = try_option_bad_request!(download::get_xtream_player_api_action_url(input, ACTION_GET_CATCHUP_TABLE).map(|action_url| format!("{action_url}&{TAG_STREAM_ID}={}&start={start}&end={end}", pli.provider_id)));
-    let content = try_result_bad_request!(download::get_xtream_stream_info_content(Arc::clone(&app_state.http_client), info_url.as_str(), input).await);
+    let info_url = try_option_bad_request!(xtream_utils::get_xtream_player_api_action_url(input, ACTION_GET_CATCHUP_TABLE).map(|action_url| format!("{action_url}&{TAG_STREAM_ID}={}&start={start}&end={end}", pli.provider_id)));
+    let content = try_result_bad_request!(xtream_utils::get_xtream_stream_info_content(Arc::clone(&app_state.http_client), info_url.as_str(), input).await);
     let mut doc: Map<String, Value> = try_result_bad_request!(serde_json::from_str(&content));
     let epg_listings = try_option_bad_request!(doc.get_mut(TAG_EPG_LISTINGS).and_then(Value::as_array_mut));
     let target_path = try_option_bad_request!(get_target_storage_path(&app_state.config, target.name.as_str()));

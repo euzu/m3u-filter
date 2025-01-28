@@ -359,7 +359,8 @@ pub async fn get_input_json_content(client: Arc<reqwest::Client>, input: &Config
 static USERNAME_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(username=)[^&]*").unwrap());
 static PASSWORD_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(password=)[^&]*").unwrap());
 static TOKEN_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(token=)[^&]*").unwrap());
-static STREAM_URL: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(.*://).*/(live|video|movie|series|m3u-stream)/\w+/\w+").unwrap());
+static STREAM_URL_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(.*://).*/(live|video|movie|series|m3u-stream|resource)/\w+/\w+").unwrap());
+static URL_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(.*://).*?/(.*)").unwrap());
 
 static SANITIZE_SENSITIVE_INFO: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(true));
 
@@ -372,7 +373,8 @@ pub fn sanitize_sensitive_info(query: &str) -> String {
         let masked_query = USERNAME_REGEX.replace_all(query, "$1***");
         let masked_query = PASSWORD_REGEX.replace_all(&masked_query, "$1***");
         let masked_query = TOKEN_REGEX.replace_all(&masked_query, "$1***");
-        let masked_query = STREAM_URL.replace_all(&masked_query, "$1***/$2/***");
+        let masked_query = STREAM_URL_REGEX.replace_all(&masked_query, "$1***/$2/***");
+        let masked_query = URL_REGEX.replace_all(&masked_query, "$1***/$2");
         masked_query.to_string()
     } else {
         query.to_string()
@@ -397,16 +399,14 @@ pub fn extract_extension_from_url(url: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    // use crate::utils::request_utils::{capitalize_header_name, STREAM_URL};
-
-    use crate::utils::request_utils::STREAM_URL;
+    use crate::utils::request_utils::{sanitize_sensitive_info};
 
     #[test]
     fn test_url_mask() {
         // Replace with "***"
-        let masked_query = "https://bubblegum.tv/live/username/password/2344.ts";
-        let masked_query = STREAM_URL.replace_all(&masked_query, "$1***/$2/***");
-        println!("{masked_query}")
+        let query = "https://bubblegum.tv/live/username/password/2344";
+        let masked = sanitize_sensitive_info(&query);
+        println!("{masked}")
     }
 
 }

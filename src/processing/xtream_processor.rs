@@ -2,7 +2,7 @@ use crate::m3u_filter_error::{str_to_io_error, to_io_error, M3uFilterError, M3uF
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::storage::get_input_storage_path;
-use crate::utils::download;
+use crate::utils::{xtream_utils};
 use crate::{info_err, notify_err};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,8 +57,8 @@ macro_rules! create_resolve_options_function_for_xtream_target {
 pub(in crate::processing) async fn playlist_resolve_download_playlist_item(client: Arc<reqwest::Client>, pli: &PlaylistItem, input: &ConfigInput, errors: &mut Vec<M3uFilterError>, resolve_delay: u16, cluster: XtreamCluster) -> Option<String> {
     let mut result = None;
     let provider_id = pli.get_provider_id()?;
-    if let Some(info_url) = download::get_xtream_player_api_info_url(input, cluster, provider_id) {
-        result = match download::get_xtream_stream_info_content(client, &info_url, input).await {
+    if let Some(info_url) = xtream_utils::get_xtream_player_api_info_url(input, cluster, provider_id) {
+        result = match xtream_utils::get_xtream_stream_info_content(client, &info_url, input).await {
             Ok(content) => Some(content),
             Err(err) => {
                 errors.push(info_err!(format!("{err}")));

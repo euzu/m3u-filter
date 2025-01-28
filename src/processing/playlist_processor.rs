@@ -1,5 +1,8 @@
 extern crate unidecode;
 
+use crate::utils::epg_utils;
+use crate::utils::m3u_utils;
+use crate::utils::xtream_utils;
 use crate::repository::storage::hash_string;
 use async_std::sync::Mutex;
 use core::cmp::Ordering;
@@ -30,7 +33,6 @@ use crate::processing::xtream_processor_series::playlist_resolve_series;
 use crate::processing::xtream_processor_vod::playlist_resolve_vod;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
-use crate::utils::download;
 use crate::{debug_if_enabled, get_errors_notify_message, model::config, notify_err, Config};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
@@ -302,11 +304,11 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
         if is_input_enabled(enabled_inputs, input.enabled, input.id, &user_targets) {
             let start_time = Instant::now();
             let (mut playlistgroups, mut error_list) = match input.input_type {
-                InputType::M3u => download::get_m3u_playlist(Arc::clone(&client), &cfg, input, &cfg.working_dir).await,
-                InputType::Xtream => download::get_xtream_playlist(Arc::clone(&client), input, &cfg.working_dir).await,
+                InputType::M3u => m3u_utils::get_m3u_playlist(Arc::clone(&client), &cfg, input, &cfg.working_dir).await,
+                InputType::Xtream => xtream_utils::get_xtream_playlist(Arc::clone(&client), input, &cfg.working_dir).await,
             };
             let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
-                download::get_xmltv(Arc::clone(&client), &cfg, input, &cfg.working_dir).await
+                epg_utils::get_xmltv(Arc::clone(&client), &cfg, input, &cfg.working_dir).await
             } else {
                 (None, vec![])
             };

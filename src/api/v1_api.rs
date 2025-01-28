@@ -16,7 +16,7 @@ use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCrede
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
 use crate::processing::playlist_processor;
 use crate::utils::request_utils::sanitize_sensitive_info;
-use crate::utils::{config_reader, download};
+use crate::utils::{config_reader, m3u_utils, xtream_utils};
 
 fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
@@ -124,6 +124,7 @@ fn create_config_input_for_url(name: &str, url: &str) -> ConfigInput {
             xtream_skip_live: false,
             xtream_skip_vod: false,
             xtream_skip_series: false,
+            xtream_live_stream_without_extension: false,
         }),
         ..Default::default()
     }
@@ -134,8 +135,8 @@ async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInp
         Some(input) => {
             let (result, errors) =
                 match input.input_type {
-                    InputType::M3u => download::get_m3u_playlist(client, cfg, input, &cfg.working_dir).await,
-                    InputType::Xtream => download::get_xtream_playlist(client, input, &cfg.working_dir).await,
+                    InputType::M3u => m3u_utils::get_m3u_playlist(client, cfg, input, &cfg.working_dir).await,
+                    InputType::Xtream => xtream_utils::get_xtream_playlist(client, input, &cfg.working_dir).await,
                 };
             if result.is_empty() {
                 let error_strings: Vec<String> = errors.iter().map(std::string::ToString::to_string).collect();
@@ -200,6 +201,10 @@ async fn config(
         threads: config.threads,
         working_dir: config.working_dir.clone(),
         backup_dir: config.backup_dir.clone(),
+        log_sanitize_sensitive_info: config.log_sanitize_sensitive_info,
+        update_on_boot: config.update_on_boot,
+        web_ui_enabled: config.web_ui_enabled,
+        web_auth: config.web_auth.clone(),
         schedules: config.schedules.clone(),
         reverse_proxy: config.reverse_proxy.clone(),
         messaging: config.messaging.clone(),

@@ -555,6 +555,8 @@ pub struct ConfigInputOptions {
     pub xtream_skip_vod: bool,
     #[serde(default)]
     pub xtream_skip_series: bool,
+    #[serde(default)]
+    pub xtream_live_stream_without_extension: bool,
 }
 
 pub struct InputUserInfo {

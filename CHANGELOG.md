@@ -1,6 +1,8 @@
 # Changelog
 # 2.1.4 (2025-01-xx)
 - !BREAKING CHANGE!  unique `input` `name` is now mandatory, because rearranging the `source.yml` could lead to wrong results without a playlist update.
+_- Added new option to `input` `xtream_live_stream_without_extension`. Default is `false`.  Some providers don't like `.ts`  extension, some providers need it.
+Now you can disable or enable it for a provider.
 
 # 2.1.3 (2025-01-26)
 - Hotfix 2.1.2, forgot to update the stream api code.  

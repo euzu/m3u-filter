@@ -1,4 +1,4 @@
-import React, {useCallback, useRef} from "react";
+import React, {useCallback, useLayoutEffect, useRef} from "react";
 import './checkbox.scss';
 
 interface CheckboxProps {
@@ -20,14 +20,21 @@ export default function Checkbox(props: CheckboxProps) {
         onSelect?.(inputRef.current.checked, value, evt);
     }, [value, onSelect]);
 
+    useLayoutEffect(() => {
+       if (inputRef.current) {
+           inputRef.current.checked = checked;
+       }
+    }, [checked]);
+
     if (label) {
         return <label className="checkbox-container" onClick={handleSelect}>
-            <input ref={inputRef}  type="checkbox" defaultChecked={checked} checked={checked}/>
+            {label}
+            <input ref={inputRef}  type="checkbox" defaultChecked={checked}/>
             <span className="checkmark"></span>
         </label>;
     } else {
         return <div className="checkbox-container" onClick={handleSelect}>
-            <input ref={inputRef} type="checkbox" defaultChecked={checked}  checked={checked}/>
+            <input ref={inputRef} type="checkbox" defaultChecked={checked}/>
             <span className="checkmark"></span>
         </div>
     }

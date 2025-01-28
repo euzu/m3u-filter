@@ -14,6 +14,9 @@ pub mod lru_cache;
 pub mod size_utils;
 pub mod sys;
 pub mod atomic_once_flag;
+pub mod xtream_utils;
+pub mod m3u_utils;
+pub mod epg_utils;
 
 #[macro_export]
 macro_rules! debug_if_enabled {

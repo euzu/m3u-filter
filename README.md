@@ -325,6 +325,7 @@ Each input has the following attributes:
     + `xtream_skip_live` true or false, live section can be skipped.
     + `xtream_skip_vod` true or false, vod section can be skipped. 
     + `xtream_skip_series` true or false, series section can be skipped.
+    + `xtream_live_stream_without_extension` default false, if set to true `.ts` extension is not added to he stream link.
 
 
 `persist` should be different for `m3u` and `xtream` types. For `m3u` use full filename like `./playlist_{}.m3u`.
@@ -344,6 +345,7 @@ sources:
       epg_url: 'test-epg.xml'
       enabled: false
       persist: 'playlist_1_{}.m3u'
+      options: {xtream_skip_series: true}
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ad.m3u'
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/au.m3u'
     - url: 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/za.m3u'
