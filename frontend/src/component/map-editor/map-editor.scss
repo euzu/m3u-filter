@@ -31,7 +31,8 @@
   }
 
   &__col-key, &__col-value {
-    flex: 1;
+    box-sizing: border-box;
+    min-width: 12rem;
     border: 1px solid var(--border-color);
     padding: 0 4px;
   }
@@ -41,12 +42,15 @@
     flex-flow: row wrap;
     gap: 20px;
     align-items: center;
-    flex: 1;
 
     &-key, &-value {
-      flex: 1;
+      box-sizing: border-box;
+      min-width: 12rem;
       display: flex;
       gap: 10px;
+      input {
+        padding: 4px 0;
+      }
     }
 
     &-toolbar {
