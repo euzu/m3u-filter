@@ -13,12 +13,12 @@ const FILE_ID_MAPPING: &str = "id_mapping.db";
 
 /// generates a hash from a string
 #[inline]
-pub fn hash_string(url: &str) -> UUIDType {
-    blake3::hash(url.as_bytes()).into()
+pub fn hash_string(text: &str) -> UUIDType {
+    blake3::hash(text.as_bytes()).into()
 }
 
 #[inline]
-fn hex_encode(bytes: &[u8]) -> String {
+pub fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().fold(String::new(), |mut output, b| {
         let _ = write!(output, "{b:02X}");
         output

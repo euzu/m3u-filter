@@ -131,7 +131,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         };
         if let Some(stream) = stream_opt {
             let content_length = get_stream_content_length(provider_response.as_ref());
-            let log_active_clients = app_state.config.log.as_ref().map_or(false, |l| l.active_clients);
+            let log_active_clients = app_state.config.log.as_ref().is_some_and(|l| l.active_clients);
             let stream = ActiveClientStream::new(stream, active_clients, log_active_clients);
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());

@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::utils::hash_utils::extract_id_from_url;
 use crate::utils::string_utils;
 
 #[inline]
@@ -154,12 +155,6 @@ fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, u
     plih
 }
 
-pub fn extract_id_from_url(url: &str) -> Option<String> {
-    if let Some(filename) = url.split('/').next_back() {
-        return filename.rfind('.').map_or_else(|| Some(filename.to_string()), |index| Some(filename[..index].to_string()));
-    }
-    None
-}
 
 pub fn consume_m3u<'a, I, F: FnMut(PlaylistItem)>(cfg: &Config, input: &ConfigInput, lines: I, mut visit: F)
 where

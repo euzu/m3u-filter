@@ -3,7 +3,6 @@ extern crate unidecode;
 use crate::utils::epg_utils;
 use crate::utils::m3u_utils;
 use crate::utils::xtream_utils;
-use crate::repository::storage::hash_string;
 use async_std::sync::Mutex;
 use core::cmp::Ordering;
 use std::cell::RefCell;
@@ -127,6 +126,16 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
                     }
                 }
             }
+        }
+    }
+}
+
+fn channel_no_playlist(new_playlist: &[PlaylistGroup]) {
+    let mut chno = 1;
+    for group in new_playlist {
+        for chan in &group.channels {
+            chan.header.borrow_mut().chno = Rc::new(chno.to_string());
+            chno += 1;
         }
     }
 }
@@ -440,7 +449,7 @@ fn get_processing_pipe(target: &ConfigTarget) -> ProcessingPipe {
 }
 
 fn duplicate_hash(item: &PlaylistItem) -> UUIDType {
-    hash_string(&item.get_provider_url())
+    item.get_uuid()
 }
 
 fn execute_pipe<'a>(target: &ConfigTarget, pipe: &ProcessingPipe, fpl: &FetchedPlaylist<'a>, duplicates: &mut HashSet<UUIDType>) -> FetchedPlaylist<'a> {
@@ -541,6 +550,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     } else {
         let mut flat_new_playlist = flatten_groups(new_playlist);
         sort_playlist(target, &mut flat_new_playlist);
+        channel_no_playlist(&flat_new_playlist);
         map_playlist_counter(target, &flat_new_playlist);
         process_watch(target, cfg, &flat_new_playlist);
         persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg).await

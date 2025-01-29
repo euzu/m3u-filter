@@ -17,6 +17,7 @@ pub mod atomic_once_flag;
 pub mod xtream_utils;
 pub mod m3u_utils;
 pub mod epg_utils;
+pub mod hash_utils;
 
 #[macro_export]
 macro_rules! debug_if_enabled {

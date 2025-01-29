@@ -1,3 +1,4 @@
+use crate::repository::storage::hex_encode;
 use crate::file_utils::file_reader;
 use crate::m3u_filter_error::str_to_io_error;
 use std::collections::HashMap;
@@ -5,7 +6,6 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
-
 use log::error;
 use serde_json::{json, Map, Value};
 
@@ -16,12 +16,13 @@ use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, Playlis
 use crate::model::xtream::{rewrite_doc_urls, XtreamMappingOptions, XtreamSeriesEpisode, INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, SEASON_RESOURCE_PREFIX};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentWriter};
-use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, hash_string, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
+use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path,  FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::file_utils::open_readonly_file;
 use crate::utils::json_utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
 use crate::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err};
+use crate::utils::hash_utils::generate_playlist_uuid;
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -697,8 +698,8 @@ async fn rewrite_xtream_series_info<P>(
             for episode in episode_list.iter_mut().filter_map(Value::as_object_mut) {
                 if let Some(episode_provider_id) = episode.get(TAG_ID).and_then(get_u32_from_serde_value)
                 {
-                    let uuid = hash_string(&format!("{provider_url}/{episode_provider_id}"));
-                    let episode_virtual_id = target_id_mapping.insert_entry(
+                    let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &episode_provider_id.to_string(), &provider_url);
+                    let episode_virtual_id = target_id_mapping.get_virtual_id(
                         uuid,
                         episode_provider_id,
                         PlaylistItemType::Series,

@@ -10,9 +10,15 @@ use log::{info, warn};
 use std::cmp::Ordering;
 use std::io::{Error};
 use crate::model::api_proxy::{ProxyUserCredentials};
-const ACTION_GET_SERIES_INFO: &str = "get_series_info";
-const ACTION_GET_VOD_INFO: &str = "get_vod_info";
-const ACTION_GET_LIVE_INFO: &str = "get_live_info";
+pub const ACTION_GET_SERIES_INFO: &str = "get_series_info";
+pub const ACTION_GET_VOD_INFO: &str = "get_vod_info";
+pub const ACTION_GET_LIVE_INFO: &str = "get_live_info";
+pub const ACTION_GET_SERIES: &str = "get_series";
+pub const ACTION_GET_LIVE_CATEGORIES: &str = "get_live_categories";
+pub const ACTION_GET_VOD_CATEGORIES: &str = "get_vod_categories";
+pub const ACTION_GET_SERIES_CATEGORIES: &str = "get_series_categories";
+pub const ACTION_GET_LIVE_STREAMS: &str = "get_live_streams";
+pub const ACTION_GET_VOD_STREAMS: &str = "get_vod_streams";
 
 #[inline]
 pub fn get_xtream_stream_url_base(url: &str, username: &str, password: &str) -> String {
@@ -122,9 +128,9 @@ fn get_skip_cluster(input: &ConfigInput) -> Vec<XtreamCluster> {
 }
 
 const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
-    (XtreamCluster::Live, "get_live_categories", "get_live_streams"),
-    (XtreamCluster::Video, "get_vod_categories", "get_vod_streams"),
-    (XtreamCluster::Series, "get_series_categories", "get_series")];
+    (XtreamCluster::Live, ACTION_GET_LIVE_CATEGORIES, ACTION_GET_LIVE_STREAMS),
+    (XtreamCluster::Video, ACTION_GET_VOD_CATEGORIES, ACTION_GET_VOD_STREAMS),
+    (XtreamCluster::Series, ACTION_GET_SERIES_CATEGORIES, ACTION_GET_SERIES)];
 
 pub async fn get_xtream_playlist(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
 

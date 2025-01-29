@@ -7,11 +7,10 @@ use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions, PROP_BACKDROP_PATH, PROP_COVER};
-use crate::processing::m3u_parser::extract_id_from_url;
-use crate::repository::storage::hash_string;
 use crate::utils::json_utils::{get_string_from_serde_value, get_u64_from_serde_value};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use crate::utils::hash_utils::{generate_playlist_uuid, get_provider_id};
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
@@ -20,6 +19,7 @@ pub trait PlaylistEntry {
     fn get_provider_id(&self) -> Option<u32>;
     fn get_category_id(&self) -> Option<u32>;
     fn get_provider_url(&self) -> Rc<String>;
+    fn get_uuid(&self) -> UUIDType;
 }
 
 #[derive(Debug, Clone)]
@@ -164,24 +164,18 @@ pub struct PlaylistItemHeader {
 
 impl PlaylistItemHeader {
     pub fn gen_uuid(&mut self) {
-        self.uuid = Rc::new(hash_string(&self.url));
+        self.uuid = Rc::new(generate_playlist_uuid(&self.input_name, &self.id, &self.url));
     }
     pub const fn get_uuid(&self) -> &Rc<UUIDType> {
         &self.uuid
     }
 
     pub fn get_provider_id(&mut self) -> Option<u32> {
-        match self.id.parse::<u32>() {
-            Ok(id) => Some(id),
-            Err(_) => match extract_id_from_url(&self.url) {
-                Some(id) => match id.parse::<u32>() {
-                    Ok(newid) => {
-                        self.id = Rc::new(newid.to_string());
-                        Some(newid)
-                    }
-                    Err(_) => None,
-                },
-                None => None,
+        match get_provider_id(&self.id, &self.url) {
+            None => None,
+            Some(newid) => {
+                self.id = Rc::new(newid.to_string());
+                Some(newid)
             }
         }
     }
@@ -331,18 +325,7 @@ impl PlaylistEntry for M3uPlaylistItem {
     }
 
     fn get_provider_id(&self) -> Option<u32> {
-        match self.provider_id.parse::<u32>() {
-            Ok(id) => Some(id),
-            Err(_) => match extract_id_from_url(&self.url) {
-                Some(id) => match id.parse::<u32>() {
-                    Ok(newid) => {
-                        Some(newid)
-                    }
-                    Err(_) => None,
-                },
-                None => None,
-            }
-        }
+        get_provider_id(&self.provider_id, &self.url)
     }
     #[inline]
     fn get_category_id(&self) -> Option<u32> {
@@ -351,6 +334,10 @@ impl PlaylistEntry for M3uPlaylistItem {
     #[inline]
     fn get_provider_url(&self) -> Rc<String> {
         Rc::clone(&self.url)
+    }
+
+    fn get_uuid(&self) -> UUIDType {
+        generate_playlist_uuid(&self.input_name, &self.provider_id, &self.url)
     }
 }
 
@@ -390,6 +377,7 @@ pub struct XtreamPlaylistItem {
     pub item_type: PlaylistItemType,
     pub category_id: u32,
     pub input_name: Rc<String>,
+    pub channel_no: u32,
 }
 
 impl XtreamPlaylistItem {
@@ -414,6 +402,11 @@ impl PlaylistEntry for XtreamPlaylistItem {
     #[inline]
     fn get_provider_url(&self) -> Rc<String> {
         Rc::clone(&self.url)
+    }
+
+    #[inline]
+    fn get_uuid(&self) -> UUIDType {
+        generate_playlist_uuid(&self.input_name, &self.provider_id.to_string(), &self.url)
     }
 }
 
@@ -525,6 +518,7 @@ impl PlaylistItem {
             item_type: header.item_type,
             category_id: header.category_id,
             input_name: Rc::clone(&header.input_name),
+            channel_no: header.chno.parse::<u32>().unwrap_or(0)
         }
     }
 }
@@ -537,27 +531,22 @@ impl PlaylistEntry for PlaylistItem {
 
     fn get_provider_id(&self) -> Option<u32> {
         let header = self.header.borrow();
-        match header.id.parse::<u32>() {
-            Ok(id) => Some(id),
-            Err(_) => match extract_id_from_url(&header.url) {
-                Some(id) => match id.parse::<u32>() {
-                    Ok(newid) => {
-                        Some(newid)
-                    }
-                    Err(_) => None,
-                },
-                None => None,
-            }
-        }
+        get_provider_id(&header.id, &header.url)
     }
 
     #[inline]
     fn get_category_id(&self) -> Option<u32> {
         None
     }
+
     #[inline]
     fn get_provider_url(&self) -> Rc<String> {
         Rc::clone(&self.header.borrow().url)
+    }
+    #[inline]
+    fn get_uuid(&self) -> UUIDType {
+        let header = self.header.borrow();
+        generate_playlist_uuid(&header.input_name, &header.id, &header.url)
     }
 }
 

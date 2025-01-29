@@ -41,7 +41,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
             }
             let uuid = header.get_uuid();
             let item_type = header.item_type;
-            header.virtual_id = target_id_mapping.insert_entry(**uuid, provider_id, item_type, 0);
+            header.virtual_id = target_id_mapping.get_virtual_id(**uuid, provider_id, item_type, 0);
         }
     }
 

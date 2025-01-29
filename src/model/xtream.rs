@@ -577,7 +577,7 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
         ("category_id".to_string(), Value::String(format!("{}", &pli.category_id))),
         ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(pli.category_id))]))),
         ("name".to_string(), Value::String(pli.name.as_ref().clone())),
-        ("num".to_string(), stream_id_value.clone()),
+        ("num".to_string(), Value::Number(serde_json::Number::from(pli.channel_no))),
         ("title".to_string(), Value::String(pli.title.as_ref().clone())),
         ("stream_icon".to_string(), Value::String(logo)),
     ]);

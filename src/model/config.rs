@@ -10,7 +10,7 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use crate::auth::user::UserCredential;
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use path_clean::PathClean;
 use url::Url;
 
@@ -1320,8 +1320,8 @@ pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigS
         if !missing_targets.is_empty() {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "No target found for {}", missing_targets.join(", "));
         }
-        let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
-        info!("Processing targets {}", processing_targets.join(", "));
+        // let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
+        // info!("Processing targets {}", processing_targets.join(", "));
     } else {
         enabled = false;
     }

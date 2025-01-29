@@ -71,7 +71,7 @@ impl TargetIdMapping {
         }
     }
 
-    pub fn insert_entry(&mut self, uuid: UUIDType, provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
+    pub fn get_virtual_id(&mut self, uuid: UUIDType, provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
         match self.by_uuid.get(&uuid) {
             None => {
                 self.dirty = true;

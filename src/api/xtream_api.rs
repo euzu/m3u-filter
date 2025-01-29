@@ -24,29 +24,24 @@ use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH, SEASON_RESOURCE_PREFIX};
-use crate::repository::storage::{get_target_storage_path, hash_string};
+use crate::repository::storage::{get_target_storage_path, hex_encode};
 use crate::repository::target_id_mapping::TargetIdMapping;
-use crate::repository::xtream_repository;
 use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
+use crate::repository::xtream_repository;
 use crate::utils::json_utils::get_u32_from_serde_value;
 use crate::utils::request_utils::{extract_extension_from_url, sanitize_sensitive_info};
 use crate::utils::{json_utils, request_utils, xtream_utils};
 use crate::{debug_if_enabled, info_err};
-
-const ACTION_GET_SERIES_INFO: &str = "get_series_info";
-const ACTION_GET_VOD_INFO: &str = "get_vod_info";
-// const ACTION_GET_LIVE_INFO: &str = "get_live_info";
+use crate::utils::hash_utils::generate_playlist_uuid;
+use crate::utils::xtream_utils::{ACTION_GET_VOD_INFO, ACTION_GET_SERIES_INFO,
+                                 ACTION_GET_LIVE_CATEGORIES, ACTION_GET_VOD_CATEGORIES,
+                                 ACTION_GET_SERIES_CATEGORIES, ACTION_GET_LIVE_STREAMS,
+                                 ACTION_GET_VOD_STREAMS,
+                                 ACTION_GET_SERIES};
 
 const ACTION_GET_EPG: &str = "get_epg";
 const ACTION_GET_SHORT_EPG: &str = "get_short_epg";
 const ACTION_GET_CATCHUP_TABLE: &str = "get_simple_data_table";
-const ACTION_GET_LIVE_CATEGORIES: &str = "get_live_categories";
-const ACTION_GET_VOD_CATEGORIES: &str = "get_vod_categories";
-const ACTION_GET_SERIES_CATEGORIES: &str = "get_series_categories";
-const ACTION_GET_LIVE_STREAMS: &str = "get_live_streams";
-const ACTION_GET_VOD_STREAMS: &str = "get_vod_streams";
-const ACTION_GET_SERIES: &str = "get_series";
-
 const TAG_ID: &str = "id";
 const TAG_CATEGORY_ID: &str = "category_id";
 const TAG_STREAM_ID: &str = "stream_id";
@@ -550,8 +545,8 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     for epg_list_item in epg_listings.iter_mut().filter_map(Value::as_object_mut) {
         // TODO epg_id
         if let Some(catchup_provider_id) = epg_list_item.get(TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok()) {
-            let uuid = hash_string(&format!("{}/{}", pli.url, catchup_provider_id));
-            let virtual_id = target_id_mapping.insert_entry(uuid, catchup_provider_id, PlaylistItemType::Catchup, pli.provider_id);
+            let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &catchup_provider_id.to_string(), &pli.url);
+            let virtual_id = target_id_mapping.get_virtual_id(uuid, catchup_provider_id, PlaylistItemType::Catchup, pli.provider_id);
             epg_list_item.insert(TAG_ID.to_string(), Value::String(virtual_id.to_string()));
         }
     }
