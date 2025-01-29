@@ -2,13 +2,15 @@
 # 2.1.4 (2025-01-xx)
 - !BREAKING CHANGE!  unique `input` `name` is now mandatory, because rearranging the `source.yml` could lead to wrong results without a playlist update.
 - !BREAKING_CHANGE! `log_sanitize_sensitive_info`  is now under `log` section  as `sanitize_sensitive_info`
-- !BREAKING_CHANGE! uuid generation for entries changed to `input.name` + `stream_id`. Virtual id mapping changed. The new Virtual id is not a sequence anymore.  
+- !BREAKING_CHANGE! uuid generation for entries changed to `input.name` + `stream_id`. Virtual id mapping changed. The new Virtual id is not a sequence anymore.
+- Added `log_level`to `log` config. Priority:  CLI-Argument, Env-Var, Config, Default(`info`)
 - Added Active clients count (for reverse proxy mode users) which is now displayed in `/status`  and can be logged with setting
 `active_clients: true` under `log`section in `config.yml`
 ```yaml
 log:
   sanitize_sensitive_info: false
   active_clients: true
+  log_level: debug
 update_on_boot: false
 web_ui_enabled: true
 ```

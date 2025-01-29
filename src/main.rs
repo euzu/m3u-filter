@@ -11,14 +11,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::auth::password::generate_password;
-use crate::model::config::{validate_targets, Config, HealthcheckConfig, ProcessTargets};
+use crate::model::config::{validate_targets, Config, HealthcheckConfig, LogLevelConfig, ProcessTargets};
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::playlist_processor;
+use crate::utils::request_utils::set_sanitize_sensitive_info;
 use crate::utils::{config_reader, file_utils};
 use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
-use crate::utils::request_utils::set_sanitize_sensitive_info;
 
 mod api;
 mod auth;
@@ -99,11 +99,12 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let args = Args::parse();
-    let default_log_level = std::env::var("M3U_FILTER_LOG").unwrap_or_else(|_| "info".to_string());
-    init_logger(args.log_level.as_ref().unwrap_or(&default_log_level));
+    let env_log_level = std::env::var("M3U_FILTER_LOG");
 
     let config_path: String = args.config_path.unwrap_or_else(file_utils::get_default_config_path);
     let config_file: String = args.config_file.unwrap_or_else(|| file_utils::get_default_config_file_path(&config_path));
+
+    init_logger(args.log_level.as_ref(), env_log_level.ok(), config_file.as_str());
 
     if args.healthcheck {
         healthcheck(config_file.as_str());
@@ -213,8 +214,19 @@ fn get_log_level(log_level: &str) -> LevelFilter {
     }
 }
 
-fn init_logger(log_level: &str) {
+fn init_logger(user_log_level: Option<&String>, env_log_level: Option<String>, config_file: &str) {
     let mut log_builder = Builder::from_default_env();
+
+    // priority  CLI-Argument, Env-Var, Config, Default
+    let log_level = user_log_level
+        .map(std::string::ToString::to_string) // cli-argument
+        .or(env_log_level) // env
+        .or_else(|| {               // config
+            File::open(config_file).ok()
+                .and_then(|file| serde_yaml::from_reader::<_, LogLevelConfig>(file).ok())
+                .and_then(|cfg| cfg.log.and_then(|l| l.log_level))
+        })
+        .unwrap_or_else(|| "info".to_string()); // Default
 
     if log_level.contains('=') {
         for pair in log_level.split(',').filter(|s| s.contains('=')) {
@@ -225,13 +237,13 @@ fn init_logger(log_level: &str) {
         }
     } else {
         // Set the log level based on the parsed value
-        log_builder.filter_level(get_log_level(log_level));
+        log_builder.filter_level(get_log_level(&log_level));
     }
     for module in LOG_ERROR_LEVEL_MOD {
         log_builder.filter_module(module, LevelFilter::Error);
     }
     log_builder.init();
-    info!("Log Level {}", get_log_level(log_level));
+    info!("Log Level {}", get_log_level(&log_level));
 }
 
 fn healthcheck(config_file: &str) {

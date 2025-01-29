@@ -725,6 +725,14 @@ pub struct LogConfig {
     pub sanitize_sensitive_info: bool,
     #[serde(default)]
     pub active_clients: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log_level: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct LogLevelConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log: Option<LogConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]

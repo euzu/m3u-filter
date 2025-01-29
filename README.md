@@ -230,14 +230,20 @@ is the directory where the backup configuration files written, when saved from t
 if set to true, an update is started when the application starts.
 
 ### 1.9 `log`
-`log` has two attributes
+`log` has three attributes
 - `sanitize_sensitive_info` default true
 - `active_clients` default false, if set to true reverse proxy client count is printed as info log.
+- `log_level` can be set to `trace`, `debug`, `info`, `warn` and `error`.
+You can also set module based level like `hyper_util::client::legacy::connect=error,m3u_filter=debug` 
+
+
+`log_level` priority  CLI-Argument, Env-Var, Config, Default(`info`).
 
 ```yaml
 log:
   sanitize_sensitive_info: false
   active_clients: true
+  log_level: debug
 ```
 
 ### 1.10 `web_ui_enabled`
@@ -961,9 +967,10 @@ Following log levels are supported:
  
 Use the `-l` or `--log-level` cli-argument to specify the log-level.
 
-The log level can be set through environment variable `M3U_FILTER_LOG`.
+The log level can be set through environment variable `M3U_FILTER_LOG`,
+or config.
 
-Precedence has cli-argument.
+Precedence is cli-argument, env-var, config, default(`info`).
 
 Log Level has module support like `m3u_filter::util=error,m3u_filter::filter=debug,m3u_filter=debug`
 
