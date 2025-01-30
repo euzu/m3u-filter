@@ -128,31 +128,16 @@ impl TargetUser {
     }
 }
 
-fn default_as_80() -> String {
-    "80".to_string()
-}
-
-fn default_as_443() -> String {
-    "443".to_string()
-}
-
-fn default_as_1935() -> String {
-    "1935".to_string()
-}
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApiProxyServerInfo {
     pub name: String,
     pub protocol: String,
     pub host: String,
-    #[serde(default = "default_as_80")]
-    pub http_port: String,
-    #[serde(default = "default_as_443")]
-    pub https_port: String,
-    #[serde(default = "default_as_1935")]
-    pub rtmp_port: String,
+    pub port: String,
     pub timezone: String,
     pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 impl ApiProxyServerInfo {
@@ -165,24 +150,17 @@ impl ApiProxyServerInfo {
         if self.host.is_empty() {
             return false;
         }
-        self.http_port = self.http_port.trim().to_string();
-        if self.http_port.is_empty() {
-            self.http_port = "80".to_string();
-        } else if self.http_port.parse::<u16>().is_err() {
+        self.port = self.port.trim().to_string();
+        if self.port.is_empty() {
+            if self.protocol == "http" {
+                self.port = "80".to_string();
+            } else {
+                self.port = "443".to_string();
+            }
+        } else if self.port.parse::<u16>().is_err() {
             return false;
         }
-        self.https_port = self.https_port.trim().to_string();
-        if self.https_port.is_empty() {
-            self.https_port = "443".to_string();
-        } else if self.https_port.parse::<u16>().is_err() {
-            return false;
-        }
-        self.rtmp_port = self.rtmp_port.trim().to_string();
-        if self.rtmp_port.is_empty() {
-            self.rtmp_port = "1953".to_string();
-        } else if self.rtmp_port.parse::<u16>().is_err() {
-            return false;
-        }
+
         self.timezone = self.timezone.trim().to_string();
         if self.timezone.is_empty() {
             self.timezone = "UTC".to_string();
@@ -195,16 +173,15 @@ impl ApiProxyServerInfo {
     }
 
     pub fn get_base_url(&self) -> String {
-        let port = if self.protocol == "https" {
-            &self.https_port
+        let base_url = if self.port.is_empty() {
+            format!("{}://{}", self.protocol, self.host)
         } else {
-            &self.http_port
+            format!("{}://{}:{}", self.protocol, self.host, self.port)
         };
-        let base_url = format!("{}://{}", self.protocol, self.host);
-        if port.is_empty() {
-            base_url
-        } else {
-            format!("{base_url}:{port}")
+
+        match &self.path {
+            None => base_url,
+            Some(path) => format!("{base_url}/{}", path.trim_matches('/'))
         }
     }
 }

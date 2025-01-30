@@ -60,10 +60,10 @@ impl XtreamAuthorizationResponse {
             },
             server_info: XtreamServerInfo {
                 url: server_info.host.clone(),
-                port: server_info.http_port.clone(),
-                https_port: server_info.https_port.clone(),
+                port: if server_info.protocol == "http" { server_info.port.clone() }  else { String::new() },
+                https_port:  if server_info.protocol == "https" { server_info.port.clone() }  else { String::new() },
                 server_protocol: server_info.protocol.clone(),
-                rtmp_port: server_info.rtmp_port.clone(),
+                rtmp_port: String::new(),
                 timezone: server_info.timezone.to_string(),
                 timestamp_now: now.timestamp(),
                 time_now: now.format("%Y-%m-%d %H:%M:%S").to_string(),

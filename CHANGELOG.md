@@ -3,6 +3,23 @@
 - !BREAKING CHANGE!  unique `input` `name` is now mandatory, because rearranging the `source.yml` could lead to wrong results without a playlist update.
 - !BREAKING_CHANGE! `log_sanitize_sensitive_info`  is now under `log` section  as `sanitize_sensitive_info`
 - !BREAKING_CHANGE! uuid generation for entries changed to `input.name` + `stream_id`. Virtual id mapping changed. The new Virtual id is not a sequence anymore.
+- !BREAKING_CHANGE! `api-proxy.yml`  server config changed.
+```yaml
+server:
+- name: default
+  protocol: http
+  host: 192.169.1.9
+  port: '8901'
+  timezone: Europe/Paris
+  message: Welcome to m3u-filter
+- name: external
+  protocol: https
+  host: m3ufilter.mydomain.tv
+  port: '443'
+  timezone: Europe/Paris
+  message: Welcome to m3u-filter
+  path: m3uflt
+```
 - Added Active clients count (for reverse proxy mode users) which is now displayed in `/status`  and can be logged with setting
 `active_clients: true` under `log`section in `config.yml`
 - Fixed iptv player using live tv stream without `/live/` context.
@@ -17,6 +34,7 @@ web_ui_enabled: true
 ```
 - Added new option to `input` `xtream_live_stream_without_extension`. Default is `false`.  Some providers don't like `.ts`  extension, some providers need it.
 Now you can disable or enable it for a provider.
+- Added `path` to `api-proxy.yml` server config for simpler front reverse-proxy configuration (like nginx)  
 
 # 2.1.3 (2025-01-26)
 - Hotfix 2.1.2, forgot to update the stream api code.  

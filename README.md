@@ -432,7 +432,7 @@ sort:
 Is a list of output format:
 Each format has 2 properties
 - `type`
-- `filename`
+- `filename` only _mandatory_ for `strm` output
 
 `type` is _mandatory_  for `m3u`, `strm` and `xtream`.  
 `filename` is _mandatory_ if type is `strm`. if type is `m3u` the plain m3u file is written but it is not used by `m3u-filter`.
@@ -440,7 +440,9 @@ Each format has 2 properties
 ```yaml
 output:
   - type: m3u
-    filename: playlist.m3u
+  - type: xtream
+  - type: strm
+    filename: /share/media/kodi/iptv
 ```
 
 ### 2.2.2.3 `processing_order`
@@ -906,7 +908,8 @@ The `token` is _optional_. If defined it should be unique. The `token`can be use
 instead of username+password
 `proxy` is _optional_. If defined it can be `reverse` or `redirect`. Default is `redirect`.
 `server` is _optional_. It should match one server definition, if not given the server with the name `default` is used or the first one.  
-`epg_timeshift` is _optional_. It is only applied when source has `epg_url` configured. `epg_timeshift: [-+]hh:mm`, example  `-2:30`, `1:45`, `+0:15`, `2`, `:30`, `:3`, `2:`
+`epg_timeshift` is _optional_. It is only applied when source has `epg_url` configured. `epg_timeshift: [-+]hh:mm`, example  
+`-2:30`(-2h30m), `1:45` (1h45m), `+0:15` (15m), `2` (2h), `:30` (30m), `:3` (3m), `2:` (3h)
 
 To access the api for: 
 - `xtream` use url like `http://192.169.1.2/player_api.php?username={}&password={}`
@@ -932,25 +935,56 @@ The `proxy` property can be `reverse`or `redirect`. `reverse` means the streams 
 
 If you use `https` you need a ssl terminator. `m3u-filter` does not support https traffic. 
 
+If you use a ssl-terminator or proxy in front of m3u-filter you can set a `path` to make the configuration of your proxy simpler.
+For example you use `nginx` as your reverse proxy.
+`api-proxy.yml`
+```yaml
+server:
+- name: default
+  protocol: http
+  host: 192.169.1.9
+  port: '8901'
+  timezone: Europe/Paris
+  message: Welcome to m3u-filter
+- name: external
+  protocol: https
+  host: m3ufilter.mydomain.tv
+  port: '443'
+  timezone: Europe/Paris
+  message: Welcome to m3u-filter
+  path: m3uflt
+```
+
+Now you can do `nginx`  configuration like
+```config
+   location /m3uflt {
+      rewrite ^/m3uflt/(.*)$ /$1 break;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-NginX-Proxy true;
+      proxy_pass http://192.169.1.9:8901/;
+      proxy_ssl_session_reuse off;
+      proxy_set_header Host $http_host;
+      proxy_redirect off;
+   }
+```
+
+Example:
 ```yaml
 server:
   - name: default 
     protocol: http
     host: 192.168.0.3
-    http_port: 80
-    https_port: 443
-    rtmp_port: 0
+    port: 80
     timezone: Europe/Paris
     message: Welcome to m3u-filter
   - name: external
-    protocol: http
+    protocol: https
     host: my_external_domain.com
-    http_port: 80
-    https_port: 443
-    rtmp_port: 0
+    port: 443
     timezone: Europe/Paris
     message: Welcome to m3u-filter
-user:
+    path: /m3uflt
   - target: pl1
     credentials:
       - {username: x3452, password: ztrhgrGZ, token: 4342sd, proxy: reverse, server: external, epg_timeshift: -2:30}
@@ -1217,15 +1251,13 @@ server:
 - name: default
   protocol: http
   host: 192.168.1.41
-  http_port: '8901'
+  port: '8901'
   timezone: Europe/Berlin
   message: Welcome to m3u-filter
 - name: external
   protocol: https
   host: tvjunkie.dyndns.org
-  http_port: '80'
-  https_port: '443'
-  rtmp_port: '1953'
+  port: '443'
   timezone: Europe/Berlin
   message: Welcome to m3u-filter
 user:
@@ -1245,6 +1277,8 @@ We have defined 2 server configurations. The `default` configuration is intended
 The next section of the `api-proxy.yml` contains the user definition. We can define users for each `target` from the `source.yml`.
 This means that each `user` can only access one `target` from `source.yml`.  We have named our target `all_channels` in `source.yml` and used this name for the user definition.  We have defined 2 users, one for local access and one for external access.
 We have set the proxy type to `redirect`, which means that the client will be redirected to the original provider URL when opening a stream. If you set the proxy type to `reverse`, the stream will be streamed from the provider through `m3u-filter`. Based on the hardware you are running `m3u-filter` on, you can opt for the proxy type `reverse`. But you should start with `redirect` first until everything works well.
+
+If no server is specified for a user, the default one is taken.
 
 
 To access a xtream api from our IPTV-application we need at least 3 information  the `url`, `username` and `password`.

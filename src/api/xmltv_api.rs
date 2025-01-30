@@ -66,41 +66,19 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
     None
 }
 
+// `-2:30`(-2h30m), `1:45` (1h45m), `+0:15` (15m), `2` (2h), `:30` (30m), `:3` (3m), `2:` (3h)
 fn parse_timeshift(time_shift: Option<&String>) -> Option<i32> {
     time_shift.and_then(|offset| {
-            let sign_factor = if offset.starts_with('-') { -1 } else { 1 };
-            let offset = offset.trim_start_matches(&['-', '+'][..]); // Remove the sign for parsing
+        let sign_factor = if offset.starts_with('-') { -1 } else { 1 };
+        let offset = offset.trim_start_matches(&['-', '+'][..]);
 
-            let total_minutes = if offset.contains(':') {
-                // Handle the case with hours and minutes (e.g., "-2:30", "1:45", "+0:15", ":30")
-                let parts: Vec<&str> = offset.split(':').collect();
+        let parts: Vec<&str> = offset.split(':').collect();
+        let hours: i32 = parts.first().and_then(|h| h.parse().ok()).unwrap_or(0);
+        let minutes: i32 = parts.get(1).and_then(|m| m.parse().ok()).unwrap_or(0);
 
-                let hours: i32 = if parts[0].is_empty() {
-                    0 // Treat empty hour part as 0 hours
-                } else {
-                    parts[0].parse().unwrap_or(0)
-                };
-
-                let minutes: i32 = if parts.len() > 1 {
-                    parts[1].parse().unwrap_or(0)
-                } else {
-                    0
-                };
-
-                // Convert hours to minutes and add the minute part
-                hours * 60 + minutes
-            } else {
-                // Handle single number case (e.g., "2" or "+2")
-                let num: i32 = offset.parse().unwrap_or(0);
-                num * 60
-            };
-
-            if total_minutes > 0 {
-                Some(sign_factor * total_minutes)
-            } else {
-                None
-            }
-        })
+        let total_minutes = hours * 60 + minutes;
+        (total_minutes > 0).then_some(sign_factor * total_minutes)
+    })
 }
 
 async fn serve_epg(epg_path: &Path, req: &HttpRequest, user: &ProxyUserCredentials) -> HttpResponse {
@@ -202,4 +180,28 @@ pub fn xmltv_api_register(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/xmltv.php").route(web::get().to(xmltv_api)))
         .service(web::resource("/update/epg.php").route(web::get().to(xmltv_api)))
         .service(web::resource("/epg").route(web::get().to(xmltv_api)));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_timeshift() {
+        assert_eq!(parse_timeshift(Some(&String::from("2"))), Some(120));
+        assert_eq!(parse_timeshift(Some(&String::from("-1:30"))), Some(-90));
+        assert_eq!(parse_timeshift(Some(&String::from("+0:15"))), Some(15));
+        assert_eq!(parse_timeshift(Some(&String::from("1:45"))), Some(105));
+        assert_eq!(parse_timeshift(Some(&String::from(":45"))), Some(45));
+        assert_eq!(parse_timeshift(Some(&String::from("-:45"))), Some(-45));
+        assert_eq!(parse_timeshift(Some(&String::from("0:30"))), Some(30));
+        assert_eq!(parse_timeshift(Some(&String::from(":3"))), Some(3));
+        assert_eq!(parse_timeshift(Some(&String::from("2:"))), Some(120));
+        assert_eq!(parse_timeshift(Some(&String::from("+2:00"))), Some(120));
+        assert_eq!(parse_timeshift(Some(&String::from("-0:10"))), Some(-10));
+        assert_eq!(parse_timeshift(Some(&String::from("invalid"))), None);
+        assert_eq!(parse_timeshift(Some(&String::from("+abc"))), None);
+        assert_eq!(parse_timeshift(Some(&String::from(""))), None);
+        assert_eq!(parse_timeshift(None), None);
+    }
 }

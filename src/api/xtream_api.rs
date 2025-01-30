@@ -26,18 +26,18 @@ use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, Playlist
 use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH, SEASON_RESOURCE_PREFIX};
 use crate::repository::storage::{get_target_storage_path, hex_encode};
 use crate::repository::target_id_mapping::TargetIdMapping;
-use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::repository::xtream_repository;
+use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
+use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils::get_u32_from_serde_value;
 use crate::utils::request_utils::{extract_extension_from_url, sanitize_sensitive_info};
+use crate::utils::xtream_utils::{ACTION_GET_LIVE_CATEGORIES, ACTION_GET_LIVE_STREAMS,
+                                 ACTION_GET_SERIES, ACTION_GET_SERIES_CATEGORIES,
+                                 ACTION_GET_SERIES_INFO, ACTION_GET_VOD_CATEGORIES,
+                                 ACTION_GET_VOD_INFO,
+                                 ACTION_GET_VOD_STREAMS};
 use crate::utils::{json_utils, request_utils, xtream_utils};
 use crate::{debug_if_enabled, info_err};
-use crate::utils::hash_utils::generate_playlist_uuid;
-use crate::utils::xtream_utils::{ACTION_GET_VOD_INFO, ACTION_GET_SERIES_INFO,
-                                 ACTION_GET_LIVE_CATEGORIES, ACTION_GET_VOD_CATEGORIES,
-                                 ACTION_GET_SERIES_CATEGORIES, ACTION_GET_LIVE_STREAMS,
-                                 ACTION_GET_VOD_STREAMS,
-                                 ACTION_GET_SERIES};
 
 const ACTION_GET_EPG: &str = "get_epg";
 const ACTION_GET_SHORT_EPG: &str = "get_short_epg";
@@ -662,12 +662,10 @@ async fn xtream_player_api(
             }
         }
     } else {
-        if user_target.is_none() {
-            debug!("Cant find user!");
-        } else if api_req.action.is_empty() {
-            debug!("Paremeter action is empty!");
-        } else {
-            debug!("Bad request!" );
+        match (user_target.is_none(), api_req.action.is_empty()) {
+            (true, _) => debug!("Cant find user!"),
+            (_, true) => debug!("Parameter action is empty!"),
+            _ => debug!("Bad request!"),
         }
         HttpResponse::BadRequest().finish()
     }

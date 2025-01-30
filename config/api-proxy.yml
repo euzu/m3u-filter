@@ -2,19 +2,17 @@ server:
   - name: default
     protocol: http
     host: 192.168.9.3
-    http_port: 80
-    https_port:
-    rtmp_port:
+    port: 80
     timezone: Europe/Paris
     message: Welcome to m3u-filter
   - name: extern
     protocol: https
     host: m3u-filter.mydns.com
-    http_port:
-    https_port: 8443
+    port: 443
     rtmp_port:
     timezone: Europe/Paris
     message: Welcome to m3u-filter
+    path: m3uflt # optional, pnly neeeded for easier reverse proxy configuration see README.md.
 user:
   - target: pl1
     credentials:
