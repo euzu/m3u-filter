@@ -10,8 +10,8 @@ server:
   - name: extern
     protocol: https
     host: m3u-filter.mydns.com
-    http_port: 8900
-    https_port:
+    http_port:
+    https_port: 8443
     rtmp_port:
     timezone: Europe/Paris
     message: Welcome to m3u-filter

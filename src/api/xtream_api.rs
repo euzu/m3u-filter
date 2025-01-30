@@ -82,6 +82,7 @@ macro_rules! try_result_bad_request {
     };
 }
 
+#[derive(Debug)]
 enum XtreamApiStreamContext {
     LiveAlt,
     Live,
@@ -91,7 +92,6 @@ enum XtreamApiStreamContext {
 }
 
 impl XtreamApiStreamContext {
-    const LIVE_ALT: &'static str = "";
     const LIVE: &'static str = "live";
     const MOVIE: &'static str = "movie";
     const SERIES: &'static str = "series";
@@ -101,7 +101,7 @@ impl XtreamApiStreamContext {
 impl Display for XtreamApiStreamContext {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Self::LiveAlt => Self::LIVE_ALT,
+            Self::LiveAlt => Self::LIVE,
             Self::Live => Self::LIVE,
             Self::Movie => Self::MOVIE,
             Self::Series => Self::SERIES,
@@ -110,6 +110,7 @@ impl Display for XtreamApiStreamContext {
     }
 }
 
+#[derive(Debug)]
 struct XtreamApiStreamRequest<'a> {
     context: XtreamApiStreamContext,
     username: &'a str,
@@ -217,6 +218,7 @@ async fn xtream_player_api_stream(
         stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()),
         true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}",
         stream_req.context));
+
     debug_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
     stream_response(app_state, &stream_url, req, Some(input), pli.item_type, target).await
 }

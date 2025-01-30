@@ -47,7 +47,7 @@ impl XtreamAuthorizationResponse {
         Self {
             user_info: XtreamUserInfo {
                 active_cons: "0".to_string(),
-                allowed_output_formats: Vec::from(["ts".to_string(), "m3u8".to_string(), "rtmp".to_string()]),
+                allowed_output_formats: Vec::from(["ts".to_string()]),
                 auth: 1,
                 created_at: (now - Duration::days(365)).timestamp(), // fake
                 exp_date: (now + Duration::days(365)).timestamp(), // fake

@@ -33,3 +33,18 @@ macro_rules! debug_if_enabled {
         }
     };
 }
+
+#[macro_export]
+macro_rules! trace_if_enabled {
+    ($fmt:expr, $( $args:expr ),*) => {
+        if log::log_enabled!(log::Level::Trace) {
+            log::log!(log::Level::Trace, $fmt, $($args),*);
+        }
+    };
+
+    ($txt:expr) => {
+        if log::log_enabled!(log::Level::Trace) {
+            log::log!(Level::Trace, $txt);
+        }
+    };
+}

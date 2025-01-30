@@ -5,6 +5,8 @@ source "${HOME}/.ghcr.io"
 
 TARGET=x86_64-unknown-linux-musl
 
+(bin/build_fe.sh && bin/build_lin_static.sh) || exit 1;
+
 # Check if the binary exists
 if [ ! -f "./target/${TARGET}/release/m3u-filter" ]; then
     echo "Error: Static binary '../target/${TARGET}/release/m3u-filter' does not exist."

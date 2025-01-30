@@ -7,7 +7,7 @@ use crate::debug_if_enabled;
 use crate::model::config::ConfigInput;
 use crate::model::playlist::PlaylistItemType;
 use crate::utils::atomic_once_flag::AtomicOnceFlag;
-use crate::utils::request_utils::{get_request_headers, sanitize_sensitive_info};
+use crate::utils::request_utils::{classify_content_type, get_request_headers, sanitize_sensitive_info, MimeCategory};
 use actix_web::HttpRequest;
 use bytes::Bytes;
 use futures::stream::{self, BoxStream};
@@ -307,7 +307,6 @@ fn create_provider_stream_options(stream_url: &Url,
     }
 }
 
-
 pub async fn create_provider_stream(client: Arc<reqwest::Client>,
                                     stream_url: &Url,
                                     req: &HttpRequest,
@@ -326,8 +325,14 @@ pub async fn create_provider_stream(client: Arc<reqwest::Client>,
 
     match get_initial_stream(Arc::clone(&client), &stream_options).await {
         Some((init_stream, info)) => {
+            let is_video_stream = if let Some((headers, _)) = &info {
+                classify_content_type(headers) == MimeCategory::Video
+            } else {
+                true // don't know what it is but lets assume it is
+            };
+
             let continue_signal = stream_options.get_continue_flag_clone();
-            if stream_options.should_reconnect() {
+            if is_video_stream && stream_options.should_reconnect() {
                 let client_signal = Arc::clone(&continue_signal);
                 let stream_options_provider = stream_options.clone();
                 let unfold: ResponseStream = stream::unfold((), move |()| {

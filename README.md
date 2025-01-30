@@ -211,7 +211,7 @@ If you set it `true` `cache` is disabled! Because the cache cant work without re
 
 ```yaml
 reverse_proxy:
-  resource_rewrite_disabled: false,
+  resource_rewrite_disabled: false
   stream:
     retry: true
     buffer:

@@ -7,7 +7,7 @@ use crate::api::model::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::shared_stream::SharedStream;
 use crate::api::model::stream_error::StreamError;
-use crate::debug_if_enabled;
+use crate::{debug_if_enabled, trace_if_enabled};
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::playlist::PlaylistItemType;
@@ -212,7 +212,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
             }
         }
     }
-    debug_if_enabled!("Try to fetch resource {}", sanitize_sensitive_info(resource_url));
+    trace_if_enabled!("Try to fetch resource {}", sanitize_sensitive_info(resource_url));
     if let Ok(url) = Url::parse(resource_url) {
         let client = request_utils::get_client_request(&app_state.http_client, input.map(|i| &i.headers), &url, Some(&req_headers));
         match client.send().await {

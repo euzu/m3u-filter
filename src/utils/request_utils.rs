@@ -397,6 +397,35 @@ pub fn extract_extension_from_url(url: &str) -> Option<&str> {
     None
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MimeCategory {
+    Unknown,
+    Video,
+    M3U8,
+    Image,
+    Json,
+    Xml,
+    Text,
+    Unclassified,
+}
+
+pub fn classify_content_type(headers: &[(String, String)]) -> MimeCategory {
+    headers.iter()
+        .find_map(|(k, v)| {
+            (k == actix_web::http::header::CONTENT_TYPE.as_str()).then_some(v)
+        })
+        .map(|v| match v.as_str() {
+            v if v.starts_with("video/") || v == "application/octet-stream" => MimeCategory::Video,
+            "application/vnd.apple.mpegurl" | "application/x-mpegURL" => MimeCategory::M3U8,
+            v if v.starts_with("image/") => MimeCategory::Image,
+            v if v.starts_with("application/json") || v.ends_with("+json") => MimeCategory::Json,
+            v if v.starts_with("application/xml") || v.ends_with("+xml") || v == "text/xml" => MimeCategory::Xml,
+            v if v.starts_with("text/") => MimeCategory::Text,
+            _ => MimeCategory::Unclassified,
+        })
+        .unwrap_or(MimeCategory::Unknown)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::utils::request_utils::{sanitize_sensitive_info};
