@@ -26,10 +26,6 @@ Content-Type: application/x-www-form-urlencoded
 
 username={{username}}&password={{password}}
 
-### m3u playlist reverse
-GET {{local}}/m3u?username={{username}}&password={{password}}
-
-
 ### m3u playlist
 GET {{local}}/m3u?username={{username}}&password={{password}}
 
@@ -40,7 +36,7 @@ GET {{local}}/player_api.php?username={{username}}&password={{password}}
 GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_live_categories
 
 ### xtream live_streams
-GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_live_streams&category_id=102
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_live_streams&category_id=1
 
 ### xtream vod_categories
 GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_vod_categories
@@ -62,7 +58,7 @@ GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=
 
 
 ### xtream series info
-GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_series_info&series_id=586
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_series_info&series_id=3529369776
 
 ### xtream series stream
  GET {{local}}/series/{{username}}/{{password}}/201422

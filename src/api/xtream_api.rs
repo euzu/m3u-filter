@@ -101,8 +101,7 @@ impl XtreamApiStreamContext {
 impl Display for XtreamApiStreamContext {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Self::LiveAlt => Self::LIVE,
-            Self::Live => Self::LIVE,
+            Self::Live | Self::LiveAlt => Self::LIVE,
             Self::Movie => Self::MOVIE,
             Self::Series => Self::SERIES,
             Self::Timeshift => Self::TIMESHIFT,
