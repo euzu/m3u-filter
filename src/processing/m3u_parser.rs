@@ -201,10 +201,13 @@ where
 {
     let mut sort_order: Vec<Vec<PlaylistItem>> = vec![];
     let mut sort_order_idx: usize = 0;
-    let mut group_map: std::collections::HashMap<Rc<String>, usize> = std::collections::HashMap::new();
+    let mut group_map: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     consume_m3u(cfg, input, lines, |item| {
         // keep the original sort order for groups and group the playlist items
-        let key = Rc::clone(&item.header.borrow().group);
+        let key = {
+            let header = item.header.borrow();
+            format!("{}{}", &header.xtream_cluster, &header.group)
+        };
         match group_map.entry(key) {
             std::collections::hash_map::Entry::Vacant(v) => {
                 v.insert(sort_order_idx);

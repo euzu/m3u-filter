@@ -2,7 +2,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use actix_web::{HttpRequest, HttpResponse, web, http::header};
-use log::{error, info};
+use log::{error, trace};
 use quick_xml::{Reader, Writer};
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -42,7 +42,7 @@ fn get_epg_path_for_target_of_type(target_name: &str, epg_path: PathBuf) -> Opti
     if file_utils::path_exists(&epg_path) {
         return Some(epg_path);
     }
-    info!("Cant find epg file for {target_name} target: {}", epg_path.to_str().unwrap_or("?"));
+    trace!("Cant find epg file for {target_name} target: {}", epg_path.to_str().unwrap_or("?"));
     None
 }
 

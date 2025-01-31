@@ -71,7 +71,20 @@ impl TargetIdMapping {
         }
     }
 
-    pub fn get_virtual_id(&mut self, uuid: UUIDType, provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
+    // pub fn get_virtual_id(&mut self, uuid: UUIDType, provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
+    //     match self.by_uuid.get(&uuid) {
+    //         None => {
+    //             self.dirty = true;
+    //             self.virtual_id_counter += 1;
+    //             let record = VirtualIdRecord::new(provider_id, self.virtual_id_counter, item_type, parent_virtual_id, uuid);
+    //             self.by_virtual_id.insert(self.virtual_id_counter, record);
+    //             self.virtual_id_counter
+    //         }
+    //         Some(virtual_id) => *virtual_id
+    //     }
+    // }
+
+    pub fn get_and_update_virtual_id(&mut self, uuid: UUIDType, provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
         match self.by_uuid.get(&uuid) {
             None => {
                 self.dirty = true;
@@ -80,7 +93,16 @@ impl TargetIdMapping {
                 self.by_virtual_id.insert(self.virtual_id_counter, record);
                 self.virtual_id_counter
             }
-            Some(record) => *record
+            Some(virtual_id) => {
+                if let Some(record) = self.by_virtual_id.query(virtual_id) {
+                    if record.provider_id != provider_id || record.item_type != item_type || record.parent_virtual_id != parent_virtual_id {
+                        let new_record = VirtualIdRecord::new(provider_id, *virtual_id, item_type, parent_virtual_id, uuid);
+                        self.by_virtual_id.insert(*virtual_id, new_record);
+                        self.dirty = true;
+                    }
+                }
+                *virtual_id
+            }
         }
     }
 
@@ -98,5 +120,21 @@ impl Drop for TargetIdMapping {
         if let Err(err) = self.persist() {
             error!("Failed to persist target id mapping {:?} err:{err}", &self.path);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use crate::repository::bplustree::BPlusTree;
+    use crate::repository::target_id_mapping::{VirtualIdRecord};
+
+    #[test]
+    fn test_id_mapping() {
+        let path = PathBuf::from("/home/euzuner/projects/m3u-test/settings/m3u-catbox/data/m3u/id_mapping.db");
+        let mapping = BPlusTree::<u32, VirtualIdRecord>::load(&path);
+        mapping.unwrap().traverse(|keys, values| {
+           println!("{keys:?} {values:?}");
+        });
     }
 }

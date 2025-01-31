@@ -425,9 +425,22 @@ pub fn classify_content_type(headers: &[(String, String)]) -> MimeCategory {
         })
 }
 
+pub fn replace_extension(path: &str, new_ext: &str) -> String {
+    let ext = if let Some(stripped) = new_ext.strip_prefix('.') { stripped } else { new_ext };
+    if let Some(pos) = path.rfind('/') {
+        if let Some(dot_pos) = path[pos..].rfind('.') {
+            let dot_index = pos + dot_pos;
+            return format!("{}{}.{}", &path[..dot_index], "", ext);
+        }
+    } else if let Some(dot_pos) = path.rfind('.') {
+        return format!("{}{}.{}", &path[..dot_pos], "", ext);
+    }
+    format!("{path}.{ext}")
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::utils::request_utils::{sanitize_sensitive_info};
+    use crate::utils::request_utils::{replace_extension, sanitize_sensitive_info};
 
     #[test]
     fn test_url_mask() {
@@ -437,4 +450,20 @@ mod tests {
         println!("{masked}")
     }
 
+    #[test]
+    fn test_replace_ext() {
+        let tests = [
+            "test.txt",
+            "folder/test.txt",
+            "folder/subfolder/file",
+            "/absolute/path/to/file.tar.gz",
+            "/home/user/script",
+            "no_extension",
+            "some/path/file.with.dots",
+        ];
+
+        for test in &tests {
+            println!("{} -> {}", test, replace_extension(test, ".mp4"));
+        }
+    }
 }

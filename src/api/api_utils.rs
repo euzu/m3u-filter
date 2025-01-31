@@ -31,6 +31,44 @@ use std::sync::Arc;
 use url::Url;
 use crate::api::model::active_client_stream::ActiveClientStream;
 
+#[macro_export]
+macro_rules! try_option_bad_request {
+    ($option:expr, $msg_is_error:expr, $msg:expr) => {
+        match $option {
+            Some(value) => value,
+            None => {
+                if $msg_is_error {error!("{}", $msg);} else {debug!("{}", $msg);}
+                return HttpResponse::BadRequest().finish();
+            }
+        }
+    };
+    ($option:expr) => {
+        match $option {
+            Some(value) => value,
+            None => return HttpResponse::BadRequest().finish(),
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! try_result_bad_request {
+    ($option:expr, $msg_is_error:expr, $msg:expr) => {
+        match $option {
+            Ok(value) => value,
+            Err(_) => {
+                if $msg_is_error {error!("{}", $msg);} else {debug!("{}", $msg);}
+                return HttpResponse::BadRequest().finish();
+            }
+        }
+    };
+    ($option:expr) => {
+        match $option {
+            Ok(value) => value,
+            Err(_) => return HttpResponse::BadRequest().finish(),
+        }
+    };
+}
+
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
         if let Ok(file) = actix_files::NamedFile::open_async(file_path).await {
@@ -249,4 +287,12 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
         error!("Url is malformed {}", sanitize_sensitive_info(resource_url));
     }
     HttpResponse::BadRequest().finish()
+}
+
+pub fn separate_number_and_remainder(input: &str) -> (String, Option<String>) {
+    input.rfind('.').map_or_else(|| (input.to_string(), None), |dot_index| {
+        let number_part = input[..dot_index].to_string();
+        let rest = input[dot_index..].to_string();
+        (number_part, if rest.len() < 2 { None } else { Some(rest) })
+    })
 }

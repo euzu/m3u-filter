@@ -9,6 +9,7 @@ use std::io::ErrorKind;
 use std::path::{PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use crate::api::hls_api::hls_api_register;
 use crate::api::m3u_api::m3u_api_register;
 use crate::api::model::app_state::AppState;
 use crate::api::model::download::DownloadQueue;
@@ -177,6 +178,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
             .configure(xtream_api_register)
             .configure(m3u_api_register)
             .configure(xmltv_api_register)
+            .configure(hls_api_register)
             .configure(|srvcfg| {
                 if web_ui_enabled {
                     srvcfg.configure(index_register(&web_dir_path));

@@ -15,11 +15,10 @@ const SERVER_INFO_FIELDS = [
     {name: 'protocol', label: 'Protocol',  fieldType: FormFieldType.SINGLE_SELECT,
         options:[{value: 'http', label:'http'}, {value: 'https', label:'https'}]},
     {name: 'host', label: 'Host',  fieldType: FormFieldType.TEXT},
-    {name: 'http_port', label: 'HTTP port', fieldType: FormFieldType.NUMBER, validator: isNumber},
-    {name: 'https_port', label: 'HTTPS port', fieldType: FormFieldType.NUMBER,validator: isNumber},
-    {name: 'rtmp_port', label: 'RTMP port', fieldType: FormFieldType.NUMBER,validator: isNumber},
+    {name: 'port', label: 'Port', fieldType: FormFieldType.NUMBER, validator: isNumber},
     {name: 'timezone', label: 'Timezone', fieldType: FormFieldType.TEXT},
     {name: 'message', label: 'Message', fieldType: FormFieldType.TEXT},
+    {name: 'path', label: 'Path', fieldType: FormFieldType.TEXT},
 ];
 
 interface ApiProxyViewProps {

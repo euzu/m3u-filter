@@ -160,7 +160,7 @@ fn get_map_item_as_str(map: &serde_json::Map<String, Value>, key: &str) -> Optio
 fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
     let mut result: HashMap<String, u32> = HashMap::new();
     let mut max_id: u32 = 0;
-    for cat in [COL_CAT_LIVE, COL_CAT_VOD, COL_CAT_SERIES] {
+    for (cluster, cat) in [(XtreamCluster::Live, COL_CAT_LIVE), (XtreamCluster::Video, COL_CAT_VOD), (XtreamCluster::Series, COL_CAT_SERIES)] {
         let col_path = get_collection_path(path, cat);
         if col_path.exists() {
             if let Ok(file) = File::open(col_path) {
@@ -169,7 +169,7 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
                     if let Some(category_id) = entry.get(TAG_CATEGORY_ID).and_then(get_u32_from_serde_value) {
                         if let Value::Object(item) = entry {
                             if let Some(category_name) = get_map_item_as_str(&item, TAG_CATEGORY_NAME) {
-                                result.insert(category_name, category_id);
+                                result.insert(format!("{cluster}{category_name}"), category_id);
                                 max_id = max_id.max(category_id);
                             }
                         }
@@ -224,19 +224,20 @@ pub async fn xtream_write_playlist(
 ) -> Result<(), M3uFilterError> {
     let path = ensure_xtream_storage_path(cfg, target.name.as_str())?;
     let mut errors = Vec::new();
-    let mut cat_live_col = vec![];
-    let mut cat_series_col = vec![];
-    let mut cat_vod_col = vec![];
-    let mut live_col = vec![];
-    let mut series_col = vec![];
-    let mut vod_col = vec![];
+    let mut cat_live_col = Vec::with_capacity(1_000);
+    let mut cat_series_col = Vec::with_capacity(1_000);
+    let mut cat_vod_col = Vec::with_capacity(1_000);
+    let mut live_col = Vec::with_capacity(50_000);
+    let mut series_col = Vec::with_capacity(10_000);
+    let mut vod_col = Vec::with_capacity(10_000);
 
     // preserve category_ids
     let (max_cat_id, existing_cat_ids) = load_old_category_ids(&path);
     let mut cat_id_counter = max_cat_id;
     for plg in playlist.iter_mut() {
         if !&plg.channels.is_empty() {
-            let cat_id = existing_cat_ids.get(plg.title.as_ref()).unwrap_or_else(|| {
+            let cat_key = format!("{}{}", plg.xtream_cluster, &plg.title);
+            let cat_id = existing_cat_ids.get(&cat_key).unwrap_or_else(|| {
                 cat_id_counter += 1;
                 &cat_id_counter
             });
@@ -254,30 +255,36 @@ pub async fn xtream_write_playlist(
 
             for pli in &plg.channels {
                 let mut header = pli.header.borrow_mut();
-                let col = match header.item_type {
-                    PlaylistItemType::LiveUnknown | PlaylistItemType::LiveHls => {
-                        header.category_id = *cat_id;
-                        Some(&mut live_col)
-                    }
-                    _ => {
-                        if header.get_provider_id().is_some() {
-                            header.category_id = *cat_id;
-                            Some(match header.xtream_cluster {
-                                XtreamCluster::Live => &mut live_col,
-                                XtreamCluster::Series => &mut series_col,
-                                XtreamCluster::Video => &mut vod_col,
-                            })
-                        } else {
-                            let title = header.title.as_str();
-                            errors.push(format!("Channel does not have an id: {title}"));
-                            None
-                        }
-                    }
+                header.category_id = *cat_id;
+                let col = match header.xtream_cluster {
+                    XtreamCluster::Live => &mut live_col,
+                    XtreamCluster::Series => &mut series_col,
+                    XtreamCluster::Video => &mut vod_col,
                 };
+
+                // let col = match header.item_type {
+                    // PlaylistItemType::LiveUnknown | PlaylistItemType::LiveHls => {
+                    //     header.category_id = *cat_id;
+                    //     Some(&mut live_col)
+                    // }
+                    // _ => {
+                        // if header.get_provider_id().is_some() {
+                        // header.category_id = *cat_id;
+                        // Some(match header.xtream_cluster {
+                        //     XtreamCluster::Live => &mut live_col,
+                        //     XtreamCluster::Series => &mut series_col,
+                        //     XtreamCluster::Video => &mut vod_col,
+                        // })
+                        // // } else {
+                        //     let title = header.title.as_str();
+                        //     errors.push(format!("Channel does not have an id: {title}"));
+                        //     errors.push(format!("Channel does not have an id: {title}"));
+                        //     None
+                        // }
+                    // }
+                // };
                 drop(header);
-                if let Some(pl) = col {
-                    pl.push(pli);
-                }
+                col.push(pli);
             }
         }
     }
@@ -699,7 +706,7 @@ async fn rewrite_xtream_series_info<P>(
                 if let Some(episode_provider_id) = episode.get(TAG_ID).and_then(get_u32_from_serde_value)
                 {
                     let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &episode_provider_id.to_string(), &provider_url);
-                    let episode_virtual_id = target_id_mapping.get_virtual_id(
+                    let episode_virtual_id = target_id_mapping.get_and_update_virtual_id(
                         uuid,
                         episode_provider_id,
                         PlaylistItemType::Series,
@@ -720,6 +727,9 @@ async fn rewrite_xtream_series_info<P>(
             }
         }
 
+        if let Err(err) = target_id_mapping.persist() {
+            error!("{}", err.to_string());
+        }
         drop(target_id_mapping);
     }
     let result = serde_json::to_string(&doc).map_err(|_| str_to_io_error("Failed to serialize updated series info"))?;

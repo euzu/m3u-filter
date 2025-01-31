@@ -151,11 +151,10 @@ export interface ApiProxyServerInfo {
     name: string;
     protocol: string;
     host: string;
-    http_port: string;
-    https_port: string;
-    rtmp_port: string;
+    port: string;
     timezone: string;
     message: string;
+    path: string;
 }
 
 export interface ApiProxyConfig {

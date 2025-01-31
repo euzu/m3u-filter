@@ -4,9 +4,9 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc};
 use std::task::{Poll};
-use log::debug;
 use futures::{Stream};
 use crate::api::model::stream_error::StreamError;
+use crate::trace_if_enabled;
 use crate::utils::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::request_utils::sanitize_sensitive_info;
 
@@ -57,7 +57,7 @@ impl Stream for ClientStream {
 
 impl Drop for ClientStream {
     fn drop(&mut self) {
-        debug!("Client disconnected {}", sanitize_sensitive_info(&self.url));
+        trace_if_enabled!("Client disconnected {}", sanitize_sensitive_info(&self.url));
         self.close_signal.notify();
     }
 }

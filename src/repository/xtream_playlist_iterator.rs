@@ -28,6 +28,9 @@ impl XtreamPlaylistIterator {
     ) -> Result<Self, M3uFilterError> {
         if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
             let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
+            if !xtream_path.exists() || !idx_path.exists() {
+                return Err(info_err!(format!("No {cluster} entries found for target {}", &target.name)));
+            }
             let file_lock = config.file_locks.read_lock(&xtream_path).await
                 .map_err(|err| info_err!(format!("Could not lock document {xtream_path:?}: {err}")))?;
 

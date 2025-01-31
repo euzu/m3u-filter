@@ -10,7 +10,7 @@ use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentWriter};
 use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
-use crate::repository::storage::{FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
+use crate::repository::storage::{get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::utils::file_utils;
 use crate::utils::file_utils::file_writer;
 
@@ -89,12 +89,14 @@ pub async fn m3u_load_rewrite_playlist(
 }
 
 
-pub async  fn m3u_get_item_for_stream_id(cfg: &Config, stream_id: u32, m3u_path: &Path, idx_path: &Path) -> Result<M3uPlaylistItem, Error> {
+pub async  fn m3u_get_item_for_stream_id(stream_id: u32, cfg: &Config, target: &ConfigTarget) -> Result<M3uPlaylistItem, Error> {
     if stream_id < 1 {
         return Err(str_to_io_error("id should start with 1"));
     }
     {
-        let _file_lock = cfg.file_locks.read_lock(m3u_path).await?;
-        IndexedDocumentDirectAccess::read_indexed_item::<u32, M3uPlaylistItem>(m3u_path, idx_path, &stream_id)
+        let target_path = get_target_storage_path(cfg, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {}", &target.name)))?;
+        let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
+        let _file_lock = cfg.file_locks.read_lock(&m3u_path).await?;
+        IndexedDocumentDirectAccess::read_indexed_item::<u32, M3uPlaylistItem>(&m3u_path, &idx_path, &stream_id)
     }
 }

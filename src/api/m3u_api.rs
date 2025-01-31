@@ -3,16 +3,18 @@ use bytes::Bytes;
 use futures::stream;
 use log::{debug, error};
 
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, resource_response, stream_response};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, resource_response, separate_number_and_remainder, stream_response};
+use crate::api::hls_api::handle_hls_stream_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::model::api_proxy::ProxyType;
 use crate::model::config::TargetType;
-use crate::model::playlist::FieldGetAccessor;
-use crate::repository::m3u_playlist_iterator::{M3U_STREAM_PATH, M3U_RESOURCE_PATH};
-use crate::repository::m3u_repository::{m3u_get_file_paths, m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
-use crate::repository::storage::get_target_storage_path;
-use crate::utils::request_utils::sanitize_sensitive_info;
+use crate::model::playlist::{FieldGetAccessor, XtreamCluster};
+use crate::repository::m3u_playlist_iterator::{M3U_RESOURCE_PATH, M3U_STREAM_PATH};
+use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
+use crate::utils::request_utils::{replace_extension, sanitize_sensitive_info};
+use crate::{debug_if_enabled, try_option_bad_request, try_result_bad_request};
+use crate::repository::playlist_repository::HLS_EXT;
 
 async fn m3u_api(
     api_req: &UserApiRequest,
@@ -57,20 +59,15 @@ async fn m3u_api_stream(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let (username, password, stream_id) = path.into_inner();
-    let Ok(m3u_stream_id) = stream_id.parse::<u32>() else { return HttpResponse::BadRequest().finish() };
+    let (action_stream_id, stream_ext) = separate_number_and_remainder(&stream_id);
+    let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state) else { return HttpResponse::BadRequest().finish() };
 
     if !target.has_output(&TargetType::M3u) {
         return HttpResponse::BadRequest().finish();
     }
 
-    let Some(target_path) = get_target_storage_path(&app_state.config, target.name.as_str()) else {
-        error!("Failed to get target path for {}", target.name);
-        return HttpResponse::BadRequest().finish();
-    };
-
-    let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
-    let m3u_item = match m3u_get_item_for_stream_id(&app_state.config, m3u_stream_id, &m3u_path, &idx_path).await {
+    let m3u_item = match m3u_get_item_for_stream_id(virtual_id, &app_state.config, target).await {
         Ok(item) => item,
         Err(err) => {
             error!("Failed to get m3u url: {}", sanitize_sensitive_info(err.to_string().as_str()));
@@ -78,10 +75,19 @@ async fn m3u_api_stream(
         }
     };
 
+    let is_hls_request = stream_ext.as_deref() == Some(HLS_EXT);
+
     if user.proxy == ProxyType::Redirect {
-        let stream_url = m3u_item.url;
-        debug!("Redirecting stream request to {}", sanitize_sensitive_info(&stream_url));
-        return HttpResponse::Found().insert_header(("Location", stream_url.to_string())).finish();
+        let redirect_url = if is_hls_request { &replace_extension(&m3u_item.url, "m3u8") } else { &m3u_item.url };
+        debug_if_enabled!("Redirecting m3u stream request to {}", sanitize_sensitive_info(redirect_url));
+        return HttpResponse::Found().insert_header(("Location", redirect_url.as_str())).finish();
+    }
+    // Reverse proxy mode
+    if is_hls_request {
+        let target_name = &target.name;
+        let input = try_option_bad_request!(app_state.config.get_input_by_name(m3u_item.input_name.as_str()), true,
+            format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
+        return handle_hls_stream_request(&app_state, &user, &m3u_item, input, TargetType::M3u).await;
     }
 
     stream_response(&app_state, m3u_item.url.as_str(), &req, None, m3u_item.item_type, target).await
@@ -100,14 +106,7 @@ async fn m3u_api_resource(
     if !target.has_output(&TargetType::M3u) {
         return HttpResponse::BadRequest().finish();
     }
-
-    let Some(target_path) = get_target_storage_path(&app_state.config, target.name.as_str()) else {
-        error!("Failed to get target path for {}", target.name);
-        return HttpResponse::BadRequest().finish();
-    };
-
-    let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
-    let m3u_item = match m3u_get_item_for_stream_id(&app_state.config, m3u_stream_id, &m3u_path, &idx_path).await {
+    let m3u_item = match m3u_get_item_for_stream_id(m3u_stream_id, &app_state.config, target).await {
         Ok(item) => item,
         Err(err) => {
             error!("Failed to get m3u url: {}", sanitize_sensitive_info(err.to_string().as_str()));

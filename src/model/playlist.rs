@@ -11,6 +11,7 @@ use crate::utils::json_utils::{get_string_from_serde_value, get_u64_from_serde_v
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use crate::utils::hash_utils::{generate_playlist_uuid, get_provider_id};
+use crate::utils::request_utils::extract_extension_from_url;
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 
@@ -76,7 +77,7 @@ impl TryFrom<PlaylistItemType> for XtreamCluster {
     type Error = String;
     fn try_from(item_type: PlaylistItemType) -> Result<Self, Self::Error> {
         match item_type {
-            PlaylistItemType::Live => Ok(Self::Live),
+            PlaylistItemType::Live | PlaylistItemType::LiveHls | PlaylistItemType::LiveUnknown => Ok(Self::Live),
             PlaylistItemType::Video => Ok(Self::Video),
             PlaylistItemType::Series => Ok(Self::Series),
             _ => Err(format!("Cant convert {item_type}")),
@@ -384,6 +385,15 @@ impl XtreamPlaylistItem {
     pub fn to_doc(&self, url: &str, options: &XtreamMappingOptions, user: &ProxyUserCredentials) -> Value {
         xtream_playlistitem_to_document(self, url, options, user)
     }
+
+    pub fn get_additional_property(&self, field: &str) -> Option<Value> {
+        if let Some(json) = self.additional_properties.as_ref() {
+            if let Ok(Value::Object(props)) = serde_json::from_str(json) {
+                return  props.get(field).cloned();
+            }
+        }
+        None
+    }
 }
 
 impl PlaylistEntry for XtreamPlaylistItem {
@@ -501,6 +511,39 @@ impl PlaylistItem {
     pub fn to_xtream(&self) -> XtreamPlaylistItem {
         let header = self.header.borrow();
         let provider_id = header.id.parse::<u32>().unwrap_or_default();
+        let mut additional_properties = None;
+        if header.xtream_cluster != XtreamCluster::Live {
+            let add_ext = match header.get_additional_property("container_extension") {
+                None => true,
+                Some(ext) => ext.as_str().map_or(true, str::is_empty)
+            };
+            if add_ext {
+                if let Some(cont_ext) = extract_extension_from_url(&header.url) {
+                    let ext = if let Some(stripped) = cont_ext.strip_prefix('.') { stripped } else { cont_ext };
+                    let mut result = match header.additional_properties.as_ref() {
+                        None => Map::new(),
+                        Some(props) => {
+                            if let  Value::Object(map)  = props {
+                                map.clone()
+                            } else {
+                                Map::new()
+                            }
+                        }
+                    };
+                    result.insert("container_extension".to_string(), Value::String(ext.to_string()));
+                    additional_properties =  serde_json::to_string(&Value::Object(result)).ok();
+                }
+            }
+        }
+        if additional_properties.is_none() {
+            additional_properties = header.additional_properties.as_ref().and_then(|props| {
+                serde_json::to_string(props).ok()
+            });
+        }
+        // let additional_properties = header.additional_properties.as_ref().and_then(|props| {
+        //     serde_json::to_string(props).ok()
+        // });
+
         XtreamPlaylistItem {
             virtual_id: header.virtual_id,
             provider_id,
@@ -514,7 +557,7 @@ impl PlaylistItem {
             url: Rc::clone(&header.url),
             epg_channel_id: header.epg_channel_id.clone(),
             xtream_cluster: header.xtream_cluster,
-            additional_properties: header.additional_properties.as_ref().and_then(|props| serde_json::to_string(props).ok()),
+            additional_properties,
             item_type: header.item_type,
             category_id: header.category_id,
             input_name: Rc::clone(&header.input_name),

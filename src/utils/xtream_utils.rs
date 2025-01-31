@@ -1,7 +1,7 @@
 use crate::Arc;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
-use crate::model::playlist::{PlaylistEntry, PlaylistGroup, XtreamCluster};
+use crate::model::playlist::{PlaylistEntry, PlaylistGroup, XtreamCluster, XtreamPlaylistItem};
 use crate::processing::{xtream_parser};
 use crate::repository::xtream_repository::{rewrite_xtream_series_info_content, rewrite_xtream_vod_info_content, xtream_get_input_info};
 use crate::repository::xtream_repository;
@@ -9,7 +9,10 @@ use crate::utils::{request_utils};
 use log::{info, warn};
 use std::cmp::Ordering;
 use std::io::{Error};
-use crate::model::api_proxy::{ProxyUserCredentials};
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
+use crate::utils::json_utils::get_string_from_serde_value;
+use crate::utils::request_utils::extract_extension_from_url;
+
 pub const ACTION_GET_SERIES_INFO: &str = "get_series_info";
 pub const ACTION_GET_VOD_INFO: &str = "get_vod_info";
 pub const ACTION_GET_LIVE_INFO: &str = "get_live_info";
@@ -136,7 +139,8 @@ pub async fn get_xtream_playlist(client: Arc<reqwest::Client>, input: &ConfigInp
 
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
-    let base_url = format!("{}/player_api.php?username={}&password={}", input.url, username, password);
+
+    let base_url = get_xtream_stream_url_base(&input.url, username, password);
 
     if let Err(err) = request_utils::get_input_json_content(Arc::clone(&client), input, base_url.as_str(), None).await {
         warn!("Failed to login xtream account {username} {err}");
@@ -185,4 +189,29 @@ pub async fn get_xtream_playlist(client: Arc<reqwest::Client>, input: &ConfigInp
         plg.id = grp_id;
     }
     (playlist_groups, errors)
+}
+
+pub fn create_vod_info_from_item(user: &ProxyUserCredentials, pli: &XtreamPlaylistItem, last_updated: i64) -> String {
+    let category_id = pli.category_id;
+    let stream_id = if user.proxy == ProxyType::Redirect { pli.virtual_id } else { pli.provider_id };
+    let name = &pli.name;
+    let extension = pli.get_additional_property("container_extension")
+        .map_or_else(|| extract_extension_from_url(&pli.url).map_or_else (String::new, std::string::ToString::to_string),
+                     |v| get_string_from_serde_value(&v).map_or_else(String::new, |v| v));
+    let added = last_updated / 1000;
+    format!(r#"{{
+  "info": {{}},
+  "movie_data": {{
+    "added": "{added}",
+    "category_id": {category_id},
+    "category_ids": [
+      {category_id}
+    ],
+    "container_extension": "{extension}",
+    "custom_sid": "",
+    "direct_source": "",
+    "name": "{name}",
+    "stream_id": {stream_id}
+  }}
+}}"#)
 }

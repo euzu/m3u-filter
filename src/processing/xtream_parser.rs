@@ -79,7 +79,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
     }
 }
 
-fn create_xtream_url(xtream_cluster: XtreamCluster, url: &str, username: &str, password: &str,
+pub fn create_xtream_url(xtream_cluster: XtreamCluster, url: &str, username: &str, password: &str,
                      stream: &XtreamStream, live_stream_without_extension: bool) -> Rc<String> {
     if stream.direct_source.is_empty() {
         let stream_base_url = match xtream_cluster {

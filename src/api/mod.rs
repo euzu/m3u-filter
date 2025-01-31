@@ -9,3 +9,4 @@ mod scheduler;
 mod web_index;
 
 pub(crate) mod model;
+mod hls_api;

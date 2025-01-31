@@ -12,7 +12,7 @@ macro_rules! get_errors_notify_message {
                 .filter(|&err| err.kind == M3uFilterErrorKind::Notify)
                 .map(|err| err.message.as_str())
                 .collect::<Vec<&str>>()
-                .join("\n");
+                .join("\r\n");
             if $size > 0 && text.len() > std::cmp::max($size - 3, 3) {
                 Some(format!("{}...", text.get(0..$size).unwrap()))
             } else {

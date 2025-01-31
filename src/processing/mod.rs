@@ -7,3 +7,4 @@ mod xtream_processor;
 mod affix_processor;
 mod xtream_processor_vod;
 mod xtream_processor_series;
+pub mod hls_parser;

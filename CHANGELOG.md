@@ -23,7 +23,7 @@ server:
 - Added Active clients count (for reverse proxy mode users) which is now displayed in `/status`  and can be logged with setting
 `active_clients: true` under `log`section in `config.yml`
 - Fixed iptv player using live tv stream without `/live/` context.
-- Added `log_level`to `log` config. Priority:  CLI-Argument, Env-Var, Config, Default(`info`)
+- Added `log_level` to `log` config. Priority:  CLI-Argument, Env-Var, Config, Default(`info`)
 ```yaml
 log:
   sanitize_sensitive_info: false
@@ -35,6 +35,7 @@ web_ui_enabled: true
 - Added new option to `input` `xtream_live_stream_without_extension`. Default is `false`.  Some providers don't like `.ts`  extension, some providers need it.
 Now you can disable or enable it for a provider.
 - Added `path` to `api-proxy.yml` server config for simpler front reverse-proxy configuration (like nginx)  
+- added `hls` handling.
 
 # 2.1.3 (2025-01-26)
 - Hotfix 2.1.2, forgot to update the stream api code.  
