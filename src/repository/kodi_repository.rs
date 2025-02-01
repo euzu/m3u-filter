@@ -14,9 +14,10 @@ use log::error;
 use regex::Regex;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf}; 
 use std::rc::Rc;
 use std::sync::LazyLock;
 use crate::utils::request_utils::extract_extension_from_url;
@@ -298,16 +299,74 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
     StrmItemInfo { group, title, item_type, provider_id, virtual_id, input_name, url, series_name, release_date, season, episode }
 }
 
-fn prepare_strm_output_directory(cleanup: bool, path: &PathBuf) -> Result<(), M3uFilterError> {
+fn prepare_strm_output_directory(cleanup: bool, path: &Path) -> Result<(), M3uFilterError> {
     if cleanup {
-        let _ = std::fs::remove_dir_all(path);
+        if path.exists() && path.is_dir() {
+            // Read directory entries safely
+            let entries = match fs::read_dir(path) {
+                Ok(entries) => entries,
+                Err(e) => {
+                    error!("Error reading directory {:?}: {:?}", path, e);
+                    return create_m3u_filter_error_result!(
+                        M3uFilterErrorKind::Notify,
+                        "Error cleaning STRM directory: {}",
+                        e
+                    );
+                }
+            };
+
+            // Iterate through all directory entries and attempt to remove them
+            for entry in entries {
+                match entry {
+                    Ok(entry) => {
+                        let entry_path = entry.path();
+
+                        // Safely retrieve file type to handle symbolic links correctly
+                        let file_type = match entry.file_type() {
+                            Ok(ft) => ft,
+                            Err(e) => {
+                                error!("Failed to get file type {:?}: {:?}", entry_path, e);
+                                continue; // Skip this file and proceed with others
+                            }
+                        };
+
+                        if file_type.is_dir() {
+                            // Ensure directory exists before attempting removal
+                            if entry_path.exists() {
+                                if let Err(e) = fs::remove_dir_all(&entry_path) {
+                                    error!("Failed to remove directory {:?}: {:?}", entry_path, e);
+                                }
+                            }
+                        } else {
+                            // Ensure file exists before attempting removal
+                            if entry_path.exists() {
+                                if let Err(e) = fs::remove_file(&entry_path) {
+                                    error!("Failed to remove file {:?}: {:?}", entry_path, e);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error retrieving directory entry: {:?}", e);
+                    }
+                }
+            }
+        }
     }
-    if let Err(e) = std::fs::create_dir_all(path) {
-        error!("cant create directory: {:?}", &path);
-        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to write strm playlist: {}", e);
-    };
+
+    // Ensure the directory exists
+    if let Err(e) = fs::create_dir_all(path) {
+        error!("Failed to create directory {:?}: {:?}", path, e);
+        return create_m3u_filter_error_result!(
+            M3uFilterErrorKind::Notify,
+            "Error creating STRM directory: {}",
+            e
+        );
+    }
+
     Ok(())
 }
+
 
 fn filter_strm_item(pli: &PlaylistItem) -> bool {
     let item_type = pli.header.borrow().item_type;
