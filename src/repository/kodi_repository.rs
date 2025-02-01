@@ -300,68 +300,55 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
 }
 
 fn prepare_strm_output_directory(cleanup: bool, path: &Path) -> Result<(), M3uFilterError> {
-    if cleanup {
-        if path.exists() && path.is_dir() {
-            // Read directory entries safely
-            let entries = match fs::read_dir(path) {
-                Ok(entries) => entries,
-                Err(e) => {
-                    error!("Error reading directory {:?}: {:?}", path, e);
-                    return create_m3u_filter_error_result!(
-                        M3uFilterErrorKind::Notify,
-                        "Error cleaning STRM directory: {}",
-                        e
-                    );
-                }
-            };
+    if cleanup && path.exists() && path.is_dir() {
+        // Read directory entries safely
+        let entries = match fs::read_dir(path) {
+            Ok(entries) => entries,
+            Err(e) => {
+                error!("Error reading directory {path:?}: {e}");
+                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify,"Error cleaning STRM directory: {e}");
+            }
+        };
 
-            // Iterate through all directory entries and attempt to remove them
-            for entry in entries {
-                match entry {
-                    Ok(entry) => {
-                        let entry_path = entry.path();
+        // Iterate through all directory entries and attempt to remove them
+        for entry in entries {
+            match entry {
+                Ok(entry) => {
+                    let entry_path = entry.path();
+                    // Safely retrieve file type to handle symbolic links correctly
+                    let file_type = match entry.file_type() {
+                        Ok(ft) => ft,
+                        Err(e) => {
+                            error!("Failed to get file type {entry_path:?}: {e}");
+                            continue; // Skip this file and proceed with others
+                        }
+                    };
 
-                        // Safely retrieve file type to handle symbolic links correctly
-                        let file_type = match entry.file_type() {
-                            Ok(ft) => ft,
-                            Err(e) => {
-                                error!("Failed to get file type {:?}: {:?}", entry_path, e);
-                                continue; // Skip this file and proceed with others
+                    if file_type.is_dir() {
+                        // Ensure directory exists before attempting removal
+                        if entry_path.exists() {
+                            if let Err(e) = fs::remove_dir_all(&entry_path) {
+                                error!("Failed to remove directory {entry_path:?}: {e}");
                             }
-                        };
-
-                        if file_type.is_dir() {
-                            // Ensure directory exists before attempting removal
-                            if entry_path.exists() {
-                                if let Err(e) = fs::remove_dir_all(&entry_path) {
-                                    error!("Failed to remove directory {:?}: {:?}", entry_path, e);
-                                }
-                            }
-                        } else {
-                            // Ensure file exists before attempting removal
-                            if entry_path.exists() {
-                                if let Err(e) = fs::remove_file(&entry_path) {
-                                    error!("Failed to remove file {:?}: {:?}", entry_path, e);
-                                }
+                        }
+                    } else {
+                        // Ensure file exists before attempting removal
+                        if entry_path.exists() {
+                            if let Err(e) = fs::remove_file(&entry_path) {
+                                error!("Failed to remove file {entry_path:?}: {e}");
                             }
                         }
                     }
-                    Err(e) => {
-                        error!("Error retrieving directory entry: {:?}", e);
-                    }
                 }
+                Err(e) =>  error!("Error retrieving directory entry: {e}")
             }
         }
     }
 
     // Ensure the directory exists
     if let Err(e) = fs::create_dir_all(path) {
-        error!("Failed to create directory {:?}: {:?}", path, e);
-        return create_m3u_filter_error_result!(
-            M3uFilterErrorKind::Notify,
-            "Error creating STRM directory: {}",
-            e
-        );
+        error!("Failed to create directory {path:?}: {e}");
+        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Error creating STRM directory: {e}");
     }
 
     Ok(())
@@ -437,7 +424,7 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
                             Ok(()) => {}
                             Err(err) => {
                                 error!("failed to write strm playlist: {err}");
-                                result = Err(notify_err!(format!("failed to write strm playlist: {}", err)));
+                                result = Err(notify_err!(format!("failed to write strm playlist: {err}")));
                             }
                         }
                     }
