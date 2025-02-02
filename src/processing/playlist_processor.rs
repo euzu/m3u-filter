@@ -261,11 +261,11 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
         for mapping in mappings {
             if let Some(counter_list) = &mapping.t_counter {
                 for counter in counter_list {
-                    let cntval = counter.value.load(core::sync::atomic::Ordering::Relaxed);
                     for plg in playlist {
                         for channel in &plg.channels {
                             let provider = ValueProvider { pli: RefCell::new(channel) };
                             if counter.filter.filter(&provider, &mut mock_processor) {
+                                let cntval = counter.value.load(core::sync::atomic::Ordering::Relaxed);
                                 let new_value = if counter.modifier == CounterModifier::Assign {
                                     cntval.to_string()
                                 } else {
@@ -594,3 +594,4 @@ pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, tar
     let elapsed = start_time.elapsed().as_secs();
     info!("Update process finished! Took {elapsed} secs.");
 }
+
