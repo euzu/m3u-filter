@@ -594,3 +594,4 @@ pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, tar
     let elapsed = start_time.elapsed().as_secs();
     info!("Update process finished! Took {elapsed} secs.");
 }
+
