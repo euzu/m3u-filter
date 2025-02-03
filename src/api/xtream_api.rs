@@ -102,9 +102,19 @@ pub fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpRespon
     HttpResponse::Ok().json(filtered)
 }
 
-fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_path: &str, fallback_url: &str) -> Option<String> {
-    let ctx_path = if context.is_empty() { String::new() } else { format!("{context}/") };
+fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStreamContext, action_path: &str, fallback_url: &str) -> Option<String> {
     if let Some(user_info) = input.get_user_info() {
+        let ctx = match context {
+            XtreamApiStreamContext::LiveAlt |
+            XtreamApiStreamContext::Live => {
+                let use_prefix = input.options.as_ref().map_or(true, |o| o.xtream_live_stream_use_prefix);
+                String::from( if use_prefix { "live" } else { "" })
+            },
+            XtreamApiStreamContext::Movie
+            | XtreamApiStreamContext::Series
+            | XtreamApiStreamContext::Timeshift => context.to_string()
+        };
+        let ctx_path = if ctx.is_empty() { String::new() } else { format!("{ctx}/") };
         Some(format!("{}/{}{}/{}/{}",
                      &user_info.base_url,
                      ctx_path,
@@ -121,6 +131,7 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &str, action_p
 
 fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
     let server_info = cfg.get_user_server_info(user);
+
     XtreamAuthorizationResponse::new(&server_info, user)
 }
 
@@ -178,7 +189,7 @@ async fn xtream_player_api_stream(
     };
 
     let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input,
-        stream_req.context.to_string().as_str(), &query_path, pli.url.as_str()),
+        &stream_req.context, &query_path, pli.url.as_str()),
         true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}",
         stream_req.context));
 

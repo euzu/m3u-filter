@@ -80,10 +80,14 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
 }
 
 pub fn create_xtream_url(xtream_cluster: XtreamCluster, url: &str, username: &str, password: &str,
-                     stream: &XtreamStream, live_stream_without_extension: bool) -> Rc<String> {
+                     stream: &XtreamStream, live_stream_use_prefix: bool, live_stream_without_extension: bool) -> Rc<String> {
     if stream.direct_source.is_empty() {
         let stream_base_url = match xtream_cluster {
-            XtreamCluster::Live => format!("{url}/live/{username}/{password}/{}{}", &stream.get_stream_id(), if live_stream_without_extension { "" } else { ".ts" }),
+            XtreamCluster::Live => {
+                let ctx_path = if live_stream_use_prefix {"live/"} else { "" };
+                let suffix = if live_stream_without_extension { "" } else { ".ts" };
+                format!("{url}/{ctx_path}{username}/{password}/{}{suffix}", &stream.get_stream_id())
+            },
             XtreamCluster::Video => {
                 let ext = stream.container_extension.as_ref().map_or("mp4", |e| e.as_str());
                 format!("{url}/movie/{username}/{password}/{}.{ext}", &stream.get_stream_id())
@@ -120,13 +124,14 @@ pub fn parse_xtream(input: &ConfigInput,
                         channels: vec![],
                     });
 
-                    let live_stream_without_extension = input.options.as_ref().is_some_and(|o| o.xtream_live_stream_without_extension);
+                    let (live_stream_use_prefix, live_stream_without_extension) = input.options.as_ref()
+                        .map_or((true, false), |o| (o.xtream_live_stream_use_prefix, o.xtream_live_stream_without_extension));
 
                     for stream in xtream_streams {
                         let group = group_map.get(&stream.category_id).unwrap_or(&unknown_grp);
                         let mut grp = group.borrow_mut();
                         let category_name = &grp.category_name;
-                        let stream_url = create_xtream_url(xtream_cluster, url, username, password, &stream, live_stream_without_extension);
+                        let stream_url = create_xtream_url(xtream_cluster, url, username, password, &stream, live_stream_use_prefix, live_stream_without_extension);
                         let item = PlaylistItem {
                             header: RefCell::new(PlaylistItemHeader {
                                 id: Rc::new(stream.get_stream_id().to_string()),

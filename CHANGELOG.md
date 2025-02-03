@@ -33,7 +33,9 @@ update_on_boot: false
 web_ui_enabled: true
 ```
 - Added new option to `input` `xtream_live_stream_without_extension`. Default is `false`.  Some providers don't like `.ts`  extension, some providers need it.
-Now you can disable or enable it for a provider.
+  Now you can disable or enable it for a provider.
+- Aded new option to `input` `xtream_live_stream_use_prefix`.. Default is `true`.  Some providers don't like `/live/`  prefix for streams, some providers need it.
+  Now you can disable or enable it for a provider.
 - Added `path` to `api-proxy.yml` server config for simpler front reverse-proxy configuration (like nginx)  
 - added `hlsr` handling.
 - refactored strm generation, does not delete root directory, avoids unchanged file creations.

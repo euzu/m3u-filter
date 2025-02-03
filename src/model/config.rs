@@ -33,7 +33,6 @@ pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "time_shift", "rec", "url", "epg_channel_id", "epg_id"
 ];
 
-
 pub const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 pub const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
 
@@ -555,6 +554,8 @@ pub struct ConfigInputOptions {
     pub xtream_skip_vod: bool,
     #[serde(default)]
     pub xtream_skip_series: bool,
+    #[serde(default = "default_as_true")]
+    pub xtream_live_stream_use_prefix: bool,
     #[serde(default)]
     pub xtream_live_stream_without_extension: bool,
 }

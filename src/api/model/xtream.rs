@@ -26,8 +26,9 @@ pub struct XtreamUserInfo {
 pub struct XtreamServerInfo {
     pub url: String,
     pub port: String,
-    pub path: Option<String>,
-    pub protocol: String, // http, https
+    pub https_port: String,
+    pub server_protocol: String, // http, https
+    pub rtmp_port: String,
     pub timezone: String,
     pub timestamp_now: i64,
     pub time_now: String, //"2021-06-28 17:07:37"
@@ -37,6 +38,17 @@ pub struct XtreamServerInfo {
 pub struct XtreamAuthorizationResponse {
     pub user_info: XtreamUserInfo,
     pub server_info: XtreamServerInfo,
+}
+
+#[derive(Serialize)]
+pub struct XtreamServerInfoDto {
+    pub url: String,
+    pub port: String,
+    pub path: Option<String>,
+    pub protocol: String, // http, https
+    pub timezone: String,
+    pub timestamp_now: i64,
+    pub time_now: String, //"2021-06-28 17:07:37"
 }
 
 impl XtreamAuthorizationResponse {
@@ -58,9 +70,10 @@ impl XtreamAuthorizationResponse {
             },
             server_info: XtreamServerInfo {
                 url: server_info.host.clone(),
-                port: server_info.port.clone(),
-                protocol: server_info.protocol.clone(),
-                path: server_info.path.clone(),
+                port: if server_info.protocol == "http" { server_info.port.clone() } else { String::from("80") },
+                https_port: if server_info.protocol == "https" { server_info.port.clone() } else { String::from("443") },
+                server_protocol: server_info.protocol.clone(),
+                rtmp_port: String::new(),
                 timezone: server_info.timezone.to_string(),
                 timestamp_now: now.timestamp(),
                 time_now: now.format("%Y-%m-%d %H:%M:%S").to_string(),

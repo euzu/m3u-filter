@@ -125,6 +125,7 @@ fn create_config_input_for_url(name: &str, url: &str) -> ConfigInput {
             xtream_skip_vod: false,
             xtream_skip_series: false,
             xtream_live_stream_without_extension: false,
+            xtream_live_stream_use_prefix: true,
         }),
         ..Default::default()
     }
