@@ -1,26 +1,28 @@
+use std::path::{Path, PathBuf};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
-use crate::model::playlist::{FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType};
+use crate::model::playlist::{FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType, UUIDType};
 use crate::model::xtream::XtreamSeriesEpisode;
 use crate::repository::bplustree::BPlusTree;
-use crate::repository::storage::get_input_storage_path;
+use crate::repository::storage::{ensure_target_storage_path, get_input_storage_path, hash_bytes, FILE_SUFFIX_DB};
 use crate::repository::xtream_repository::{xtream_get_record_file_path, InputVodInfoRecord};
 use crate::utils::file_lock_manager::FileReadGuard;
 use crate::utils::file_utils;
-use crate::{create_m3u_filter_error_result, notify_err};
+use crate::utils::request_utils::extract_extension_from_url;
+use crate::{create_m3u_filter_error_result, info_err, notify_err};
+use async_std::io::{BufReadExt, BufWriter, BufReader, ReadExt, WriteExt};
+use async_std::fs::{File, read_dir, remove_dir, remove_file, create_dir_all};
 use chrono::Datelike;
+use futures::{StreamExt};
 use log::error;
 use regex::Regex;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::fs;
-use std::fs::File;
-use std::io::Write;
-use std::path::{Path, PathBuf}; 
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::LazyLock;
-use crate::utils::request_utils::extract_extension_from_url;
+
+const FILE_STRM: &str = "strm";
 
 struct KodiStyle {
     year: Regex,
@@ -260,6 +262,11 @@ async fn get_tmdb_value(cfg: &Config, provider_id: Option<u32>, input_name: &str
     }
 }
 
+pub fn strm_get_file_paths(target_path: &Path) -> PathBuf {
+    target_path.join(PathBuf::from(format!("{FILE_STRM}.{FILE_SUFFIX_DB}")))
+}
+
+
 #[derive(Serialize)]
 struct StrmItemInfo {
     group: Rc<String>,
@@ -289,7 +296,7 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
             Some(name) if !name.is_empty() => Some(name.to_string()),
             _ => header.get_additional_property_as_str("series_name"),
         };
-        let release_date =  header.get_additional_property_as_str("series_release_date")
+        let release_date = header.get_additional_property_as_str("series_release_date")
             .or_else(|| header.get_additional_property_as_str("release_date"));
         let season = header.get_additional_property_as_str("season");
         let episode = header.get_additional_property_as_str("episode");
@@ -299,56 +306,98 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
     StrmItemInfo { group, title, item_type, provider_id, virtual_id, input_name, url, series_name, release_date, season, episode }
 }
 
-fn prepare_strm_output_directory(cleanup: bool, path: &Path) -> Result<(), M3uFilterError> {
-    if cleanup && path.exists() && path.is_dir() {
-        // Read directory entries safely
-        let entries = match fs::read_dir(path) {
-            Ok(entries) => entries,
-            Err(e) => {
-                error!("Error reading directory {path:?}: {e}");
-                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify,"Error cleaning STRM directory: {e}");
-            }
-        };
+async fn prepare_strm_output_directory(path: &Path) -> Result<(), M3uFilterError> {
+    // Ensure the directory exists
+    if let Err(e) = async_std::fs::create_dir_all(path).await {
+        error!("Failed to create directory {path:?}: {e}");
+        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Error creating STRM directory: {e}");
+    }
+    Ok(())
+}
+async fn cleanup_strm_output_directory(
+    cleanup: bool,
+    root_path: &Path,
+    existing: &HashSet<String>,
+    processed: &HashSet<String>,
+) -> Result<(), String> {
+    if !(root_path.exists() && root_path.is_dir()) {
+        return Err(format!("Error: STRM directory does not exist: {root_path:?}"));
+    }
 
-        // Iterate through all directory entries and attempt to remove them
-        for entry in entries {
-            match entry {
-                Ok(entry) => {
-                    let entry_path = entry.path();
-                    // Safely retrieve file type to handle symbolic links correctly
-                    let file_type = match entry.file_type() {
-                        Ok(ft) => ft,
-                        Err(e) => {
-                            error!("Failed to get file type {entry_path:?}: {e}");
-                            continue; // Skip this file and proceed with others
-                        }
-                    };
+    let to_remove: HashSet<String> = if cleanup {
+        // Remove al files which are not in `processed`
+        let mut found_files = HashSet::new();
 
-                    if file_type.is_dir() {
-                        // Ensure directory exists before attempting removal
-                        if entry_path.exists() {
-                            if let Err(e) = fs::remove_dir_all(&entry_path) {
-                                error!("Failed to remove directory {entry_path:?}: {e}");
-                            }
-                        }
-                    } else {
-                        // Ensure file exists before attempting removal
-                        if entry_path.exists() {
-                            if let Err(e) = fs::remove_file(&entry_path) {
-                                error!("Failed to remove file {entry_path:?}: {e}");
-                            }
-                        }
-                    }
+        let mut entries = read_dir(root_path).await.map_err(|e| format!("Failed to read directory {root_path:?}: {e}"))?;
+        while let Some(entry) = entries.next().await {
+            let entry = entry.map_err(|e| format!("Error retrieving directory entry: {e}"))?;
+            if entry.file_type().await.map_err(|e| format!("Failed to get file type for {entry:?}: {e}"))?.is_file() {
+                if let Some(file_name) = entry.path().strip_prefix(root_path).ok().and_then(|p| p.to_str()) {
+                    found_files.insert(file_name.to_string());
                 }
-                Err(e) =>  error!("Error retrieving directory entry: {e}")
             }
+        }
+        &found_files - processed
+    } else {
+        // Remove all files from `existing`, which are not in `processed`
+        existing - processed
+    };
+
+    for file in &to_remove {
+        let file_path = root_path.join(file);
+        if let Err(err) = remove_file(&file_path).await {
+            eprintln!("Failed to remove file {file_path:?}: {err}");
         }
     }
 
-    // Ensure the directory exists
-    if let Err(e) = fs::create_dir_all(path) {
-        error!("Failed to create directory {path:?}: {e}");
-        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Error creating STRM directory: {e}");
+    // TODO should we delete all empty directories if cleanup=false ?
+    remove_empty_dirs(root_path.into()).await?;
+
+    Ok(())
+}
+
+async fn remove_empty_dirs(root_path: async_std::path::PathBuf) -> Result<(), String> {
+    let mut stack = vec![root_path];
+    let mut dirs_to_delete = Vec::new();
+    let mut ignore_root = true;
+
+    while let Some(dir) = stack.pop() {
+        let mut entries = match read_dir(&dir).await {
+            Ok(entries) => entries,
+            Err(err) => {
+                error!("Error reading directory {dir:?}: {err}");
+                continue;
+            }
+        };
+
+        let mut has_files = false;
+
+        while let Some(entry) = entries.next().await {
+            match entry {
+                Ok(entry) => {
+                    if entry.file_type().await.map_err(|e| format!("Failed to get file type for {entry:?}: {e}"))?.is_dir() {
+                        stack.push(entry.path());
+                    } else {
+                        has_files = true;
+                    }
+                }
+                Err(err) => {
+                    error!("Error retrieving directory entry: {dir:?} {err}");
+                }
+            }
+        }
+
+        if !ignore_root && !has_files {
+            dirs_to_delete.push(dir);
+        }
+        ignore_root = false;
+    }
+
+    // Delete directories from bottom to top
+    for dir in dirs_to_delete.into_iter().rev() {
+        if let Err(e) = remove_dir(&dir).await {
+            eprintln!("Failed to remove empty directory {dir:?}: {e}");
+        }
     }
 
     Ok(())
@@ -368,75 +417,168 @@ fn get_strm_output_options(target: &ConfigTarget) -> (bool, bool, bool) {
         |o| (o.underscore_whitespace, o.cleanup, o.kodi_style))
 }
 
+fn get_relative_path_str(full_path: &Path, root_path: &Path) -> String {
+    full_path.strip_prefix(root_path).map_or_else(|_| full_path.to_string_lossy(), |relative| relative.to_string_lossy())
+        .to_string()
+}
+
 pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], output: &TargetOutput) -> Result<(), M3uFilterError> {
-    let mut result = Ok(());
-    if !new_playlist.is_empty() {
-        if output.filename.is_none() {
-            return Err(notify_err!("write strm playlist failed: ".to_string()));
-        }
-        let credentials_and_server_info = output.username.as_ref()
-            .and_then(|username| cfg.get_user_credentials(username))
-            .filter(|credentials| credentials.proxy == ProxyType::Reverse)
-            .map(|credentials| {
-                let server_info = cfg.get_user_server_info(&credentials);
-                (credentials, server_info)
-            });
+    if new_playlist.is_empty() {
+        return Ok(());
+    }
+    if output.filename.is_none() {
+        return Err(notify_err!("write strm playlist failed: ".to_string()));
+    }
 
-        let (underscore_whitespace, cleanup, kodi_style) = get_strm_output_options(target);
-        let Some(path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&output.filename.as_ref().unwrap()))) else {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Failed to get file path for {}", output.filename.as_deref().unwrap_or(""));
-        };
+    let Some(root_path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&output.filename.as_ref().unwrap()))) else {
+        return Err(info_err!(format!("Failed to get file path for {}", output.filename.as_deref().unwrap_or(""))));
+    };
 
-        let strm_props = target.options.as_ref().and_then(|o| o.strm_props.as_ref());
+    let credentials_and_server_info = get_credentials_and_server_info(cfg, output);
+    let (underscore_whitespace, cleanup, kodi_style) = get_strm_output_options(target);
+    let strm_index_path = strm_get_file_paths(&ensure_target_storage_path(cfg, target.name.as_str())?);
+    let existing_strm = {
+        let _file_lock = cfg.file_locks.read_lock(&strm_index_path).await.map_err(|err| info_err!(format!("{err}")))?;
+        read_strm_file_index(&strm_index_path).await.unwrap_or_else(|_| HashSet::with_capacity(4096))
+    };
+    let mut processed_strm: HashSet<String> = HashSet::with_capacity(existing_strm.len());
 
-        prepare_strm_output_directory(cleanup, &path)?;
-        let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
-        for pg in new_playlist {
-            for pli in pg.channels.iter().filter(|&pli: &&PlaylistItem| filter_strm_item(pli)) {
-                // we need to consider
-                // - Live streams
-                // - Xtream Series Episode (has series_name and release_date)
-                // - Xtream VOD (should have year or release_date)
-                // - M3u Series (TODO we dont have this currently, should be guessed through m3u parser)
-                // - M3u Vod (no additional infos, need to extract from title)
+    let mut failed = vec![];
+    let strm_props = target.options.as_ref().and_then(|o| o.strm_props.as_ref());
 
-                let str_item_info = extract_item_info(pli);
-                let (dir_path, strm_file_name) = if kodi_style {
-                    kodi_style_rename(cfg, &str_item_info, &KODI_STYLE, &mut input_tmdb_indexes, underscore_whitespace).await
-                } else {
-                    let dir_path = path.join(sanitize_for_filename(&str_item_info.group, underscore_whitespace));
-                    let strm_file_name = sanitize_for_filename(&str_item_info.title, underscore_whitespace);
-                    (dir_path, strm_file_name)
-                };
-                let output_path = path.join(dir_path);
-                if let Err(e) = std::fs::create_dir_all(&output_path) {
-                    error!("cant create directory: {output_path:?}");
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "failed to create directory for strm playlist:{output_path:?} {e}");
-                };
+    prepare_strm_output_directory(&root_path).await?;
+    let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
 
-                let url = get_strm_url(credentials_and_server_info.as_ref(), &str_item_info);
-                let file_path = output_path.join(format!("{strm_file_name}.strm"));
-                match File::create(&file_path) {
-                    Ok(mut strm_file) => {
-                        let mut content =  strm_props.map_or_else(Vec::new, std::clone::Clone::clone);
-                        content.push(url);
-                        match file_utils::check_write(&strm_file.write_all(content.join("\n").as_bytes())) {
-                            Ok(()) => {}
-                            Err(err) => {
-                                error!("failed to write strm playlist: {err}");
-                                result = Err(notify_err!(format!("failed to write strm playlist: {err}")));
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        error!("failed to write strm playlist: {err}");
-                        result = Err(notify_err!(format!("failed to write strm playlist: {}", err)));
-                    }
-                };
+    for pg in new_playlist {
+        for pli in pg.channels.iter().filter(|&pli| filter_strm_item(pli)) {
+            // we need to consider
+            // - Live streams
+            // - Xtream Series Episode (has series_name and release_date)
+            // - Xtream VOD (should have year or release_date)
+            // - M3u Series (TODO we dont have this currently, should be guessed through m3u parser)
+            // - M3u Vod (no additional infos, need to extract from title)
+
+            let str_item_info = extract_item_info(pli);
+            let (dir_path, strm_file_name) = if kodi_style {
+                kodi_style_rename(cfg, &str_item_info, &KODI_STYLE, &mut input_tmdb_indexes, underscore_whitespace).await
+            } else {
+                let dir_path = root_path.join(sanitize_for_filename(&str_item_info.group, underscore_whitespace));
+                let strm_file_name = sanitize_for_filename(&str_item_info.title, underscore_whitespace);
+                (dir_path, strm_file_name)
+            };
+
+            // file paths
+            let output_path = root_path.join(dir_path);
+            let file_path = output_path.join(format!("{strm_file_name}.strm"));
+            let file_exists = file_path.exists();
+            let relative_file_path = get_relative_path_str(&file_path, &root_path);
+
+            // create content
+            let url = get_strm_url(credentials_and_server_info.as_ref(), &str_item_info);
+            let mut content = strm_props.map_or_else(Vec::new, std::clone::Clone::clone);
+            content.push(url);
+            let content_text = content.join("\r\n");
+            let content_as_bytes = content_text.as_bytes();
+            let content_hash = hash_bytes(content_as_bytes);
+
+            // check if file exists and has same hash
+            if file_exists && has_strm_file_same_hash(&file_path, content_hash).await {
+                processed_strm.insert(relative_file_path);
+                continue; // skip creation
             }
+
+            // if we cant create the directory skip this entry
+            if !ensure_strm_file_directory(&mut failed, &output_path).await { continue; }
+
+            match write_strm_file(&file_path, content_as_bytes).await {
+                Ok(()) => { processed_strm.insert(relative_file_path); }
+                Err(err) => { failed.push(err); }
+            };
         }
     }
-    result
+
+    if let Err(err) = write_strm_index_file(cfg, &processed_strm, &strm_index_path).await {
+        failed.push(err);
+     };
+
+    if let Err(err) = cleanup_strm_output_directory(cleanup, &root_path, &existing_strm, &processed_strm).await {
+        failed.push(err);
+    }
+
+    if failed.is_empty() {
+        Ok(())
+    } else {
+        Err(info_err!(failed.join(", ")))
+    }
+}
+
+async fn write_strm_index_file(cfg: &Config, entries: &HashSet<String>, index_file_path: &PathBuf) -> Result<(), String> {
+    let _file_lock = cfg.file_locks.write_lock(index_file_path).await.map_err(|err| format!("{err}"))?;
+    let file = File::create(index_file_path).await.map_err(|err| format!("Failed to create strm index file: {index_file_path:?} {err}"))?;
+    let mut writer = BufWriter::new(file);
+    let new_line = "\n".as_bytes();
+    for entry in entries {
+        writer.write_all(entry.as_bytes()).await.map_err(|err| format!("failed to write strm index entry: {err}"))?;
+        writer.write(new_line).await.map_err(|err| format!("failed to write strm index entry: {err}"))?;
+    }
+    writer.flush().await.map_err(|err| format!("failed to write strm index entry: {err}"))?;
+    Ok(())
+}
+
+async fn ensure_strm_file_directory(failed: &mut Vec<String>, output_path: &Path) -> bool {
+    if !output_path.exists() {
+        if let Err(e) = create_dir_all(output_path).await {
+            let err_msg = format!("Failed to create directory for strm playlist: {output_path:?} {e}");
+            error!("{}", err_msg);
+            failed.push(err_msg);
+            return false; // skip creation, could not create directory
+        };
+    }
+    true
+}
+
+async fn write_strm_file(file_path: &Path, content_as_bytes: &[u8]) -> Result<(), String> {
+    File::create(file_path).await
+        .map_err(|err| format!("failed to create strm file: {err}"))?
+        .write_all(content_as_bytes).await
+        .map_err(|err| format!("failed to write strm playlist: {err}"))?;
+
+    Ok(())
+}
+
+async fn has_strm_file_same_hash(file_path: &PathBuf, content_hash: UUIDType) -> bool {
+    if let Ok(file) = File::open(&file_path).await {
+        let mut reader = BufReader::new(file);
+        let mut buffer = Vec::new();
+        if reader.read_to_end(&mut buffer).await.is_ok() {
+            let file_hash = hash_bytes(&buffer);
+            if content_hash == file_hash {
+                return true;
+            }
+        };
+    }
+    false
+}
+
+fn get_credentials_and_server_info(cfg: &Config, output: &TargetOutput) -> Option<(ProxyUserCredentials, ApiProxyServerInfo)> {
+    output.username.as_ref()
+        .and_then(|username| cfg.get_user_credentials(username))
+        .filter(|credentials| credentials.proxy == ProxyType::Reverse)
+        .map(|credentials| {
+            let server_info = cfg.get_user_server_info(&credentials);
+            (credentials, server_info)
+        })
+}
+
+async fn read_strm_file_index(strm_file_index_path: &Path) -> std::io::Result<HashSet<String>> {
+    let file = File::open(strm_file_index_path).await?;
+    let reader = BufReader::new(file);
+    let mut result = HashSet::new();
+    let mut lines = reader.lines();
+    while let Some(Ok(line)) = lines.next().await {
+        result.insert(line);
+    }
+    Ok(result)
 }
 
 fn get_strm_url(credentials_and_server_info: Option<&(ProxyUserCredentials, ApiProxyServerInfo)>, str_item_info: &StrmItemInfo) -> String {

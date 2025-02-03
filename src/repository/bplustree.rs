@@ -97,6 +97,14 @@ where
         }
     }
 
+    // pub fn count(&self) -> usize {
+    //     if self.is_leaf {
+    //         self.values.len()
+    //     } else {
+    //         self.children.iter().map(|child| child.count()).sum()
+    //     }
+    // }
+
     #[inline]
     fn is_overflow(&self, order: usize) -> bool {
         self.keys.len() > order
@@ -121,8 +129,7 @@ where
         if self.is_leaf {
             return self.keys.binary_search(key).map_or(None, |idx| self.values.get(idx));
         }
-        let node = self.children.get(self.get_entry_index_upper_bound(key)).unwrap();
-        node.query(key)
+        self.children.get(self.get_entry_index_upper_bound(key))?.query(key)
     }
 
     fn get_equal_entry_index(&self, key: &K) -> Option<usize>
@@ -457,6 +464,10 @@ where
             self.root = new_root;
         }
     }
+
+    // pub fn count(&self) -> usize {
+    //     self.root.count()
+    // }
 
     #[allow(dead_code)]
     pub fn query(&self, key: &K) -> Option<&V> {

@@ -11,11 +11,19 @@ pub(in crate::repository) const FILE_SUFFIX_INDEX: &str = "idx";
 
 const FILE_ID_MAPPING: &str = "id_mapping.db";
 
+
+
+#[inline]
+pub fn hash_bytes(bytes: &[u8]) -> UUIDType {
+    blake3::hash(bytes).into()
+}
+
 /// generates a hash from a string
 #[inline]
 pub fn hash_string(text: &str) -> UUIDType {
-    blake3::hash(text.as_bytes()).into()
+    hash_bytes(text.as_bytes())
 }
+
 
 #[inline]
 pub fn hex_encode(bytes: &[u8]) -> String {
