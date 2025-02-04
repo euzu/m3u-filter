@@ -21,6 +21,7 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::LazyLock;
+use filetime::{set_file_times, FileTime};
 
 const FILE_STRM: &str = "strm";
 
@@ -280,6 +281,13 @@ struct StrmItemInfo {
     release_date: Option<String>,
     season: Option<String>,
     episode: Option<String>,
+    added: Option<u64>,
+}
+
+impl StrmItemInfo {
+    pub(crate) fn get_file_ts(&self) -> Option<u64> {
+        self.added
+    }
 }
 
 fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
@@ -291,19 +299,28 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
     let virtual_id = header.virtual_id;
     let input_name = Rc::clone(&header.input_name);
     let url = Rc::clone(&header.url);
-    let (series_name, release_date, season, episode) = if header.item_type == PlaylistItemType::Series {
-        let series_name = match header.get_field("name") {
-            Some(name) if !name.is_empty() => Some(name.to_string()),
-            _ => header.get_additional_property_as_str("series_name"),
-        };
-        let release_date = header.get_additional_property_as_str("series_release_date")
-            .or_else(|| header.get_additional_property_as_str("release_date"));
-        let season = header.get_additional_property_as_str("season");
-        let episode = header.get_additional_property_as_str("episode");
-        (series_name, release_date, season, episode)
-    } else { (None, None, None, None) };
-
-    StrmItemInfo { group, title, item_type, provider_id, virtual_id, input_name, url, series_name, release_date, season, episode }
+    let (series_name, release_date, added, season, episode) = match header.item_type {
+        PlaylistItemType::Series => {
+            let series_name = match header.get_field("name") {
+                Some(name) if !name.is_empty() => Some(name.to_string()),
+                _ => header.get_additional_property_as_str("series_name"),
+            };
+            let release_date = header.get_additional_property_as_str("series_release_date")
+                .or_else(|| header.get_additional_property_as_str("release_date"));
+            let season = header.get_additional_property_as_str("season");
+            let episode = header.get_additional_property_as_str("episode");
+            let added = header.get_additional_property_as_u64("added");
+            (series_name, release_date, added,  season, episode)
+        },
+        PlaylistItemType::Video => {
+            let name = header.get_field("name").map(|v| v.to_string());
+            let release_date = header.get_additional_property_as_str("release_date");
+            let added = header.get_additional_property_as_u64("added");
+            (name, release_date, added, None, None)
+        },
+        _ => { (None, None, None, None, None) }
+    };
+    StrmItemInfo { group, title, item_type, provider_id, virtual_id, input_name, url, series_name, release_date, season, episode, added }
 }
 
 async fn prepare_strm_output_directory(path: &Path) -> Result<(), M3uFilterError> {
@@ -490,7 +507,7 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
             // if we cant create the directory skip this entry
             if !ensure_strm_file_directory(&mut failed, &output_path).await { continue; }
 
-            match write_strm_file(&file_path, content_as_bytes).await {
+            match write_strm_file(&file_path, content_as_bytes, str_item_info.get_file_ts()).await {
                 Ok(()) => { processed_strm.insert(relative_file_path); }
                 Err(err) => { failed.push(err); }
             };
@@ -537,11 +554,19 @@ async fn ensure_strm_file_directory(failed: &mut Vec<String>, output_path: &Path
     true
 }
 
-async fn write_strm_file(file_path: &Path, content_as_bytes: &[u8]) -> Result<(), String> {
+async fn write_strm_file(file_path: &Path, content_as_bytes: &[u8], timestamp: Option<u64>) -> Result<(), String> {
     File::create(file_path).await
         .map_err(|err| format!("failed to create strm file: {err}"))?
         .write_all(content_as_bytes).await
         .map_err(|err| format!("failed to write strm playlist: {err}"))?;
+
+    if let Some(ts) = timestamp {
+        #[allow(clippy::cast_possible_wrap)]
+        let mtime = FileTime::from_unix_time(ts as i64, 0); // Unix-Timestamp: 01.01.2023 00:00:00 UTC
+        #[allow(clippy::cast_possible_wrap)]
+        let atime = FileTime::from_unix_time(ts as i64, 0); // access time
+        let _ = set_file_times(file_path, mtime, atime);
+    }
 
     Ok(())
 }

@@ -705,7 +705,7 @@ async fn rewrite_xtream_series_info<P>(
             for episode in episode_list.iter_mut().filter_map(Value::as_object_mut) {
                 if let Some(episode_provider_id) = episode.get(TAG_ID).and_then(get_u32_from_serde_value)
                 {
-                    let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &episode_provider_id.to_string(), &provider_url);
+                    let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &episode_provider_id.to_string(), PlaylistItemType::Series, &provider_url);
                     let episode_virtual_id = target_id_mapping.get_and_update_virtual_id(
                         uuid,
                         episode_provider_id,

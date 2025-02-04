@@ -41,7 +41,7 @@ pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, S
     headers.push((actix_web::http::header::DATE, HeaderValue::from_str(&chrono::Utc::now().to_rfc2822()).unwrap()));
 
     let mut response_builder = actix_web::HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap());
-    debug_if_enabled!("Responding stream {} with status {status}, headers {headers:?}", sanitize_sensitive_info(stream_url));
+    debug_if_enabled!("Responding stream request {} with status {status}, headers {headers:?}", sanitize_sensitive_info(stream_url));
     for header in headers {
         response_builder.insert_header(header);
     }

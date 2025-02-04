@@ -3,7 +3,7 @@
 pub enum StreamError {
     Reqwest(String),
     // StdIo(std::io::Error),
-    ReceiverClosed,
+    // ReceiverClosed,
     // ReceiverError(RecvError),
 }
 
@@ -23,7 +23,7 @@ impl std::fmt::Display for StreamError {
         match self {
             StreamError::Reqwest(e) => write!(f, "Reqwest error: {e}"),
             // StreamError::StdIo(e) => write!(f, "IO error: {e}"),
-            StreamError::ReceiverClosed =>  write!(f, "Receiver closed"),
+            // StreamError::ReceiverClosed =>  write!(f, "Receiver closed"),
             // StreamError::ReceiverError(e) =>  write!(f, "Receiver error {e}"),
         }
     }

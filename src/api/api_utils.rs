@@ -5,7 +5,6 @@ use crate::api::model::provider_stream;
 use crate::api::model::provider_stream::get_provider_pipe_stream;
 use crate::api::model::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::request::UserApiRequest;
-use crate::api::model::shared_stream::SharedStream;
 use crate::api::model::stream_error::StreamError;
 use crate::{debug_if_enabled, trace_if_enabled};
 use crate::model::api_proxy::ProxyUserCredentials;
@@ -20,8 +19,6 @@ use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
 use async_std::sync::Mutex;
-use bytes::Bytes;
-use futures::stream::BoxStream;
 use futures::{TryStreamExt};
 use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
@@ -30,6 +27,7 @@ use std::path::Path;
 use std::sync::Arc;
 use url::Url;
 use crate::api::model::active_client_stream::ActiveClientStream;
+use crate::api::model::shared_stream_manager::SharedStreamManager;
 
 #[macro_export]
 macro_rules! try_option_bad_request {
@@ -102,21 +100,6 @@ pub fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a AppState)
     get_user_target_by_credentials(username, password, api_req, app_state)
 }
 
-/// Creates a broadcast notify stream for the given URL if a shared stream exists.
-async fn create_broadcast_stream(
-    app_state: &AppState,
-    stream_url: &str,
-) -> Option<BoxStream<'static, Result<Bytes, StreamError>>> {
-    let notify_stream_url = stream_url.to_string();
-    // Acquire lock and check for existing stream
-    let shared_streams = app_state.shared_streams.lock().await;
-    if let Some((_, shared_stream)) = shared_streams.get(&notify_stream_url) {
-        Some(shared_stream.get_receiver())
-    } else {
-        None
-    }
-}
-
 fn get_stream_options(app_state: &AppState) -> (bool, bool, usize, bool, bool) {
     let (stream_retry, buffer_enabled, buffer_size) = app_state
         .config
@@ -173,8 +156,8 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
             let stream = ActiveClientStream::new(stream, active_clients, log_active_clients);
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
-                SharedStream::register(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers).await;
-                if let Some(broadcast_stream) = create_broadcast_stream(app_state, stream_url).await {
+                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers).await;
+                if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
                     let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
                     if content_length > 0 { response_builder.body(SizedStream::new(content_length, broadcast_stream)) } else { response_builder.body(BodyStream::new(broadcast_stream)) }
                 } else {
@@ -193,9 +176,9 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
 }
 
 async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
-    if let Some(stream) = create_broadcast_stream(app_state, stream_url).await {
+    if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
-        if let Some((headers, _)) = app_state.shared_streams.lock().await.get(stream_url) {
+        if let Some(headers) = app_state.shared_stream_manager.lock().await.get_shared_state_headers(stream_url).await {
             let mut response_builder = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
             return Some(response_builder.body(BodyStream::new(stream)));
         }
@@ -204,7 +187,7 @@ async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Optio
 }
 
 pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarget) -> bool {
-    item_type == PlaylistItemType::Live && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
+    (item_type == PlaylistItemType::Live  || item_type == PlaylistItemType::LiveHls) && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
 }
 
 pub type HeaderFilter = Option<Box<dyn Fn(&str) -> bool>>;

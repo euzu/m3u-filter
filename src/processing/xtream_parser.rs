@@ -54,7 +54,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
                      PlaylistItem {
                          header: RefCell::new(PlaylistItemHeader {
                              id: Rc::new(episode.id.to_string()),
-                             uuid: Rc::new(generate_playlist_uuid(&input.name, &episode.id, &episode_url)),
+                             uuid: Rc::new(generate_playlist_uuid(&input.name, &episode.id, PlaylistItemType::Series, &episode_url)),
                              name: Rc::new(series_name.to_string()),
                              logo: Rc::new(episode.info.as_ref().map_or_else(String::new, |info| info.movie_image.to_string())),
                              group: Rc::new(group_title.to_string()),
@@ -132,17 +132,18 @@ pub fn parse_xtream(input: &ConfigInput,
                         let mut grp = group.borrow_mut();
                         let category_name = &grp.category_name;
                         let stream_url = create_xtream_url(xtream_cluster, url, username, password, &stream, live_stream_use_prefix, live_stream_without_extension);
+                        let item_type = PlaylistItemType::from(xtream_cluster);
                         let item = PlaylistItem {
                             header: RefCell::new(PlaylistItemHeader {
                                 id: Rc::new(stream.get_stream_id().to_string()),
-                                uuid: Rc::new(generate_playlist_uuid(&input_name,  &stream.get_stream_id().to_string(), &stream_url)),
+                                uuid: Rc::new(generate_playlist_uuid(&input_name,  &stream.get_stream_id().to_string(), item_type, &stream_url)),
                                 name: Rc::clone(&stream.name),
                                 logo: Rc::clone(&stream.stream_icon),
                                 group: Rc::clone(category_name),
                                 title: Rc::clone(&stream.name),
                                 url: stream_url,
                                 epg_channel_id: stream.epg_channel_id.clone(),
-                                item_type: PlaylistItemType::from(xtream_cluster),
+                                item_type,
                                 xtream_cluster,
                                 additional_properties: stream.get_additional_properties(),
                                 category_id: 0,

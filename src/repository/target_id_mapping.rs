@@ -89,14 +89,16 @@ impl TargetIdMapping {
             None => {
                 self.dirty = true;
                 self.virtual_id_counter += 1;
-                let record = VirtualIdRecord::new(provider_id, self.virtual_id_counter, item_type, parent_virtual_id, uuid);
-                self.by_virtual_id.insert(self.virtual_id_counter, record);
+                let virtual_id = self.virtual_id_counter;
+                let record = VirtualIdRecord::new(provider_id, virtual_id, item_type, parent_virtual_id, uuid);
+                self.by_virtual_id.insert(virtual_id, record);
                 self.virtual_id_counter
             }
             Some(virtual_id) => {
                 if let Some(record) = self.by_virtual_id.query(virtual_id) {
-                    if record.provider_id != provider_id || record.item_type != item_type || record.parent_virtual_id != parent_virtual_id {
+                    if record.provider_id == provider_id && (record.item_type != item_type || record.parent_virtual_id != parent_virtual_id) {
                         let new_record = VirtualIdRecord::new(provider_id, *virtual_id, item_type, parent_virtual_id, uuid);
+                        println!("updating record {virtual_id} {record:?} {new_record:?} ");
                         self.by_virtual_id.insert(*virtual_id, new_record);
                         self.dirty = true;
                     }
@@ -131,10 +133,12 @@ mod tests {
 
     #[test]
     fn test_id_mapping() {
-        let path = PathBuf::from("/home/euzuner/projects/m3u-test/settings/m3u-catbox/data/m3u/id_mapping.db");
+        let path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/id_mapping.db");
         let mapping = BPlusTree::<u32, VirtualIdRecord>::load(&path);
         mapping.unwrap().traverse(|keys, values| {
-           println!("{keys:?} {values:?}");
+            for (key, value) in keys.iter().zip(values.iter()) {
+                println!("{key:?} {value:?}\n");
+            }
         });
     }
 }

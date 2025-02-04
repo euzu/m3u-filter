@@ -585,8 +585,8 @@ mod tests {
 
     #[test]
     fn test_read_xt() -> io::Result<()> {
-        let main_path = PathBuf::from("/tmp/live.db");
-        let index_path = PathBuf::from("/tmp/live.idx");
+        let main_path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/xtream/live.db");
+        let index_path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/xtream/live.idx");
         let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&main_path, &index_path)?;
         for doc in reader {
             println!("{doc:?}");

@@ -4,7 +4,7 @@ use actix_web::web::Data;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use async_std::sync::{Mutex, RwLock};
 use log::{error, info};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{VecDeque};
 use std::io::ErrorKind;
 use std::path::{PathBuf};
 use std::sync::Arc;
@@ -13,6 +13,7 @@ use crate::api::hls_api::hls_api_register;
 use crate::api::m3u_api::m3u_api_register;
 use crate::api::model::app_state::AppState;
 use crate::api::model::download::DownloadQueue;
+use crate::api::model::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
 use crate::api::v1_api::v1_api_register;
 use crate::api::web_index::index_register;
@@ -69,7 +70,7 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
             finished: Arc::from(RwLock::new(Vec::new())),
         }),
         active_clients: Arc::new(AtomicUsize::new(0)),
-        shared_streams: Arc::new(Mutex::new(HashMap::new())),
+        shared_stream_manager: Arc::new(Mutex::new(SharedStreamManager::new())),
         http_client: Arc::new(reqwest::Client::new()),
         cache,
     })

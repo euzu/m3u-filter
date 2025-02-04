@@ -538,7 +538,7 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     for epg_list_item in epg_listings.iter_mut().filter_map(Value::as_object_mut) {
         // TODO epg_id
         if let Some(catchup_provider_id) = epg_list_item.get(TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok()) {
-            let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &catchup_provider_id.to_string(), &pli.url);
+            let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &catchup_provider_id.to_string(), pli.item_type, &pli.url);
             let virtual_id = target_id_mapping.get_and_update_virtual_id(uuid, catchup_provider_id, PlaylistItemType::Catchup, pli.provider_id);
             epg_list_item.insert(TAG_ID.to_string(), Value::String(virtual_id.to_string()));
         }

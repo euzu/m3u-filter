@@ -165,7 +165,7 @@ pub struct PlaylistItemHeader {
 
 impl PlaylistItemHeader {
     pub fn gen_uuid(&mut self) {
-        self.uuid = Rc::new(generate_playlist_uuid(&self.input_name, &self.id, &self.url));
+        self.uuid = Rc::new(generate_playlist_uuid(&self.input_name, &self.id, self.item_type, &self.url));
     }
     pub const fn get_uuid(&self) -> &Rc<UUIDType> {
         &self.uuid
@@ -338,7 +338,7 @@ impl PlaylistEntry for M3uPlaylistItem {
     }
 
     fn get_uuid(&self) -> UUIDType {
-        generate_playlist_uuid(&self.input_name, &self.provider_id, &self.url)
+        generate_playlist_uuid(&self.input_name, &self.provider_id, self.item_type, &self.url)
     }
 }
 
@@ -416,7 +416,7 @@ impl PlaylistEntry for XtreamPlaylistItem {
 
     #[inline]
     fn get_uuid(&self) -> UUIDType {
-        generate_playlist_uuid(&self.input_name, &self.provider_id.to_string(), &self.url)
+        generate_playlist_uuid(&self.input_name, &self.provider_id.to_string(), self.item_type, &self.url)
     }
 }
 
@@ -589,7 +589,7 @@ impl PlaylistEntry for PlaylistItem {
     #[inline]
     fn get_uuid(&self) -> UUIDType {
         let header = self.header.borrow();
-        generate_playlist_uuid(&header.input_name, &header.id, &header.url)
+        generate_playlist_uuid(&header.input_name, &header.id, header.item_type, &header.url)
     }
 }
 
