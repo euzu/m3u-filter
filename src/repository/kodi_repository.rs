@@ -575,10 +575,15 @@ async fn has_strm_file_same_hash(file_path: &PathBuf, content_hash: UUIDType) ->
     if let Ok(file) = File::open(&file_path).await {
         let mut reader = BufReader::new(file);
         let mut buffer = Vec::new();
-        if reader.read_to_end(&mut buffer).await.is_ok() {
-            let file_hash = hash_bytes(&buffer);
-            if content_hash == file_hash {
-                return true;
+        match reader.read_to_end(&mut buffer).await {
+            Ok(_) => {
+                let file_hash = hash_bytes(&buffer);
+                if content_hash == file_hash {
+                    return true;
+                }
+            }
+            Err(err) => {
+                error!("Could not read existing strm file {file_path:?} {err}");
             }
         };
     }
