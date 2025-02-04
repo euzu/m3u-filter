@@ -26,9 +26,12 @@ async fn m3u_api(
                 Ok(m3u_iter) => {
                     // Convert the iterator into a stream of `Bytes`
                     let content_stream = stream::iter(m3u_iter.map(|line| Ok::<Bytes, String>(Bytes::from([line.as_bytes(), b"\n"].concat()))));
-                    HttpResponse::Ok()
-                        .content_type(mime::TEXT_PLAIN_UTF_8)
-                        .streaming(content_stream)
+                    let mut builder = HttpResponse::Ok();
+                    builder.content_type(mime::TEXT_PLAIN_UTF_8);
+                    if api_req.content_type == "m3u_plus" {
+                        builder.insert_header(("Content-Disposition", "attachment; filename=\"playlist.m3u\""));
+                    }
+                    builder.streaming(content_stream)
                 }
                 Err(err) => {
                     error!("{}", sanitize_sensitive_info(err.to_string().as_str()));

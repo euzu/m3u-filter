@@ -40,6 +40,7 @@ web_ui_enabled: true
 - added `hlsr` handling.
 - refactored strm generation, does not delete root directory, avoids unchanged file creations.
 - fixed mapper counter not incrementing.
+- adding `&type=m3u_plus` at the end of an `m3u` url wil trigger a download. Without it will only stream the result. 
 
 # 2.1.3 (2025-01-26)
 - Hotfix 2.1.2, forgot to update the stream api code.  

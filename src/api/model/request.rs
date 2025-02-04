@@ -41,4 +41,6 @@ pub struct UserApiRequest {
     pub stream: String,
     #[serde(default)]
     pub duration: String,
+    #[serde(default, alias = "type")]
+    pub content_type: String,
 }
