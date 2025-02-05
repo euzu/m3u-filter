@@ -4,9 +4,9 @@ use std::time::{Duration, Instant, SystemTime};
 use chrono::{DateTime, FixedOffset, Local};
 use cron::Schedule;
 use log::error;
-use crate::exit;
+use crate::utils::sys_utils::exit;
 use crate::model::config::{Config, ProcessTargets};
-use crate::processing::playlist_processor::exec_processing;
+use crate::processing::processor::playlist::exec_processing;
 
 fn datetime_to_instant(datetime: DateTime<FixedOffset>) -> Instant {
     // Convert DateTime<FixedOffset> to SystemTime

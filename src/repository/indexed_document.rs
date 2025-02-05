@@ -5,12 +5,12 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery};
-use crate::utils::file_utils;
+use crate::utils::file::file_utils;
 use log::error;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use crate::m3u_filter_error::{str_to_io_error, to_io_error};
-use crate::utils::file_utils::{create_new_file_for_read_write, file_reader, file_writer, open_read_write_file, open_readonly_file, rename_or_copy};
+use crate::utils::file::file_utils::{create_new_file_for_read_write, file_reader, file_writer, open_read_write_file, open_readonly_file, rename_or_copy};
 
 const BLOCK_SIZE: usize = 4096;
 const LEN_SIZE: usize = 4;
@@ -257,7 +257,7 @@ where
                 t_type: PhantomData,
             })
         } else {
-            Err(Error::new(ErrorKind::NotFound, format!("File not found {}", main_path.to_str().unwrap())))
+            Err(Error::new(ErrorKind::NotFound, format!("File not found {main_path:?}")))
         }
     }
     pub fn get(&mut self, doc_id: &K) -> Result<T, Error> {

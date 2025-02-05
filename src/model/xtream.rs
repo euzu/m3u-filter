@@ -258,7 +258,7 @@ impl XtreamStream {
         let mut result = Map::new();
         if let Some(bdpath) = self.backdrop_path.as_ref() {
             if !bdpath.is_empty() {
-                result.insert(String::from(PROP_BACKDROP_PATH), Value::Array(Vec::from([Value::String(String::from(bdpath.first().unwrap()))])));
+                result.insert(String::from(PROP_BACKDROP_PATH), Value::Array(Vec::from([Value::String(String::from(bdpath.first()?))])));
             }
         }
         add_rc_str_property_if_exists!(result, self.tmdb, "tmdb");
@@ -461,7 +461,7 @@ impl XtreamSeriesInfoEpisode {
         let bdpath = info.and_then(|i| i.backdrop_path.as_ref());
         let bdpath_is_set = bdpath.as_ref().is_some_and(|bdpath| !bdpath.is_empty());
         if bdpath_is_set {
-            result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath.as_ref().unwrap().first()?))])));
+            result.insert(String::from("backdrop_path"), Value::Array(Vec::from([Value::String(String::from(bdpath?.first()?))])));
         }
         add_str_property_if_exists!(result, info.map_or("", |i| i.name.as_str()), "series_name");
         add_str_property_if_exists!(result, info.map_or("", |i| i.release_date.as_str()), "series_release_date");

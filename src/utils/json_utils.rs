@@ -6,7 +6,7 @@ use std::path::Path;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Deserializer, Value};
-use crate::utils::file_utils::{file_reader, file_writer};
+use crate::utils::file::file_utils::{file_reader, file_writer};
 
 fn read_skipping_ws(mut reader: impl Read) -> io::Result<u8> {
     loop {
@@ -64,7 +64,7 @@ pub fn json_iter_array<T: DeserializeOwned, R: Read>(
     std::iter::from_fn(move || yield_next_obj(&mut reader, &mut at_start).transpose())
 }
 
-pub fn json_filter_file(file_path: &Path, filter: &HashMap<&str, &str>) -> Vec<serde_json::Value> {
+pub fn json_filter_file<S: ::std::hash::BuildHasher>(file_path: &Path, filter: &HashMap<&str, &str, S>) -> Vec<serde_json::Value> {
     let mut filtered: Vec<serde_json::Value> = Vec::with_capacity(1024);
     if !file_path.exists() {
         return filtered; // Return early if the file does not exist

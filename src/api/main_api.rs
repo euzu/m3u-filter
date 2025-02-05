@@ -9,22 +9,22 @@ use std::io::ErrorKind;
 use std::path::{PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::api::hls_api::hls_api_register;
-use crate::api::m3u_api::m3u_api_register;
+use crate::api::endpoints::hls_api::hls_api_register;
+use crate::api::endpoints::m3u_api::m3u_api_register;
 use crate::api::model::app_state::AppState;
 use crate::api::model::download::DownloadQueue;
-use crate::api::model::shared_stream_manager::SharedStreamManager;
+use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
-use crate::api::v1_api::v1_api_register;
-use crate::api::web_index::index_register;
-use crate::api::xmltv_api::xmltv_api_register;
-use crate::api::xtream_api::xtream_api_register;
+use crate::api::endpoints::v1_api::v1_api_register;
+use crate::api::endpoints::web_index::index_register;
+use crate::api::endpoints::xmltv_api::xmltv_api_register;
+use crate::api::endpoints::xtream_api::xtream_api_register;
 use crate::model::config::{validate_targets, Config, ProcessTargets, ScheduleConfig};
 use crate::model::healthcheck::Healthcheck;
-use crate::processing::playlist_processor;
-use crate::utils::lru_cache::{LRUResourceCache};
+use crate::processing::processor::playlist;
+use crate::tools::lru_cache::{LRUResourceCache};
 use crate::utils::size_utils::human_readable_byte_size;
-use crate::utils::sys;
+use crate::utils::sys_utils;
 use crate::VERSION;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -43,7 +43,7 @@ async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
         status: "ok".to_string(),
         version: VERSION.to_string(),
         time: ts,
-        mem: sys::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
+        mem: sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
         active_clients: app_state.active_clients.as_ref().load(Ordering::Relaxed)
     })
 }
@@ -81,7 +81,7 @@ fn exec_update_on_boot(client: Arc<reqwest::Client>, cfg: &Arc<Config>, targets:
         let cfg_clone = Arc::clone(cfg);
         let targets_clone = Arc::clone(targets);
         actix_rt::spawn(
-            async move { playlist_processor::exec_processing(client, cfg_clone, targets_clone).await }
+            async move { playlist::exec_processing(client, cfg_clone, targets_clone).await }
         );
     }
 }

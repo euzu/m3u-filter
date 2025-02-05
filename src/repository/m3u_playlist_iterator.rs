@@ -1,4 +1,4 @@
-use crate::info_err;
+use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, ConfigTargetOptions};
@@ -6,7 +6,7 @@ use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType};
 use crate::repository::indexed_document::IndexedDocumentIterator;
 use crate::repository::m3u_repository::m3u_get_file_paths;
 use crate::repository::storage::ensure_target_storage_path;
-use crate::utils::file_lock_manager::FileReadGuard;
+use crate::utils::file::file_lock_manager::FileReadGuard;
 
 pub const M3U_STREAM_PATH: &str = "m3u-stream";
 pub const M3U_RESOURCE_PATH: &str = "resource/m3u";
@@ -46,7 +46,7 @@ impl M3uPlaylistIterator {
         let include_type_in_url = target_options.is_some_and(|opts| opts.m3u_include_type_in_url);
         let mask_redirect_url = target_options.is_some_and(|opts| opts.m3u_mask_redirect_url);
 
-        let server_info = cfg.get_user_server_info(user);
+        let server_info = cfg.get_user_server_info(user).await;
         Ok(Self {
             reader,
             base_url: server_info.get_base_url(),

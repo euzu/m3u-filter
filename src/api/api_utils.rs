@@ -1,19 +1,19 @@
 use crate::api::model::app_state::AppState;
 use crate::api::model::model_utils::get_stream_response_with_headers;
-use crate::api::model::persist_pipe_stream::PersistPipeStream;
-use crate::api::model::provider_stream;
-use crate::api::model::provider_stream::get_provider_pipe_stream;
-use crate::api::model::provider_stream_factory::BufferStreamOptions;
+use crate::api::model::streams::persist_pipe_stream::PersistPipeStream;
+use crate::api::model::streams::provider_stream;
+use crate::api::model::streams::provider_stream::get_provider_pipe_stream;
+use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::stream_error::StreamError;
-use crate::{debug_if_enabled, trace_if_enabled};
+use crate::utils::{debug_if_enabled, trace_if_enabled};
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::playlist::PlaylistItemType;
-use crate::utils::file_utils::create_new_file_for_write;
-use crate::utils::lru_cache::LRUResourceCache;
-use crate::utils::request_utils;
-use crate::utils::request_utils::sanitize_sensitive_info;
+use crate::utils::file::file_utils::create_new_file_for_write;
+use crate::tools::lru_cache::LRUResourceCache;
+use crate::utils::network::request;
+use crate::utils::network::request::sanitize_sensitive_info;
 use actix_files::NamedFile;
 use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
@@ -26,8 +26,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use url::Url;
-use crate::api::model::active_client_stream::ActiveClientStream;
-use crate::api::model::shared_stream_manager::SharedStreamManager;
+use crate::api::model::streams::active_client_stream::ActiveClientStream;
+use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 
 #[macro_export]
 macro_rules! try_option_bad_request {
@@ -67,6 +67,9 @@ macro_rules! try_result_bad_request {
     };
 }
 
+pub use try_option_bad_request;
+pub use try_result_bad_request;
+
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
         if let Ok(file) = actix_files::NamedFile::open_async(file_path).await {
@@ -80,24 +83,24 @@ pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mi
     HttpResponse::NoContent().finish()
 }
 
-pub fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a UserApiRequest,
+pub async fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a UserApiRequest,
                                           app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() && !password.is_empty() {
-        app_state.config.get_target_for_user(username, password)
+        app_state.config.get_target_for_user(username, password).await
     } else {
         let token = api_req.token.as_str().trim();
         if token.is_empty() {
             None
         } else {
-            app_state.config.get_target_for_user_by_token(token)
+            app_state.config.get_target_for_user_by_token(token).await
         }
     }
 }
 
-pub fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
+pub async fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     let username = api_req.username.as_str().trim();
     let password = api_req.password.as_str().trim();
-    get_user_target_by_credentials(username, password, api_req, app_state)
+    get_user_target_by_credentials(username, password, api_req, app_state).await
 }
 
 fn get_stream_options(app_state: &AppState) -> (bool, bool, usize, bool, bool) {
@@ -235,7 +238,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
     }
     trace_if_enabled!("Try to fetch resource {}", sanitize_sensitive_info(resource_url));
     if let Ok(url) = Url::parse(resource_url) {
-        let client = request_utils::get_client_request(&app_state.http_client, input.map(|i| &i.headers), &url, Some(&req_headers));
+        let client = request::get_client_request(&app_state.http_client, input.map(|i| &i.headers), &url, Some(&req_headers));
         match client.send().await {
             Ok(response) => {
                 let status = response.status();

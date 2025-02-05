@@ -1,5 +1,5 @@
 use crate::repository::storage::hex_encode;
-use crate::file_utils::file_reader;
+use crate::utils::file::file_utils::file_reader;
 use crate::m3u_filter_error::str_to_io_error;
 use std::collections::HashMap;
 use std::fs;
@@ -19,9 +19,9 @@ use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDo
 use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path,  FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
-use crate::utils::file_utils::open_readonly_file;
+use crate::utils::file::file_utils::open_readonly_file;
 use crate::utils::json_utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
-use crate::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err};
+use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err};
 use crate::utils::hash_utils::generate_playlist_uuid;
 
 pub static COL_CAT_LIVE: &str = "cat_live";
@@ -297,7 +297,7 @@ pub async fn xtream_write_playlist(
         match json_write_documents_to_file(&col_path, data) {
             Ok(()) => {}
             Err(err) => {
-                errors.push(format!("Persisting collection failed: {}: {}", &col_path.to_str().unwrap(), err));
+                errors.push(format!("Persisting collection failed: {col_path:?}: {err}"));
             }
         }
     }
@@ -577,7 +577,7 @@ pub async fn xtream_load_vod_info(
     None
 }
 
-fn rewrite_xtream_vod_info<P>(
+async fn rewrite_xtream_vod_info<P>(
     config: &Config,
     target: &ConfigTarget,
     pli: &P,
@@ -591,7 +591,7 @@ fn rewrite_xtream_vod_info<P>(
         if let Some(Value::Object(info_data)) = doc.get_mut(TAG_INFO_DATA) {
             match user.proxy {
                 ProxyType::Reverse => {
-                    let server_info = config.get_user_server_info(user);
+                    let server_info = config.get_user_server_info(user).await;
                     let url = server_info.get_base_url();
                     let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
                     rewrite_doc_urls(resource_url.as_ref(), info_data, INFO_REWRITE_FIELDS, INFO_RESOURCE_PREFIX);
@@ -624,7 +624,7 @@ fn rewrite_xtream_vod_info<P>(
     Ok(result)
 }
 
-pub fn rewrite_xtream_vod_info_content<P>(
+pub async fn rewrite_xtream_vod_info_content<P>(
     config: &Config,
     target: &ConfigTarget,
     pli: &P,
@@ -634,7 +634,7 @@ pub fn rewrite_xtream_vod_info_content<P>(
     P: PlaylistEntry,
 {
     let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
-    rewrite_xtream_vod_info(config, target, pli, user, &mut doc)
+    rewrite_xtream_vod_info(config, target, pli, user, &mut doc).await
 }
 
 pub async fn write_and_get_xtream_vod_info<P>(
@@ -648,7 +648,7 @@ pub async fn write_and_get_xtream_vod_info<P>(
 {
     let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
     xtream_write_vod_info(config, target.name.as_str(), pli.get_virtual_id(), content).await.ok();
-    rewrite_xtream_vod_info(config, target, pli, user, &mut doc)
+    rewrite_xtream_vod_info(config, target, pli, user, &mut doc).await
 }
 
 async fn rewrite_xtream_series_info<P>(
@@ -665,7 +665,7 @@ async fn rewrite_xtream_series_info<P>(
     let resource_url = if config.is_reverse_proxy_resource_rewrite_enabled() {
         match user.proxy {
             ProxyType::Reverse => {
-                let server_info = config.get_user_server_info(user);
+                let server_info = config.get_user_server_info(user).await;
                 let url = server_info.get_base_url();
                 Some(format!("{url}/resource/series/{}/{}/{}", user.username, user.password, pli.get_virtual_id()))
             }

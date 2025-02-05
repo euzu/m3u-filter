@@ -1,5 +1,5 @@
 use log::error;
-use crate::info_err;
+use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
@@ -7,7 +7,7 @@ use crate::model::playlist::{XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
 use crate::repository::indexed_document::{IndexedDocumentIterator};
 use crate::repository::xtream_repository::{xtream_get_file_paths, xtream_get_storage_path};
-use crate::utils::file_lock_manager::FileReadGuard;
+use crate::utils::file::file_lock_manager::FileReadGuard;
 
 pub struct XtreamPlaylistIterator {
     reader: IndexedDocumentIterator<u32, XtreamPlaylistItem>,
@@ -35,10 +35,10 @@ impl XtreamPlaylistIterator {
                 .map_err(|err| info_err!(format!("Could not lock document {xtream_path:?}: {err}")))?;
 
             let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&xtream_path, &idx_path)
-                .map_err(|err| info_err!(format!("Could not deserialize file {} - {}", &xtream_path.to_str().unwrap(), err)))?;
+                .map_err(|err| info_err!(format!("Could not deserialize file {xtream_path:?} - {err}")))?;
 
             let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
-            let server_info = config.get_user_server_info(user);
+            let server_info = config.get_user_server_info(user).await;
             Ok(Self {
                 reader,
                 options,

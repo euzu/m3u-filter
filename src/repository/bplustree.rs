@@ -1,16 +1,16 @@
-use std::fs::{File};
+use std::fs::File;
 use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::path::Path;
 
+use crate::m3u_filter_error::{str_to_io_error, to_io_error};
+use crate::utils::file::file_utils::{file_reader, file_writer, open_read_write_file, rename_or_copy};
 use log::error;
 use ruzstd::decoding::StreamingDecoder;
 use ruzstd::encoding::{compress_to_vec, CompressionLevel};
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
-use crate::m3u_filter_error::{str_to_io_error, to_io_error};
-use crate::utils::file_utils::{file_reader, file_writer, open_read_write_file, rename_or_copy};
 
 const BLOCK_SIZE: usize = 4096;
 const BINCODE_OVERHEAD: usize = 8;
@@ -115,9 +115,9 @@ where
         order >> 1
     }
 
-    fn find_leaf_entry(node: &Self) -> &K {
+    fn find_leaf_entry(node: &Self) -> Option<&K> {
         if node.is_leaf {
-            node.keys.first().unwrap()
+            node.keys.first()
         } else {
             let child = node.children.first().unwrap();
             Self::find_leaf_entry(child)
@@ -176,13 +176,14 @@ where
             let child = self.children.get_mut(pos)?;
             let node = child.insert(key.clone(), v, inner_order, leaf_order);
             if node.is_some() {
-                let leaf_key = Self::find_leaf_entry(node.as_ref().unwrap());
-                let idx = self.get_entry_index_upper_bound(leaf_key);
-                if self.keys.binary_search(&key).is_err() {
-                    self.keys.insert(idx, leaf_key.clone());
-                    self.children.insert(idx + 1, node.unwrap());
-                    if self.is_overflow(inner_order) {
-                        return Some(self.split(inner_order));
+                if let Some(leaf_key) = Self::find_leaf_entry(node.as_ref().unwrap()) {
+                    let idx = self.get_entry_index_upper_bound(leaf_key);
+                    if self.keys.binary_search(&key).is_err() {
+                        self.keys.insert(idx, leaf_key.clone());
+                        self.children.insert(idx + 1, node.unwrap());
+                        if self.is_overflow(inner_order) {
+                            return Some(self.split(inner_order));
+                        }
                     }
                 }
             }
@@ -329,7 +330,7 @@ where
                 left_over_bytes -= bytes_available_on_block;
                 while left_over_bytes > 0 {
                     file.read_exact(buffer)?;
-                    let bytes_to_read =  if left_over_bytes >= BLOCK_SIZE {
+                    let bytes_to_read = if left_over_bytes >= BLOCK_SIZE {
                         BLOCK_SIZE
                     } else {
                         left_over_bytes
@@ -366,7 +367,7 @@ where
                 let nodes: Result<Vec<Self>, io::Error> = pointers
                     .iter()
                     .map(|pointer| {
-                       Self::deserialize_from_block(file, buffer, *pointer, nested)
+                        Self::deserialize_from_block(file, buffer, *pointer, nested)
                             .map(|(node, _)| node)
                     })
                     .collect();
@@ -385,7 +386,7 @@ fn decode_content(content_bytes: &Vec<u8>) -> Option<Vec<u8>> {
     if let Ok(mut decoder) = StreamingDecoder::new(&**content_bytes) {
         let mut result = Vec::with_capacity(content_bytes.len());
         if decoder.read_to_end(&mut result).is_ok() {
-            return Some(result)
+            return Some(result);
         }
     }
 
@@ -408,12 +409,22 @@ pub struct BPlusTree<K, V> {
 }
 
 const fn calc_order<K, V>() -> (usize, usize) {
-    let overhead_size =  BINCODE_OVERHEAD + LEN_SIZE + FLAG_SIZE;
+    let overhead_size = BINCODE_OVERHEAD + LEN_SIZE + FLAG_SIZE;
     let key_size = size_of::<K>() + overhead_size;
     let value_size = key_size + size_of::<V>() + overhead_size;
     let inner_order = BLOCK_SIZE / key_size;
     let leaf_order = BLOCK_SIZE / (key_size + value_size);
     (inner_order, leaf_order)
+}
+
+impl<K, V> Default for BPlusTree<K, V>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<K, V> BPlusTree<K, V>
@@ -450,18 +461,22 @@ where
         }
 
         if let Some(node) = self.root.insert(key, value, self.inner_order, self.leaf_order) {
-            let child_key = if node.is_leaf {
-                node.keys.first().as_ref().unwrap()
+            let child_key_opt = if node.is_leaf {
+                node.keys.first()
             } else {
                 BPlusTreeNode::<K, V>::find_leaf_entry(&node)
             };
 
-            let mut new_root = BPlusTreeNode::<K, V>::new(false);
-            new_root.keys.push(child_key.clone());
-            new_root.children.push(std::mem::replace(&mut self.root, BPlusTreeNode::new(true)));
-            new_root.children.push(node);
+            if let Some(child_key) = child_key_opt {
+                let mut new_root = BPlusTreeNode::<K, V>::new(false);
+                new_root.keys.push(child_key.clone());
+                new_root.children.push(std::mem::replace(&mut self.root, BPlusTreeNode::new(true)));
+                new_root.children.push(node);
 
-            self.root = new_root;
+                self.root = new_root;
+            } else {
+                error!("Failed to insert child key");
+            }
         }
     }
 
@@ -664,7 +679,11 @@ where
                         };
                     }
                     let child_idx = get_entry_index_upper_bound::<K>(&node.keys, key);
-                    offset = *pointers.unwrap().get(child_idx).unwrap();
+                    if let Some(pters) = pointers {
+                        if let Some(child_idx) = pters.get(child_idx) {
+                            offset = *child_idx;
+                        }
+                    }
                 }
                 Err(err) => {
                     error!("Failed to read id tree from file {err}");
@@ -744,8 +763,21 @@ where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
     V: Serialize + for<'de> Deserialize<'de> + Clone,
 {
-    pub fn iter(&self) -> BPlusTreeIterator<K, V> {
+    pub fn iter(&self) -> BPlusTreeIterator<'_, K, V> {
         BPlusTreeIterator::new(self)
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a BPlusTree<K, V>
+where
+    K: Ord + Serialize + for<'de> Deserialize<'de> + Clone,
+    V: Serialize + for<'de> Deserialize<'de> + Clone,
+{
+    type Item = (&'a K, &'a V);
+    type IntoIter = BPlusTreeIterator<'a, K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -785,7 +817,7 @@ mod tests {
     #[test]
     fn insert_test() -> io::Result<()> {
         let test_size = 500;
-        let content =  generate_random_string(1024);
+        let content = generate_random_string(1024);
         let mut tree = BPlusTree::<u32, Record>::new();
         for i in 0u32..=test_size {
             tree.insert(i, Record {

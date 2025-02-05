@@ -45,13 +45,15 @@ pub async fn validator(
     req: ServiceRequest,
     credentials: Option<BearerAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let app_state: &web::Data<AppState> = req.app_data::<web::Data<AppState>>().unwrap();
-    let secret_key = app_state.config.web_auth.as_ref().unwrap().secret.as_ref();
-    if verify_token(credentials, secret_key) {
-        Ok(req)
-    } else {
-        Err((actix_web::error::ErrorUnauthorized("Unauthorized"), req))
+    if let Some(app_state) = req.app_data::<web::Data<AppState>>() {
+        if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
+            let secret_key = web_auth_config.secret.as_ref();
+            if verify_token(credentials, secret_key) {
+                return Ok(req);
+            }
+        }    
     }
+    Err((actix_web::error::ErrorUnauthorized("Unauthorized"), req))
 }
 
 // pub fn handle_unauthorized<B>(srvres: ServiceResponse<B>) -> actix_web::Result<ErrorHandlerResponse<B>> {

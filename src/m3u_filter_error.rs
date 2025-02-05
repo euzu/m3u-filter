@@ -22,6 +22,8 @@ macro_rules! get_errors_notify_message {
     };
 }
 
+pub use get_errors_notify_message;
+
 #[macro_export]
 macro_rules! notify_err {
     ($text:expr) => {
@@ -29,12 +31,64 @@ macro_rules! notify_err {
     };
 }
 
+pub use notify_err;
+
 #[macro_export]
 macro_rules! info_err {
     ($text:expr) => {
         M3uFilterError::new(M3uFilterErrorKind::Info, $text)
     };
 }
+pub use info_err;
+
+
+#[macro_export]
+macro_rules! create_m3u_filter_error {
+     ($kind: expr, $($arg:tt)*) => {
+        M3uFilterError::new($kind, format!($($arg)*))
+    }
+}
+pub use create_m3u_filter_error;
+
+#[macro_export]
+macro_rules! create_m3u_filter_error_result {
+     ($kind: expr, $($arg:tt)*) => {
+        Err(M3uFilterError::new($kind, format!($($arg)*)))
+    }
+}
+pub use create_m3u_filter_error_result;
+
+#[macro_export]
+macro_rules! handle_m3u_filter_error_result_list {
+    ($kind:expr, $result: expr) => {
+        let errors = $result
+            .filter_map(|result| {
+                if let Err(err) = result {
+                    Some(err.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+        if !&errors.is_empty() {
+            return Err(M3uFilterError::new($kind, errors.join("\n")));
+        }
+    }
+}
+
+pub use handle_m3u_filter_error_result_list;
+
+#[macro_export]
+macro_rules! handle_m3u_filter_error_result {
+    ($kind:expr, $result: expr) => {
+        if let Err(err) = $result {
+            return Err(M3uFilterError::new($kind, err.to_string()));
+        }
+    }
+}
+
+pub use handle_m3u_filter_error_result;
+
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum M3uFilterErrorKind {

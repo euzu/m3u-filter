@@ -1,10 +1,10 @@
-use crate::debug_if_enabled;
+use crate::utils::debug_if_enabled;
 use actix_web::http::header::{HeaderName, HeaderValue};
 use actix_web::{HttpResponseBuilder};
 use reqwest::{Response, StatusCode};
 use std::collections::{HashSet};
 use std::str::FromStr;
-use crate::utils::request_utils::sanitize_sensitive_info;
+use crate::utils::network::request::sanitize_sensitive_info;
 
 const MEDIA_STREAM_HEADERS: &[&str] = &["accept", "content-type", "content-length", "connection", "accept-ranges", "content-range", "vary", "transfer-encoding", "access-control-allow-origin", "access-control-allow-credentials", "icy-metadata"];
 

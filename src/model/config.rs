@@ -7,25 +7,28 @@ use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use async_std::sync::RwLock;
 
 use crate::auth::user::UserCredential;
 use log::{debug, error, warn};
 use path_clean::PathClean;
 use url::Url;
 
-use crate::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
+use crate::foundation::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
+use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
+use crate::utils::config_reader;
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
-use crate::utils::file_lock_manager::FileLockManager;
-use crate::utils::file_utils::file_reader;
+use crate::utils::file::file_lock_manager::FileLockManager;
+use crate::utils::file::file_utils;
+use crate::utils::file::file_utils::file_reader;
 use crate::utils::size_utils::parse_size_base_2;
-use crate::utils::{config_reader, file_utils};
-use crate::{exit, info_err};
+use crate::utils::sys_utils::exit;
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
@@ -44,47 +47,8 @@ macro_rules! valid_property {
         $array.contains(&$key)
     }};
 }
-
-#[macro_export]
-macro_rules! create_m3u_filter_error {
-     ($kind: expr, $($arg:tt)*) => {
-        M3uFilterError::new($kind, format!($($arg)*))
-    }
-}
-
-#[macro_export]
-macro_rules! create_m3u_filter_error_result {
-     ($kind: expr, $($arg:tt)*) => {
-        Err(M3uFilterError::new($kind, format!($($arg)*)))
-    }
-}
-
-#[macro_export]
-macro_rules! handle_m3u_filter_error_result_list {
-    ($kind:expr, $result: expr) => {
-        let errors = $result
-            .filter_map(|result| {
-                if let Err(err) = result {
-                    Some(err.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<String>>();
-        if !&errors.is_empty() {
-            return Err(M3uFilterError::new($kind, errors.join("\n")));
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! handle_m3u_filter_error_result {
-    ($kind:expr, $result: expr) => {
-        if let Err(err) = $result {
-            return Err(M3uFilterError::new($kind, err.to_string()));
-        }
-    }
-}
+pub use valid_property;
+use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
 pub enum TargetType {
@@ -240,12 +204,13 @@ pub struct ConfigSortChannel {
 
 impl ConfigSortChannel {
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
-        let re = regex::Regex::new(&self.group_pattern);
-        if re.is_err() {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", &self.group_pattern);
+        match regex::Regex::new(&self.group_pattern) {
+            Ok(pattern) => {
+                self.re = Some(pattern);
+                Ok(())
+            }
+            Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", &self.group_pattern),
         }
-        self.re = Some(re.unwrap());
-        Ok(())
     }
 }
 
@@ -281,12 +246,13 @@ pub struct ConfigRename {
 
 impl ConfigRename {
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
-        let re = regex::Regex::new(&self.pattern);
-        if re.is_err() {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", &self.pattern);
+        match regex::Regex::new(&self.pattern) {
+            Ok(pattern) => {
+                self.re = Some(pattern);
+                Ok(())
+            }
+            Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", &self.pattern),
         }
-        self.re = Some(re.unwrap());
-        Ok(())
     }
 }
 
@@ -452,7 +418,10 @@ impl ConfigTarget {
 
     pub fn filter(&self, provider: &ValueProvider) -> bool {
         let mut processor = MockValueProcessor {};
-        self.t_filter.as_ref().unwrap().filter(provider, &mut processor)
+        if let Some(filter) = self.t_filter.as_ref() {
+            return filter.filter(provider, &mut processor);
+        }
+        true
     }
 
     pub fn get_m3u_filename(&self) -> Option<&String> {
@@ -637,11 +606,11 @@ impl ConfigInput {
 
     pub fn get_user_info(&self) -> Option<InputUserInfo> {
         if self.input_type == InputType::Xtream {
-            if self.username.is_some() || self.password.is_some() {
+            if let (Some(username), Some(password)) = (self.username.as_ref(), self.password.as_ref()) {
                 return Some(InputUserInfo {
                     base_url: self.url.clone(),
-                    username: self.username.as_ref().unwrap().to_owned(),
-                    password: self.password.as_ref().unwrap().to_owned(),
+                    username: username.to_owned(),
+                    password: password.to_owned(),
                 });
             }
         } else if let Ok(url) = Url::parse(&self.url) {
@@ -656,11 +625,13 @@ impl ConfigInput {
                 }
             }
             if username.is_some() || password.is_some() {
-                return Some(InputUserInfo {
-                    base_url,
-                    username: username.as_ref().unwrap().to_owned(),
-                    password: password.as_ref().unwrap().to_owned(),
-                });
+                if let (Some(username), Some(password)) = (username.as_ref(), password.as_ref()) {
+                    return Some(InputUserInfo {
+                        base_url,
+                        username: username.to_owned(),
+                        password: password.to_owned(),
+                    });
+                }
             }
         }
         None
@@ -767,6 +738,10 @@ pub struct VideoConfig {
 }
 
 impl VideoConfig {
+
+    /// # Panics
+    ///
+    /// Will panic if default `RegEx` gets invalid
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         self.extensions = vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()];
         match &mut self.download {
@@ -780,14 +755,16 @@ impl VideoConfig {
 
                 if let Some(episode_pattern) = &downl.episode_pattern {
                     if !episode_pattern.is_empty() {
-                        let re = regex::Regex::new(episode_pattern);
-                        if re.is_err() {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", episode_pattern);
+                        match regex::Regex::new(episode_pattern) {
+                            Ok(pattern) => {
+                                downl.t_re_episode_pattern = Some(pattern);
+                            }
+                            Err(err) => {
+                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {episode_pattern} {err}");
+                            }
                         }
-                        downl.t_re_episode_pattern = Some(re.unwrap());
                     }
                 }
-
                 downl.t_re_filename = Some(regex::Regex::new(r"[^A-Za-z0-9_.-]").unwrap());
                 downl.t_re_remove_filename_ending = Some(regex::Regex::new(r"[_.\s-]$").unwrap());
             }
@@ -1095,16 +1072,16 @@ impl Config {
         None
     }
 
-    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(username, password)))
+    pub async fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
+        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(username, password)))
     }
 
-    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name_by_token(token)))
+    pub async fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
+        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name_by_token(token)))
     }
 
-    pub fn get_user_credentials(&self, username: &str) -> Option<ProxyUserCredentials> {
-        self.t_api_proxy.read().unwrap().as_ref().and_then(|api_proxy| api_proxy.get_user_credentials(username))
+    pub async fn get_user_credentials(&self, username: &str) -> Option<ProxyUserCredentials> {
+        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| api_proxy.get_user_credentials(username))
     }
 
     pub fn get_input_by_name(&self, input_name: &str) -> Option<&ConfigInput> {
@@ -1192,11 +1169,17 @@ impl Config {
     pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
         let work_dir = if resolve_var { &config_reader::resolve_env_var(&self.working_dir) } else { &self.working_dir };
         self.working_dir = file_utils::get_working_path(work_dir);
+
         if self.backup_dir.is_none() {
             self.backup_dir = Some(PathBuf::from(&self.working_dir).join("backup").clean().to_string_lossy().to_string());
         } else {
-            let backup_dir = if resolve_var { &config_reader::resolve_env_var(self.backup_dir.as_ref().unwrap()) } else { self.backup_dir.as_ref().unwrap() };
-            self.backup_dir = Some(backup_dir.to_string());
+            self.backup_dir = self.backup_dir.as_ref().map(|backup_dir| {
+                if resolve_var {
+                    config_reader::resolve_env_var(backup_dir)
+                } else {
+                    backup_dir.to_owned()
+                }
+            }).map(|dir| dir.to_string());
         }
         if let Some(reverse_proxy) = self.reverse_proxy.as_mut() {
             reverse_proxy.prepare(&self.working_dir, resolve_var);
@@ -1286,8 +1269,12 @@ impl Config {
         }
     }
 
-    pub fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
-        let server_info_list = self.t_api_proxy.read().unwrap().as_ref().unwrap().server.clone();
+
+    /// # Panics
+    ///
+    /// Will panic if default server invalid
+    pub async fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
+        let server_info_list = self.t_api_proxy.read().await.as_ref().unwrap().server.clone();
         let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
         server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), Clone::clone)
     }

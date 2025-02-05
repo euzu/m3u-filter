@@ -4,8 +4,8 @@ use log::{error, info};
 use crate::messaging::{MsgKind, send_message};
 use crate::model::config::Config;
 use crate::model::playlist::PlaylistGroup;
-use crate::utils::file_utils;
-use crate::utils::file_utils::sanitize_filename;
+use crate::utils::file::file_utils;
+use crate::utils::file::file_utils::sanitize_filename;
 
 pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) {
     let mut new_tree = BTreeSet::new();

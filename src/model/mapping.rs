@@ -1,21 +1,22 @@
+use enum_iterator::Sequence;
+use log::{debug, error, trace};
+use regex::{Regex};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::{Arc};
 use std::sync::atomic::AtomicU32;
-use enum_iterator::Sequence;
-use log::{debug, error, trace};
-use regex::Regex;
+use std::sync::Arc;
 
-use crate::filter::{apply_templates_to_pattern, get_filter, prepare_templates, Filter, PatternTemplate, RegexWithCaptures, ValueProcessor};
+use crate::foundation::filter::{apply_templates_to_pattern, get_filter, prepare_templates, Filter, PatternTemplate, RegexWithCaptures, ValueProcessor};
+use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::model::config::valid_property;
 use crate::model::config::{ItemField, AFFIX_FIELDS, COUNTER_FIELDS, MAPPER_ATTRIBUTE_FIELDS};
 use crate::model::playlist::{FieldGetAccessor, FieldSetAccessor, PlaylistItem};
 use crate::utils::string_utils::Capitalize;
-use crate::{create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err, valid_property};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct MappingTag {
@@ -168,11 +169,10 @@ impl MapperTransform {
                         new_pattern = apply_templates_to_pattern(pattern, template_list);
                     }
                 }
-                let re = Regex::new(&new_pattern);
-                if re.is_err() {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", new_pattern);
+                match Regex::new(&new_pattern) {
+                    Ok(pattern) => self.t_pattern = Some(pattern),
+                    Err(err) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {new_pattern} {err}"),
                 }
-                self.t_pattern = Some(re.unwrap());
             }
         }
         Ok(())
@@ -206,6 +206,9 @@ pub struct Mapper {
 }
 
 impl Mapper {
+    /// # Panics
+    ///
+    /// Will panic if default `RegEx` gets invalid
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
         for key in self.attributes.keys() {
             if !valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {

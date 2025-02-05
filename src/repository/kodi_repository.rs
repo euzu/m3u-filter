@@ -10,10 +10,10 @@ use crate::repository::storage::{
     ensure_target_storage_path, get_input_storage_path, hash_bytes, FILE_SUFFIX_DB,
 };
 use crate::repository::xtream_repository::{xtream_get_record_file_path, InputVodInfoRecord};
-use crate::utils::file_lock_manager::FileReadGuard;
-use crate::utils::file_utils;
-use crate::utils::request_utils::extract_extension_from_url;
-use crate::{create_m3u_filter_error_result, info_err, notify_err};
+use crate::utils::file::file_lock_manager::FileReadGuard;
+use crate::utils::file::file_utils;
+use crate::utils::network::request::extract_extension_from_url;
+use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, notify_err};
 use async_std::fs::{create_dir_all, read_dir, remove_dir, remove_file, File};
 use async_std::io::{BufReadExt, BufReader, BufWriter, ReadExt, WriteExt};
 use chrono::Datelike;
@@ -664,7 +664,7 @@ pub async fn kodi_write_strm_playlist(
 
     let Some(root_path) = file_utils::get_file_path(
         &cfg.working_dir,
-        Some(std::path::PathBuf::from(&output.filename.as_ref().unwrap())),
+        Some(std::path::PathBuf::from(&output.filename.as_ref().map_or_else(|| "/tmp", |v| v.as_ref()))),
     ) else {
         return Err(info_err!(format!(
             "Failed to get file path for {}",
@@ -672,7 +672,7 @@ pub async fn kodi_write_strm_playlist(
         )));
     };
 
-    let credentials_and_server_info = get_credentials_and_server_info(cfg, output);
+    let credentials_and_server_info = get_credentials_and_server_info(cfg, output).await;
     let (underscore_whitespace, cleanup, kodi_style) = get_strm_output_options(target);
     let strm_index_path =
         strm_get_file_paths(&ensure_target_storage_path(cfg, target.name.as_str())?);
@@ -852,19 +852,17 @@ async fn has_strm_file_same_hash(file_path: &PathBuf, content_hash: UUIDType) ->
     false
 }
 
-fn get_credentials_and_server_info(
+async fn get_credentials_and_server_info(
     cfg: &Config,
     output: &TargetOutput,
 ) -> Option<(ProxyUserCredentials, ApiProxyServerInfo)> {
-    output
-        .username
-        .as_ref()
-        .and_then(|username| cfg.get_user_credentials(username))
-        .filter(|credentials| credentials.proxy == ProxyType::Reverse)
-        .map(|credentials| {
-            let server_info = cfg.get_user_server_info(&credentials);
-            (credentials, server_info)
-        })
+    let username = output.username.as_ref()?;
+    let credentials = cfg.get_user_credentials(username).await?;
+    if credentials.proxy != ProxyType::Reverse {
+        return None;
+    }
+    let server_info = cfg.get_user_server_info(&credentials).await;
+    Some((credentials, server_info))
 }
 
 async fn read_strm_file_index(strm_file_index_path: &Path) -> std::io::Result<HashSet<String>> {

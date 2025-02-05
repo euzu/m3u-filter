@@ -11,7 +11,7 @@ use crate::utils::json_utils::{get_string_from_serde_value, get_u64_from_serde_v
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use crate::utils::hash_utils::{generate_playlist_uuid, get_provider_id};
-use crate::utils::request_utils::extract_extension_from_url;
+use crate::utils::network::request::extract_extension_from_url;
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 

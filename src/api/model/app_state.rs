@@ -2,9 +2,9 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use async_std::sync::{Mutex};
 use crate::api::model::download::DownloadQueue;
-use crate::api::model::shared_stream_manager::SharedStreamManager;
+use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::model::config::{Config};
-use crate::utils::lru_cache::LRUResourceCache;
+use crate::tools::lru_cache::LRUResourceCache;
 
 pub struct AppState {
     pub config: Arc<Config>,

@@ -3,7 +3,7 @@ use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
 use log::error;
 
-use crate::{create_m3u_filter_error, info_err};
+use crate::m3u_filter_error::{info_err, create_m3u_filter_error};
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
@@ -11,8 +11,8 @@ use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, Playl
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentWriter};
 use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
 use crate::repository::storage::{get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
-use crate::utils::file_utils;
-use crate::utils::file_utils::file_writer;
+use crate::utils::file::file_utils;
+use crate::utils::file::file_utils::file_writer;
 
 const FILE_M3U: &str = "m3u";
 macro_rules! cant_write_result {

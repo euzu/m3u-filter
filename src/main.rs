@@ -1,9 +1,16 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::return_self_not_must_use)]
+#![allow(clippy::missing_errors_doc)]
 extern crate core;
 extern crate env_logger;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
+#[macro_use]
+mod modules;
+include_modules!();
 
 use actix_rt::System;
 use std::fs::File;
@@ -13,22 +20,13 @@ use std::sync::Arc;
 use crate::auth::password::generate_password;
 use crate::model::config::{validate_targets, Config, HealthcheckConfig, LogLevelConfig, ProcessTargets};
 use crate::model::healthcheck::Healthcheck;
-use crate::processing::playlist_processor;
-use crate::utils::request_utils::set_sanitize_sensitive_info;
-use crate::utils::{config_reader, file_utils};
+use crate::processing::processor::playlist;
+use crate::utils::config_reader;
+use crate::utils::file::file_utils;
+use crate::utils::network::request::set_sanitize_sensitive_info;
 use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
-
-mod api;
-mod auth;
-mod filter;
-mod m3u_filter_error;
-mod messaging;
-mod model;
-mod processing;
-mod repository;
-mod utils;
 
 const LOG_ERROR_LEVEL_MOD: &[&str] = &[
     "actix_web::middleware::logger",
@@ -40,6 +38,7 @@ const LOG_ERROR_LEVEL_MOD: &[&str] = &[
     "actix_server::builder",
     "actix_server::accept",
 ];
+
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
@@ -86,6 +85,7 @@ struct Args {
     )]
     healthcheck: bool,
 }
+
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -193,7 +193,7 @@ fn create_directories(cfg: &Config) {
 
 fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let client = Arc::new(reqwest::Client::new());
-    System::new().block_on(async { playlist_processor::exec_processing(client, cfg, targets).await });
+    System::new().block_on(async { playlist::exec_processing(client, cfg, targets).await });
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {

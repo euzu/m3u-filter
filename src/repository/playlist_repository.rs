@@ -1,4 +1,4 @@
-use crate::info_err;
+use crate::m3u_filter_error::{info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, TargetType};
 use crate::model::playlist::{PlaylistGroup, PlaylistItemType};

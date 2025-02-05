@@ -4,8 +4,7 @@ use std::str::FromStr;
 
 use enum_iterator::Sequence;
 use log::debug;
-use crate::{create_m3u_filter_error_result, info_err};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result, info_err};
 use crate::utils::config_reader;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
@@ -198,7 +197,7 @@ impl ApiProxyConfig {
         let mut tokens = HashSet::new();
         let mut errors = Vec::new();
         if self.server.is_empty() {
-            errors.push("No serverinfo defined".to_string());
+            errors.push("No server info defined".to_string());
         } else {
             let mut name_set = HashSet::new();
             for server in &self.server {

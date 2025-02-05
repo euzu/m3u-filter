@@ -1,4 +1,4 @@
-import React, {useRef, useState, useCallback, useMemo, useEffect} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import './app.scss';
 import SourceSelector from "../component/source-selector/source-selector";
 import PlaylistViewer, {IPlaylistViewer, SearchRequest} from "../component/playlist-viewer/playlist-viewer";
@@ -40,7 +40,7 @@ export default function App(props: AppProps) {
         setProgress(true);
         services.playlist().getPlaylist(req).pipe(first()).subscribe({
             next: (pl: PlaylistGroup[]) => {
-                enqueueSnackbar('Sucessfully downloaded playlist', {variant: 'success'})
+                enqueueSnackbar('Successfully downloaded playlist', {variant: 'success'})
                 setPlaylist(pl);
             },
             error: (err) => {
