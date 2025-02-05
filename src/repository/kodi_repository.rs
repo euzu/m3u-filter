@@ -1,4 +1,3 @@
-use std::path::{Path, PathBuf};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
@@ -11,17 +10,18 @@ use crate::utils::file_lock_manager::FileReadGuard;
 use crate::utils::file_utils;
 use crate::utils::request_utils::extract_extension_from_url;
 use crate::{create_m3u_filter_error_result, info_err, notify_err};
-use async_std::io::{BufReadExt, BufWriter, BufReader, ReadExt, WriteExt};
-use async_std::fs::{File, read_dir, remove_dir, remove_file, create_dir_all};
+use async_std::fs::{create_dir_all, read_dir, remove_dir, remove_file, File};
+use async_std::io::{BufReadExt, BufReader, BufWriter, ReadExt, WriteExt};
 use chrono::Datelike;
-use futures::{StreamExt};
-use log::error;
+use filetime::{set_file_times, FileTime};
+use futures::StreamExt;
+use log::{debug, error};
 use regex::Regex;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::LazyLock;
-use filetime::{set_file_times, FileTime};
 
 const FILE_STRM: &str = "strm";
 
@@ -310,14 +310,14 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
             let season = header.get_additional_property_as_str("season");
             let episode = header.get_additional_property_as_str("episode");
             let added = header.get_additional_property_as_u64("added");
-            (series_name, release_date, added,  season, episode)
-        },
+            (series_name, release_date, added, season, episode)
+        }
         PlaylistItemType::Video => {
             let name = header.get_field("name").map(|v| v.to_string());
             let release_date = header.get_additional_property_as_str("release_date");
             let added = header.get_additional_property_as_u64("added");
             (name, release_date, added, None, None)
-        },
+        }
         _ => { (None, None, None, None, None) }
     };
     StrmItemInfo { group, title, item_type, provider_id, virtual_id, input_name, url, series_name, release_date, season, episode, added }
@@ -412,14 +412,15 @@ async fn remove_empty_dirs(root_path: async_std::path::PathBuf) -> Result<(), St
 
     // Delete directories from bottom to top
     for dir in dirs_to_delete.into_iter().rev() {
-        if let Err(e) = remove_dir(&dir).await {
-            eprintln!("Failed to remove empty directory {dir:?}: {e}");
+        if dir.exists().await {
+            if let Err(e) = remove_dir(&dir).await {
+                debug!("Failed to remove empty directory {dir:?}: {e}");
+            }
         }
     }
 
     Ok(())
 }
-
 
 fn filter_strm_item(pli: &PlaylistItem) -> bool {
     let item_type = pli.header.borrow().item_type;
@@ -439,12 +440,49 @@ fn get_relative_path_str(full_path: &Path, root_path: &Path) -> String {
         .to_string()
 }
 
+struct StrmFile {
+    file_name: Rc<String>,
+    dir_path: PathBuf,
+    strm_info: StrmItemInfo,
+}
+
+async fn prepare_strm_files(cfg: &Config, new_playlist: &[PlaylistGroup], root_path: &Path, underscore_whitespace: bool, kodi_style: bool) -> Vec<Rc<StrmFile>> {
+    let channel_count = new_playlist.iter().map(|g| g.filter_count(filter_strm_item)).sum();
+    let mut strm_files = HashMap::with_capacity(channel_count);
+    let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::with_capacity(channel_count);
+    let mut result = Vec::with_capacity(channel_count);
+    // first we create the names to identify name collisions
+    for pg in new_playlist {
+        for pli in pg.channels.iter().filter(|&c| filter_strm_item(c)) {
+            let strm_item_info = extract_item_info(pli);
+            let (dir_path, strm_file_name) = if kodi_style {
+                kodi_style_rename(cfg, &strm_item_info, &KODI_STYLE, &mut input_tmdb_indexes, underscore_whitespace).await
+            } else {
+                let dir_path = root_path.join(sanitize_for_filename(&strm_item_info.group, underscore_whitespace));
+                let strm_file_name = sanitize_for_filename(&strm_item_info.title, underscore_whitespace);
+                (dir_path, strm_file_name)
+            };
+            let filename = Rc::new(strm_file_name);
+            if let Some(_existing) = strm_files.get(&filename) {
+                // name collision
+                // TODO
+                println!("TODO strm file name collision {filename}");
+            } else {
+                let strm_file = Rc::new(StrmFile { file_name: Rc::clone(&filename), dir_path, strm_info: strm_item_info });
+                strm_files.insert(filename, Rc::clone(&strm_file));
+                result.push(strm_file);
+            }
+        }
+    }
+    result
+}
+
 pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_playlist: &[PlaylistGroup], output: &TargetOutput) -> Result<(), M3uFilterError> {
     if new_playlist.is_empty() {
         return Ok(());
     }
     if output.filename.is_none() {
-        return Err(notify_err!("write strm playlist failed: ".to_string()));
+        return Err(notify_err!("Output directory missing. Write strm playlist failed".to_string()));
     }
 
     let Some(root_path) = file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(&output.filename.as_ref().unwrap()))) else {
@@ -464,59 +502,47 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
     let strm_props = target.options.as_ref().and_then(|o| o.strm_props.as_ref());
 
     prepare_strm_output_directory(&root_path).await?;
-    let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::new();
 
-    for pg in new_playlist {
-        for pli in pg.channels.iter().filter(|&pli| filter_strm_item(pli)) {
-            // we need to consider
-            // - Live streams
-            // - Xtream Series Episode (has series_name and release_date)
-            // - Xtream VOD (should have year or release_date)
-            // - M3u Series (TODO we dont have this currently, should be guessed through m3u parser)
-            // - M3u Vod (no additional infos, need to extract from title)
+    // we need to consider
+    // - Live streams
+    // - Xtream Series Episode (has series_name and release_date)
+    // - Xtream VOD (should have year or release_date)
+    // - M3u Series (TODO we dont have this currently, should be guessed through m3u parser)
+    // - M3u Vod (no additional infos, need to extract from title)
+    let strm_files = prepare_strm_files(cfg, new_playlist, &root_path, underscore_whitespace, kodi_style).await;
+    for strm_file in strm_files {
+        // file paths
+        let output_path = root_path.join(&strm_file.dir_path);
+        let file_path = output_path.join(format!("{}.strm", strm_file.file_name));
+        let file_exists = file_path.exists();
+        let relative_file_path = get_relative_path_str(&file_path, &root_path);
 
-            let str_item_info = extract_item_info(pli);
-            let (dir_path, strm_file_name) = if kodi_style {
-                kodi_style_rename(cfg, &str_item_info, &KODI_STYLE, &mut input_tmdb_indexes, underscore_whitespace).await
-            } else {
-                let dir_path = root_path.join(sanitize_for_filename(&str_item_info.group, underscore_whitespace));
-                let strm_file_name = sanitize_for_filename(&str_item_info.title, underscore_whitespace);
-                (dir_path, strm_file_name)
-            };
+        // create content
+        let url = get_strm_url(credentials_and_server_info.as_ref(), &strm_file.strm_info);
+        let mut content = strm_props.map_or_else(Vec::new, std::clone::Clone::clone);
+        content.push(url);
+        let content_text = content.join("\r\n");
+        let content_as_bytes = content_text.as_bytes();
+        let content_hash = hash_bytes(content_as_bytes);
 
-            // file paths
-            let output_path = root_path.join(dir_path);
-            let file_path = output_path.join(format!("{strm_file_name}.strm"));
-            let file_exists = file_path.exists();
-            let relative_file_path = get_relative_path_str(&file_path, &root_path);
-
-            // create content
-            let url = get_strm_url(credentials_and_server_info.as_ref(), &str_item_info);
-            let mut content = strm_props.map_or_else(Vec::new, std::clone::Clone::clone);
-            content.push(url);
-            let content_text = content.join("\r\n");
-            let content_as_bytes = content_text.as_bytes();
-            let content_hash = hash_bytes(content_as_bytes);
-
-            // check if file exists and has same hash
-            if file_exists && has_strm_file_same_hash(&file_path, content_hash).await {
-                processed_strm.insert(relative_file_path);
-                continue; // skip creation
-            }
-
-            // if we cant create the directory skip this entry
-            if !ensure_strm_file_directory(&mut failed, &output_path).await { continue; }
-
-            match write_strm_file(&file_path, content_as_bytes, str_item_info.get_file_ts()).await {
-                Ok(()) => { processed_strm.insert(relative_file_path); }
-                Err(err) => { failed.push(err); }
-            };
+        // check if file exists and has same hash
+        if file_exists && has_strm_file_same_hash(&file_path, content_hash).await {
+            processed_strm.insert(relative_file_path);
+            continue; // skip creation
         }
+
+        // if we cant create the directory skip this entry
+        if !ensure_strm_file_directory(&mut failed, &output_path).await { continue; }
+
+        match write_strm_file(&file_path, content_as_bytes, strm_file.strm_info.get_file_ts()).await {
+            Ok(()) => { processed_strm.insert(relative_file_path); }
+            Err(err) => { failed.push(err); }
+        };
     }
 
     if let Err(err) = write_strm_index_file(cfg, &processed_strm, &strm_index_path).await {
         failed.push(err);
-     };
+    };
 
     if let Err(err) = cleanup_strm_output_directory(cleanup, &root_path, &existing_strm, &processed_strm).await {
         failed.push(err);
@@ -528,7 +554,6 @@ pub async fn kodi_write_strm_playlist(target: &ConfigTarget, cfg: &Config, new_p
         Err(info_err!(failed.join(", ")))
     }
 }
-
 async fn write_strm_index_file(cfg: &Config, entries: &HashSet<String>, index_file_path: &PathBuf) -> Result<(), String> {
     let _file_lock = cfg.file_locks.write_lock(index_file_path).await.map_err(|err| format!("{err}"))?;
     let file = File::create(index_file_path).await.map_err(|err| format!("Failed to create strm index file: {index_file_path:?} {err}"))?;

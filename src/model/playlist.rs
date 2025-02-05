@@ -607,4 +607,13 @@ impl PlaylistGroup {
     pub fn on_load(&mut self) {
         self.channels.iter().for_each(|pl| pl.header.borrow_mut().gen_uuid());
     }
+
+    #[inline]
+    pub  fn filter_count<F>(&self, filter: F) -> usize
+    where
+        F: Fn(&PlaylistItem) -> bool,
+    {
+        self.channels.iter().filter(|&c| filter(c)).count()
+    }
+
 }
