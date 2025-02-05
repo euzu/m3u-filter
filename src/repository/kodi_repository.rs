@@ -784,11 +784,11 @@ async fn write_strm_index_file(
         writer
             .write_all(entry.as_bytes())
             .await
-            .map_err(|err| format!("failed to write strm index entry: {err}"))?;
+            .map_err(|err| format!("Failed to write strm index entry: {err}"))?;
         writer
             .write(new_line)
             .await
-            .map_err(|err| format!("failed to write strm index entry: {err}"))?;
+            .map_err(|err| format!("Failed to write strm index entry: {err}"))?;
     }
     writer
         .flush()
@@ -817,10 +817,10 @@ async fn write_strm_file(
 ) -> Result<(), String> {
     File::create(file_path)
         .await
-        .map_err(|err| format!("failed to create strm file: {err}"))?
+        .map_err(|err| format!("Failed to create strm file: {err}"))?
         .write_all(content_as_bytes)
         .await
-        .map_err(|err| format!("failed to write strm playlist: {err}"))?;
+        .map_err(|err| format!("Failed to write strm playlist: {err}"))?;
 
     if let Some(ts) = timestamp {
         #[allow(clippy::cast_possible_wrap)]
