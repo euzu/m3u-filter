@@ -1,9 +1,9 @@
-use rand::{Rng, distributions::Alphanumeric, rngs::OsRng};
+use rand::{Rng};
+use rand::distr::Alphanumeric;
 use crate::m3u_filter_error::str_to_io_error;
 
 fn generate_salt(length: usize) -> String {
-    let rng = OsRng;
-    let salt: String = rng
+    let salt: String = rand::rng()
         .sample_iter(&Alphanumeric)
         .take(length)
         .map(char::from)

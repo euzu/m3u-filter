@@ -14,11 +14,10 @@ use crate::utils::file::file_lock_manager::FileReadGuard;
 use crate::utils::file::file_utils;
 use crate::utils::network::request::extract_extension_from_url;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, notify_err};
-use async_std::fs::{create_dir_all, read_dir, remove_dir, remove_file, File};
-use async_std::io::{BufReadExt, BufReader, BufWriter, ReadExt, WriteExt};
+use tokio::fs::{create_dir_all, read_dir, remove_dir, remove_file, File};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use chrono::Datelike;
 use filetime::{set_file_times, FileTime};
-use futures::StreamExt;
 use log::{debug, error};
 use regex::Regex;
 use serde::Serialize;
@@ -156,7 +155,7 @@ fn trim_whitespace(pattern: &Regex, input: &str) -> String {
     pattern.replace_all(input, " ").to_string()
 }
 
-async fn kodi_style_rename(
+fn kodi_style_rename(
     cfg: &Config,
     strm_item_info: &StrmItemInfo,
     style: &KodiStyle,
@@ -191,7 +190,6 @@ async fn kodi_style_rename(
                 input_tmdb_indexes,
                 strm_item_info.item_type,
             )
-                .await
         }
         _ => None,
     } {
@@ -282,7 +280,7 @@ enum InputTmdbIndexValue {
 }
 
 type InputTmdbIndexMap = HashMap<String, Option<(FileReadGuard, InputTmdbIndexTree)>>;
-async fn get_tmdb_value(
+fn get_tmdb_value(
     cfg: &Config,
     provider_id: Option<u32>,
     input_name: &str,
@@ -313,7 +311,8 @@ async fn get_tmdb_value(
                     if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
                         .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type))
                     {
-                        if let Ok(file_lock) = cfg.file_locks.read_lock(&tmdb_path).await {
+                        {
+                            let file_lock = cfg.file_locks.read_lock(&tmdb_path);
                             match item_type {
                                 PlaylistItemType::Series => {
                                     if let Ok(tree) =
@@ -430,7 +429,7 @@ fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
 
 async fn prepare_strm_output_directory(path: &Path) -> Result<(), M3uFilterError> {
     // Ensure the directory exists
-    if let Err(e) = async_std::fs::create_dir_all(path).await {
+    if let Err(e) = tokio::fs::create_dir_all(path).await {
         error!("Failed to create directory {path:?}: {e}");
         return create_m3u_filter_error_result!(
             M3uFilterErrorKind::Notify,
@@ -458,8 +457,7 @@ async fn cleanup_strm_output_directory(
         let mut entries = read_dir(root_path)
             .await
             .map_err(|e| format!("Failed to read directory {root_path:?}: {e}"))?;
-        while let Some(entry) = entries.next().await {
-            let entry = entry.map_err(|e| format!("Error retrieving directory entry: {e}"))?;
+        while let Ok(Some(entry)) = entries.next_entry().await {
             if entry
                 .file_type()
                 .await
@@ -495,7 +493,7 @@ async fn cleanup_strm_output_directory(
     Ok(())
 }
 
-async fn remove_empty_dirs(root_path: async_std::path::PathBuf) -> Result<(), String> {
+async fn remove_empty_dirs(root_path: PathBuf) -> Result<(), String> {
     let mut stack = vec![root_path];
     let mut dirs_to_delete = Vec::new();
     let mut ignore_root = true;
@@ -511,23 +509,16 @@ async fn remove_empty_dirs(root_path: async_std::path::PathBuf) -> Result<(), St
 
         let mut has_files = false;
 
-        while let Some(entry) = entries.next().await {
-            match entry {
-                Ok(entry) => {
-                    if entry
-                        .file_type()
-                        .await
-                        .map_err(|e| format!("Failed to get file type for {entry:?}: {e}"))?
-                        .is_dir()
-                    {
-                        stack.push(entry.path());
-                    } else {
-                        has_files = true;
-                    }
-                }
-                Err(err) => {
-                    error!("Error retrieving directory entry: {dir:?} {err}");
-                }
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if entry
+                .file_type()
+                .await
+                .map_err(|e| format!("Failed to get file type for {entry:?}: {e}"))?
+                .is_dir()
+            {
+                stack.push(entry.path());
+            } else {
+                has_files = true;
             }
         }
 
@@ -539,7 +530,7 @@ async fn remove_empty_dirs(root_path: async_std::path::PathBuf) -> Result<(), St
 
     // Delete directories from bottom to top
     for dir in dirs_to_delete.into_iter().rev() {
-        if dir.exists().await {
+        if dir.exists() {
             if let Err(e) = remove_dir(&dir).await {
                 debug!("Failed to remove empty directory {dir:?}: {e}");
             }
@@ -579,7 +570,7 @@ struct StrmFile {
     strm_info: StrmItemInfo,
 }
 
-async fn prepare_strm_files(
+fn prepare_strm_files(
     cfg: &Config,
     new_playlist: &[PlaylistGroup],
     root_path: &Path,
@@ -609,7 +600,6 @@ async fn prepare_strm_files(
                     &mut input_tmdb_indexes,
                     underscore_whitespace,
                 )
-                    .await
             } else {
                 let dir_path = root_path.join(sanitize_for_filename(
                     &strm_item_info.group,
@@ -672,16 +662,14 @@ pub async fn kodi_write_strm_playlist(
         )));
     };
 
-    let credentials_and_server_info = get_credentials_and_server_info(cfg, output).await;
+    let credentials_and_server_info = get_credentials_and_server_info(cfg, output);
     let (underscore_whitespace, cleanup, kodi_style) = get_strm_output_options(target);
     let strm_index_path =
         strm_get_file_paths(&ensure_target_storage_path(cfg, target.name.as_str())?);
     let existing_strm = {
         let _file_lock = cfg
             .file_locks
-            .read_lock(&strm_index_path)
-            .await
-            .map_err(|err| info_err!(format!("{err}")))?;
+            .read_lock(&strm_index_path);
         read_strm_file_index(&strm_index_path)
             .await
             .unwrap_or_else(|_| HashSet::with_capacity(4096))
@@ -705,8 +693,7 @@ pub async fn kodi_write_strm_playlist(
         &root_path,
         underscore_whitespace,
         kodi_style,
-    )
-        .await;
+    );
     for strm_file in strm_files {
         // file paths
         let output_path = root_path.join(&strm_file.dir_path);
@@ -737,8 +724,7 @@ pub async fn kodi_write_strm_playlist(
             &file_path,
             content_as_bytes,
             strm_file.strm_info.get_file_ts(),
-        )
-            .await
+        ).await
         {
             Ok(()) => {
                 processed_strm.insert(relative_file_path);
@@ -772,9 +758,7 @@ async fn write_strm_index_file(
 ) -> Result<(), String> {
     let _file_lock = cfg
         .file_locks
-        .write_lock(index_file_path)
-        .await
-        .map_err(|err| format!("{err}"))?;
+        .write_lock(index_file_path);
     let file = File::create(index_file_path)
         .await
         .map_err(|err| format!("Failed to create strm index file: {index_file_path:?} {err}"))?;
@@ -852,16 +836,16 @@ async fn has_strm_file_same_hash(file_path: &PathBuf, content_hash: UUIDType) ->
     false
 }
 
-async fn get_credentials_and_server_info(
+fn get_credentials_and_server_info(
     cfg: &Config,
     output: &TargetOutput,
 ) -> Option<(ProxyUserCredentials, ApiProxyServerInfo)> {
     let username = output.username.as_ref()?;
-    let credentials = cfg.get_user_credentials(username).await?;
+    let credentials = cfg.get_user_credentials(username)?;
     if credentials.proxy != ProxyType::Reverse {
         return None;
     }
-    let server_info = cfg.get_user_server_info(&credentials).await;
+    let server_info = cfg.get_user_server_info(&credentials);
     Some((credentials, server_info))
 }
 
@@ -870,7 +854,7 @@ async fn read_strm_file_index(strm_file_index_path: &Path) -> std::io::Result<Ha
     let reader = BufReader::new(file);
     let mut result = HashSet::new();
     let mut lines = reader.lines();
-    while let Some(Ok(line)) = lines.next().await {
+    while let Ok(Some(line)) = lines.next_line().await {
         result.insert(line);
     }
     Ok(result)

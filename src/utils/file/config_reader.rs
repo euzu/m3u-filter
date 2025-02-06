@@ -152,7 +152,7 @@ pub fn resolve_env_var(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::config_reader::resolve_env_var;
+    use crate::utils::file::config_reader::resolve_env_var;
 
     #[test]
     fn test_resolve() {

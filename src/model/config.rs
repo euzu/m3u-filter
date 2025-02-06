@@ -7,8 +7,8 @@ use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc};
-use async_std::sync::RwLock;
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 use crate::auth::user::UserCredential;
 use log::{debug, error, warn};
@@ -22,7 +22,7 @@ use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::utils::config_reader;
+use crate::utils::file::config_reader;
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
@@ -504,9 +504,9 @@ impl FromStr for InputType {
     type Err = M3uFilterError;
 
     fn from_str(s: &str) -> Result<Self, M3uFilterError> {
-        if s.eq("m3u") {
+        if s.eq(Self::M3U) {
             Ok(Self::M3u)
-        } else if s.eq("xtream") {
+        } else if s.eq(Self::XTREAM) {
             Ok(Self::Xtream)
         } else {
             create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown InputType: {}", s)
@@ -1072,16 +1072,16 @@ impl Config {
         None
     }
 
-    pub async fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(username, password)))
+    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
+        self.t_api_proxy.read().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(username, password)))
     }
 
-    pub async fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name_by_token(token)))
+    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
+        self.t_api_proxy.read().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name_by_token(token)))
     }
 
-    pub async fn get_user_credentials(&self, username: &str) -> Option<ProxyUserCredentials> {
-        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| api_proxy.get_user_credentials(username))
+    pub fn get_user_credentials(&self, username: &str) -> Option<ProxyUserCredentials> {
+        self.t_api_proxy.read().as_ref().and_then(|api_proxy| api_proxy.get_user_credentials(username))
     }
 
     pub fn get_input_by_name(&self, input_name: &str) -> Option<&ConfigInput> {
@@ -1273,8 +1273,8 @@ impl Config {
     /// # Panics
     ///
     /// Will panic if default server invalid
-    pub async fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
-        let server_info_list = self.t_api_proxy.read().await.as_ref().unwrap().server.clone();
+    pub fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
+        let server_info_list = self.t_api_proxy.read().as_ref().unwrap().server.clone();
         let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
         server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), Clone::clone)
     }

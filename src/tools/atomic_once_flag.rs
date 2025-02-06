@@ -1,5 +1,4 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 /// A flag that is initially active (`true`) and can only be disabled once.
 /// Once the flag is disabled by calling `disable()`, it remains inactive (`false`) forever.
@@ -14,9 +13,9 @@ use std::sync::Arc;
 /// assert!(flag.is_active());
 /// flag.disable();
 /// assert!(!flag.is_active());
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AtomicOnceFlag {
-    enabled: Arc<AtomicBool>,
+    enabled: AtomicBool,
     ordering: Ordering,
 }
 
@@ -30,7 +29,7 @@ impl AtomicOnceFlag {
     /// Creates a new `AtomicOnceFlag` with the specified memory ordering.
     pub fn with_ordering(ordering: Ordering) -> Self {
         Self {
-            enabled: Arc::new(AtomicBool::new(true)),
+            enabled: AtomicBool::new(true),
             ordering,
         }
     }

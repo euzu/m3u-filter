@@ -22,13 +22,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
 
     let target_id_mapping_file = get_target_id_mapping_file(&target_path);
 
-    let _file_lock = match cfg.file_locks.write_lock(&target_id_mapping_file).await {
-        Ok(lock) => lock,
-        Err(err) => {
-            errors.push(info_err!(err.to_string()));
-            return Err(errors);
-        }
-    };
+    let _file_lock = cfg.file_locks.write_lock(&target_id_mapping_file);
 
     let mut target_id_mapping = TargetIdMapping::new(&target_id_mapping_file);
 

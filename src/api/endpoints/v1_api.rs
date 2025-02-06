@@ -16,7 +16,7 @@ use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCrede
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
 use crate::processing::processor::playlist;
 use crate::utils::network::request::sanitize_sensitive_info;
-use crate::utils::config_reader;
+use crate::utils::file::config_reader;
 use crate::utils::network::{m3u, xtream};
 
 fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
@@ -47,7 +47,7 @@ async fn save_config_api_proxy_user(
 ) -> HttpResponse {
     let mut users = req.0;
     users.iter_mut().flat_map(|t| &mut t.credentials).for_each(ProxyUserCredentials::trim);
-    if let Some(api_proxy) = app_state.config.t_api_proxy.write().await.as_mut() {
+    if let Some(api_proxy) = app_state.config.t_api_proxy.write().as_mut() {
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         api_proxy.user = users;
         if let Some(err) = intern_save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
@@ -85,7 +85,7 @@ async fn save_config_api_proxy_config(
             return HttpResponse::BadRequest().json(json!({"error": "Invalid content"}));
         }
     }
-    if let Some(api_proxy) = app_state.config.t_api_proxy.write().await.as_mut() {
+    if let Some(api_proxy) = app_state.config.t_api_proxy.write().as_mut() {
         api_proxy.server = req_api_proxy;
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         if let Some(err) = intern_save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
@@ -227,7 +227,7 @@ async fn config(
 
     // if we didn't read it from file then we should use it from app_state
     if result.api_proxy.is_none() {
-        result.api_proxy.clone_from(&*app_state.config.t_api_proxy.read().await);
+        result.api_proxy.clone_from(&*app_state.config.t_api_proxy.read());
     }
 
     HttpResponse::Ok().json(result)

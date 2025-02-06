@@ -12,7 +12,7 @@ use actix_web::HttpRequest;
 use bytes::Bytes;
 use futures::stream::{self, BoxStream};
 use futures::{StreamExt, TryStreamExt};
-use log::warn;
+use log::{error, warn};
 use reqwest::header::{HeaderMap, RANGE};
 use reqwest::StatusCode;
 use std::collections::HashMap;
@@ -34,6 +34,7 @@ pub struct BufferStreamOptions {
     reconnect_enabled: bool,
     buffer_enabled: bool,
     buffer_size: usize,
+    share_stream: bool,
 }
 
 impl BufferStreamOptions {
@@ -42,12 +43,14 @@ impl BufferStreamOptions {
         reconnect_enabled: bool,
         buffer_enabled: bool,
         buffer_size: usize,
+        share_stream: bool,
     ) -> Self {
         Self {
             item_type,
             reconnect_enabled,
             buffer_enabled,
             buffer_size,
+            share_stream
         }
     }
 
@@ -170,6 +173,7 @@ fn get_client_stream_request_params(
     // we need the range bytes from client request for seek ing to the right position
     let req_range_start_bytes = get_request_range_start_bytes(&req_headers);
     req_headers.remove("range");
+
     // These are the configured headers for this input.
     let input_headers = input.map(|i| i.headers.clone());
     // We merge configured input headers with the headers from the request.
@@ -206,7 +210,10 @@ async fn provider_request(request_client: Arc<reqwest::Client>, initial_info: bo
                 } else {
                     None
                 };
-                return Ok(Some((response.bytes_stream().map_err(|err| StreamError::reqwest(&err)).boxed(), response_info)));
+                return Ok(Some((response.bytes_stream().map_err(|err| {
+                    error!("Failed to read response body: {err}");
+                    StreamError::reqwest(&err)
+                }).boxed(), response_info)));
             }
             Err(status)
         }
@@ -229,7 +236,10 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
             Ok(response) => {
                 let status = response.status();
                 if status.is_success() {
-                    return Some(response.bytes_stream().map_err(|err| StreamError::reqwest(&err)).boxed());
+                    return Some(response.bytes_stream().map_err(|err| {
+                        error!("Stream error {err}");
+                        StreamError::reqwest(&err)
+                    }).boxed());
                 }
                 if status.is_client_error() {
                     return None;
@@ -314,31 +324,30 @@ pub async fn create_provider_stream(client: Arc<reqwest::Client>,
                                     options: BufferStreamOptions) -> Option<ProviderStreamResponse> {
     let stream_options = create_provider_stream_options(stream_url, req, input, &options);
 
-    let client_stream_factory = |stream, reconnect, range_cnt| {
+    let client_stream_factory = |stream, reconnect_flag, range_cnt| {
         let stream = if stream_options.is_buffered() {
             BufferedStream::new(stream, stream_options.get_buffer_size(), stream_options.get_continue_flag_clone(), stream_url.as_str()).boxed()
         } else {
             stream
         };
-        ClientStream::new(stream, reconnect, range_cnt, stream_options.get_url().as_str()).boxed()
+        ClientStream::new(stream, reconnect_flag, range_cnt, stream_options.get_url().as_str()).boxed()
     };
 
     match get_initial_stream(Arc::clone(&client), &stream_options).await {
         Some((init_stream, info)) => {
-            let is_video_stream = if let Some((headers, _)) = &info {
+            let is_media_stream = if let Some((headers, _)) = &info {
                 classify_content_type(headers) == MimeCategory::Video
             } else {
                 true // don't know what it is but lets assume it is
             };
 
             let continue_signal = stream_options.get_continue_flag_clone();
-            if is_video_stream && stream_options.should_reconnect() {
+            if is_media_stream && stream_options.should_reconnect() {
                 let client_signal = Arc::clone(&continue_signal);
                 let stream_options_provider = stream_options.clone();
                 let unfold: ResponseStream = stream::unfold((), move |()| {
                     let client = Arc::clone(&client);
                     let stream_opts = stream_options_provider.clone();
-
                     async move {
                         let stream = stream_provider(client, stream_opts).await?;
                         Some((stream, ()))
@@ -378,7 +387,7 @@ mod tests {
         let url = url::Url::parse("https://info.cern.ch/hypertext/WWW/TheProject.html").unwrap();
         let input = None;
 
-        let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0);
+        let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0, false);
         let value = create_provider_stream(Arc::clone(&client), &url, &req, input, options);
         let mut values = value.await;
         'outer: while let Some((ref mut stream, info)) = values.as_mut() {

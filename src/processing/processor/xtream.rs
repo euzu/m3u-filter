@@ -1,8 +1,8 @@
+use crate::m3u_filter_error::{info_err, notify_err};
 use crate::m3u_filter_error::{str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::storage::get_input_storage_path;
-use crate::m3u_filter_error::{info_err, notify_err};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -107,16 +107,14 @@ where
         }
     };
 
-    match cfg.file_locks.read_lock(&file_path).await {
-        Ok(file_lock) => {
-            if let Ok(info_records) = BPlusTree::<u32, V>::load(&file_path) {
-                info_records.iter().for_each(|(provider_id, record)| {
-                    processed_info_ids.insert(*provider_id, extract_ts(record));
-                });
-            }
-            drop(file_lock);
+    {
+        let file_lock = cfg.file_locks.read_lock(&file_path);
+        if let Ok(info_records) = BPlusTree::<u32, V>::load(&file_path) {
+            info_records.iter().for_each(|(provider_id, record)| {
+                processed_info_ids.insert(*provider_id, extract_ts(record));
+            });
         }
-        Err(err) => errors.push(info_err!(format!("{err}"))),
+        drop(file_lock);
     }
     processed_info_ids
 }

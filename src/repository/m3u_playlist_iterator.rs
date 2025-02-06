@@ -27,7 +27,7 @@ pub struct M3uPlaylistIterator {
 }
 
 impl M3uPlaylistIterator {
-    pub async fn new(
+    pub fn new(
         cfg: &Config,
         target: &ConfigTarget,
         user: &ProxyUserCredentials,
@@ -35,8 +35,7 @@ impl M3uPlaylistIterator {
         let target_path = ensure_target_storage_path(cfg, target.name.as_str())?;
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
 
-        let file_lock = cfg.file_locks.read_lock(&m3u_path).await
-            .map_err(|err| info_err!(format!("Could not lock document {m3u_path:?}: {err}")))?;
+        let file_lock = cfg.file_locks.read_lock(&m3u_path);
 
         let reader =
             IndexedDocumentIterator::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path)
@@ -46,7 +45,7 @@ impl M3uPlaylistIterator {
         let include_type_in_url = target_options.is_some_and(|opts| opts.m3u_include_type_in_url);
         let mask_redirect_url = target_options.is_some_and(|opts| opts.m3u_mask_redirect_url);
 
-        let server_info = cfg.get_user_server_info(user).await;
+        let server_info = cfg.get_user_server_info(user);
         Ok(Self {
             reader,
             base_url: server_info.get_base_url(),

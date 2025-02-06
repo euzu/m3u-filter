@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc};
-use async_std::sync::{RwLock, Mutex};
+use tokio::sync::{RwLock, Mutex};
+use std::sync::Arc;
 use actix_web::web;
 use serde::{Deserialize, Serialize};
 use unidecode::unidecode;

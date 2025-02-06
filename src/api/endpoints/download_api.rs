@@ -3,7 +3,7 @@ use crate::api::model::download::{DownloadQueue, FileDownload, FileDownloadReque
 use crate::model::config::VideoDownloadConfig;
 use crate::utils::network::request;
 use actix_web::{web, HttpResponse};
-use async_std::sync::RwLock;
+use tokio::sync::RwLock;
 use futures::stream::TryStreamExt;
 use log::info;
 use serde_json::{json, Value};

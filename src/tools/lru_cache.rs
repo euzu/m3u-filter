@@ -1,7 +1,7 @@
 use crate::repository::storage::hash_string_as_hex;
 use crate::utils::file::file_utils::traverse_dir;
 use crate::utils::size_utils::human_readable_byte_size;
-use async_std::sync::RwLock;
+use parking_lot::RwLock;
 use log::{debug, error, info, trace};
 use std::collections::{HashMap, VecDeque};
 use std::fs;
@@ -49,8 +49,8 @@ impl LRUResourceCache {
     /// - Scans the cache directory and populates the internal data structures with existing files and their sizes.
     /// - Updates the `current_size` and `usage_order` fields based on the scanned files.
     ///   The use/access order is not restored!!!
-    pub async fn scan(&mut self) -> std::io::Result<()> {
-        let _write_lock = self.lock.write().await;
+    pub fn scan(&mut self) -> std::io::Result<()> {
+        let _write_lock = self.lock.write();
         let mut visit = |entry: &std::fs::DirEntry, metadata: &std::fs::Metadata| {
             let path = entry.path();
             if let Some(file_name) = path.file_name() {
@@ -79,19 +79,17 @@ impl LRUResourceCache {
     ///     - `file_size`: The size of the file in bytes.
     ///   - Returns:
     ///     - The `PathBuf` where the file is stored.
-    pub async fn add_content(&mut self, url: &str, file_size: usize) -> std::io::Result<PathBuf> {
+    pub fn add_content(&mut self, url: &str, file_size: usize) -> std::io::Result<PathBuf> {
         let key = hash_string_as_hex(url);
-        let path = {
-            self.insert_to_cache(key, file_size).await
-        };
+        let path = self.insert_to_cache(key, file_size);
         if self.current_size > self.capacity {
-            self.evict_if_needed().await;
+            self.evict_if_needed();
         }
         Ok(path)
     }
 
-    async fn insert_to_cache(&mut self, key: String, file_size: usize) -> PathBuf {
-        let _write_lock = self.lock.write().await;
+    fn insert_to_cache(&mut self, key: String, file_size: usize) -> PathBuf {
+        let _write_lock = self.lock.write();
         let mut path = self.cache_dir.clone();
         path.push(&key);
         debug!("Added file to cache: {}", &path.to_string_lossy());
@@ -114,10 +112,10 @@ impl LRUResourceCache {
     ///     - `url`: The unique identifier for the file.
     ///   - Returns:
     ///     - The `PathBuf` of the file if it exists; `None` otherwise.
-    pub async fn get_content(&mut self, url: &str) -> Option<PathBuf> {
+    pub fn get_content(&mut self, url: &str) -> Option<PathBuf> {
         let key = hash_string_as_hex(url);
         {
-            let _read_lock = self.lock.read().await;
+            let _read_lock = self.lock.read();
             if let Some((path, size)) = self.cache.get(&key) {
                 if path.exists() {
                     // Move to the end of the queue
@@ -127,7 +125,7 @@ impl LRUResourceCache {
                 }
                 {
                     // this should not happen, someone deleted the file manually and the cache is not in sync
-                    let _write_lock = self.lock.write().await;
+                    let _write_lock = self.lock.write();
                     self.current_size -= size;
                     self.cache.remove(&key);
                     self.usage_order.retain(|k| k != &key);
@@ -137,8 +135,8 @@ impl LRUResourceCache {
         None
     }
 
-    async fn evict_if_needed(&mut self) {
-        let _write_lock = self.lock.write().await;
+    fn evict_if_needed(&mut self) {
+        let _write_lock = self.lock.write();
         // if the cache size is to small and one element exceeds the size than the cache won't work, we ignore this
         while self.current_size > self.capacity {
             if let Some(oldest_file) = self.usage_order.pop_front() {

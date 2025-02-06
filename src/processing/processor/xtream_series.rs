@@ -139,10 +139,7 @@ async fn process_series_info(
         return result;
     };
 
-    let Ok(_file_lock) = cfg.file_locks.read_lock(&info_path).await else {
-        errors.push(notify_err!("Could not lock input info file for series".to_string()));
-        return result;
-    };
+    let _file_lock = cfg.file_locks.read_lock(&info_path);
 
     // Contains the Series Info with episode listing
     let Ok(mut info_reader) = IndexedDocumentReader::<u32, String>::new(&info_path, &idx_path) else { return result; };

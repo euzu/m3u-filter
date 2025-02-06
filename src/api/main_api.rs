@@ -2,11 +2,12 @@ use actix_cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpResponse, HttpServer};
-use async_std::sync::{Mutex, RwLock};
+use parking_lot::{FairMutex};
+use tokio::sync::{RwLock, Mutex};
 use log::{error, info};
 use std::collections::{VecDeque};
 use std::io::ErrorKind;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::api::endpoints::hls_api::hls_api_register;
@@ -50,14 +51,14 @@ async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
 
 fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
     let lru_cache = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()).and_then(|c| if c.enabled  {
-        Some(Mutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
+        Some(FairMutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
     } else { None} );
     let cache = Arc::new(lru_cache);
     let cache_scanner = Arc::clone(&cache);
     actix_rt::spawn(async move {
         if let Some(m) = cache_scanner.as_ref() {
-            let mut c = m.lock().await;
-            if let Err(err) = (*c).scan().await {
+            let mut c = m.lock();
+            if let Err(err) = (*c).scan() {
                 error!("Failed to scan cache {err}");
             }
         }
@@ -70,7 +71,7 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
             finished: Arc::from(RwLock::new(Vec::new())),
         }),
         active_clients: Arc::new(AtomicUsize::new(0)),
-        shared_stream_manager: Arc::new(Mutex::new(SharedStreamManager::new())),
+        shared_stream_manager: Arc::new(FairMutex::new(SharedStreamManager::new())),
         http_client: Arc::new(reqwest::Client::new()),
         cache,
     })

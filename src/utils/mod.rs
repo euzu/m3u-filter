@@ -1,6 +1,5 @@
 pub mod string_utils;
 pub mod json_utils;
-pub mod config_reader;
 pub mod default_utils;
 pub mod size_utils;
 pub mod sys_utils;

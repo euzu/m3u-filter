@@ -3,7 +3,7 @@ use crate::api::model::streams::provider_stream_factory::STREAM_QUEUE_SIZE;
 use crate::api::model::stream_error::StreamError;
 use crate::utils::debug_if_enabled;
 use crate::utils::network::request::sanitize_sensitive_info;
-use async_std::sync::Mutex;
+use parking_lot::FairMutex;
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
@@ -52,7 +52,7 @@ fn convert_stream(stream: BoxStream<Bytes>) -> BoxStream<Result<Bytes, StreamErr
 struct SharedStreamState {
     headers: Vec<(String, String)>,
     buf_size: usize,
-    subscribers: Arc<Mutex<Vec<Sender<Bytes>>>>,
+    subscribers: Arc<FairMutex<Vec<Sender<Bytes>>>>,
 }
 
 impl SharedStreamState {
@@ -61,17 +61,17 @@ impl SharedStreamState {
         Self {
             headers,
             buf_size,
-            subscribers: Arc::new(Mutex::new(Vec::new())),
+            subscribers: Arc::new(FairMutex::new(Vec::new())),
         }
     }
 
-    async fn subscribe(&self) -> BoxStream<'static, Result<Bytes, StreamError>> {
+    fn subscribe(&self) -> BoxStream<'static, Result<Bytes, StreamError>> {
         let (tx, rx) = mpsc::channel(self.buf_size);
-        self.subscribers.lock().await.push(tx);
+        self.subscribers.lock().push(tx);
         convert_stream(ReceiverStream::new(rx).boxed())
     }
 
-    fn broadcast<S, E>(&self, stream_url: &str, bytes_stream: S, shared_streams: Arc<Mutex<SharedStreamManager>>)
+    fn broadcast<S, E>(&self, stream_url: &str, bytes_stream: S, shared_streams: Arc<FairMutex<SharedStreamManager>>)
     where
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
     {
@@ -82,7 +82,7 @@ impl SharedStreamState {
         actix_rt::spawn(async move {
             while let Some(item) = source_stream.next().await {
                 if let Ok(data) = item {
-                    let mut subs = subscriber.lock().await;
+                    let mut subs = subscriber.lock();
                     if subs.len() > 0 {
                         (*subs).retain(|sender| {
                             match sender.try_send(data.clone()) {
@@ -94,16 +94,17 @@ impl SharedStreamState {
                     } else {
                         debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
                         // Cleanup for removing unused shared streams
-                        shared_streams.lock().await.unregister(&streaming_url).await;
+                        shared_streams.lock().unregister(&streaming_url);
                         return;
                     }
                 }
             }
+            shared_streams.lock().unregister(&streaming_url);
         });
     }
 }
 
-type SharedStreamRegister = Arc<Mutex<HashMap<String, SharedStreamState>>>;
+type SharedStreamRegister = Arc<FairMutex<HashMap<String, SharedStreamState>>>;
 
 pub struct SharedStreamManager {
     shared_streams: SharedStreamRegister,
@@ -112,19 +113,19 @@ pub struct SharedStreamManager {
 impl SharedStreamManager {
     pub(crate) fn new() -> Self {
         Self {
-            shared_streams: Arc::new(Mutex::new(HashMap::new())),
+            shared_streams: Arc::new(FairMutex::new(HashMap::new())),
         }
     }
 
-    pub async fn get_shared_state_headers(&self, stream_url: &str) -> Option<Vec<(String, String)>> {
-        self.shared_streams.lock().await.get(stream_url).map(|s| s.headers.clone())
+    pub fn get_shared_state_headers(&self, stream_url: &str) -> Option<Vec<(String, String)>> {
+        self.shared_streams.lock().get(stream_url).map(|s| s.headers.clone())
     }
 
-    async fn unregister(&self, stream_url: &str) {
-        self.shared_streams.lock().await.remove(stream_url);
+    fn unregister(&self, stream_url: &str) {
+        self.shared_streams.lock().remove(stream_url);
     }
 
-    pub(crate) async fn subscribe<S, E>(
+    pub(crate) fn subscribe<S, E>(
         app_state: &AppState,
         stream_url: &str,
         bytes_stream: S,
@@ -138,26 +139,26 @@ impl SharedStreamManager {
         shared_state.broadcast(stream_url, bytes_stream, Arc::clone(&app_state.shared_stream_manager));
         app_state
             .shared_stream_manager
-            .lock().await
+            .lock()
             .shared_streams
-            .lock().await
+            .lock()
             .insert(stream_url.to_string(), shared_state);
         debug_if_enabled!("Created shared provider stream {}", sanitize_sensitive_info(stream_url));
     }
 
     /// Creates a broadcast notify stream for the given URL if a shared stream exists.
-    pub async fn subscribe_shared_stream(
+    pub fn subscribe_shared_stream(
         app_state: &AppState,
         stream_url: &str,
     ) -> Option<BoxStream<'static, Result<Bytes, StreamError>>> {
         if let Some(shared_stream) =  app_state
             .shared_stream_manager
-            .lock().await
+            .lock()
             .shared_streams
-            .lock().await
+            .lock()
             .get(stream_url) {
             debug_if_enabled!("Responding existing shared client stream {}", sanitize_sensitive_info(stream_url));
-            Some(shared_stream.subscribe().await)
+            Some(shared_stream.subscribe())
         } else {
             None
         }

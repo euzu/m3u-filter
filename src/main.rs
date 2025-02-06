@@ -21,7 +21,7 @@ use crate::auth::password::generate_password;
 use crate::model::config::{validate_targets, Config, HealthcheckConfig, LogLevelConfig, ProcessTargets};
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::processor::playlist;
-use crate::utils::config_reader;
+use utils::file::config_reader;
 use crate::utils::file::file_utils;
 use crate::utils::network::request::set_sanitize_sensitive_info;
 use clap::Parser;

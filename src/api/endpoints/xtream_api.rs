@@ -132,8 +132,8 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStre
     }
 }
 
-async fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
-    let server_info = cfg.get_user_server_info(user).await;
+fn get_user_info(user: &ProxyUserCredentials, cfg: &Config) -> XtreamAuthorizationResponse {
+    let server_info = cfg.get_user_server_info(user);
     XtreamAuthorizationResponse::new(&server_info, user)
 }
 
@@ -151,7 +151,7 @@ async fn xtream_player_api_stream(
     }
     let (action_stream_id, stream_ext) = separate_number_and_remainder(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
-    let (pli, mapping) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
+    let (pli, mapping) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
     if pli.item_type == PlaylistItemType::LiveHls {
@@ -222,13 +222,13 @@ fn get_doc_resource_field_value(field: &str, doc: Option<&Value>) -> Option<Rc<S
     None
 }
 
-async fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<Rc<String>>, serde_json::Error> {
+fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<Rc<String>>, serde_json::Error> {
     let info_content = match pli.xtream_cluster {
         XtreamCluster::Video => {
-            xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id()).await
+            xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id())
         }
         XtreamCluster::Series => {
-            xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()).await
+            xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id())
         }
         XtreamCluster::Live => None,
     };
@@ -297,10 +297,10 @@ fn get_season_info_doc(doc: &Vec<Value>, season_id: u32) -> Option<&Value> {
 }
 
 
-async fn xtream_get_season_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<Rc<String>>, serde_json::Error> {
+fn xtream_get_season_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<Rc<String>>, serde_json::Error> {
     let info_content = match pli.xtream_cluster {
         XtreamCluster::Series => {
-            xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()).await
+            xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id())
         }
         XtreamCluster::Video | XtreamCluster::Live => None,
     };
@@ -339,11 +339,11 @@ async fn xtream_player_api_resource(
     }
     let virtual_id: u32 = try_result_bad_request!(resource_req.stream_id.trim().parse());
     let resource = resource_req.action_path.trim();
-    let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
+    let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let stream_url = if resource.starts_with(INFO_RESOURCE_PREFIX) {
-        try_result_bad_request!(xtream_get_info_resource_url(&app_state.config, &pli, target, resource).await)
+        try_result_bad_request!(xtream_get_info_resource_url(&app_state.config, &pli, target, resource))
     } else if resource.starts_with(SEASON_RESOURCE_PREFIX) {
-        try_result_bad_request!(xtream_get_season_resource_url(&app_state.config, &pli, target, resource).await)
+        try_result_bad_request!(xtream_get_season_resource_url(&app_state.config, &pli, target, resource))
     } else {
         pli.get_field(resource)
     };
@@ -434,7 +434,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
         Err(_) => return HttpResponse::BadRequest().finish()
     };
 
-    if let Ok((pli, virtual_record)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(cluster)).await {
+    if let Ok((pli, virtual_record)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(cluster)) {
         if pli.provider_id > 0 {
             let input_name = Rc::clone(&pli.input_name);
             if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
@@ -468,7 +468,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
             Err(_) => return HttpResponse::BadRequest().finish()
         };
 
-        if let Ok((pli, _)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await {
+        if let Ok((pli, _)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None) {
             if pli.provider_id > 0 {
                 let input_name = Rc::clone(&pli.input_name);
                 if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
@@ -520,7 +520,7 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
 
 async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget, stream_id: &str, start: &str, end: &str) -> HttpResponse {
     let virtual_id: u32 = try_result_bad_request!(FromStr::from_str(stream_id));
-    let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)).await);
+    let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)));
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()));
     let info_url = try_option_bad_request!(xtream::get_xtream_player_api_action_url(input, ACTION_GET_CATCHUP_TABLE).map(|action_url| format!("{action_url}&{TAG_STREAM_ID}={}&start={start}&end={end}", pli.provider_id)));
     let content = try_result_bad_request!(xtream::get_xtream_stream_info_content(Arc::clone(&app_state.http_client), info_url.as_str(), input).await);
@@ -528,13 +528,7 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     let epg_listings = try_option_bad_request!(doc.get_mut(TAG_EPG_LISTINGS).and_then(Value::as_array_mut));
     let target_path = try_option_bad_request!(get_target_storage_path(&app_state.config, target.name.as_str()));
     let mut target_id_mapping = {
-        let _file_lock = match app_state.config.file_locks.read_lock(&target_path).await {
-            Ok(lock) => lock,
-            Err(err) => {
-                error!("Could not get lock for id mapping for target {} err:{err}", target.name);
-                return HttpResponse::InternalServerError().finish();
-            }
-        };
+        let _file_lock = app_state.config.file_locks.read_lock(&target_path);
         TargetIdMapping::new(&target_path)
     };
     for epg_list_item in epg_listings.iter_mut().filter_map(Value::as_object_mut) {
@@ -546,13 +540,7 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
         }
     }
     {
-        let _file_lock = match app_state.config.file_locks.write_lock(&target_path).await {
-            Ok(lock) => lock,
-            Err(err) => {
-                error!("Could not get lock for id mapping for target {} err:{err}", target.name);
-                return HttpResponse::InternalServerError().finish();
-            }
-        };
+        let _file_lock = app_state.config.file_locks.write_lock(&target_path);
         if let Err(err) = target_id_mapping.persist() {
             error!("Failed to write catchup id mapping {err}");
             return HttpResponse::BadRequest().finish();
@@ -588,12 +576,12 @@ async fn xtream_player_api(
     let user_target = get_user_target(&api_req, app_state).await;
     if let Some((user, target)) = user_target {
         if !target.has_output(&TargetType::Xtream) {
-            return HttpResponse::Ok().json(get_user_info(&user, &app_state.config).await);
+            return HttpResponse::Ok().json(get_user_info(&user, &app_state.config));
         }
 
         let action = api_req.action.trim();
         if action.is_empty() {
-            return HttpResponse::Ok().json(get_user_info(&user, &app_state.config).await);
+            return HttpResponse::Ok().json(get_user_info(&user, &app_state.config));
         }
 
         // Process specific playlist actions
@@ -634,11 +622,11 @@ async fn xtream_player_api(
         let category_id = api_req.category_id.trim().parse::<u32>().unwrap_or(0);
         let result = match action {
             ACTION_GET_LIVE_STREAMS =>
-                skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id, &user).await),
+                skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id, &user)),
             ACTION_GET_VOD_STREAMS =>
-                skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id, &user).await),
+                skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id, &user)),
             ACTION_GET_SERIES =>
-                skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id, &user).await),
+                skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id, &user)),
             _ => Some(Err(info_err!(format!("Cant find action: {action} for target: {}", &target.name))
             )),
         };

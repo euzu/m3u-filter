@@ -19,7 +19,7 @@ pub struct XtreamPlaylistIterator {
 }
 
 impl XtreamPlaylistIterator {
-    pub async fn new(
+    pub fn new(
         cluster: XtreamCluster,
         config: &Config,
         target: &ConfigTarget,
@@ -31,14 +31,13 @@ impl XtreamPlaylistIterator {
             if !xtream_path.exists() || !idx_path.exists() {
                 return Err(info_err!(format!("No {cluster} entries found for target {}", &target.name)));
             }
-            let file_lock = config.file_locks.read_lock(&xtream_path).await
-                .map_err(|err| info_err!(format!("Could not lock document {xtream_path:?}: {err}")))?;
+            let file_lock = config.file_locks.read_lock(&xtream_path);
 
             let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&xtream_path, &idx_path)
                 .map_err(|err| info_err!(format!("Could not deserialize file {xtream_path:?} - {err}")))?;
 
             let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
-            let server_info = config.get_user_server_info(user).await;
+            let server_info = config.get_user_server_info(user);
             Ok(Self {
                 reader,
                 options,

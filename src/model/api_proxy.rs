@@ -5,7 +5,7 @@ use std::str::FromStr;
 use enum_iterator::Sequence;
 use log::debug;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result, info_err};
-use crate::utils::config_reader;
+use crate::utils::file::config_reader;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
 pub enum ProxyType {
@@ -28,10 +28,7 @@ impl ProxyType {
 
 impl Display for ProxyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
+        write!(f, "{}", match self {
                 Self::Reverse => Self::REVERSE,
                 Self::Redirect => Self::REDIRECT,
             }

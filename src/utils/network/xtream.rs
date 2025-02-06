@@ -1,4 +1,4 @@
-use crate::Arc;
+use std::sync::Arc;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, XtreamCluster, XtreamPlaylistItem};
@@ -69,31 +69,31 @@ where
     P: PlaylistEntry,
 {
     if cluster == XtreamCluster::Series {
-        if let Some(content) = xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()).await {
+        if let Some(content) = xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id()) {
             // Deliver existing target content
-            return rewrite_xtream_series_info_content(config, target, pli, user, &content).await;
+            return rewrite_xtream_series_info_content(config, target, pli, user, &content);
         }
 
         // Check if the content has been resolved
         let resolve_series = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_series);
         if resolve_series {
             if let Some(provider_id) = pli.get_provider_id() {
-                if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Series).await {
-                    return xtream_repository::write_and_get_xtream_series_info(config, target, pli, user, &content).await;
+                if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Series) {
+                    return xtream_repository::write_and_get_xtream_series_info(config, target, pli, user, &content);
                 }
             }
         }
     } else if cluster == XtreamCluster::Video {
-        if let Some(content) = xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id()).await {
+        if let Some(content) = xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id()) {
             // Deliver existing target content
-            return rewrite_xtream_vod_info_content(config, target, pli, user, &content).await;
+            return rewrite_xtream_vod_info_content(config, target, pli, user, &content);
         }
         // Check if the content has been resolved
         let resolve_vod = target.options.as_ref().is_some_and(|opt| opt.xtream_resolve_vod);
         if resolve_vod {
             if let Some(provider_id) = pli.get_provider_id() {
-                if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Video).await {
-                    return xtream_repository::write_and_get_xtream_vod_info(config, target, pli, user, &content).await;
+                if let Some(content) = xtream_get_input_info(config, input, provider_id, XtreamCluster::Video) {
+                    return xtream_repository::write_and_get_xtream_vod_info(config, target, pli, user, &content);
                 }
             }
         }
@@ -102,8 +102,8 @@ where
     if let Ok(content) = get_xtream_stream_info_content(client, info_url, input).await {
         return match cluster {
             XtreamCluster::Live => Ok(content),
-            XtreamCluster::Video => xtream_repository::write_and_get_xtream_vod_info(config, target, pli, user, &content).await,
-            XtreamCluster::Series => xtream_repository::write_and_get_xtream_series_info(config, target, pli, user, &content).await,
+            XtreamCluster::Video => xtream_repository::write_and_get_xtream_vod_info(config, target, pli, user, &content),
+            XtreamCluster::Series => xtream_repository::write_and_get_xtream_series_info(config, target, pli, user, &content),
         };
     }
 

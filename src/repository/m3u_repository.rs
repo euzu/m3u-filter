@@ -3,7 +3,7 @@ use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
 use log::error;
 
-use crate::m3u_filter_error::{info_err, create_m3u_filter_error};
+use crate::m3u_filter_error::{create_m3u_filter_error};
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
@@ -62,7 +62,7 @@ pub async fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path
 
         persist_m3u_playlist_as_text(target, cfg, &m3u_playlist);
         {
-            let _file_lock = cfg.file_locks.write_lock(&m3u_path).await.map_err(|err| info_err!(format!("{err}")))?;
+            let _file_lock = cfg.file_locks.write_lock(&m3u_path);
             match IndexedDocumentWriter::new(m3u_path.clone(), idx_path) {
                 Ok(mut writer) => {
                     for m3u in m3u_playlist {
@@ -85,7 +85,7 @@ pub async fn m3u_load_rewrite_playlist(
     target: &ConfigTarget,
     user: &ProxyUserCredentials,
 ) -> Result<Box<dyn Iterator<Item = String>>, M3uFilterError> {
-    Ok(Box::new(M3uPlaylistIterator::new(cfg, target, user).await?))
+    Ok(Box::new(M3uPlaylistIterator::new(cfg, target, user)?))
 }
 
 
@@ -96,7 +96,7 @@ pub async  fn m3u_get_item_for_stream_id(stream_id: u32, cfg: &Config, target: &
     {
         let target_path = get_target_storage_path(cfg, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {}", &target.name)))?;
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
-        let _file_lock = cfg.file_locks.read_lock(&m3u_path).await?;
+        let _file_lock = cfg.file_locks.read_lock(&m3u_path);
         IndexedDocumentDirectAccess::read_indexed_item::<u32, M3uPlaylistItem>(&m3u_path, &idx_path, &stream_id)
     }
 }

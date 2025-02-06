@@ -5,7 +5,7 @@ use crate::model::config::ConfigRename;
 use crate::utils::network::epg;
 use crate::utils::network::m3u;
 use crate::utils::network::xtream;
-use async_std::sync::Mutex;
+use parking_lot::Mutex;
 use core::cmp::Ordering;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -399,7 +399,7 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
     for (index, _) in config.sources.iter().enumerate() {
         // We're using the file lock this way on purpose
         let source_lock_path = PathBuf::from(format!("source_{index}"));
-        let Ok(update_lock) = config.file_locks.try_write_lock(&source_lock_path).await else {
+        let Ok(update_lock) = config.file_locks.try_write_lock(&source_lock_path) else {
             warn!("The update operation for the source at index {index} was skipped because an update is already in progress.");
             continue;
         };
@@ -414,9 +414,9 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
             let process = move || {
                 System::new().block_on(async {
                     let (input_stats, target_stats, mut res_errors) = process_source(Arc::clone(&http_client), cfg, index, usr_trgts).await;
-                    shared_errors.lock().await.append(&mut res_errors);
+                    shared_errors.lock().append(&mut res_errors);
                     let process_stats = SourceStats::new(input_stats, target_stats);
-                    shared_stats.lock().await.push(process_stats);
+                    shared_stats.lock().push(process_stats);
                 });
             };
             handles.push(thread::spawn(process));
@@ -425,9 +425,9 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
             }
         } else {
             let (input_stats, target_stats, mut res_errors) = process_source(Arc::clone(&client), cfg, index, usr_trgts).await;
-            shared_errors.lock().await.append(&mut res_errors);
+            shared_errors.lock().append(&mut res_errors);
             let process_stats = SourceStats::new(input_stats, target_stats);
-            shared_stats.lock().await.push(process_stats);
+            shared_stats.lock().push(process_stats);
         }
         drop(update_lock);
     }

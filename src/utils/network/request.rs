@@ -1,4 +1,4 @@
-use crate::Arc;
+use std::sync::Arc;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;

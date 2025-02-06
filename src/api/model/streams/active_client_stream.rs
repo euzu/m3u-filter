@@ -2,7 +2,7 @@ use crate::api::model::streams::provider_stream_factory::ResponseStream;
 use bytes::Bytes;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::task::{Poll};
 use futures::{Stream};
 use log::info;

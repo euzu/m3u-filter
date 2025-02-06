@@ -18,7 +18,7 @@ use actix_files::NamedFile;
 use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
-use async_std::sync::Mutex;
+use parking_lot::FairMutex;
 use futures::{TryStreamExt};
 use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
@@ -86,13 +86,13 @@ pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mi
 pub async fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a UserApiRequest,
                                           app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() && !password.is_empty() {
-        app_state.config.get_target_for_user(username, password).await
+        app_state.config.get_target_for_user(username, password)
     } else {
         let token = api_req.token.as_str().trim();
         if token.is_empty() {
             None
         } else {
-            app_state.config.get_target_for_user_by_token(token).await
+            app_state.config.get_target_for_user_by_token(token)
         }
     }
 }
@@ -137,7 +137,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
 
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url).await {
+        if let Some(value) = shared_stream_response(app_state, stream_url) {
             return value;
         }
     }
@@ -150,7 +150,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
             get_provider_pipe_stream(&app_state.http_client, &url, req, input).await
         } else {
-            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size);
+            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size, share_stream);
             provider_stream::get_provider_reconnect_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {
@@ -159,10 +159,14 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
             let stream = ActiveClientStream::new(stream, active_clients, log_active_clients);
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
-                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers).await;
-                if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
+                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers);
+                if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url) {
                     let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
-                    if content_length > 0 { response_builder.body(SizedStream::new(content_length, broadcast_stream)) } else { response_builder.body(BodyStream::new(broadcast_stream)) }
+                    if content_length > 0 { 
+                        response_builder.body(SizedStream::new(content_length, broadcast_stream)) } 
+                    else { 
+                        response_builder.body(BodyStream::new(broadcast_stream)) 
+                    }
                 } else {
                     HttpResponse::BadRequest().finish()
                 }
@@ -178,10 +182,10 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
     HttpResponse::BadRequest().finish()
 }
 
-async fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
-    if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
+fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
+    if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url) {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
-        if let Some(headers) = app_state.shared_stream_manager.lock().await.get_shared_state_headers(stream_url).await {
+        if let Some(headers) = app_state.shared_stream_manager.lock().get_shared_state_headers(stream_url) {
             let mut response_builder = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
             return Some(response_builder.body(BodyStream::new(stream)));
         }
@@ -205,7 +209,7 @@ pub fn get_headers_from_request(req: &HttpRequest, filter: &HeaderFilter) -> Has
         .collect()
 }
 
-fn get_add_cache_content(res_url: &str, cache: &Arc<Option<Mutex<LRUResourceCache>>>) -> Box<dyn Fn(usize)> {
+fn get_add_cache_content(res_url: &str, cache: &Arc<Option<FairMutex<LRUResourceCache>>>) -> Box<dyn Fn(usize)> {
     let resource_url = String::from(res_url);
     let cache = Arc::clone(cache);
     let add_cache_content: Box<dyn Fn(usize)> = Box::new(move |size| {
@@ -213,8 +217,8 @@ fn get_add_cache_content(res_url: &str, cache: &Arc<Option<Mutex<LRUResourceCach
         let cache = Arc::clone(&cache);
         actix_rt::spawn(async move {
             if let Some(cache) = cache.as_ref() {
-                let mut guard = cache.lock().await;
-                let _ = guard.add_content(&res_url, size).await;
+                let mut guard = cache.lock();
+                let _ = guard.add_content(&res_url, size);
             }
         });
     });
@@ -228,9 +232,9 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
     let filter: HeaderFilter = Some(Box::new(|key| key != "if-none-match" && key != "if-modified-since"));
     let req_headers = get_headers_from_request(req, &filter);
     if let Some(cache) = app_state.cache.as_ref() {
-        let mut guard = cache.lock().await;
-        if let Some(resource_path) = guard.get_content(resource_url).await {
-            if let Ok(named_file) = NamedFile::open_async(resource_path).await {
+        let mut guard = cache.lock();
+        if let Some(resource_path) = guard.get_content(resource_url) {
+            if let Ok(named_file) = NamedFile::open(resource_path) {
                 debug_if_enabled!("Cached resource {}", sanitize_sensitive_info(resource_url));
                 return named_file.into_response(req);
             }
@@ -251,7 +255,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                     let byte_stream = response.bytes_stream().map_err(|err| StreamError::reqwest(&err));
                     if let Some(cache) = app_state.cache.as_ref() {
                         let resource_path = {
-                            let guard = cache.lock().await;
+                            let guard = cache.lock();
                             guard.store_path(resource_url)
                         };
                         if let Ok(file) = create_new_file_for_write(&resource_path) {

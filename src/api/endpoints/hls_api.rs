@@ -45,7 +45,7 @@ async fn hls_api_stream(
     let target_name = &target.name;
     let virtual_id: u32 = try_result_bad_request!(channel.parse());
     let (pli_url, input_name) = if target_type == TargetType::Xtream {
-        let (pli, _ ) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
+        let (pli, _ ) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
         (pli.url, pli.input_name)
     } else {
         let pli = try_result_bad_request!(m3u_repository::m3u_get_item_for_stream_id(virtual_id, &app_state.config, target).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
