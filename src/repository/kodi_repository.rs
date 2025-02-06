@@ -1,3 +1,4 @@
+use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, notify_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
@@ -13,18 +14,17 @@ use crate::repository::xtream_repository::{xtream_get_record_file_path, InputVod
 use crate::utils::file::file_lock_manager::FileReadGuard;
 use crate::utils::file::file_utils;
 use crate::utils::network::request::extract_extension_from_url;
-use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, notify_err};
-use tokio::fs::{create_dir_all, read_dir, remove_dir, remove_file, File};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use chrono::Datelike;
 use filetime::{set_file_times, FileTime};
-use log::{debug, error};
+use log::{error, trace};
 use regex::Regex;
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::LazyLock;
+use tokio::fs::{create_dir_all, remove_dir, remove_file, File};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 
 const FILE_STRM: &str = "strm";
 
@@ -438,6 +438,29 @@ async fn prepare_strm_output_directory(path: &Path) -> Result<(), M3uFilterError
     }
     Ok(())
 }
+
+async fn read_files_non_recursive(path: &Path) -> tokio::io::Result<Vec<PathBuf>> {
+    let mut stack = vec![PathBuf::from(path)]; // Initialize the stack with the starting directory
+    let mut files = vec![]; // To store all the found files
+
+    while let Some(current_dir) = stack.pop() {
+        // Read the directory
+        let mut dir_read = tokio::fs::read_dir(&current_dir).await?;
+        // Iterate over the entries in the current directory
+        while let Some(entry) = dir_read.next_entry().await? {
+            let entry_path = entry.path();
+            // If it's a directory, push it onto the stack for later processing
+            if entry_path.is_dir() {
+                stack.push(entry_path.clone());
+            } else {
+                // If it's a file, add it to the entries list
+                files.push(entry_path);
+            }
+        }
+    }
+    Ok(files)
+}
+
 async fn cleanup_strm_output_directory(
     cleanup: bool,
     root_path: &Path,
@@ -453,25 +476,13 @@ async fn cleanup_strm_output_directory(
     let to_remove: HashSet<String> = if cleanup {
         // Remove al files which are not in `processed`
         let mut found_files = HashSet::new();
-
-        let mut entries = read_dir(root_path)
-            .await
-            .map_err(|e| format!("Failed to read directory {root_path:?}: {e}"))?;
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if entry
-                .file_type()
-                .await
-                .map_err(|e| format!("Failed to get file type for {entry:?}: {e}"))?
-                .is_file()
-            {
-                if let Some(file_name) = entry
-                    .path()
-                    .strip_prefix(root_path)
-                    .ok()
-                    .and_then(|p| p.to_str())
-                {
-                    found_files.insert(file_name.to_string());
-                }
+        let files = read_files_non_recursive(root_path).await.map_err(|err| err.to_string())?;
+        for file_path in files {
+            if let Some(file_name) = file_path
+                .strip_prefix(root_path)
+                .ok()
+                .and_then(|p| p.to_str()) {
+                found_files.insert(file_name.to_string());
             }
         }
         &found_files - processed
@@ -483,60 +494,12 @@ async fn cleanup_strm_output_directory(
     for file in &to_remove {
         let file_path = root_path.join(file);
         if let Err(err) = remove_file(&file_path).await {
-            eprintln!("Failed to remove file {file_path:?}: {err}");
+            error!("Failed to remove file {file_path:?}: {err}");
         }
     }
 
     // TODO should we delete all empty directories if cleanup=false ?
-    remove_empty_dirs(root_path.into()).await?;
-
-    Ok(())
-}
-
-async fn remove_empty_dirs(root_path: PathBuf) -> Result<(), String> {
-    let mut stack = vec![root_path];
-    let mut dirs_to_delete = Vec::new();
-    let mut ignore_root = true;
-
-    while let Some(dir) = stack.pop() {
-        let mut entries = match read_dir(&dir).await {
-            Ok(entries) => entries,
-            Err(err) => {
-                error!("Error reading directory {dir:?}: {err}");
-                continue;
-            }
-        };
-
-        let mut has_files = false;
-
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if entry
-                .file_type()
-                .await
-                .map_err(|e| format!("Failed to get file type for {entry:?}: {e}"))?
-                .is_dir()
-            {
-                stack.push(entry.path());
-            } else {
-                has_files = true;
-            }
-        }
-
-        if !ignore_root && !has_files {
-            dirs_to_delete.push(dir);
-        }
-        ignore_root = false;
-    }
-
-    // Delete directories from bottom to top
-    for dir in dirs_to_delete.into_iter().rev() {
-        if dir.exists() {
-            if let Err(e) = remove_dir(&dir).await {
-                debug!("Failed to remove empty directory {dir:?}: {e}");
-            }
-        }
-    }
-
+    remove_empty_dirs(root_path.into()).await;
     Ok(())
 }
 
@@ -889,3 +852,130 @@ fn get_strm_url(
         },
     )
 }
+
+// /////////////////////////////////////////////
+// /////////////////////////////////////////////
+#[derive(Debug, Clone)]
+struct DirNode {
+    path: PathBuf,
+    is_root: bool,
+    has_files: bool,
+    children: HashSet<PathBuf>,
+    parent: Option<PathBuf>,
+}
+
+impl DirNode {
+    fn new(path: PathBuf, parent: Option<PathBuf>) -> Self {
+        Self::new_with_flag(path, parent, false)
+    }
+
+    fn new_root(path: PathBuf) -> Self {
+        Self::new_with_flag(path, None, true)
+    }
+
+    fn new_with_flag(path: PathBuf, parent: Option<PathBuf>, is_root: bool) -> Self {
+        Self {
+            path,
+            is_root,
+            has_files: false,
+            children: HashSet::new(),
+            parent,
+        }
+    }
+}
+
+/// Because of rust ownership we don't want to use References or Mutexes.
+/// We use paths identifier to handle the tree construction.
+/// Rust sucks!!!
+async fn build_directory_tree(root_path: &Path) -> HashMap<PathBuf, DirNode> {
+    let mut nodes: HashMap<PathBuf, DirNode> = HashMap::new();
+    nodes.insert(PathBuf::from(root_path), DirNode::new_root(root_path.to_path_buf()));
+    let mut stack = vec![root_path.to_path_buf()];
+    while let Some(current_path) = stack.pop() {
+        if let Ok(mut dir_read) = tokio::fs::read_dir(&current_path).await {
+            while let Ok(Some(entry)) = dir_read.next_entry().await {
+                let entry_path = entry.path();
+                if entry_path.is_dir() {
+                    if !nodes.contains_key(&entry_path) {
+                        let new_node = DirNode::new(entry_path.clone(), Some(current_path.clone()));
+                        nodes.insert(entry_path.clone(), new_node);
+                    }
+                    if let Some(current_node) = nodes.get_mut(&current_path) {
+                        current_node.children.insert(entry_path.clone());
+                    }
+                    stack.push(entry_path);
+                } else if let Some(data) = nodes.get_mut(&current_path) {
+                    data.has_files = true;
+                    let mut parent_path_opt = data.parent.clone();
+
+                    while let Some(parent_path) = parent_path_opt {
+                        parent_path_opt = {
+                            if let Some(parent) = nodes.get_mut(&parent_path) {
+                                parent.has_files = true;
+                                parent.parent.clone()
+                            } else {
+                                None
+                            }
+                        };
+                    }
+                }
+            }
+        }
+    }
+    nodes
+}
+
+fn flatten_tree(
+    root_path: &Path,
+    mut tree_nodes: HashMap<PathBuf, DirNode>,
+) -> Vec<DirNode> {
+    let mut paths_to_process = Vec::new(); // List of paths to process
+
+    {
+        let mut queue: VecDeque<PathBuf> = VecDeque::new(); // processing queue
+        queue.push_back(PathBuf::from(root_path));
+
+        while let Some(current_path) = queue.pop_front() {
+            if let Some(current) = tree_nodes.get(&current_path) {
+                current.children.iter().for_each(|child_path| {
+                    if let Some(node) = tree_nodes.get(child_path) {
+                        queue.push_back(node.path.clone());
+                    }
+                });
+                paths_to_process.push(current.path.clone());
+            }
+        }
+    }
+
+    paths_to_process
+        .iter()
+        .filter_map(|path| tree_nodes.remove(path))
+        .collect()
+}
+
+async fn delete_empty_dirs_from_tree(root_path: &Path, tree_nodes: HashMap<PathBuf, DirNode>) {
+    let tree_stack = flatten_tree(root_path, tree_nodes);
+    for node in tree_stack.into_iter().rev() {
+        if !node.has_files && !node.is_root {
+            if let Err(err) = remove_dir(&node.path).await {
+                trace!("Could not delete empty dir: {:?}, {err}", &node.path);
+            }
+        }
+    }
+}
+async fn remove_empty_dirs(root_path: PathBuf) {
+    let tree_nodes = build_directory_tree(&root_path).await;
+    delete_empty_dirs_from_tree(&root_path, tree_nodes).await;
+}
+
+
+// #[cfg(test)]
+// mod tests {
+//     use crate::repository::kodi_repository::remove_empty_dirs;
+//     use std::path::PathBuf;
+//
+//     #[actix_web::test]
+//     async fn test_empty_dirs() {
+//         remove_empty_dirs(PathBuf::from("/tmp/hello")).await;
+//     }
+// }
