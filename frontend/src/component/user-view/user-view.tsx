@@ -13,6 +13,14 @@ const PROXY_OPTIONS = [
     { value: 'reverse', label: 'Reverse' },
     { value: 'redirect', label: 'Redirect' }
 ];
+const STATUS_OPTIONS = [
+    {value: 'Active', label: 'Active'},
+    {value: 'Expired', label: 'Expired'},
+    {value: 'Banned', label: 'Banned'},
+    {value: 'Trial', label: 'Trial'},
+    {value: 'Disabled', label: 'Disabled'},
+    {value: 'Pending', label: 'Pending'},
+];
 
 interface UserViewProps {
     config: ServerConfig;
@@ -72,11 +80,16 @@ export default function UserView(props: UserViewProps) {
                     break;
                 }
             }
+            const created_at = Math.floor(Date.now() / 1000);
             target.credentials.push({
                 username,
                 password: TextGenerator.generatePassword(),
                 token: TextGenerator.generatePassword(),
-                proxy: 'reverse'
+                proxy: 'reverse',
+                created_at,
+                exp_date: undefined,
+                max_connections: undefined,
+                status: "Active",
             });
             setTargets([...targets]);
         }
@@ -98,13 +111,7 @@ export default function UserView(props: UserViewProps) {
         if (target) {
             const idx = evt.target.dataset.idx;
             const field: any = evt.target.dataset.field;
-            if (field === 'username') {
-                target.credentials[idx].username = evt.target.value;
-            } else if (field === 'password') {
-                target.credentials[idx].password = evt.target.value;
-            } else if (field === 'token') {
-                target.credentials[idx].token = evt.target.value;
-            }
+            (target.credentials[idx] as any)[field] = evt.target.value;
         }
     }, [targets]);
 
@@ -115,7 +122,19 @@ export default function UserView(props: UserViewProps) {
         if (target) {
             const idx = parseInt(parts[1]);
             const credentials: any = target.credentials[idx];
+            console.log(parts[2], value);
             credentials[parts[2]] = value;
+        }
+    }, [targets]);
+
+    const handleSelectChange = useCallback((event: any) => {
+        const parts = event.target.name.split('@');
+        const target_name = parts[0];
+        const target = targets.find(target => target.target === target_name);
+        if (target) {
+            const idx = parseInt(parts[1]);
+            const credentials: any = target.credentials[idx];
+            credentials[parts[2]] = event.target.value;
         }
     }, [targets]);
 
@@ -132,6 +151,21 @@ export default function UserView(props: UserViewProps) {
                     return;
                 }
                 usernames[user.username] = true;
+
+                if (user.max_connections != null) {
+                    const max_con = parseInt(user.max_connections as any);
+                    console.log(('' + max_con), user.max_connections);
+                    if (isNaN(max_con) || max_con < 0 || (('' + max_con) != user.max_connections as any)) {
+                        enqueueSnackbar("MaxConnections invalid! " + user.max_connections, {variant: 'error'});
+                        return;
+                    } else {
+                        if (max_con < 1) {
+                            user.max_connections = undefined;
+                        } else {
+                            user.max_connections = max_con;
+                        }
+                    }
+                }
             }
         }
         const targetUser = targets.map(t => {
@@ -184,6 +218,12 @@ export default function UserView(props: UserViewProps) {
                                         <label>Server</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
                                         <label>Proxy</label></div>
+                                    <div className={'user__target-user-col user__target-user-col-header'}>
+                                        <label>MaxCon</label></div>
+                                    <div className={'user__target-user-col user__target-user-col-header'}>
+                                        <label>Status</label></div>
+                                    <div className={'user__target-user-col user__target-user-col-header'}>
+                                        <label>Exp.Date</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}></div>
                                 </div>
 
@@ -211,6 +251,37 @@ export default function UserView(props: UserViewProps) {
                                             <TagSelect options={PROXY_OPTIONS} name={target.target + '@' + idx + '@proxy'}
                                                        defaultValues={(usr as any)?.['proxy']} radio={true} multi={false} onSelect={handleChange}></TagSelect>
                                         </div>
+                                        {['max_connections'].map((field) =>
+                                            <div key={'target_' + target.target + '_' + field + '_' + usr.username}
+                                                 className={'user__target-user-col'}>
+                                                <div className={'user__target-user-col-label'}><label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                                </div>
+                                                <input data-target={target.target} data-idx={idx}
+                                                       defaultValue={(usr as any)[field]}
+                                                       className={'user__target-user-col-number'}
+                                                       data-field={field} onChange={handleValueChange}></input>
+                                            </div>
+                                        )}
+                                        <div key={'target_' + target.target + '_status_' + usr.username}
+                                             className={'user__target-user-col '}>
+                                            <div className={'user__target-user-col-label'}><label>Status</label></div>
+                                            <select name={target.target + '@' + idx + '@status'} defaultValue={(usr as any)?.['status']} onChange={handleSelectChange}>
+                                                {STATUS_OPTIONS.map(option =>
+                                                    <option key={option.value + idx}>{option.label}</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                        {['exp_date'].map((field) =>
+                                            <div key={'target_' + target.target + '_' + field + '_' + usr.username}
+                                                 className={'user__target-user-col'}>
+                                                <div className={'user__target-user-col-label'}><label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                                </div>
+                                                <input data-target={target.target} data-idx={idx}
+                                                       defaultValue={(usr as any)[field]}
+                                                       className={'user__target-user-col-number'}
+                                                       data-field={field} onChange={handleValueChange}></input>
+                                            </div>
+                                        )}
                                         <div className={'user__target-user-col user__target-user-col-toolbar'}>
                                             <span data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
                                                 {getIconByName('PersonRemove')}

@@ -18,7 +18,7 @@ use actix_files::NamedFile;
 use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::{Mutex};
 use futures::{TryStreamExt};
 use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
@@ -152,7 +152,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
             get_provider_pipe_stream(&app_state.http_client, &url, req, input, item_type).await
         } else {
-            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size, share_stream);
+            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size);
             provider_stream::get_provider_reconnect_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {

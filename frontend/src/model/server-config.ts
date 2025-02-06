@@ -142,10 +142,8 @@ export interface Credentials {
     proxy: 'redirect' | 'reverse';
     created_at: number,
     exp_date: number,
-    is_trial: String,
-    max_connections: String,
-    message: String,
-    status: String,
+    max_connections: number,
+    status: string,
 }
 
 export interface TargetUser {

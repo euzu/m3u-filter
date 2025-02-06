@@ -6,6 +6,7 @@ use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilte
 use crate::utils::file::config_reader;
 use enum_iterator::Sequence;
 use log::debug;
+use crate::api::model::app_state::AppState;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
 pub enum ProxyType {
@@ -119,7 +120,7 @@ pub struct ProxyUserCredentials {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exp_date: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_connections: Option<String>, // int as string
+    pub max_connections: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ProxyUserStatus>,
 }
@@ -158,14 +159,19 @@ impl ProxyUserCredentials {
         }
     }
 
-    pub fn is_active(&self) -> bool {
-        if let Some(status) = &self.status {
+    pub fn is_active(&self, app_state: &AppState) -> bool {
+        if let Some(exp_date) = self.exp_date.as_ref() {
             let now = Local::now();
-            if let Some(exp_date) = self.exp_date.as_ref() {
-                if  (exp_date - now.timestamp()) < 0 {
-                    return false;
-                }
+            if  (exp_date - now.timestamp()) < 0 {
+                return false;
             }
+        }
+        if let Some(max_connections) = self.max_connections.as_ref() {
+            if *max_connections < app_state.get_active_connections_for_user(&self.username) {
+                return false;
+            }
+        }
+        if let Some(status) = &self.status {
             return matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial);
         }
         true

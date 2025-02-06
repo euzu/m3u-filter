@@ -35,7 +35,6 @@ pub struct BufferStreamOptions {
     reconnect_enabled: bool,
     buffer_enabled: bool,
     buffer_size: usize,
-    share_stream: bool,
 }
 
 impl BufferStreamOptions {
@@ -44,14 +43,12 @@ impl BufferStreamOptions {
         reconnect_enabled: bool,
         buffer_enabled: bool,
         buffer_size: usize,
-        share_stream: bool,
     ) -> Self {
         Self {
             item_type,
             reconnect_enabled,
             buffer_enabled,
             buffer_size,
-            share_stream
         }
     }
 

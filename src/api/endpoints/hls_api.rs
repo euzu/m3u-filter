@@ -41,7 +41,7 @@ async fn hls_api_stream(
         get_user_target_by_credentials(&username, &password, api_req, app_state).await,
         false,
         format!("Could not find any user {username}"));
-    if !user.is_active() {
+    if !user.is_active(&app_state) {
         debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }

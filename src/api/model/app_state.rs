@@ -14,3 +14,9 @@ pub struct AppState {
     pub cache: Arc<Option<Mutex<LRUResourceCache>>>,
     pub active_users: Arc<RwLock<ActiveUserManager>>,
 }
+
+impl AppState {
+    pub fn get_active_connections_for_user(&self, username: &str) -> u32 {
+        self.active_users.read().user_connections(username)
+    }
+}

@@ -68,7 +68,7 @@ async fn m3u_api_stream(
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
     else { return HttpResponse::BadRequest().finish() };
-    if !user.is_active() {
+    if !user.is_active(&app_state) {
         debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
@@ -113,7 +113,7 @@ async fn m3u_api_resource(
     let Ok(m3u_stream_id) = stream_id.parse::<u32>() else { return HttpResponse::BadRequest().finish() };
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
     else { return HttpResponse::BadRequest().finish() };
-    if !user.is_active() {
+    if !user.is_active(&app_state) {
         debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
