@@ -3,7 +3,7 @@ use crate::api::model::streams::provider_stream_factory::STREAM_QUEUE_SIZE;
 use crate::api::model::stream_error::StreamError;
 use crate::utils::debug_if_enabled;
 use crate::utils::network::request::sanitize_sensitive_info;
-use parking_lot::FairMutex;
+use parking_lot::{FairMutex, Mutex};
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
@@ -71,7 +71,7 @@ impl SharedStreamState {
         convert_stream(ReceiverStream::new(rx).boxed())
     }
 
-    fn broadcast<S, E>(&self, stream_url: &str, bytes_stream: S, shared_streams: Arc<FairMutex<SharedStreamManager>>)
+    fn broadcast<S, E>(&self, stream_url: &str, bytes_stream: S, shared_streams: Arc<Mutex<SharedStreamManager>>)
     where
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
     {

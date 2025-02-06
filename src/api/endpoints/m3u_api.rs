@@ -68,6 +68,10 @@ async fn m3u_api_stream(
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
     else { return HttpResponse::BadRequest().finish() };
+    if !user.is_active() {
+        debug!("User access denied: {user:?}");
+        return HttpResponse::Forbidden().finish();
+    }
 
     if !target.has_output(&TargetType::M3u) {
         return HttpResponse::BadRequest().finish();
@@ -96,7 +100,7 @@ async fn m3u_api_stream(
         return handle_hls_stream_request(&app_state, &user, &m3u_item, input, TargetType::M3u).await;
     }
 
-    stream_response(&app_state, m3u_item.url.as_str(), &req, None, m3u_item.item_type, target).await
+    stream_response(&app_state, m3u_item.url.as_str(), &req, None, m3u_item.item_type, target, &user).await
 }
 
 async fn m3u_api_resource(
@@ -109,6 +113,10 @@ async fn m3u_api_resource(
     let Ok(m3u_stream_id) = stream_id.parse::<u32>() else { return HttpResponse::BadRequest().finish() };
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
     else { return HttpResponse::BadRequest().finish() };
+    if !user.is_active() {
+        debug!("User access denied: {user:?}");
+        return HttpResponse::Forbidden().finish();
+    }
 
     if !target.has_output(&TargetType::M3u) {
         return HttpResponse::BadRequest().finish();

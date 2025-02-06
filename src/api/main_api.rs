@@ -2,14 +2,13 @@ use actix_cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpResponse, HttpServer};
-use parking_lot::{FairMutex};
+use parking_lot::{Mutex as PlMutex, RwLock as PlRwLock};
 use tokio::sync::{RwLock, Mutex};
 use log::{error, info};
 use std::collections::{VecDeque};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
 use crate::api::model::app_state::AppState;
@@ -20,6 +19,7 @@ use crate::api::endpoints::v1_api::v1_api_register;
 use crate::api::endpoints::web_index::index_register;
 use crate::api::endpoints::xmltv_api::xmltv_api_register;
 use crate::api::endpoints::xtream_api::xtream_api_register;
+use crate::api::model::active_user_manager::ActiveUserManager;
 use crate::model::config::{validate_targets, Config, ProcessTargets, ScheduleConfig};
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::processor::playlist;
@@ -40,18 +40,23 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
 
 async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
     let ts = chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let (active_clients, active_connections) =  {
+        let active_user = app_state.active_users.read();
+        (active_user.active_users(), active_user.active_connections())
+    };
     HttpResponse::Ok().json(Healthcheck {
         status: "ok".to_string(),
         version: VERSION.to_string(),
         time: ts,
         mem: sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
-        active_clients: app_state.active_clients.as_ref().load(Ordering::Relaxed)
+        active_clients,
+        active_connections,
     })
 }
 
 fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
     let lru_cache = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()).and_then(|c| if c.enabled  {
-        Some(FairMutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
+        Some(PlMutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
     } else { None} );
     let cache = Arc::new(lru_cache);
     let cache_scanner = Arc::clone(&cache);
@@ -70,8 +75,8 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
             active: Arc::from(RwLock::new(None)),
             finished: Arc::from(RwLock::new(Vec::new())),
         }),
-        active_clients: Arc::new(AtomicUsize::new(0)),
-        shared_stream_manager: Arc::new(FairMutex::new(SharedStreamManager::new())),
+        shared_stream_manager: Arc::new(PlMutex::new(SharedStreamManager::new())),
+        active_users: Arc::new(PlRwLock::new(ActiveUserManager::new())),
         http_client: Arc::new(reqwest::Client::new()),
         cache,
     })

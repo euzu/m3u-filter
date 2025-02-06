@@ -1,20 +1,15 @@
-use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials};
-use serde::Serialize;
+use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials, ProxyUserStatus};
 use chrono::{Duration, Local};
+use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct XtreamUserInfo {
     pub active_cons: String,
-    pub allowed_output_formats: Vec<String>,
-    //["ts"],
-    pub auth: u16,
-    // 0 | 1
-    pub created_at: i64,
-    //1623429679,
-    pub exp_date: i64,
-    //1628755200,
-    pub is_trial: String,
-    // 0 | 1
+    pub allowed_output_formats: Vec<String>, //["ts"],
+    pub auth: u16, // 0 | 1
+    pub created_at: i64, //1623429679,
+    pub exp_date: i64, //1628755200,
+    pub is_trial: String, // 0 | 1
     pub max_connections: String,
     pub message: String,
     pub password: String,
@@ -54,19 +49,26 @@ pub struct XtreamServerInfoDto {
 impl XtreamAuthorizationResponse {
     pub fn new(server_info: &ApiProxyServerInfo, user: &ProxyUserCredentials) -> Self {
         let now = Local::now();
+        let created_at = user.created_at.as_ref().map_or_else(|| (now - Duration::days(365)).timestamp(), |d| *d);
+        let exp_date = user.exp_date.as_ref().map_or_else(|| (now + Duration::days(365)).timestamp(), |d| *d);
+
+        let is_expired = (exp_date - now.timestamp()) < 0;
+        let is_trial = user.status.as_ref().map_or("0", |s| if *s == ProxyUserStatus::Trial { "1" } else { "0" }).to_string();
+        let max_connections = user.max_connections.as_ref().map_or("1", |s| s).to_string();
+        let user_status = if is_expired { &ProxyUserStatus::Expired } else { user.status.as_ref().unwrap_or(&ProxyUserStatus::Active) };
         Self {
             user_info: XtreamUserInfo {
                 active_cons: "0".to_string(),
                 allowed_output_formats: Vec::from(["ts".to_string()]),
                 auth: 1,
-                created_at: (now - Duration::days(365)).timestamp(), // fake
-                exp_date: (now + Duration::days(365)).timestamp(), // fake
-                is_trial: "0".to_string(),
-                max_connections: "1".to_string(),
+                created_at,
+                exp_date,
+                is_trial,
+                max_connections,
                 message: server_info.message.to_string(),
                 password: user.password.to_string(),
                 username: user.username.to_string(),
-                status: "Active".to_string(),
+                status: user_status.to_string(),
             },
             server_info: XtreamServerInfo {
                 url: server_info.host.clone(),

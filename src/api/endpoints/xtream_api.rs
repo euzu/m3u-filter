@@ -144,6 +144,10 @@ async fn xtream_player_api_stream(
     stream_req: XtreamApiStreamRequest<'_>,
 ) -> HttpResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state).await, false, format!("Could not find any user {}", stream_req.username));
+    if !user.is_active() {
+        debug!("User access denied: {user:?}");
+        return HttpResponse::Forbidden().finish();
+    }
     let target_name = &target.name;
     if !target.has_output(&TargetType::Xtream) {
         debug!("Target has no xtream output {}", target_name);
@@ -196,7 +200,7 @@ async fn xtream_player_api_stream(
         stream_req.context));
 
     trace_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
-    stream_response(app_state, &stream_url, req, Some(input), pli.item_type, target).await
+    stream_response(app_state, &stream_url, req, Some(input), pli.item_type, target, &user).await
 }
 
 
@@ -332,6 +336,10 @@ async fn xtream_player_api_resource(
     resource_req: XtreamApiStreamRequest<'_>,
 ) -> HttpResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(resource_req.username, resource_req.password, api_req, app_state).await, false, format!("Could not find any user {}", resource_req.username));
+    if !user.is_active() {
+        debug!("User access denied: {user:?}");
+        return HttpResponse::Forbidden().finish();
+    }
     let target_name = &target.name;
     if !target.has_output(&TargetType::Xtream) {
         debug!("Target has no xtream output {}", target_name);
@@ -582,6 +590,11 @@ async fn xtream_player_api(
         let action = api_req.action.trim();
         if action.is_empty() {
             return HttpResponse::Ok().json(get_user_info(&user, &app_state.config));
+        }
+
+        if !user.is_active() {
+            debug!("User access denied: {user:?}");
+            return HttpResponse::Forbidden().finish();
         }
 
         // Process specific playlist actions

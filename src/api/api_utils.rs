@@ -18,7 +18,7 @@ use actix_files::NamedFile;
 use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
-use parking_lot::FairMutex;
+use parking_lot::{Mutex, RwLock};
 use futures::{TryStreamExt};
 use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
@@ -132,12 +132,14 @@ fn get_stream_content_length(provider_response: Option<&(Vec<(String, String)>, 
 
 pub async fn stream_response(app_state: &AppState, stream_url: &str,
                              req: &HttpRequest, input: Option<&ConfigInput>,
-                             item_type: PlaylistItemType, target: &ConfigTarget) -> HttpResponse {
+                             item_type: PlaylistItemType, target: &ConfigTarget,
+                             user: &ProxyUserCredentials) -> HttpResponse {
     if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", sanitize_sensitive_info(stream_url)); }
 
+    let log_active_clients = app_state.config.log.as_ref().is_some_and(|l| l.active_clients);
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url) {
+        if let Some(value) = shared_stream_response(app_state, stream_url, log_active_clients, user) {
             return value;
         }
     }
@@ -146,7 +148,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         get_stream_options(app_state);
 
     if let Ok(url) = Url::parse(stream_url) {
-        let active_clients = Arc::clone(&app_state.active_clients);
+        let active_clients = Arc::clone(&app_state.active_users);
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
             get_provider_pipe_stream(&app_state.http_client, &url, req, input, item_type).await
         } else {
@@ -155,8 +157,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         };
         if let Some(stream) = stream_opt {
             let content_length = get_stream_content_length(provider_response.as_ref());
-            let log_active_clients = app_state.config.log.as_ref().is_some_and(|l| l.active_clients);
-            let stream = ActiveClientStream::new(stream, active_clients, log_active_clients);
+            let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients);
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
                 SharedStreamManager::subscribe(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers);
@@ -182,11 +183,13 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
     HttpResponse::BadRequest().finish()
 }
 
-fn shared_stream_response(app_state: &AppState, stream_url: &str) -> Option<HttpResponse> {
+fn shared_stream_response(app_state: &AppState, stream_url: &str, log_active_clients: bool, user: &ProxyUserCredentials) -> Option<HttpResponse> {
     if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url) {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
         if let Some(headers) = app_state.shared_stream_manager.lock().get_shared_state_headers(stream_url) {
             let mut response_builder = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
+            let active_clients = Arc::clone(&app_state.active_users);
+            let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients);
             return Some(response_builder.body(BodyStream::new(stream)));
         }
     }
@@ -209,7 +212,7 @@ pub fn get_headers_from_request(req: &HttpRequest, filter: &HeaderFilter) -> Has
         .collect()
 }
 
-fn get_add_cache_content(res_url: &str, cache: &Arc<Option<FairMutex<LRUResourceCache>>>) -> Box<dyn Fn(usize)> {
+fn get_add_cache_content(res_url: &str, cache: &Arc<Option<Mutex<LRUResourceCache>>>) -> Box<dyn Fn(usize)> {
     let resource_url = String::from(res_url);
     let cache = Arc::clone(cache);
     let add_cache_content: Box<dyn Fn(usize)> = Box::new(move |size| {
@@ -255,8 +258,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                     let byte_stream = response.bytes_stream().map_err(|err| StreamError::reqwest(&err));
                     if let Some(cache) = app_state.cache.as_ref() {
                         let resource_path = {
-                            let guard = cache.lock();
-                            guard.store_path(resource_url)
+                            cache.lock().store_path(resource_url)
                         };
                         if let Ok(file) = create_new_file_for_write(&resource_path) {
                             let writer = Arc::new(file);

@@ -2,7 +2,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use actix_web::{http::header, web, HttpRequest, HttpResponse};
-use log::{error, trace};
+use log::{debug, error, trace};
 use quick_xml::{Reader, Writer};
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -164,6 +164,10 @@ async fn xmltv_api(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     if let Some((user, target)) = get_user_target(&api_req, &app_state).await {
+        if !user.is_active() {
+            debug!("User access denied: {user:?}");
+            return HttpResponse::Forbidden().finish();
+        }
         match get_epg_path_for_target(&app_state.config, target) {
             None => {
                 // No epg configured,  No processing or timeshift, epg can't be mapped to the channels.

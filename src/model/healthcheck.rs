@@ -5,4 +5,5 @@ pub struct Healthcheck {
     pub time: String,
     pub mem: String,
     pub active_clients: usize,
+    pub active_connections: usize,
 }

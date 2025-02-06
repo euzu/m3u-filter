@@ -140,6 +140,12 @@ export interface Credentials {
     password: string;
     token: string;
     proxy: 'redirect' | 'reverse';
+    created_at: number,
+    exp_date: number,
+    is_trial: String,
+    max_connections: String,
+    message: String,
+    status: String,
 }
 
 export interface TargetUser {

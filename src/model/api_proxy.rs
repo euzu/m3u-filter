@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::str::FromStr;
-
+use chrono::{Local};
+use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
+use crate::utils::file::config_reader;
 use enum_iterator::Sequence;
 use log::debug;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result, info_err};
-use crate::utils::file::config_reader;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
 pub enum ProxyType {
@@ -29,9 +29,9 @@ impl ProxyType {
 impl Display for ProxyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-                Self::Reverse => Self::REVERSE,
-                Self::Redirect => Self::REDIRECT,
-            }
+            Self::Reverse => Self::REVERSE,
+            Self::Redirect => Self::REDIRECT,
+        }
         )
     }
 }
@@ -40,12 +40,64 @@ impl FromStr for ProxyType {
     type Err = M3uFilterError;
 
     fn from_str(s: &str) -> Result<Self, M3uFilterError> {
-        if s.eq("reverse") {
-            Ok(Self::Reverse)
-        } else if s.eq("redirect") {
-            Ok(Self::Redirect)
-        } else {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+        match s {
+            Self::REVERSE => Ok(Self::Reverse),
+            Self::REDIRECT => Ok(Self::Redirect),
+            _ => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
+pub enum ProxyUserStatus {
+    Active, // The account is in good standing and can stream content
+    Expired, // The account can no longer access content unless it is renewed.
+    Banned, // The account is temporarily or permanently disabled. Typically used for users who violate terms of service or abuse the system.
+    Trial, // The account is marked as a trial account.
+    Disabled, // The account is inactive or deliberately disabled by the administrator.
+    Pending,
+}
+
+
+impl Default for ProxyUserStatus {
+    fn default() -> Self {
+        Self::Active
+    }
+}
+
+impl ProxyUserStatus {
+    const ACTIVE: &'static str = "Active";
+    const EXPIRED: &'static str = "Expired";
+    const BANNED: &'static str = "Banned";
+    const TRIAL: &'static str = "Trial";
+    const DISABLED: &'static str = "Disabled";
+    const PENDING: &'static str = "Pending";
+}
+
+impl Display for ProxyUserStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Active => Self::ACTIVE,
+            Self::Expired => Self::EXPIRED,
+            Self::Banned => Self::BANNED,
+            Self::Trial => Self::TRIAL,
+            Self::Disabled => Self::DISABLED,
+            Self::Pending => Self::PENDING,
+        })
+    }
+}
+
+impl FromStr for ProxyUserStatus {
+    type Err = M3uFilterError;
+
+    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+        match s {
+            Self::EXPIRED => Ok(Self::Expired),
+            Self::BANNED => Ok(Self::Banned),
+            Self::TRIAL => Ok(Self::Trial),
+            Self::DISABLED => Ok(Self::Disabled),
+            Self::PENDING => Ok(Self::Pending),
+            _ => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
         }
     }
 }
@@ -62,6 +114,14 @@ pub struct ProxyUserCredentials {
     pub server: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epg_timeshift: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exp_date: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_connections: Option<String>, // int as string
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<ProxyUserStatus>,
 }
 
 impl ProxyUserCredentials {
@@ -96,6 +156,19 @@ impl ProxyUserCredentials {
                 self.token = Some(tkn.trim().to_string());
             }
         }
+    }
+
+    pub fn is_active(&self) -> bool {
+        if let Some(status) = &self.status {
+            let now = Local::now();
+            if let Some(exp_date) = self.exp_date.as_ref() {
+                if  (exp_date - now.timestamp()) < 0 {
+                    return false;
+                }
+            }
+            return matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial);
+        }
+        true
     }
 }
 
@@ -274,7 +347,7 @@ impl ApiProxyConfig {
         None
     }
 
-    pub fn get_user_credentials(&self,username: &str) -> Option<ProxyUserCredentials> {
+    pub fn get_user_credentials(&self, username: &str) -> Option<ProxyUserCredentials> {
         let result = self.user.iter()
             .flat_map(|target_user| &target_user.credentials)
             .find(|credential| credential.username == username)

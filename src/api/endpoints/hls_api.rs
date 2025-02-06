@@ -37,10 +37,14 @@ async fn hls_api_stream(
     target_type: TargetType
 ) -> HttpResponse {
     let (_token, username, password, channel, _hash, _chunk) = path.into_inner();
-    let (_user, target) = try_option_bad_request!(
+    let (user, target) = try_option_bad_request!(
         get_user_target_by_credentials(&username, &password, api_req, app_state).await,
         false,
         format!("Could not find any user {username}"));
+    if !user.is_active() {
+        debug!("User access denied: {user:?}");
+        return HttpResponse::Forbidden().finish();
+    }
 
     let target_name = &target.name;
     let virtual_id: u32 = try_result_bad_request!(channel.parse());
@@ -59,7 +63,7 @@ async fn hls_api_stream(
     // we don't respond as hlsr, we take the original stream, because the location could be different and then it does not work
     // The next problem is, different url to same channel causes to fail stream share.
     // let stream_url = format!("{input_url}/hlsr/{token}/{input_username}/{input_password}/{}/{hash}/{chunk}", pli.provider_id);
-    stream_response(app_state, &pli_url, req, Some(input), PlaylistItemType::Live, target).await
+    stream_response(app_state, &pli_url, req, Some(input), PlaylistItemType::Live, target, &user).await
 }
 
 async fn hls_api_stream_xtream(
