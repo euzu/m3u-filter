@@ -148,7 +148,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
     if let Ok(url) = Url::parse(stream_url) {
         let active_clients = Arc::clone(&app_state.active_clients);
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
-            get_provider_pipe_stream(&app_state.http_client, &url, req, input).await
+            get_provider_pipe_stream(&app_state.http_client, &url, req, input, item_type).await
         } else {
             let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size, share_stream);
             provider_stream::get_provider_reconnect_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await

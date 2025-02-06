@@ -20,6 +20,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use url::Url;
+use crate::api::model::streams::provider_stream::get_header_filter_for_item_type;
 
 // TODO make this configurable
 pub const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
@@ -168,7 +169,8 @@ fn get_client_stream_request_params(
     options: &BufferStreamOptions) -> (usize, Option<usize>, bool, HeaderMap)
 {
     let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 1 };
-    let mut req_headers = get_headers_from_request(req, &None);
+    let filter_header = get_header_filter_for_item_type(options.item_type);
+    let mut req_headers = get_headers_from_request(req, &filter_header);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
     // we need the range bytes from client request for seek ing to the right position
     let req_range_start_bytes = get_request_range_start_bytes(&req_headers);

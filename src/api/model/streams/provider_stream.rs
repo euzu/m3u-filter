@@ -1,4 +1,4 @@
-use crate::api::api_utils::get_headers_from_request;
+use crate::api::api_utils::{get_headers_from_request, HeaderFilter};
 use crate::api::model::streams::provider_stream_factory::{create_provider_stream, BufferStreamOptions};
 use crate::model::config::ConfigInput;
 use crate::utils::network::request::{get_request_headers, sanitize_sensitive_info};
@@ -12,15 +12,28 @@ use futures::TryStreamExt;
 use url::Url;
 use crate::api::model::model_utils::get_response_headers;
 use crate::api::model::stream_error::StreamError;
+use crate::model::playlist::PlaylistItemType;
 use crate::utils::debug_if_enabled;
 
 type ProviderStreamResponse = (Option<BoxStream<'static, Result<Bytes, StreamError>>>, Option<(Vec<(String, String)>, StatusCode)>);
 
+
+pub fn get_header_filter_for_item_type(item_type: PlaylistItemType) -> HeaderFilter {
+    match item_type {
+        PlaylistItemType::Live | PlaylistItemType::LiveUnknown | PlaylistItemType::LiveHls => {
+            Some(Box::new(|key| key != "accept-ranges" && key != "range" && key != "content-range"))
+        }
+        _ => None,
+    }
+}
+
 pub async fn get_provider_pipe_stream(http_client: &Arc<reqwest::Client>,
                                       stream_url: &Url,
                                       req: &HttpRequest,
-                                      input: Option<&ConfigInput>) -> ProviderStreamResponse {
-    let req_headers = get_headers_from_request(req, &None);
+                                      input: Option<&ConfigInput>,
+                                      item_type: PlaylistItemType) -> ProviderStreamResponse {
+    let filter_header = get_header_filter_for_item_type(item_type);
+    let req_headers = get_headers_from_request(req, &filter_header);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
     // These are the configured headers for this input.
     let input_headers = input.map(|i| i.headers.clone());
