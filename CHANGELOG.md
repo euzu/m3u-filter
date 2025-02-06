@@ -43,6 +43,8 @@ web_ui_enabled: true
 - `kodi` `strm` generation, does not delete root directory, avoids unchanged file creations.
   `strm` files now o get timestamp from `addedd`property if exists.
 - shared live stream implementation refactored.
+- added optional user properties: `max_connections`, `status`, `exp_date` (expiration date as unix seconds). 
+If they exist they are checked, if you don't need them remove this fields from `api-proxy.yml`
 
 # 2.1.3 (2025-01-26)
 - Hotfix 2.1.2, forgot to update the stream api code.  
