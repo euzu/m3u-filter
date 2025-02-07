@@ -4,6 +4,7 @@ use std::{
     pin::Pin,
     sync::Arc,
 };
+use std::time::Duration;
 use tokio::sync::mpsc::channel;
 use tokio_stream::wrappers::ReceiverStream;
 use crate::api::model::stream_error::StreamError;
@@ -18,6 +19,7 @@ impl BufferedStream {
         let (tx, rx) = channel(buffer_size);
         actix_rt::spawn(async move {
             let mut stream = stream;
+            let sleep_duration= Duration::from_millis(100);
             loop {
                 match stream.next().await {
                     Some(Ok(chunk)) => {
@@ -30,7 +32,9 @@ impl BufferedStream {
                             break;
                         }
                     }
-                    Some(Err(_err)) => {}
+                    Some(Err(_err)) => {
+                        actix_web::rt::time::sleep(sleep_duration).await;
+                    }
                     None => {
                         break
                     }

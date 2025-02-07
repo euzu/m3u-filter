@@ -39,7 +39,7 @@ impl Stream for ClientStream {
                     }
 
                     if let Some(counter) = self.total_bytes.as_ref() {
-                        counter.fetch_add(bytes.len(), Ordering::Relaxed);
+                        counter.fetch_add(bytes.len(), Ordering::SeqCst);
                     }
 
                     return Poll::Ready(Some(Ok(bytes)));

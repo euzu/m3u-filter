@@ -5,27 +5,24 @@ use crate::model::api_proxy::ProxyUserCredentials;
 use bytes::Bytes;
 use futures::Stream;
 use log::info;
-use parking_lot::{RwLock};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
 
 pub(in crate::api) struct ActiveClientStream {
     inner: ResponseStream,
-    active_clients: Arc<RwLock<ActiveUserManager>>,
+    active_clients: Arc<ActiveUserManager>,
     log_active_clients: bool,
     username: String,
 }
 
 impl ActiveClientStream {
-    pub(crate) fn new(inner: ResponseStream, active_clients: Arc<RwLock<ActiveUserManager>>, user: &ProxyUserCredentials, log_active_clients: bool) -> Self {
-        let client_count = {
-            let mut clients = active_clients.write();
-            clients.add_connection(&user.username);
-            clients.active_users()
+    pub(crate) fn new(inner: ResponseStream, active_clients: Arc<ActiveUserManager>, user: &ProxyUserCredentials, log_active_clients: bool) -> Self {
+        let (client_count, connection_count) = {
+            active_clients.add_connection(&user.username)
         };
         if log_active_clients {
-            info!("Active clients: {client_count}");
+            info!("Active clients: {client_count}, active connections {connection_count}");
         }
         Self { inner, active_clients, log_active_clients, username: user.username.clone() }
     }
@@ -44,13 +41,11 @@ impl Stream for ActiveClientStream {
 
 impl Drop for ActiveClientStream {
     fn drop(&mut self) {
-        let client_count = {
-            let mut clients = self.active_clients.write();
-            clients.remove_connection(&self.username);
-            clients.active_users()
+        let (client_count, connection_count) = {
+            self.active_clients.remove_connection(&self.username)
         };
         if self.log_active_clients {
-            info!("Active clients: {client_count}");
+           info!("Active clients: {client_count}, active connections {connection_count}");
         }
     }
 }

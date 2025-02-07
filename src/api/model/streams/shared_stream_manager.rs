@@ -3,103 +3,93 @@ use crate::api::model::streams::provider_stream_factory::STREAM_QUEUE_SIZE;
 use crate::api::model::stream_error::StreamError;
 use crate::utils::debug_if_enabled;
 use crate::utils::network::request::sanitize_sensitive_info;
-use parking_lot::{FairMutex, Mutex};
+use parking_lot::{FairMutex};
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::TrySendError;
-use tokio::sync::mpsc::{Sender};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::wrappers::BroadcastStream;
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
-const MIN_STREAM_QUEUE_SIZE: usize = 1024;
+const MIN_STREAM_QUEUE_SIZE: usize = 128;
 
 ///
 /// Wraps a `ReceiverStream` as Stream<Item = Result<Bytes, `StreamError`>>
 ///
-struct ReceiverStreamWrapper<S> {
-    stream: S,
+struct BroadcastStreamWrapper {
+    stream: BroadcastStream<Bytes>,
 }
 
-impl<S> Stream for ReceiverStreamWrapper<S>
-where
-    S: Stream<Item=Bytes> + Unpin,
-{
+impl Stream for BroadcastStreamWrapper {
     type Item = Result<Bytes, StreamError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match Pin::new(&mut self.stream).poll_next(cx) {
-            Poll::Ready(Some(bytes)) => Poll::Ready(Some(Ok(bytes))),
+            Poll::Ready(Some(Ok(bytes))) => Poll::Ready(Some(Ok(bytes))),
+            Poll::Ready(Some(Err(_))) | Poll::Pending => Poll::Pending,
             Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
         }
     }
 }
 
-fn convert_stream(stream: BoxStream<Bytes>) -> BoxStream<Result<Bytes, StreamError>> {
-    Box::pin(ReceiverStreamWrapper { stream }.boxed())
+fn convert_stream(stream: BroadcastStream<Bytes>) -> BoxStream<'static, Result<Bytes, StreamError>> {
+    Box::pin(BroadcastStreamWrapper { stream })
 }
 
 /// Represents the state of a shared provider URL.
 ///
 /// - `headers`: The initial connection headers used during the setup of the shared stream.
-/// - `subscribers`: A list of clients that have subscribed to the shared stream.
 struct SharedStreamState {
     headers: Vec<(String, String)>,
-    buf_size: usize,
-    subscribers: Arc<FairMutex<Vec<Sender<Bytes>>>>,
+    sender: tokio::sync::broadcast::Sender<Bytes>,
 }
 
 impl SharedStreamState {
     fn new(headers: Vec<(String, String)>,
            buf_size: usize) -> Self {
+        let (sender, _) = tokio::sync::broadcast::channel(buf_size);
         Self {
             headers,
-            buf_size,
-            subscribers: Arc::new(FairMutex::new(Vec::new())),
+            sender,
         }
     }
 
     fn subscribe(&self) -> BoxStream<'static, Result<Bytes, StreamError>> {
-        let (tx, rx) = mpsc::channel(self.buf_size);
-        self.subscribers.lock().push(tx);
-        convert_stream(ReceiverStream::new(rx).boxed())
+        let rx = self.sender.subscribe();
+        convert_stream(BroadcastStream::new(rx)).boxed()
+        // .map_err(StreamError::ReceiverError).boxed()
     }
 
-    fn broadcast<S, E>(&self, stream_url: &str, bytes_stream: S, shared_streams: Arc<Mutex<SharedStreamManager>>)
+    fn broadcast<S, E>(&self, stream_url: &str, bytes_stream: S, shared_streams: Arc<SharedStreamManager>)
     where
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
     {
         let mut source_stream = Box::pin(bytes_stream);
-        let subscriber = Arc::clone(&self.subscribers);
         let streaming_url = stream_url.to_string();
+        let sender = self.sender.clone();
         // Spawn a task to forward items from the source stream to the broadcast channel
         actix_rt::spawn(async move {
-            while let Some(item) = source_stream.next().await {
-                if let Ok(data) = item {
-                    let mut subs = subscriber.lock();
-                    if subs.len() > 0 {
-                        (*subs).retain(|sender| {
-                            match sender.try_send(data.clone()) {
-                                Err(TrySendError::Closed(_)) => false,
-                                Ok(()) | Err(_) => true,
-                                // Err(TrySendError::Full(_)) => false, // Drop slow consumers
-                            }
-                        });
-                    } else {
-                        debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
-                        // Cleanup for removing unused shared streams
-                        shared_streams.lock().unregister(&streaming_url);
-                        return;
+            let sleep_duration = Duration::from_millis(20);
+            loop  {
+                match source_stream.next().await {
+                    Some(Ok(data)) => {
+                        if sender.receiver_count() == 0 {
+                            debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
+                            break;
+                        }
+                        let _ = sender.send(data);
+                    }
+                    None | Some(Err(_)) => {
+                        break;
                     }
                 }
+                actix_web::rt::time::sleep(sleep_duration).await;
             }
-            shared_streams.lock().unregister(&streaming_url);
+            shared_streams.unregister(&streaming_url);
         });
     }
 }
@@ -139,7 +129,6 @@ impl SharedStreamManager {
         shared_state.broadcast(stream_url, bytes_stream, Arc::clone(&app_state.shared_stream_manager));
         app_state
             .shared_stream_manager
-            .lock()
             .shared_streams
             .lock()
             .insert(stream_url.to_string(), shared_state);
@@ -153,7 +142,6 @@ impl SharedStreamManager {
     ) -> Option<BoxStream<'static, Result<Bytes, StreamError>>> {
         if let Some(shared_stream) =  app_state
             .shared_stream_manager
-            .lock()
             .shared_streams
             .lock()
             .get(stream_url) {

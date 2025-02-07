@@ -186,7 +186,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
 fn shared_stream_response(app_state: &AppState, stream_url: &str, log_active_clients: bool, user: &ProxyUserCredentials) -> Option<HttpResponse> {
     if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url) {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
-        if let Some(headers) = app_state.shared_stream_manager.lock().get_shared_state_headers(stream_url) {
+        if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url) {
             let mut response_builder = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
             let active_clients = Arc::clone(&app_state.active_users);
             let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients);

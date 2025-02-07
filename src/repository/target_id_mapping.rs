@@ -98,7 +98,6 @@ impl TargetIdMapping {
                 if let Some(record) = self.by_virtual_id.query(virtual_id) {
                     if record.provider_id == provider_id && (record.item_type != item_type || record.parent_virtual_id != parent_virtual_id) {
                         let new_record = VirtualIdRecord::new(provider_id, *virtual_id, item_type, parent_virtual_id, uuid);
-                        println!("updating record {virtual_id} {record:?} {new_record:?} ");
                         self.by_virtual_id.insert(*virtual_id, new_record);
                         self.dirty = true;
                     }

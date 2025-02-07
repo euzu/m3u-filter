@@ -36,7 +36,7 @@ impl AtomicOnceFlag {
 
     /// Creates a new `AtomicOnceFlag` with a default memory ordering of `Relaxed`.
     pub fn new() -> Self {
-        Self::with_ordering(Ordering::Relaxed)
+        Self::with_ordering(Ordering::SeqCst)
     }
 
     /// Disables the flag. After calling this method, `is_active()` will always return `false`.

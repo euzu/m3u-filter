@@ -125,7 +125,7 @@ impl ProviderStreamOptions {
 
     #[inline]
     pub fn get_total_bytes_send(&self) -> Option<usize> {
-        self.range_bytes.as_ref().as_ref().map(|atomic| atomic.load(Ordering::Relaxed))
+        self.range_bytes.as_ref().as_ref().map(|atomic| atomic.load(Ordering::SeqCst))
     }
 
     // pub fn get_range_bytes(&self) -> &Arc<Option<AtomicUsize>> {
@@ -227,7 +227,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
     let url = stream_options.get_url();
     let range_start = stream_options.get_total_bytes_send();
     let headers = stream_options.get_headers();
-
+    debug_if_enabled!("stream provider {}", sanitize_sensitive_info(url.as_str()));
     while stream_options.should_continue() {
         debug_if_enabled!("Reconnecting stream {}", sanitize_sensitive_info(url.as_str()));
         let (client, _) = prepare_client(&client, url, headers, range_start);
@@ -386,7 +386,7 @@ mod tests {
         let url = url::Url::parse("https://info.cern.ch/hypertext/WWW/TheProject.html").unwrap();
         let input = None;
 
-        let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0, false);
+        let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0);
         let value = create_provider_stream(Arc::clone(&client), &url, &req, input, options);
         let mut values = value.await;
         'outer: while let Some((ref mut stream, info)) = values.as_mut() {

@@ -2,7 +2,7 @@ use actix_cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpResponse, HttpServer};
-use parking_lot::{Mutex as PlMutex, RwLock as PlRwLock};
+use parking_lot::{Mutex as PlMutex};
 use tokio::sync::{RwLock, Mutex};
 use log::{error, info};
 use std::collections::{VecDeque};
@@ -41,7 +41,7 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
 async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
     let ts = chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let (active_clients, active_connections) =  {
-        let active_user = app_state.active_users.read();
+        let active_user = &app_state.active_users;
         (active_user.active_users(), active_user.active_connections())
     };
     HttpResponse::Ok().json(Healthcheck {
@@ -75,8 +75,8 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
             active: Arc::from(RwLock::new(None)),
             finished: Arc::from(RwLock::new(Vec::new())),
         }),
-        shared_stream_manager: Arc::new(PlMutex::new(SharedStreamManager::new())),
-        active_users: Arc::new(PlRwLock::new(ActiveUserManager::new())),
+        shared_stream_manager: Arc::new(SharedStreamManager::new()),
+        active_users: Arc::new(ActiveUserManager::new()),
         http_client: Arc::new(reqwest::Client::new()),
         cache,
     })
