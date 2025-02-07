@@ -21,6 +21,11 @@ use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
 
+pub fn get_empty_epg_response() -> HttpResponse {
+    HttpResponse::Ok().content_type(mime::TEXT_XML).body(
+        r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)
+}
+
 fn time_correct(date_time: &str, correction: &TimeDelta) -> String {
     // Split the dateTime string into date and time parts
     let date_time_split: Vec<&str> = date_time.split(' ').collect();
@@ -92,7 +97,7 @@ async fn serve_epg(epg_path: &Path, req: &HttpRequest, user: &ProxyUserCredentia
             }
         }
         Err(_) => {
-            HttpResponse::NoContent().finish()
+            get_empty_epg_response()
         }
     }
 }
@@ -176,8 +181,7 @@ async fn xmltv_api(
             Some(epg_path) => return serve_epg(&epg_path, &req, &user).await
         }
     }
-    HttpResponse::Ok().content_type(mime::TEXT_XML).body(
-        r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)
+    get_empty_epg_response()
 }
 
 pub fn xmltv_api_register(cfg: &mut web::ServiceConfig) {

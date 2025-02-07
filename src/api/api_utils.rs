@@ -18,8 +18,8 @@ use actix_files::NamedFile;
 use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
 use actix_web::{HttpRequest, HttpResponse};
-use parking_lot::{Mutex};
-use futures::{TryStreamExt};
+use parking_lot::Mutex;
+use futures::TryStreamExt;
 use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
 use std::collections::HashMap;
@@ -287,4 +287,8 @@ pub fn separate_number_and_remainder(input: &str) -> (String, Option<String>) {
         let rest = input[dot_index..].to_string();
         (number_part, if rest.len() < 2 { None } else { Some(rest) })
     })
+}
+
+pub fn empty_json_list_response() -> HttpResponse {
+    HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("[]")
 }

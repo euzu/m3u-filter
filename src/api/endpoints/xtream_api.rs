@@ -1,7 +1,7 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
 use crate::api::api_utils::{try_option_bad_request, try_result_bad_request};
-use crate::utils::{trace_if_enabled};
+use crate::utils::trace_if_enabled;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
@@ -14,9 +14,10 @@ use futures::stream::{self, StreamExt};
 use futures::Stream;
 use log::{debug, error, warn};
 use serde_json::{Map, Value};
-
+use crate::api::api_utils;
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, resource_response, separate_number_and_remainder, serve_file, stream_response};
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
+use crate::api::endpoints::xmltv_api::get_empty_epg_response;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
@@ -494,7 +495,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                             Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
                             Err(err) => {
                                 error!("Failed to download epg {}", sanitize_sensitive_info(err.to_string().as_str()));
-                                HttpResponse::NoContent().finish()
+                                get_empty_epg_response()
                             }
                         };
                     }
@@ -503,7 +504,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
         }
     }
     warn!("Cant find short epg with id: {target_name}/{stream_id}");
-    HttpResponse::NoContent().finish()
+    get_empty_epg_response()
 }
 
 async fn xtream_player_api_handle_content_action(config: &Config, target_name: &str, action: &str, category_id: &str, req: &HttpRequest) -> Option<HttpResponse> {
@@ -522,7 +523,7 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
         } else if let Some(payload) = content {
             return Some(HttpResponse::Ok().body(payload));
         }
-        return Some(HttpResponse::NoContent().finish());
+        return Some(api_utils::empty_json_list_response());
     }
     None
 }
@@ -561,7 +562,7 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
 macro_rules! skip_json_response_if_flag_set {
     ($flag:expr, $stmt:expr) => {
         if $flag {
-            return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("[]");
+            return api_utils::empty_json_list_response();
         }
         return $stmt;
     };
@@ -658,14 +659,13 @@ async fn xtream_player_api(
                     Err(err) => {
                         error!("Failed response for xtream target: {} action: {} error: {}", &target.name, action, err);
                         // Some players fail on NoContent, so we return an empty array
-                        HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("[]")
-                        // HttpResponse::NoContent().finish()
+                        api_utils::empty_json_list_response()
                     }
                 }
             }
             None => {
                 // Some players fail on NoContent, so we return an empty array
-                HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("[]")
+                api_utils::empty_json_list_response()
             }
         }
     } else {
