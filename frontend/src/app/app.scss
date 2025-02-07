@@ -16,7 +16,10 @@
     font-weight: bold;
     color: var(--app-header-color);
     text-align:center;
-    padding-top: 10px;
+    padding: 10px 68px;
+    @media (max-width: common.$media-size-mobile) {
+      padding: 10px 0;
+    }
 
     &__logo {
       svg {
@@ -27,7 +30,6 @@
     &__caption {
       flex: 1 1 auto;
       text-align:center;
-      padding-left: 40px;
     }
 
     &__toolbar {

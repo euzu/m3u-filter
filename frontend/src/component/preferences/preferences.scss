@@ -7,17 +7,17 @@
   overflow: hidden;
   justify-content: center;
   gap: 18px;
+  flex: 1 1 auto;
 
   &__content {
     display: flex;
     flex-flow: row nowrap;
-    @media (max-width: 600px) {
+    @media (max-width: common.$media-size-mobile) {
       flex-flow: column;
     }
 
     justify-content: flex-start;
     gap: 12px;
-    max-width: 900px;
     flex: 1 1 auto;
   }
 
@@ -25,16 +25,27 @@
     display: flex;
     flex-flow: column;
     flex: 1 1 auto;
+    .panel {
+      flex: 1 1 auto;
+      .card {
+        flex: 1 1 auto;
+      }
+    }
   }
 
   &__sidebar {
     display: flex;
     flex-flow: column;
-    @media (max-width: 600px) {
+    @media (max-width: common.$media-size-mobile) {
       flex-flow: row;
     }
-    max-width: 32px;
-    min-width: 32px;
+    max-width: 48px;
+    min-width: 48px;
+    width: 48px;
+    @media (max-width: common.$media-size-mobile) {
+      max-width: 32px;
+      min-width: 32px;
+    }
     gap: 4px;
 
     button {

@@ -2,6 +2,7 @@
 @use '../../scss/preferences';
 
 .target-update {
+
   @include preferences.prefsRoot();
 
   @include common.list();
@@ -9,11 +10,11 @@
 
   @include preferences.prefsToolbar();
 
+
   &__content {
     overflow: auto;
     display: flex;
     flex-flow: column;
     padding: 12px;
-
   }
 }

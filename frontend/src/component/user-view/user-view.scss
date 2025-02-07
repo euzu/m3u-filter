@@ -8,7 +8,6 @@
 .user {
   & {
     min-height: 400px;
-    max-height: 480px;
 
     @include preferences.prefsRoot();
     @include preferences.prefsToolbar();
@@ -86,12 +85,15 @@
         overflow-y: scroll;
         background-color: var(--card-background-color);
         padding: 8px;
+        margin: 10px;
+        box-sizing: border-box;
       }
       &-table {
-        margin: 8px 4px;
         display: table;
         table-layout: auto;
-        width: auto;
+        width: 100%;
+        height: auto;
+        box-sizing: border-box;
         border-collapse: collapse;
       }
 

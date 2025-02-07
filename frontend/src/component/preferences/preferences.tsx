@@ -59,6 +59,7 @@ export default function Preferences(props: PreferencesProps) {
                     <div className={'card'}><MainConfigView config={config}></MainConfigView></div>
                 </Panel>
             </div>
+            <div className={'preferences__sidebar'}></div>
         </div>
     </div>
 }

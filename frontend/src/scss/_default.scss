@@ -34,6 +34,7 @@ button {
   display: flex;
   flex-flow: column;
   flex: 0 1 auto;
+  align-content: flex-start;
   overflow: hidden;
   padding: 20px;
   border: 1px solid var(--card-border-color);

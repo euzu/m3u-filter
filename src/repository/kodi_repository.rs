@@ -289,68 +289,66 @@ fn get_tmdb_value(
 ) -> Option<InputTmdbIndexValue> {
     // the tmdb_ids are stored inside record files for xtream input.
     // we load this record files on request for each input and item_type.
-    match provider_id {
-        None => None,
-        Some(pid) => match input_indexes.entry(input_name.to_string()) {
-            std::collections::hash_map::Entry::Occupied(entry) => {
-                if let Some((_, tree_value)) = entry.get() {
-                    match tree_value {
-                        InputTmdbIndexTree::Video(tree) => tree
-                            .query(&pid)
-                            .map(|vod_record| InputTmdbIndexValue::Video(vod_record.clone())),
-                        InputTmdbIndexTree::Series(tree) => tree
-                            .query(&pid)
-                            .map(|episode| InputTmdbIndexValue::Series(episode.clone())),
-                    }
-                } else {
-                    None
+    let pid = provider_id?;
+    match input_indexes.entry(input_name.to_string()) {
+        std::collections::hash_map::Entry::Occupied(entry) => {
+            if let Some((_, tree_value)) = entry.get() {
+                match tree_value {
+                    InputTmdbIndexTree::Video(tree) => tree
+                        .query(&pid)
+                        .map(|vod_record| InputTmdbIndexValue::Video(vod_record.clone())),
+                    InputTmdbIndexTree::Series(tree) => tree
+                        .query(&pid)
+                        .map(|episode| InputTmdbIndexValue::Series(episode.clone())),
                 }
-            }
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                if let Some(input) = cfg.get_input_by_name(input_name) {
-                    if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
-                        .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type))
-                    {
-                        {
-                            let file_lock = cfg.file_locks.read_lock(&tmdb_path);
-                            match item_type {
-                                PlaylistItemType::Series => {
-                                    if let Ok(tree) =
-                                        BPlusTree::<u32, XtreamSeriesEpisode>::load(&tmdb_path)
-                                    {
-                                        let tmdb_id = tree.query(&pid).map(|episode| {
-                                            InputTmdbIndexValue::Series(episode.clone())
-                                        });
-                                        entry.insert(Some((
-                                            file_lock,
-                                            InputTmdbIndexTree::Series(tree),
-                                        )));
-                                        return tmdb_id;
-                                    }
-                                }
-                                PlaylistItemType::Video => {
-                                    if let Ok(tree) =
-                                        BPlusTree::<u32, InputVodInfoRecord>::load(&tmdb_path)
-                                    {
-                                        let tmdb_id = tree.query(&pid).map(|vod_record| {
-                                            InputTmdbIndexValue::Video(vod_record.clone())
-                                        });
-                                        entry.insert(Some((
-                                            file_lock,
-                                            InputTmdbIndexTree::Video(tree),
-                                        )));
-                                        return tmdb_id;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        };
-                    };
-                }
-                entry.insert(None);
+            } else {
                 None
             }
-        },
+        }
+        std::collections::hash_map::Entry::Vacant(entry) => {
+            if let Some(input) = cfg.get_input_by_name(input_name) {
+                if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
+                    .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type))
+                {
+                    {
+                        let file_lock = cfg.file_locks.read_lock(&tmdb_path);
+                        match item_type {
+                            PlaylistItemType::Series => {
+                                if let Ok(tree) =
+                                    BPlusTree::<u32, XtreamSeriesEpisode>::load(&tmdb_path)
+                                {
+                                    let tmdb_id = tree.query(&pid).map(|episode| {
+                                        InputTmdbIndexValue::Series(episode.clone())
+                                    });
+                                    entry.insert(Some((
+                                        file_lock,
+                                        InputTmdbIndexTree::Series(tree),
+                                    )));
+                                    return tmdb_id;
+                                }
+                            }
+                            PlaylistItemType::Video => {
+                                if let Ok(tree) =
+                                    BPlusTree::<u32, InputVodInfoRecord>::load(&tmdb_path)
+                                {
+                                    let tmdb_id = tree.query(&pid).map(|vod_record| {
+                                        InputTmdbIndexValue::Video(vod_record.clone())
+                                    });
+                                    entry.insert(Some((
+                                        file_lock,
+                                        InputTmdbIndexTree::Video(tree),
+                                    )));
+                                    return tmdb_id;
+                                }
+                            }
+                            _ => {}
+                        }
+                    };
+                };
+            }
+            entry.insert(None);
+            None
+        }
     }
 }
 
@@ -854,12 +852,15 @@ fn get_strm_url(
 }
 
 // /////////////////////////////////////////////
+// - Cleanup -
+// We first build a Directory Tree to
+// identifiy the deletable files and directories
 // /////////////////////////////////////////////
 #[derive(Debug, Clone)]
 struct DirNode {
     path: PathBuf,
-    is_root: bool,
-    has_files: bool,
+    is_root: bool, // is root -> not delete!
+    has_files: bool, //  has content -> do not delete!
     children: HashSet<PathBuf>,
     parent: Option<PathBuf>,
 }
@@ -885,6 +886,7 @@ impl DirNode {
 }
 
 /// Because of rust ownership we don't want to use References or Mutexes.
+/// Because of async operations ve cant use recursion.
 /// We use paths identifier to handle the tree construction.
 /// Rust sucks!!!
 async fn build_directory_tree(root_path: &Path) -> HashMap<PathBuf, DirNode> {
@@ -925,6 +927,10 @@ async fn build_directory_tree(root_path: &Path) -> HashMap<PathBuf, DirNode> {
     nodes
 }
 
+// We have build the directory tree,
+// now we need to build an ordered flat list,
+// We walk from top to bottom.
+// (PS: you can only delete in reverse order, because delete first children, then the parents)
 fn flatten_tree(
     root_path: &Path,
     mut tree_nodes: HashMap<PathBuf, DirNode>,
@@ -955,6 +961,7 @@ fn flatten_tree(
 
 async fn delete_empty_dirs_from_tree(root_path: &Path, tree_nodes: HashMap<PathBuf, DirNode>) {
     let tree_stack = flatten_tree(root_path, tree_nodes);
+    // reverse order  to delete from leaf to root
     for node in tree_stack.into_iter().rev() {
         if !node.has_files && !node.is_root {
             if let Err(err) = remove_dir(&node.path).await {
