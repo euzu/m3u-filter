@@ -159,20 +159,22 @@ impl ProxyUserCredentials {
         }
     }
 
-    pub fn is_active(&self, app_state: &AppState) -> bool {
-        if let Some(exp_date) = self.exp_date.as_ref() {
-            let now = Local::now();
-            if  (exp_date - now.timestamp()) < 0 {
-                return false;
+    pub fn has_permissions(&self, app_state: &AppState) -> bool {
+        if app_state.config.user_access_control {
+            if let Some(exp_date) = self.exp_date.as_ref() {
+                let now = Local::now();
+                if (exp_date - now.timestamp()) < 0 {
+                    return false;
+                }
             }
-        }
-        if let Some(max_connections) = self.max_connections.as_ref() {
-            if *max_connections < app_state.get_active_connections_for_user(&self.username) {
-                return false;
+            if let Some(max_connections) = self.max_connections.as_ref() {
+                if *max_connections < app_state.get_active_connections_for_user(&self.username) {
+                    return false;
+                }
             }
-        }
-        if let Some(status) = &self.status {
-            return matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial);
+            if let Some(status) = &self.status {
+                return matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial);
+            }
         }
         true
     }

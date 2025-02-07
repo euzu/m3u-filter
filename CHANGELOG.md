@@ -44,7 +44,8 @@ web_ui_enabled: true
   `strm` files now o get timestamp from `addedd`property if exists.
 - shared live stream implementation refactored.
 - added optional user properties: `max_connections`, `status`, `exp_date` (expiration date as unix seconds). 
-If they exist they are checked, if you don't need them remove this fields from `api-proxy.yml`
+If they exist they are checked when `config.yml` `user_access_control` set to true., if you don't need them remove this fields from `api-proxy.yml` 
+Added option in `config.yml` the option `user_access_control` to activate the checks. Default is false.  
 
 # 2.1.3 (2025-01-26)
 - Hotfix 2.1.2, forgot to update the stream api code.  

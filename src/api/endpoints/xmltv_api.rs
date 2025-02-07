@@ -164,7 +164,7 @@ async fn xmltv_api(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     if let Some((user, target)) = get_user_target(&api_req, &app_state).await {
-        if !user.is_active(&app_state) {
+        if !user.has_permissions(&app_state) {
             debug!("User access denied: {user:?}");
             return HttpResponse::Forbidden().finish();
         }

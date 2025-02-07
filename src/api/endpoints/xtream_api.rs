@@ -135,7 +135,7 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStre
 fn get_user_info(user: &ProxyUserCredentials, app_state: &AppState) -> XtreamAuthorizationResponse {
     let server_info = app_state.config.get_user_server_info(user);
     let active_connections = app_state.get_active_connections_for_user(&user.username);
-    XtreamAuthorizationResponse::new(&server_info, user, active_connections)
+    XtreamAuthorizationResponse::new(&server_info, user, active_connections, app_state.config.user_access_control)
 }
 
 async fn xtream_player_api_stream(
@@ -145,7 +145,7 @@ async fn xtream_player_api_stream(
     stream_req: XtreamApiStreamRequest<'_>,
 ) -> HttpResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state).await, false, format!("Could not find any user {}", stream_req.username));
-    if !user.is_active(&app_state) {
+    if !user.has_permissions(app_state) {
         debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
@@ -337,7 +337,7 @@ async fn xtream_player_api_resource(
     resource_req: XtreamApiStreamRequest<'_>,
 ) -> HttpResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(resource_req.username, resource_req.password, api_req, app_state).await, false, format!("Could not find any user {}", resource_req.username));
-    if !user.is_active(&app_state) {
+    if !user.has_permissions(app_state) {
         debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
@@ -585,15 +585,15 @@ async fn xtream_player_api(
     let user_target = get_user_target(&api_req, app_state).await;
     if let Some((user, target)) = user_target {
         if !target.has_output(&TargetType::Xtream) {
-            return HttpResponse::Ok().json(get_user_info(&user, &app_state));
+            return HttpResponse::Ok().json(get_user_info(&user, app_state));
         }
 
         let action = api_req.action.trim();
         if action.is_empty() {
-            return HttpResponse::Ok().json(get_user_info(&user, &app_state));
+            return HttpResponse::Ok().json(get_user_info(&user, app_state));
         }
 
-        if !user.is_active(&app_state) {
+        if !user.has_permissions(app_state) {
             debug!("User access denied: {user:?}");
             return HttpResponse::Forbidden().finish();
         }

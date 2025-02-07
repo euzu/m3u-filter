@@ -47,19 +47,34 @@ pub struct XtreamAuthorizationResponse {
 // }
 
 impl XtreamAuthorizationResponse {
-    pub fn new(server_info: &ApiProxyServerInfo, user: &ProxyUserCredentials, active_connections: u32) -> Self {
+    pub fn new(server_info: &ApiProxyServerInfo, user: &ProxyUserCredentials, active_connections: u32, access_control: bool) -> Self {
         let now = Local::now();
-        let created_at = user.created_at.as_ref().map_or_else(|| (now - Duration::days(365)).timestamp(), |d| *d);
-        let exp_date = user.exp_date.as_ref().map_or_else(|| (now + Duration::days(365)).timestamp(), |d| *d);
+        let created_default = (now - Duration::days(365)).timestamp();
+        let expired_default = (now + Duration::days(365)).timestamp();
 
-        let is_expired = (exp_date - now.timestamp()) < 0;
-        let is_trial = user.status.as_ref().map_or("0", |s| if *s == ProxyUserStatus::Trial { "1" } else { "0" }).to_string();
-        let max_connections = user.max_connections.as_ref().map_or("1".to_string(), |s| format!("{s}"));
-        let current_status = user.status.as_ref().unwrap_or(&ProxyUserStatus::Active);
-        let user_status =  match current_status {
-            ProxyUserStatus::Active | ProxyUserStatus::Trial => if is_expired { &ProxyUserStatus::Expired } else { current_status },
-            _ => current_status
-        };
+        let (created_at, exp_date, is_trial, max_connections, user_status) =
+            if access_control {
+                let exp_date = user.exp_date.as_ref().map_or(expired_default, |d| *d);
+                let is_expired = (exp_date - now.timestamp()) < 0;
+                let current_status = user.status.as_ref().unwrap_or(&ProxyUserStatus::Active);
+                let user_status = match current_status {
+                    ProxyUserStatus::Active | ProxyUserStatus::Trial => if is_expired { &ProxyUserStatus::Expired } else { current_status },
+                    _ => current_status
+                };
+                (user.created_at.as_ref().map_or(created_default, |d| *d),
+                 exp_date,
+                 user.status.as_ref().map_or("0", |s| if *s == ProxyUserStatus::Trial { "1" } else { "0" }).to_string(),
+                 user.max_connections.as_ref().map_or("1".to_string(), |s| format!("{s}")),
+                 user_status
+                )
+            } else {
+                (created_default,
+                 expired_default,
+                 "0".to_string(),
+                 "1".to_string(),
+                 &ProxyUserStatus::Active,
+                )
+            };
 
         Self {
             user_info: XtreamUserInfoResponse {

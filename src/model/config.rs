@@ -1015,6 +1015,8 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub log: Option<LogConfig>,
     #[serde(default)]
+    pub user_access_control: bool,
+    #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]
     pub web_ui_enabled: bool,

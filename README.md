@@ -77,6 +77,7 @@ Top level entries in the config files are:
 * `web_auth` _optional_
 * `reverse_proxy` _optional_
 * `log` _optional
+* `user_access_control` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -295,6 +296,16 @@ api:
   port: 8901
   web_root: ./web
 ```
+
+### 1.12 `user_access_control`
+The default is `false`. 
+If you set it to `true`,  the attributes (if available)
+
+- expiration date, 
+- status and 
+- max_connections
+
+are checked to permit or deny access.
 
 ## 2. `source.yml`
 
