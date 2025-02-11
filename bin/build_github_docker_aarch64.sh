@@ -3,6 +3,8 @@ set -euo pipefail
 source "${HOME}/.ghcr.io"
 
 WORKING_DIR=$(pwd)
+BIN_DIR="${WORKING_DIR}/bin"
+RESOURCES_DIR="${WORKING_DIR}/resources"
 DOCKER_DIR="${WORKING_DIR}/docker"
 FRONTEND_DIR="${WORKING_DIR}/frontend"
 TARGET=aarch64-unknown-linux-musl
@@ -11,6 +13,11 @@ if [ -z "${VERSION}" ]; then
     echo "Error: Failed to determine the version from Cargo.toml."
     exit 1
 fi
+
+if [ ! -f "${BIN_DIR}/build_resources.sh" ]; then
+  "${BIN_DIR}/build_resources.sh"
+fi
+
 
 cd "$FRONTEND_DIR" && rm -rf build && yarn  && yarn build
 cd "$WORKING_DIR"
@@ -35,6 +42,7 @@ fi
 cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${WORKING_DIR}/frontend/build" "${DOCKER_DIR}/web"
+cp -r "${RESOURCES_DIR}/freeze_frame.ts" "${DOCKER_DIR}/"
 
 # Get the version from the binary
 # VERSION=$(./m3u-filter -V | sed 's/m3u-filter *//')
@@ -58,5 +66,6 @@ docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
 echo "Cleaning up build artifacts..."
 rm -rf "${DOCKER_DIR}/web"
 rm -f "${DOCKER_DIR}/m3u-filter"
+rm -f "${DOCKER_DIR}/freeze_frame.ts"
 
 echo "Docker images ghcr.io/euzu/${SCRATCH_IMAGE_NAME}${VERSION} have been successfully built, tagged, and pushed."

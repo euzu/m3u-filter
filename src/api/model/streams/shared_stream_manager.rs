@@ -3,7 +3,7 @@ use crate::api::model::streams::provider_stream_factory::STREAM_QUEUE_SIZE;
 use crate::api::model::stream_error::StreamError;
 use crate::utils::debug_if_enabled;
 use crate::utils::network::request::sanitize_sensitive_info;
-use parking_lot::{FairMutex};
+use parking_lot::{RwLock};
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
@@ -14,8 +14,6 @@ use tokio_stream::wrappers::BroadcastStream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-
-const MIN_STREAM_QUEUE_SIZE: usize = 128;
 
 ///
 /// Wraps a `ReceiverStream` as Stream<Item = Result<Bytes, `StreamError`>>
@@ -67,6 +65,7 @@ impl SharedStreamState {
     fn broadcast<S, E>(&self, stream_url: &str, bytes_stream: S, shared_streams: Arc<SharedStreamManager>)
     where
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
+        E: std::fmt::Debug
     {
         let mut source_stream = Box::pin(bytes_stream);
         let streaming_url = stream_url.to_string();
@@ -81,9 +80,13 @@ impl SharedStreamState {
                             debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
                             break;
                         }
-                        let _ = sender.send(data);
+                        if let Err(err) = sender.send(data) {
+                           eprintln!("broadcast send err {err:?}");
+                        }
                     }
-                    None | Some(Err(_)) => {
+                    None => break,
+                    Some(Err(err)) => {
+                        eprintln!("broadcast failure {err:?}");
                         break;
                     }
                 }
@@ -94,7 +97,7 @@ impl SharedStreamState {
     }
 }
 
-type SharedStreamRegister = Arc<FairMutex<HashMap<String, SharedStreamState>>>;
+type SharedStreamRegister = RwLock<HashMap<String, SharedStreamState>>;
 
 pub struct SharedStreamManager {
     shared_streams: SharedStreamRegister,
@@ -103,35 +106,36 @@ pub struct SharedStreamManager {
 impl SharedStreamManager {
     pub(crate) fn new() -> Self {
         Self {
-            shared_streams: Arc::new(FairMutex::new(HashMap::new())),
+            shared_streams: RwLock::new(HashMap::new()),
         }
     }
 
     pub fn get_shared_state_headers(&self, stream_url: &str) -> Option<Vec<(String, String)>> {
-        self.shared_streams.lock().get(stream_url).map(|s| s.headers.clone())
+        self.shared_streams.read().get(stream_url).map(|s| s.headers.clone())
     }
 
     fn unregister(&self, stream_url: &str) {
-        self.shared_streams.lock().remove(stream_url);
+        self.shared_streams.write().remove(stream_url);
+    }
+
+    fn register(&self, stream_url: &str, shared_state: SharedStreamState) {
+        self.shared_streams.write().insert(stream_url.to_string(), shared_state);
     }
 
     pub(crate) fn subscribe<S, E>(
         app_state: &AppState,
         stream_url: &str,
         bytes_stream: S,
-        use_buffer: bool,
-        headers: Vec<(String, String)>, )
+        headers: Vec<(String, String)>,
+        buffer_size: usize,)
     where
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
+        E: std::fmt::Debug
     {
-        let buf_size = if use_buffer { STREAM_QUEUE_SIZE } else { MIN_STREAM_QUEUE_SIZE };
+        let buf_size = std::cmp::max(buffer_size, STREAM_QUEUE_SIZE);
         let shared_state = SharedStreamState::new(headers, buf_size);
         shared_state.broadcast(stream_url, bytes_stream, Arc::clone(&app_state.shared_stream_manager));
-        app_state
-            .shared_stream_manager
-            .shared_streams
-            .lock()
-            .insert(stream_url.to_string(), shared_state);
+        app_state.shared_stream_manager.register(stream_url, shared_state);
         debug_if_enabled!("Created shared provider stream {}", sanitize_sensitive_info(stream_url));
     }
 
@@ -140,15 +144,7 @@ impl SharedStreamManager {
         app_state: &AppState,
         stream_url: &str,
     ) -> Option<BoxStream<'static, Result<Bytes, StreamError>>> {
-        if let Some(shared_stream) =  app_state
-            .shared_stream_manager
-            .shared_streams
-            .lock()
-            .get(stream_url) {
-            debug_if_enabled!("Responding existing shared client stream {}", sanitize_sensitive_info(stream_url));
-            Some(shared_stream.subscribe())
-        } else {
-            None
-        }
+        debug_if_enabled!("Responding existing shared client stream {}", sanitize_sensitive_info(stream_url));
+        app_state.shared_stream_manager.shared_streams.read().get(stream_url).map(SharedStreamState::subscribe)
     }
 }

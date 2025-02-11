@@ -3,6 +3,7 @@ threads: 0
 working_dir: /home/m3u-filter/data
 backup_dir: /home/m3u-filter/.backup
 update_on_boot: false
+channel_unavailable_file: /home/m3u-filter/freeze_frame.ts
 # sec  min   hour   day of month   month   day of week   year
 schedules:
   - schedule: "0  0  8,12,16,20,22,1  *  *  *  *"

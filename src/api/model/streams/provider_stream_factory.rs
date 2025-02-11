@@ -1,12 +1,13 @@
 use crate::api::api_utils::get_headers_from_request;
-use crate::api::model::streams::buffered_stream::BufferedStream;
-use crate::api::model::streams::client_stream::ClientStream;
 use crate::api::model::model_utils::get_response_headers;
 use crate::api::model::stream_error::StreamError;
-use crate::utils::debug_if_enabled;
-use crate::model::config::ConfigInput;
+use crate::api::model::streams::buffered_stream::BufferedStream;
+use crate::api::model::streams::client_stream::ClientStream;
+use crate::api::model::streams::provider_stream::get_header_filter_for_item_type;
+use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::PlaylistItemType;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
+use crate::utils::debug_if_enabled;
 use crate::utils::network::request::{classify_content_type, get_request_headers, sanitize_sensitive_info, MimeCategory};
 use actix_web::HttpRequest;
 use bytes::Bytes;
@@ -20,7 +21,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use url::Url;
-use crate::api::model::streams::provider_stream::get_header_filter_for_item_type;
+use crate::api::model::streams::freeze_frame_stream::FreezeFrameStream;
 
 // TODO make this configurable
 pub const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
@@ -35,6 +36,7 @@ pub struct BufferStreamOptions {
     reconnect_enabled: bool,
     buffer_enabled: bool,
     buffer_size: usize,
+    share_stream: bool,
 }
 
 impl BufferStreamOptions {
@@ -43,18 +45,25 @@ impl BufferStreamOptions {
         reconnect_enabled: bool,
         buffer_enabled: bool,
         buffer_size: usize,
+        share_stream: bool
     ) -> Self {
         Self {
             item_type,
             reconnect_enabled,
             buffer_enabled,
             buffer_size,
+            share_stream,
         }
     }
 
     #[inline]
     fn is_buffer_enabled(&self) -> bool {
         self.buffer_enabled
+    }
+
+    #[inline]
+    fn is_shared_stream(&self) -> bool {
+        self.share_stream
     }
 
     // #[inline]
@@ -193,7 +202,7 @@ fn prepare_client(request_client: &Arc<reqwest::Client>, url: &Url, headers: &He
     }
 }
 
-async fn provider_request(request_client: Arc<reqwest::Client>, initial_info: bool, stream_options: &ProviderStreamOptions) -> Result<Option<ProviderStreamResponse>, StatusCode> {
+async fn provider_request(cfg: &Config, request_client: Arc<reqwest::Client>, initial_info: bool, stream_options: &ProviderStreamOptions) -> Result<Option<ProviderStreamResponse>, StatusCode> {
     let (client, _partial_content) = prepare_client(&request_client, stream_options.get_url(), stream_options.get_headers(), stream_options.get_total_bytes_send());
     match client.send().await {
         Ok(mut response) => {
@@ -213,6 +222,9 @@ async fn provider_request(request_client: Arc<reqwest::Client>, initial_info: bo
                     error!("Failed to read response body: {err}");
                     StreamError::reqwest(&err)
                 }).boxed(), response_info)));
+            }
+            if let Some(freeze_frame) = cfg.t_channel_unavailable_file.as_ref() {
+                return Ok(Some((FreezeFrameStream::new(status.as_u16(), Arc::clone(freeze_frame)).boxed(), None)))
             }
             Err(status)
         }
@@ -260,17 +272,17 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
         }
         actix_web::rt::time::sleep(Duration::from_millis(100)).await;
     }
-    debug_if_enabled!("Stopped seconnecting stream {}", sanitize_sensitive_info(url.as_str()));
+    debug_if_enabled!("Stopped reconnecting stream {}", sanitize_sensitive_info(url.as_str()));
     None
 }
 
 const RETRY_SECONDS: u64 = 5;
 const ERR_MAX_RETRY_COUNT: u32 = 5;
-async fn get_initial_stream(client: Arc<reqwest::Client>, stream_options: &ProviderStreamOptions) -> Option<ProviderStreamResponse> {
+async fn get_initial_stream(cfg: &Config, client: Arc<reqwest::Client>, stream_options: &ProviderStreamOptions) -> Option<ProviderStreamResponse> {
     let start = Instant::now();
     let mut connect_err: u32 = 1;
     while stream_options.should_continue() {
-        match provider_request(Arc::clone(&client), true, stream_options).await {
+        match provider_request(cfg, Arc::clone(&client), true, stream_options).await {
             Ok(Some(value)) => return Some(value),
             Ok(None) => {
                 if connect_err > ERR_MAX_RETRY_COUNT {
@@ -316,7 +328,8 @@ fn create_provider_stream_options(stream_url: &Url,
     }
 }
 
-pub async fn create_provider_stream(client: Arc<reqwest::Client>,
+pub async fn create_provider_stream(cfg: &Config,
+                                    client: Arc<reqwest::Client>,
                                     stream_url: &Url,
                                     req: &HttpRequest,
                                     input: Option<&ConfigInput>,
@@ -324,7 +337,7 @@ pub async fn create_provider_stream(client: Arc<reqwest::Client>,
     let stream_options = create_provider_stream_options(stream_url, req, input, &options);
 
     let client_stream_factory = |stream, reconnect_flag, range_cnt| {
-        let stream = if stream_options.is_buffered() {
+        let stream = if stream_options.is_buffered() && !options.is_shared_stream() {
             BufferedStream::new(stream, stream_options.get_buffer_size(), stream_options.get_continue_flag_clone(), stream_url.as_str()).boxed()
         } else {
             stream
@@ -332,7 +345,7 @@ pub async fn create_provider_stream(client: Arc<reqwest::Client>,
         ClientStream::new(stream, reconnect_flag, range_cnt, stream_options.get_url().as_str()).boxed()
     };
 
-    match get_initial_stream(Arc::clone(&client), &stream_options).await {
+    match get_initial_stream(cfg, Arc::clone(&client), &stream_options).await {
         Some((init_stream, info)) => {
             let is_media_stream = if let Some((headers, _)) = &info {
                 classify_content_type(headers) == MimeCategory::Video
@@ -344,12 +357,18 @@ pub async fn create_provider_stream(client: Arc<reqwest::Client>,
             if is_media_stream && stream_options.should_reconnect() {
                 let client_signal = Arc::clone(&continue_signal);
                 let stream_options_provider = stream_options.clone();
+                let continue_streaming_signal = client_signal.clone();
                 let unfold: ResponseStream = stream::unfold((), move |()| {
                     let client = Arc::clone(&client);
                     let stream_opts = stream_options_provider.clone();
+                    let continue_streaming = continue_streaming_signal.clone();
                     async move {
-                        let stream = stream_provider(client, stream_opts).await?;
-                        Some((stream, ()))
+                        if continue_streaming.is_active() {
+                            let stream = stream_provider(client, stream_opts).await?;
+                            Some((stream, ()))
+                        } else {
+                            None
+                        }
                     }
                 }).flatten().boxed();
                 Some((client_stream_factory(init_stream.chain(unfold).boxed(), Arc::clone(&client_signal), stream_options.get_range_bytes_clone()).boxed(), info))

@@ -1,5 +1,5 @@
 # Changelog
-# 2.1.4 (2025-01-xx)
+# 2.2.0 (2025-02-11)
 - !BREAKING CHANGE!  unique `input` `name` is now mandatory, because rearranging the `source.yml` could lead to wrong results without a playlist update.
 - !BREAKING_CHANGE! `log_sanitize_sensitive_info`  is now under `log` section  as `sanitize_sensitive_info`
 - !BREAKING_CHANGE! uuid generation for entries changed to `input.name` + `stream_id`. Virtual id mapping changed. The new Virtual id is not a sequence anymore.
@@ -46,6 +46,12 @@ web_ui_enabled: true
 - added optional user properties: `max_connections`, `status`, `exp_date` (expiration date as unix seconds). 
 If they exist they are checked when `config.yml` `user_access_control` set to true., if you don't need them remove this fields from `api-proxy.yml` 
 Added option in `config.yml` the option `user_access_control` to activate the checks. Default is false.  
+- Added option `channel_unavailable_file` in `config.yml`. If a provider stream is not available this file content is send instead.
+```yaml
+update_on_boot: false
+web_ui_enabled: true
+channel_unavailable_file: /freeze_frame.ts
+```
 
 # 2.1.3 (2025-01-26)
 - Hotfix 2.1.2, forgot to update the stream api code.  

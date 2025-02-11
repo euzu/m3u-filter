@@ -39,6 +39,7 @@ COPY --from=rust-build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter /m3u-filter
 COPY --from=node-build /app/build /web
+COPY ./freeze_frame.ts /freeze_frame.ts
 # config should be mounted as volume
 # COPY ./config /config
 
@@ -54,6 +55,7 @@ WORKDIR /app
 
 COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter m3u-filter
 COPY --from=node-build /app/build web
+COPY ./freeze_frame.ts /freeze_frame.ts
 # config should be mounted as volume
 # COPY ./config config
 

@@ -4,10 +4,11 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
+use crate::m3u_filter_error::str_to_io_error;
+use crate::utils::debug_if_enabled;
+use crate::utils::file::{config_reader};
 use log::{debug, error};
 use path_clean::PathClean;
-use crate::utils::debug_if_enabled;
-use crate::m3u_filter_error::str_to_io_error;
 
 const USER_FILE: &str = "user.txt";
 const CONFIG_PATH: &str = "config";
@@ -17,13 +18,15 @@ const MAPPING_FILE: &str = "mapping.yml";
 const API_PROXY_FILE: &str = "api-proxy.yml";
 
 pub fn file_writer<W>(w: W) -> BufWriter<W>
-where W:  Write
+where
+    W: Write,
 {
     BufWriter::with_capacity(131_072, w)
 }
 
 pub fn file_reader<R>(r: R) -> BufReader<R>
-where R:  Read
+where
+    R: Read,
 {
     BufReader::with_capacity(131_072, r)
 }
@@ -250,4 +253,33 @@ pub fn prepare_file_path(persist: Option<&str>, working_dir: &str, action: &str)
     } else {
         None
     }
+}
+
+pub fn read_file_as_bytes(path: &Path) -> std::io::Result<Vec<u8>> {
+    let mut file = File::open(path)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
+
+pub fn make_absolute_path(path: &str, working_dir: &str, resolve_var: bool) -> String {
+    let resolved_path = if resolve_var { config_reader::resolve_env_var(path) } else { path.to_string() };
+
+    let rpb = std::path::PathBuf::from(&resolved_path);
+    if rpb.is_relative() {
+        let mut rpb2 = std::path::PathBuf::from(working_dir).join(&rpb);
+        if !rpb2.exists() {
+            rpb2 = get_exe_path().join(&rpb);
+        }
+        if !rpb2.exists() {
+            let cwd = std::env::current_dir();
+            if let Ok(cwd_path) = cwd {
+                rpb2 = cwd_path.join(&rpb);
+            }
+        }
+        if rpb2.exists() {
+            return String::from(rpb2.clean().to_str().unwrap_or_default());
+        }
+    }
+    resolved_path
 }

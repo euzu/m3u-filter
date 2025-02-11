@@ -3,12 +3,19 @@ set -euo pipefail
 source "${HOME}/.ghcr.io"
 
 WORKING_DIR=$(pwd)
+BIN_DIR="${WORKING_DIR}/bin"
+RESOURCES_DIR="${WORKING_DIR}/resources"
 DOCKER_DIR="${WORKING_DIR}/docker"
 FRONTEND_DIR="${WORKING_DIR}/frontend"
 TARGET=x86_64-unknown-linux-musl
 
 cd "$FRONTEND_DIR" && rm -rf build && yarn  && yarn build
 cd "$WORKING_DIR"
+
+if [ ! -f "${BIN_DIR}/build_resources.sh" ]; then
+  "${BIN_DIR}/build_resources.sh"
+fi
+
 
 # Check if the frontend build directory exists
 if [ ! -d "$FRONTEND_DIR/build" ]; then
@@ -30,6 +37,7 @@ BIN_FILE=${WORKING_DIR}/target/${TARGET}/release/m3u-filter
 cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${FRONTEND_DIR}/build" "${DOCKER_DIR}/web"
+cp -r "${RESOURCES_DIR}/freeze_frame.ts" "${DOCKER_DIR}/"
 
 # Get the version from the binary
 VERSION=$("$BIN_FILE" -V | sed 's/m3u-filter *//')
@@ -66,5 +74,6 @@ docker push ghcr.io/euzu/${ALPINE_IMAGE_NAME}:latest
 echo "Cleaning up build artifacts..."
 rm -rf "${DOCKER_DIR}/web"
 rm -f "${DOCKER_DIR}/m3u-filter"
+rm -f "${DOCKER_DIR}/freeze_frame.ts"
 
 echo "Docker images for version ${VERSION} have been successfully built, tagged, and pushed."

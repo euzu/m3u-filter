@@ -78,6 +78,7 @@ Top level entries in the config files are:
 * `reverse_proxy` _optional_
 * `log` _optional
 * `user_access_control` _optional_
+* `channel_unavailable_file` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
@@ -306,6 +307,20 @@ If you set it to `true`,  the attributes (if available)
 - max_connections
 
 are checked to permit or deny access.
+
+### 1.12 `channel_unavailable_file`
+If you want to send a `Unavailable Channel` picture instead of black screen when a channel is not available.
+A video file with name `freeze_frame.ts` is already available in the docker image. 
+
+You can convert an image with `ffmpeg`.
+
+`ffmpeg -loop 1 -framerate 1 -i freeze_frame.jpg -t 1 -c:v mpeg2video -f mpegts freeze_frame.ts` 
+
+and add it to the `config.yml`.
+
+```yaml
+channel_unavailable_file: /freeze_frame.ts
+```
 
 ## 2. `source.yml`
 

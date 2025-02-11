@@ -35,6 +35,7 @@ impl Stream for ClientStream {
             match Pin::as_mut(&mut self.inner).poll_next(cx) {
                 Poll::Ready(Some(Ok(bytes))) => {
                     if bytes.is_empty() {
+                        eprintln!("client stream empty bytes");
                         continue;
                     }
 
@@ -48,7 +49,10 @@ impl Stream for ClientStream {
                     self.close_signal.notify();
                     return Poll::Ready(None);
                 }
-                other => return other,
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Some(Err(err))) => {
+                    eprintln!("client stream error: {err}");
+                }
             }
         }
     }

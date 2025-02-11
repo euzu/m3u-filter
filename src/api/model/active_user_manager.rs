@@ -42,6 +42,7 @@ impl ActiveUserManager {
             } else {
                 lock.insert(username.to_string(), AtomicU32::new(1));
             }
+            drop(lock);
         }
         (self.active_users(), self.active_connections())
     }
@@ -54,6 +55,7 @@ impl ActiveUserManager {
                     lock.remove(username);
                 }
             }
+            drop(lock);
         }
         (self.active_users(), self.active_connections())
     }

@@ -5,7 +5,7 @@ source "${HOME}/.ghcr.io"
 
 TARGET=x86_64-unknown-linux-musl
 
-(bin/build_fe.sh && bin/build_lin_static.sh) || exit 1;
+(bin/build_fe.sh && bin/build_lin_static.sh && bin/build_resources.sh ) || exit 1;
 
 # Check if the binary exists
 if [ ! -f "./target/${TARGET}/release/m3u-filter" ]; then
@@ -19,11 +19,17 @@ if [ ! -d "./frontend/build" ]; then
     exit 1
 fi
 
+if [ ! -f "./resources/freeze_frame.ts" ]; then
+    echo "Error: ./resources/freeze_frame.ts does not exist."
+    exit 1
+fi
+
 # Prepare Docker build context
 cd ./docker
 cp "../target/${TARGET}/release/m3u-filter" .
 rm -rf ./web
 cp -r ../frontend/build ./web
+cp -r ../resources/freeze_frame.ts .
 
 # Get the version from the binary
 VERSION=$(./m3u-filter -V | sed 's/m3u-filter *//')
@@ -58,5 +64,6 @@ docker push ghcr.io/euzu/m3u-filter-beta:latest
 echo "Cleaning up build artifacts..."
 rm -rf ./web
 rm -f ./m3u-filter
+rm -f ./freeze_frame.ts
 
 echo "Docker images for version ${VERSION} have been successfully built, tagged, and pushed."

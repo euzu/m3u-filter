@@ -16,7 +16,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[derive(Debug)]
 pub struct AtomicOnceFlag {
     enabled: AtomicBool,
-    ordering: Ordering,
 }
 
 impl Default for AtomicOnceFlag {
@@ -26,30 +25,24 @@ impl Default for AtomicOnceFlag {
 }
 
 impl AtomicOnceFlag {
-    /// Creates a new `AtomicOnceFlag` with the specified memory ordering.
-    pub fn with_ordering(ordering: Ordering) -> Self {
-        Self {
-            enabled: AtomicBool::new(true),
-            ordering,
-        }
-    }
-
     /// Creates a new `AtomicOnceFlag` with a default memory ordering of `Relaxed`.
     pub fn new() -> Self {
-        Self::with_ordering(Ordering::SeqCst)
+        Self {
+            enabled: AtomicBool::new(true),
+        }
     }
 
     /// Disables the flag. After calling this method, `is_active()` will always return `false`.
     ///
     /// This operation is atomic and uses the specified memory ordering.
     pub fn notify(&self) {
-        self.enabled.store(false, self.ordering);
+        self.enabled.store(false, Ordering::SeqCst);
     }
 
     /// Checks if the flag is still active.
     ///
     /// Returns `true` if the flag is active (initial state). Returns `false` if the flag has been disabled.
     pub fn is_active(&self) -> bool {
-        self.enabled.load(self.ordering)
+        self.enabled.load(Ordering::SeqCst)
     }
 }

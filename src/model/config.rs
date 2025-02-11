@@ -1007,6 +1007,8 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_dir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_unavailable_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub templates: Option<Vec<PatternTemplate>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub video: Option<VideoConfig>,
@@ -1038,6 +1040,8 @@ pub struct Config {
     pub t_api_proxy_file_path: String,
     #[serde(skip)]
     pub file_locks: Arc<FileLockManager>,
+    #[serde(skip)]
+    pub t_channel_unavailable_file: Option<Arc<Vec<u8>>>,
 }
 
 impl Config {
@@ -1172,6 +1176,17 @@ impl Config {
         let work_dir = if resolve_var { &config_reader::resolve_env_var(&self.working_dir) } else { &self.working_dir };
         self.working_dir = file_utils::get_working_path(work_dir);
 
+        if let Some(channel_unavailable_file) = &self.channel_unavailable_file {
+            let channel_unavailable = file_utils::make_absolute_path(channel_unavailable_file, &self.working_dir, resolve_var);
+            match file_utils::read_file_as_bytes(&PathBuf::from(&channel_unavailable)) {
+                Ok(data) => self.t_channel_unavailable_file = Some(Arc::new(data)),
+                Err(err) => {
+                    error!("Failed to load channel unavailable file: {channel_unavailable} {err}");
+                }
+            }
+            self.channel_unavailable_file = Some(channel_unavailable);
+        }
+
         if self.backup_dir.is_none() {
             self.backup_dir = Some(PathBuf::from(&self.working_dir).join("backup").clean().to_string_lossy().to_string());
         } else {
@@ -1250,24 +1265,7 @@ impl Config {
 
     fn prepare_api_web_root(&mut self, resolve_var: bool) {
         if !self.api.web_root.is_empty() {
-            let web_root = if resolve_var { config_reader::resolve_env_var(&self.api.web_root) } else { self.api.web_root.clone() };
-            self.api.web_root = web_root.to_string();
-            let wrpb = std::path::PathBuf::from(&self.api.web_root);
-            if wrpb.is_relative() {
-                let mut wrpb2 = std::path::PathBuf::from(&self.working_dir).join(&web_root);
-                if !wrpb2.exists() {
-                    wrpb2 = file_utils::get_exe_path().join(&web_root);
-                }
-                if !wrpb2.exists() {
-                    let cwd = std::env::current_dir();
-                    if let Ok(cwd_path) = cwd {
-                        wrpb2 = cwd_path.join(&web_root);
-                    }
-                }
-                if wrpb2.exists() {
-                    self.api.web_root = String::from(wrpb2.clean().to_str().unwrap_or_default());
-                }
-            }
+            self.api.web_root = file_utils::make_absolute_path(&self.api.web_root, &self.working_dir, resolve_var);
         }
     }
 

@@ -18,9 +18,7 @@ pub(in crate::api) struct ActiveClientStream {
 
 impl ActiveClientStream {
     pub(crate) fn new(inner: ResponseStream, active_clients: Arc<ActiveUserManager>, user: &ProxyUserCredentials, log_active_clients: bool) -> Self {
-        let (client_count, connection_count) = {
-            active_clients.add_connection(&user.username)
-        };
+        let (client_count, connection_count) = active_clients.add_connection(&user.username);
         if log_active_clients {
             info!("Active clients: {client_count}, active connections {connection_count}");
         }
@@ -30,10 +28,7 @@ impl ActiveClientStream {
 impl Stream for ActiveClientStream {
     type Item = Result<Bytes, StreamError>;
 
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>,cx: &mut std::task::Context<'_>,) -> Poll<Option<Self::Item>> {
         Pin::as_mut(&mut self.inner).poll_next(cx)
     }
 }
@@ -41,9 +36,7 @@ impl Stream for ActiveClientStream {
 
 impl Drop for ActiveClientStream {
     fn drop(&mut self) {
-        let (client_count, connection_count) = {
-            self.active_clients.remove_connection(&self.username)
-        };
+        let (client_count, connection_count) = self.active_clients.remove_connection(&self.username);
         if self.log_active_clients {
            info!("Active clients: {client_count}, active connections {connection_count}");
         }

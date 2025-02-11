@@ -4,8 +4,7 @@ use std::{
     pin::Pin,
     sync::Arc,
 };
-use std::time::Duration;
-use tokio::sync::mpsc::channel;
+use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use crate::api::model::stream_error::StreamError;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
@@ -17,33 +16,43 @@ pub(in crate::api::model) struct BufferedStream {
 impl BufferedStream {
     pub fn new(stream: ResponseStream, buffer_size: usize, client_close_signal: Arc<AtomicOnceFlag>, _url: &str) -> Self {
         let (tx, rx) = channel(buffer_size);
-        actix_rt::spawn(async move {
-            let mut stream = stream;
-            let sleep_duration= Duration::from_millis(100);
-            loop {
-                match stream.next().await {
-                    Some(Ok(chunk)) => {
-                        // this is for backpressure, we fill the buffer and wait for the receiver
-                        if let Ok(permit) = tx.reserve().await {
-                            permit.send(Ok(chunk));
-                        } else {
-                            // receiver closed.
+        actix_rt::spawn(Self::buffer_stream(tx, stream, client_close_signal));
+        Self {
+            stream: ReceiverStream::new(rx)
+        }
+    }
+
+    async fn buffer_stream(
+        tx: Sender<Result<bytes::Bytes, StreamError>>,
+        mut stream: ResponseStream,
+        client_close_signal: Arc<AtomicOnceFlag>,
+    ) {
+        loop {
+            if !client_close_signal.is_active() {
+                break;
+            }
+            match stream.next().await {
+                Some(Ok(chunk)) => {
+                    match tx.reserve().await {
+                        Ok(permit) => permit.send(Ok(chunk)),
+                        Err(_err) => {
+                            // Receiver dropped, notify and exit
                             client_close_signal.notify();
                             break;
                         }
                     }
-                    Some(Err(_err)) => {
-                        actix_web::rt::time::sleep(sleep_duration).await;
-                    }
-                    None => {
-                        break
-                    }
                 }
+                Some(Err(err)) => {
+                    eprintln!("Buffered Stream Error: {err:?}");
+                    // actix_web::rt::time::sleep(sleep_duration).await;
+                    // Attempt to send error to client
+                    if tx.send(Err(err)).await.is_err() {
+                        client_close_signal.notify();
+                    }
+                    break;
+                }
+                None => break,
             }
-        });
-
-        Self {
-            stream: ReceiverStream::new(rx)
         }
     }
 }
@@ -51,7 +60,7 @@ impl BufferedStream {
 impl Stream for BufferedStream {
     type Item = Result<bytes::Bytes, StreamError>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.stream.poll_next_unpin(cx)
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.get_mut().stream).poll_next(cx)
     }
 }

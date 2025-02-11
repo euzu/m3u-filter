@@ -9,6 +9,7 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY ./m3u-filter /
 COPY ./web /web
+COPY ./freeze_frame.ts ./freeze_frame.ts
 
 CMD ["./m3u-filter", "-s", "-p", "/config"]
 
@@ -21,6 +22,7 @@ WORKDIR /app
 
 COPY ./m3u-filter .
 COPY ./web ./web
+COPY ./freeze_frame.ts ./freeze_frame.ts
 # config should be mounted as volume
 # COPY ./config ./config
 

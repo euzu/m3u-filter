@@ -2,7 +2,6 @@ use crate::api::model::app_state::AppState;
 use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::streams::persist_pipe_stream::PersistPipeStream;
 use crate::api::model::streams::provider_stream;
-use crate::api::model::streams::provider_stream::get_provider_pipe_stream;
 use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::stream_error::StreamError;
@@ -10,7 +9,7 @@ use crate::utils::{debug_if_enabled, trace_if_enabled};
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::playlist::PlaylistItemType;
-use crate::utils::file::file_utils::create_new_file_for_write;
+use crate::utils::file::file_utils::{create_new_file_for_write};
 use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::network::request;
 use crate::utils::network::request::sanitize_sensitive_info;
@@ -23,6 +22,7 @@ use futures::TryStreamExt;
 use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
 use std::collections::HashMap;
+use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
 use url::Url;
@@ -103,7 +103,7 @@ pub async fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a App
     get_user_target_by_credentials(username, password, api_req, app_state).await
 }
 
-fn get_stream_options(app_state: &AppState) -> (bool, bool, usize, bool, bool) {
+fn get_stream_options(app_state: &AppState) -> (bool, bool, usize, bool) {
     let (stream_retry, buffer_enabled, buffer_size) = app_state
         .config
         .reverse_proxy
@@ -117,8 +117,7 @@ fn get_stream_options(app_state: &AppState) -> (bool, bool, usize, bool, bool) {
             (stream.retry, buffer_enabled, buffer_size)
         });
     let pipe_provider_stream = !stream_retry && !buffer_enabled;
-    let shared_stream_use_own_buffer = !buffer_enabled || pipe_provider_stream;
-    (stream_retry, buffer_enabled, buffer_size, pipe_provider_stream, shared_stream_use_own_buffer)
+    (stream_retry, buffer_enabled, buffer_size, pipe_provider_stream)
 }
 
 fn get_stream_content_length(provider_response: Option<&(Vec<(String, String)>, StatusCode)>) -> u64 {
@@ -144,23 +143,23 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         }
     }
 
-    let (stream_retry, buffer_enabled, buffer_size, direct_pipe_provider_stream, shared_stream_use_own_buffer) =
+    let (stream_retry, buffer_enabled, buffer_size, direct_pipe_provider_stream) =
         get_stream_options(app_state);
 
     if let Ok(url) = Url::parse(stream_url) {
         let active_clients = Arc::clone(&app_state.active_users);
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
-            get_provider_pipe_stream(&app_state.http_client, &url, req, input, item_type).await
+            provider_stream::get_provider_pipe_stream(&app_state.config, &app_state.http_client, &url, req, input, item_type).await
         } else {
-            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size);
-            provider_stream::get_provider_reconnect_buffered_stream(&app_state.http_client, &url, req, input, buffer_stream_options).await
+            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size, share_stream);
+            provider_stream::get_provider_reconnect_buffered_stream(&app_state.config, &app_state.http_client, &url, req, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {
             let content_length = get_stream_content_length(provider_response.as_ref());
             let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients);
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
-                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_stream_use_own_buffer, shared_headers);
+                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, buffer_size);
                 if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url) {
                     let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
                     if content_length > 0 { 
@@ -261,7 +260,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
                             cache.lock().store_path(resource_url)
                         };
                         if let Ok(file) = create_new_file_for_write(&resource_path) {
-                            let writer = Arc::new(file);
+                            let writer = BufWriter::new(file);
                             let add_cache_content = get_add_cache_content(resource_url, &app_state.cache);
                             let stream = PersistPipeStream::new(byte_stream, writer, add_cache_content);
                             return response_builder.body(BodyStream::new(stream));

@@ -1,3 +1,4 @@
+/resources/*.ts
 /release
 /target
 /frontend/build
