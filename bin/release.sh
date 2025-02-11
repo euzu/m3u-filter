@@ -3,6 +3,7 @@ set -e
 set -o pipefail
 
 WORKING_DIR=$(pwd)
+RESOURCES_DIR="$WORKING_DIR/resources"
 RELEASE_DIR="$WORKING_DIR/release"
 FRONTEND_DIR="${WORKING_DIR}/frontend"
 
@@ -90,6 +91,7 @@ for PLATFORM in "${!TARGETS[@]}"; do
     cp "$BIN" "$DIR"
     cp ../config/*.yml "$DIR"
     cp -rf "${FRONTEND_DIR}/build" "$DIR"/web
+    cp "${RESOURCES_DIR}/freeze_frame.ts" "$DIR"
 
     # Create archive for the platform
     if [[ $PLATFORM == "WINDOWS" ]]; then
