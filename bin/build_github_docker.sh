@@ -37,7 +37,7 @@ BIN_FILE=${WORKING_DIR}/target/${TARGET}/release/m3u-filter
 cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${FRONTEND_DIR}/build" "${DOCKER_DIR}/web"
-cp -r "${RESOURCES_DIR}/freeze_frame.ts" "${DOCKER_DIR}/"
+cp "${RESOURCES_DIR}/freeze_frame.ts" "${DOCKER_DIR}/"
 
 # Get the version from the binary
 VERSION=$("$BIN_FILE" -V | sed 's/m3u-filter *//')
