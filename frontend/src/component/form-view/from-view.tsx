@@ -5,7 +5,7 @@ import TagSelect from "../tag-select/tags-select";
 import MapEditor from "../map-editor/map-editor";
 import TagInput from "../tag-input/tag-input";
 import ScheduleEditor from "../schedule-editor/schedule-editor";
-
+import DatePicker from "react-date-picker";
 // export const isNumber = (value: string): boolean => {
 //     return !isNaN(value as any);
 // }
@@ -19,7 +19,8 @@ export enum FormFieldType {
     CHECK = 'checkbox',
     TAGS = 'tags',
     MAP = 'map',
-    SCHEDULE = 'schedule'
+    SCHEDULE = 'schedule',
+    DATE = 'date'
 }
 
 export type FormField = {
@@ -75,6 +76,8 @@ export default function FormView(props: FormViewProps) {
                 return <TagInput placeHolder={''} onChange={handleChange} name={field.name} values={data?.[field.name] || []}></TagInput>
             case FormFieldType.SCHEDULE:
                 return <ScheduleEditor onChange={handleChange} name={field.name} values={data?.[field.name] || []} sources={data?.sources || []}></ScheduleEditor>
+            case FormFieldType.DATE:
+                return <DatePicker onChange={handleValueChange} name={field.name} value={data?.[field.name] || []}></DatePicker>
             case FormFieldType.NUMBER:
             case FormFieldType.TEXT:
             default:

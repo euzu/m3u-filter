@@ -10,6 +10,7 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
+use mime::APPLICATION_JSON;
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
 use crate::api::model::app_state::AppState;
@@ -39,7 +40,7 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
     Ok(web_dir_path)
 }
 
-async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
+fn create_healthcheck(app_state: web::Data<AppState>) -> Healthcheck {
     let server_time = chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string();
     let cache = app_state.cache.as_ref().as_ref().map(|c| c.lock().get_size_text());
     let (active_clients, active_connections) =  {
@@ -47,16 +48,28 @@ async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
         (active_user.active_users(), active_user.active_connections())
     };
     let build_time: Option<String> = BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string());
-    HttpResponse::Ok().json(Healthcheck {
+    Healthcheck {
         status: "ok".to_string(),
         version: VERSION.to_string(),
         build_time,
         server_time,
-        mem: sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
+        memory: sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
         active_clients,
         active_connections,
         cache,
-    })
+    }
+}
+
+async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
+    HttpResponse::Ok().json(create_healthcheck(app_state))
+}
+
+async fn status(app_state: web::Data<AppState>,) -> HttpResponse {
+    let status = create_healthcheck(app_state);
+    match serde_json::to_string_pretty(&status) {
+        Ok(pretty_json) => HttpResponse::Ok().content_type(APPLICATION_JSON).body(pretty_json),
+        Err(_) => HttpResponse::Ok().json(status),
+    }
 }
 
 fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
@@ -185,7 +198,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
                     srvcfg.configure(v1_api_register(web_auth_enabled));
                 }
                 srvcfg.service(web::resource("/healthcheck").route(web::get().to(healthcheck)));
-                srvcfg.service(web::resource("/status").route(web::get().to(healthcheck)));
+                srvcfg.service(web::resource("/status").route(web::get().to(status)));
             })
             .configure(xtream_api_register)
             .configure(m3u_api_register)

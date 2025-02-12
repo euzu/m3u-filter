@@ -1,8 +1,8 @@
 :root {
   --media-size-mobile: 600px;
   --text-color: #ffffff;
-  --label-color: #aaaaaa;
-  --background-color: #21222C;
+  --label-color: #a1b4ff;
+  --background-color: #1b1b1d;
   --app-header-color: #6495b1;
   --sidebar-toggle-color: #ffffff;
   --sidebar-toggle-hover-color: #47495d;
@@ -35,26 +35,28 @@
   --attention-color: red;
   --warn-color: orange;
 
-  --card-background-color: #282A36;
+  --card-background-color: #1b1d26;
   --card-color: #ffffff;
   --card-border-color: #47495d;
 
   --title-label-color: #6495b1;
 
-  --border-radius: 4px;
+  --border-radius: 8px;
 
   --icon-button-border-radius: 4px;
-  --icon-button-background-color: #44475A;
+  --icon-button-background-color: #124a9b;
   --icon-button-color: #ffffff;
-  --icon-button-hover-background-color: #6272A4;
+  --icon-button-hover-background-color: #0d6efd;
   --icon-button-hover-color: #ffffff;
+  --icon-button-hover-border-color: #ced9fb;
+
 
   --text-button-border-radius: 4px;
   --text-button-border-color: transparent;
-  --text-button-background-color: #44475A;
-  --text-button-color: #69a6ff;
-  --text-button-hover-background-color: #6272A4;
-  --text-button-hover-color: #50FA7B;
+  --text-button-background-color: #124a9b;
+  --text-button-color: #ffffff;
+  --text-button-hover-background-color: #0d6efd;
+  --text-button-hover-color: #ffffff;
 
 
   --scrollbar-track-color: #838383;
@@ -73,8 +75,8 @@
   --table-border-color: #44475a;
 
   --checkbox-background-color: #44475A;
-  --checkbox-hover-background-color: #6272A4;
-  --checkbox-checked-background-color: #6272A4;
+  --checkbox-hover-background-color: #006fee;
+  --checkbox-checked-background-color: #006fee;
 
   --option-active-background-color: #50FA7B;
   --option-active-color: #000;

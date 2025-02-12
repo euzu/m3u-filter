@@ -12,6 +12,10 @@
     cursor: pointer;
     border: 1px solid var(--border-light-color);
 
+    &:hover {
+      border: 1px solid var(--checkbox-checked-background-color);
+    }
+
     &-selected {
       background-color: var(--checkbox-checked-background-color);
       color: var(--text-color);

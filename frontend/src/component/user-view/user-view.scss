@@ -1,5 +1,6 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
+@use '../../scss/date-picker';
 
 .tag-select {
   min-width: 160px;
@@ -125,6 +126,11 @@
         &-number {
           max-width: 50px;
         }
+
+        &-date {
+          width: 120px;
+        }
+
 
         &-toolbar {
           & {

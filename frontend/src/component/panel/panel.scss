@@ -1,6 +1,7 @@
 .panel {
   display: flex;
   flex-flow: column;
+  overflow: hidden;
 }
 .hidden {
   display: none;

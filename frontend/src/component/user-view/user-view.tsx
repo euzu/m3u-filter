@@ -8,6 +8,7 @@ import {useServices} from "../../provider/service-provider";
 import ConfigUtils from "../../utils/config-utils";
 import TabSet, {TabSetTab} from "../tab-set/tab-set";
 import TagSelect from "../tag-select/tags-select";
+import DatePicker from "react-date-picker";
 
 const PROXY_OPTIONS = [
     { value: 'reverse', label: 'Reverse' },
@@ -21,6 +22,27 @@ const STATUS_OPTIONS = [
     {value: 'Disabled', label: 'Disabled'},
     {value: 'Pending', label: 'Pending'},
 ];
+
+const prepareCredentials = (targetUser: TargetUser[]) => {
+    targetUser.forEach((user) => {
+        user.credentials.forEach((credential) => {
+            if (credential.exp_date) {
+                credential.exp_date = new Date(credential.exp_date*1000) as any;
+            }
+    })});
+}
+
+const prepareTargetUserForSave = (targetUser: TargetUser[]): TargetUser[] => {
+    return targetUser.map((user) => {
+        let newUser = {...user, credentials: user.credentials.map(c => ({...c}))};
+        newUser.credentials.forEach((credential) => {
+            if (credential.exp_date) {
+                credential.exp_date = Math.floor((credential.exp_date as any).getTime() / 1000);
+            }
+        });
+        return newUser;
+    });
+}
 
 interface UserViewProps {
     config: ServerConfig;
@@ -46,6 +68,7 @@ export default function UserView(props: UserViewProps) {
                 target: name,
                 credentials: config.api_proxy.user.find(t => t.target === name)?.credentials || []
             } as any));
+            prepareCredentials(result);
             missing?.forEach(target => {
                 result.push({src: false, target: target.target, credentials: target.credentials} as any);
             });
@@ -112,6 +135,7 @@ export default function UserView(props: UserViewProps) {
             const idx = evt.target.dataset.idx;
             const field: any = evt.target.dataset.field;
             (target.credentials[idx] as any)[field] = evt.target.value;
+            setTargets([...targets]); // this is needed for DatePicker for change detection
         }
     }, [targets]);
 
@@ -122,7 +146,6 @@ export default function UserView(props: UserViewProps) {
         if (target) {
             const idx = parseInt(parts[1]);
             const credentials: any = target.credentials[idx];
-            console.log(parts[2], value);
             credentials[parts[2]] = value;
         }
     }, [targets]);
@@ -154,7 +177,6 @@ export default function UserView(props: UserViewProps) {
 
                 if (user.max_connections != null) {
                     const max_con = parseInt(user.max_connections as any);
-                    console.log(('' + max_con), user.max_connections);
                     if (isNaN(max_con) || max_con < 0 || (('' + max_con) != user.max_connections as any)) {
                         enqueueSnackbar("MaxConnections invalid! " + user.max_connections, {variant: 'error'});
                         return;
@@ -176,7 +198,8 @@ export default function UserView(props: UserViewProps) {
             })
             return {target: t.target, credentials: t.credentials}
         });
-        services.config().saveTargetUser(targetUser).subscribe({
+        const toSaveTargetUser = prepareTargetUserForSave(targetUser);
+        services.config().saveTargetUser(toSaveTargetUser).subscribe({
             next: () => enqueueSnackbar("User saved!", {variant: 'success'}),
             error: (err) => enqueueSnackbar("Failed to save user!", {variant: 'error'})
         });
@@ -276,10 +299,19 @@ export default function UserView(props: UserViewProps) {
                                                  className={'user__target-user-col'}>
                                                 <div className={'user__target-user-col-label'}><label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
                                                 </div>
-                                                <input data-target={target.target} data-idx={idx}
-                                                       defaultValue={(usr as any)[field]}
-                                                       className={'user__target-user-col-number'}
-                                                       data-field={field} onChange={handleValueChange}></input>
+                                                <DatePicker
+                                                       value={(usr as any)[field]}
+                                                       className={'user__target-user-col-date'}
+                                                       onChange={(date: any) => handleValueChange({
+                                                    target: {
+                                                        value: date,
+                                                        dataset: {
+                                                            target: target.target,
+                                                            idx,
+                                                            field,
+                                                        }
+                                                    },
+                                                })}></DatePicker>
                                             </div>
                                         )}
                                         <div className={'user__target-user-col user__target-user-col-toolbar'}>
