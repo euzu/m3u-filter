@@ -7,7 +7,7 @@ fi
 
 
 if which ffmpeg > /dev/null 2>&1; then
-    ffmpeg -loop 1 -framerate 1 -i ./resources/freeze_frame.jpg -t 1 -c:v mpeg2video -f mpegts ./resources/freeze_frame.ts
+    ffmpeg -loop 1 -i ./resources/freeze_frame.jpg -t 10 -r 1 -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p ./resources/freeze_frame.ts
 else
     echo "ffmpeg not found";
     exit;

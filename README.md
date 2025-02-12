@@ -314,7 +314,7 @@ A video file with name `freeze_frame.ts` is already available in the docker imag
 
 You can convert an image with `ffmpeg`.
 
-`ffmpeg -loop 1 -framerate 1 -i freeze_frame.jpg -t 1 -an -c:v mpeg2video -f mpegts freeze_frame.ts` 
+`ffmpeg -loop 1 -i freeze_frame.jpg -t 10 -r 1 -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p freeze_frame.ts` 
 
 and add it to the `config.yml`.
 
