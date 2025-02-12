@@ -27,9 +27,8 @@ use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH, SEASON_RESOURCE_PREFIX};
-use crate::repository::playlist_repository::HLS_EXT;
+use crate::repository::playlist_repository::{get_target_id_mapping, HLS_EXT};
 use crate::repository::storage::{get_target_storage_path, hex_encode};
-use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository;
 use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::utils::hash_utils::generate_playlist_uuid;
@@ -537,10 +536,7 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     let mut doc: Map<String, Value> = try_result_bad_request!(serde_json::from_str(&content));
     let epg_listings = try_option_bad_request!(doc.get_mut(TAG_EPG_LISTINGS).and_then(Value::as_array_mut));
     let target_path = try_option_bad_request!(get_target_storage_path(&app_state.config, target.name.as_str()));
-    let mut target_id_mapping = {
-        let _file_lock = app_state.config.file_locks.read_lock(&target_path);
-        TargetIdMapping::new(&target_path)
-    };
+    let (mut target_id_mapping, file_lock) =  get_target_id_mapping(&app_state.config, &target_path);
     for epg_list_item in epg_listings.iter_mut().filter_map(Value::as_object_mut) {
         // TODO epg_id
         if let Some(catchup_provider_id) = epg_list_item.get(TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok()) {
@@ -549,13 +545,11 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
             epg_list_item.insert(TAG_ID.to_string(), Value::String(virtual_id.to_string()));
         }
     }
-    {
-        let _file_lock = app_state.config.file_locks.write_lock(&target_path);
-        if let Err(err) = target_id_mapping.persist() {
-            error!("Failed to write catchup id mapping {err}");
-            return HttpResponse::BadRequest().finish();
-        }
-    };
+    if let Err(err) = target_id_mapping.persist() {
+        error!("Failed to write catchup id mapping {err}");
+        return HttpResponse::BadRequest().finish();
+    }
+    drop(file_lock);
     serde_json::to_string(&doc).map_or_else(|_| HttpResponse::BadRequest().finish(), |result| HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(result))
 }
 

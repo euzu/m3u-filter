@@ -15,7 +15,7 @@ pub struct FreezeFrameStream {
 }
 
 impl FreezeFrameStream {
-    pub fn new(_status: u16, buffer: Arc<Vec<u8>>) -> Self {
+    pub fn new(buffer: Arc<Vec<u8>>) -> Self {
         let buffer_len = buffer.len();
         Self {
             buffer,
@@ -32,7 +32,6 @@ impl Stream for FreezeFrameStream {
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-
         if self.buffer_len == 0 {
             return Poll::Ready(None); // If buffer is empty, return None (end of stream)
         }

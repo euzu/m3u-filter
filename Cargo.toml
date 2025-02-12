@@ -61,3 +61,6 @@ libc = "0"
 winapi = { version = "0", features = ["psapi", "minwindef", "processthreadsapi"] }
 # [target.'cfg(not(target_env = "msvc"))'.dependencies]
 # tikv-jemallocator =  { version = "*", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+
+[build-dependencies]
+vergen = { version = "9", features = ["build"] }

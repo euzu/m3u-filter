@@ -17,8 +17,9 @@ use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, Playlis
 use crate::model::xtream::{rewrite_doc_urls, XtreamMappingOptions, XtreamSeriesEpisode, INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, SEASON_RESOURCE_PREFIX};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentWriter};
+use crate::repository::playlist_repository::get_target_id_mapping;
 use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
-use crate::repository::target_id_mapping::{TargetIdMapping, VirtualIdRecord};
+use crate::repository::target_id_mapping::{VirtualIdRecord};
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::file::file_utils::open_readonly_file;
 use crate::utils::hash_utils::generate_playlist_uuid;
@@ -685,9 +686,7 @@ fn rewrite_xtream_series_info<P>(
 
     let virtual_id = pli.get_virtual_id();
     {
-        let target_id_mapping_file = get_target_id_mapping_file(&target_path);
-        let _file_lock = config.file_locks.write_lock(&target_id_mapping_file);
-        let mut target_id_mapping = TargetIdMapping::new(&target_id_mapping_file);
+        let (mut target_id_mapping, file_lock) = get_target_id_mapping(config, &target_path);
         let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
 
         let provider_url = pli.get_provider_url();
@@ -720,6 +719,7 @@ fn rewrite_xtream_series_info<P>(
         if let Err(err) = target_id_mapping.persist() {
             error!("{}", err.to_string());
         }
+        drop(file_lock);
         drop(target_id_mapping);
     }
     let result = serde_json::to_string(&doc).map_err(|_| str_to_io_error("Failed to serialize updated series info"))?;

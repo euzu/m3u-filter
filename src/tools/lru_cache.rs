@@ -68,8 +68,12 @@ impl LRUResourceCache {
             }
         };
         let result = traverse_dir(&self.cache_dir, &mut visit);
-        info!("Cache scanned, current size {} / {}", human_readable_byte_size(self.current_size as u64), human_readable_byte_size(self.capacity as u64));
+        info!("Cache scanned, current size {}", self.get_size_text());
         result
+    }
+
+    pub fn get_size_text(&self) -> String {
+        format!("{} / {}", human_readable_byte_size(self.current_size as u64), human_readable_byte_size(self.capacity as u64))
     }
 
     ///   - Adds a new file to the cache.

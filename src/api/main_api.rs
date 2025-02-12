@@ -9,6 +9,7 @@ use std::collections::{VecDeque};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
+use chrono::{DateTime, Utc};
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
 use crate::api::model::app_state::AppState;
@@ -26,7 +27,7 @@ use crate::processing::processor::playlist;
 use crate::tools::lru_cache::{LRUResourceCache};
 use crate::utils::size_utils::human_readable_byte_size;
 use crate::utils::sys_utils;
-use crate::VERSION;
+use crate::{BUILD_TIMESTAMP, VERSION};
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
@@ -39,18 +40,22 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
 }
 
 async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
-    let ts = chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let server_time = chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string();
+    let cache = app_state.cache.as_ref().as_ref().map(|c| c.lock().get_size_text());
     let (active_clients, active_connections) =  {
         let active_user = &app_state.active_users;
         (active_user.active_users(), active_user.active_connections())
     };
+    let build_time: Option<String> = BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string());
     HttpResponse::Ok().json(Healthcheck {
         status: "ok".to_string(),
         version: VERSION.to_string(),
-        time: ts,
+        build_time,
+        server_time,
         mem: sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
         active_clients,
         active_connections,
+        cache,
     })
 }
 

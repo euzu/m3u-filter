@@ -237,7 +237,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
         let mut guard = cache.lock();
         if let Some(resource_path) = guard.get_content(resource_url) {
             if let Ok(named_file) = NamedFile::open(resource_path) {
-                debug_if_enabled!("Cached resource {}", sanitize_sensitive_info(resource_url));
+                trace_if_enabled!("Responding resource from cache {}", sanitize_sensitive_info(resource_url));
                 return named_file.into_response(req);
             }
         }

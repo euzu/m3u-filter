@@ -1,4 +1,9 @@
 # Changelog
+# 2.2.1 (2025-02-xx)
+- Added more info to `/status`.
+- Refactored unavailable channel replacement streaming.
+- Fixed catch up saving.
+
 # 2.2.0 (2025-02-11)
 - !BREAKING CHANGE!  unique `input` `name` is now mandatory, because rearranging the `source.yml` could lead to wrong results without a playlist update.
 - !BREAKING_CHANGE! `log_sanitize_sensitive_info`  is now under `log` section  as `sanitize_sensitive_info`

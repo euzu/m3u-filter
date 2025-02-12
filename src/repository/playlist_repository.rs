@@ -1,3 +1,4 @@
+use std::path::{Path};
 use crate::m3u_filter_error::{info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, TargetType};
@@ -9,6 +10,7 @@ use crate::repository::m3u_repository::m3u_write_playlist;
 use crate::repository::storage::{ensure_target_storage_path, get_target_id_mapping_file};
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
+use crate::utils::file::file_lock_manager::FileWriteGuard;
 
 pub const HLS_EXT: &str = ".m3u8";
 
@@ -20,11 +22,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
         Err(err) => return Err(vec![err]),
     };
 
-    let target_id_mapping_file = get_target_id_mapping_file(&target_path);
-
-    let _file_lock = cfg.file_locks.write_lock(&target_id_mapping_file);
-
-    let mut target_id_mapping = TargetIdMapping::new(&target_id_mapping_file);
+    let (mut target_id_mapping, file_lock) = get_target_id_mapping(cfg, &target_path);
 
     // Virtual IDs assignment
     for group in playlist.iter_mut() {
@@ -62,6 +60,13 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     if let Err(err) = target_id_mapping.persist() {
         errors.push(info_err!(err.to_string()));
     }
+    drop(file_lock);
 
     if errors.is_empty() { Ok(()) } else { Err(errors) }
+}
+
+pub fn get_target_id_mapping(cfg: &Config, target_path: &Path) -> (TargetIdMapping, FileWriteGuard) {
+    let target_id_mapping_file = get_target_id_mapping_file(target_path);
+    let file_lock = cfg.file_locks.write_lock(&target_id_mapping_file);
+    (TargetIdMapping::new(&target_id_mapping_file), file_lock)
 }

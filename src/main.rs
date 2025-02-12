@@ -3,13 +3,10 @@
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::return_self_not_must_use)]
 #![allow(clippy::missing_errors_doc)]
-extern crate core;
-extern crate env_logger;
-extern crate pest;
-#[macro_use]
-extern crate pest_derive;
+
 #[macro_use]
 mod modules;
+
 include_modules!();
 
 use actix_rt::System;
@@ -42,7 +39,7 @@ const LOG_ERROR_LEVEL_MOD: &[&str] = &[
 
 #[derive(Parser)]
 #[command(name = "m3u-filter")]
-#[command(author = "euzu <euzu@github.com>")]
+#[command(author = "euzu <euzu@proton.me>")]
 #[command(version)]
 #[command(about = "Extended M3U playlist filter", long_about = None)]
 struct Args {
@@ -88,6 +85,7 @@ struct Args {
 
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const BUILD_TIMESTAMP:&str = env!("VERGEN_BUILD_TIMESTAMP");
 
 // #[cfg(not(target_env = "msvc"))]
 // #[global_allocator]
@@ -145,6 +143,10 @@ fn main() {
         }
         Ok(None) => {}
         Err(err) => exit!("{err}"),
+    }
+
+    if cfg.t_channel_unavailable_file.is_some() {
+        info!("Freeze frame video loaded from {}", cfg.channel_unavailable_file.as_ref().map_or("?", |v| v.as_str()));
     }
 
     let mut temp_path = PathBuf::from(&cfg.working_dir);

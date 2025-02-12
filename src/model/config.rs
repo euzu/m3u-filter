@@ -1179,7 +1179,9 @@ impl Config {
         if let Some(channel_unavailable_file) = &self.channel_unavailable_file {
             let channel_unavailable = file_utils::make_absolute_path(channel_unavailable_file, &self.working_dir, resolve_var);
             match file_utils::read_file_as_bytes(&PathBuf::from(&channel_unavailable)) {
-                Ok(data) => self.t_channel_unavailable_file = Some(Arc::new(data)),
+                Ok(data) => {
+                    self.t_channel_unavailable_file = Some(Arc::new(data));
+                },
                 Err(err) => {
                     error!("Failed to load channel unavailable file: {channel_unavailable} {err}");
                 }

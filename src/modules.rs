@@ -1,6 +1,11 @@
 #[macro_export]
 macro_rules! include_modules {
     () => {
+        extern crate core;
+        extern crate env_logger;
+        extern crate pest;
+        #[macro_use]
+        extern crate pest_derive;
         pub mod api;
         pub mod auth;
         pub mod m3u_filter_error;

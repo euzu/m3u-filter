@@ -1,15 +1,16 @@
 use crate::utils::debug_if_enabled;
 use actix_web::http::header::{HeaderName, HeaderValue};
 use actix_web::{HttpResponseBuilder};
-use reqwest::{Response, StatusCode};
+use reqwest::{StatusCode};
 use std::collections::{HashSet};
 use std::str::FromStr;
+use reqwest::header::HeaderMap;
 use crate::utils::network::request::sanitize_sensitive_info;
 
 const MEDIA_STREAM_HEADERS: &[&str] = &["accept", "content-type", "content-length", "connection", "accept-ranges", "content-range", "vary", "transfer-encoding", "access-control-allow-origin", "access-control-allow-credentials", "icy-metadata"];
 
-pub fn get_response_headers(response: &mut Response) -> Vec<(String, String)> {
-    let response_headers: Vec<(String, String)> = response.headers_mut().iter()
+pub fn get_response_headers(headers: &HeaderMap) -> Vec<(String, String)> {
+    let response_headers: Vec<(String, String)> = headers.iter()
         .filter(|(key, _)| MEDIA_STREAM_HEADERS.contains(&key.as_str()))
         .map(|(key, value)| (key.to_string(), value.to_str().unwrap().to_string())).collect();
     response_headers
