@@ -11,9 +11,9 @@ include_modules!();
 
 use actix_rt::System;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
+use chrono::{DateTime, Utc};
 use crate::auth::password::generate_password;
 use crate::model::config::{validate_targets, Config, HealthcheckConfig, LogLevelConfig, ProcessTargets};
 use crate::model::healthcheck::Healthcheck;
@@ -121,41 +121,43 @@ fn main() {
         return;
     }
 
-    create_directories(&cfg);
+    let temp_path = PathBuf::from(&cfg.working_dir).join("tmp");
+    create_directories(&cfg, &temp_path);
+    let _ = tempfile::env::override_temp_dir(&temp_path);
 
     let targets = validate_targets(args.target.as_ref(), &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
     info!("Version: {}", VERSION);
+    if let Some(bts) = BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string()) {
+        info!("Build time: {bts}");
+    }
     info!("Current time: {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
     info!("Working dir: {:?}", &cfg.working_dir);
     info!("Config dir: {:?}", &cfg.t_config_path);
-    info!("Config file: {}", &config_file);
-    info!("Source file: {}", &sources_file);
+    info!("Config file: {config_file:?}");
+    info!("Source file: {sources_file:?}");
+    info!("Temp dir: {temp_path:?}");
     if let Some(cache) = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()) {
         if cache.enabled {
-            info!("Cache dir: {}", cache.dir.as_ref().unwrap_or(&String::new()));
+            info!("Cache dir: {:?}", cache.dir.as_ref().unwrap_or(&String::new()));
         }
     }
 
     match config_reader::read_mappings(args.mapping_file, &mut cfg) {
         Ok(Some(mapping_file)) => {
-            info!("Mapping file: {mapping_file}");
+            info!("Mapping file: {mapping_file:?}");
         }
         Ok(None) => {}
         Err(err) => exit!("{err}"),
     }
 
     if cfg.t_channel_unavailable_file.is_some() {
-        info!("Freeze frame video loaded from {}", cfg.channel_unavailable_file.as_ref().map_or("?", |v| v.as_str()));
+        info!("Freeze frame video loaded from {:?}", cfg.channel_unavailable_file.as_ref().map_or("?", |v| v.as_str()));
     }
-
-    let mut temp_path = PathBuf::from(&cfg.working_dir);
-    temp_path.push("tmp");
-    let _ = tempfile::env::override_temp_dir(&temp_path);
 
     if args.server {
         if let Some(api_proxy_file) = config_reader::read_api_proxy_config(args.api_proxy, &mut cfg) {
-            info!("Api Proxy File: {api_proxy_file}");
+            info!("Api Proxy File: {api_proxy_file:?}");
         }
         start_in_server_mode(Arc::new(cfg), Arc::new(targets));
     } else {
@@ -163,7 +165,7 @@ fn main() {
     }
 }
 
-fn create_directories(cfg: &Config) {
+fn create_directories(cfg: &Config, temp_path: &Path) {
     // Collect the paths into a vector.
     let paths_strings = [
         Some(cfg.working_dir.clone()),
@@ -175,9 +177,7 @@ fn create_directories(cfg: &Config) {
     let mut paths: Vec<PathBuf> = paths_strings.iter()
         .filter_map(|opt| opt.as_ref()) // Get rid of the `Option`
         .map(PathBuf::from).collect();
-    let mut temp_path = PathBuf::from(&cfg.working_dir);
-    temp_path.push("tmp");
-    paths.push(temp_path);
+    paths.push(temp_path.to_path_buf());
 
     // Iterate over the paths, filter out `None` values, and process the `Some(path)` values.
     for path in &paths {
