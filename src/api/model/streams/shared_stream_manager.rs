@@ -14,7 +14,7 @@ use tokio::sync::mpsc::{Sender};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use log::trace;
+use log::{trace};
 use tokio::sync::{mpsc};
 use tokio::sync::mpsc::error::TrySendError;
 use tokio_stream::wrappers::ReceiverStream;
@@ -76,63 +76,49 @@ impl SharedStreamState {
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
         E: std::fmt::Debug
     {
-        // let mut source_stream = Box::pin(bytes_stream);
-        // let streaming_url = stream_url.to_string();
-        // let sender = self.sender.clone();
-        // Spawn a task to forward items from the source stream to the broadcast channel
-        let sleep_duration = Duration::from_millis(6);
+        let buf_size = self.buf_size;
+        let sleep_duration = Duration::from_millis(10);
         let mut source_stream = Box::pin(bytes_stream);
         let subscriber = Arc::clone(&self.subscribers);
         let streaming_url = stream_url.to_string();
-        // Spawn a task to forward items from the source stream to the broadcast channel
+
+        //Spawn a task to forward items from the source stream to the broadcast channel
         actix_rt::spawn(async move {
             while let Some(item) = source_stream.next().await {
                 if let Ok(data) = item {
+
+                    if subscriber.read().is_empty() {
+                        debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
+                        break;
+                    }
+
+                    while !subscriber.read().iter().any(|sender| sender.capacity() == buf_size) {
+                        actix_web::rt::time::sleep(sleep_duration).await;
+                    }
+
                     let mut subs = subscriber.write();
-                    if subs.len() > 0 {
-                        (*subs).retain(|sender| {
-                            match sender.try_send(data.clone()) {
-                                Ok(()) => true,
-                                Err(TrySendError::Closed(_)) => false,
-                                Err(err) => {
-                                    trace!("broadcast send error {err}");
-                                    true
-                                }
-                            }
-                        });
-                    } else {
+                    if subs.is_empty() {
                         debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
                         // Cleanup for removing unused shared streams
                         shared_streams.unregister(&streaming_url);
-                        return;
+                        break;
                     }
+                    (*subs).retain(|sender| {
+                        match sender.try_send(data.clone()) {
+                            Ok(()) => true,
+                            Err(TrySendError::Closed(_)) => false,
+                            Err(err) => {
+                                trace!("broadcast send error {err}");
+                                true
+                            }
+                        }
+                    });
                 }
                 actix_web::rt::time::sleep(sleep_duration).await;
             }
             debug_if_enabled!("Shared stream exhausted. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
             shared_streams.unregister(&streaming_url);
         });
-
-            // loop  {
-            //     match source_stream.next().await {
-            //         Some(Ok(data)) => {
-            //             if sender.receiver_count() == 0 {
-            //                 debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
-            //                 break;
-            //             }
-            //             if let Err(err) = sender.send(data) {
-            //                eprintln!("broadcast send err {err:?}");
-            //             }
-            //         }
-            //         None => break,
-            //         Some(Err(err)) => {
-            //             eprintln!("broadcast failure {err:?}");
-            //             break;
-            //         }
-            //     }
-            //     actix_web::rt::time::sleep(sleep_duration).await;
-            // }
-            // shared_streams.unregister(&streaming_url);
     }
 }
 
