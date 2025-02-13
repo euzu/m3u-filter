@@ -40,7 +40,7 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
     Ok(web_dir_path)
 }
 
-fn create_healthcheck(app_state: web::Data<AppState>) -> Healthcheck {
+fn create_healthcheck(app_state: &web::Data<AppState>) -> Healthcheck {
     let server_time = chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string();
     let cache = app_state.cache.as_ref().as_ref().map(|c| c.lock().get_size_text());
     let (active_clients, active_connections) =  {
@@ -61,11 +61,11 @@ fn create_healthcheck(app_state: web::Data<AppState>) -> Healthcheck {
 }
 
 async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
-    HttpResponse::Ok().json(create_healthcheck(app_state))
+    HttpResponse::Ok().json(create_healthcheck(&app_state))
 }
 
 async fn status(app_state: web::Data<AppState>,) -> HttpResponse {
-    let status = create_healthcheck(app_state);
+    let status = create_healthcheck(&app_state);
     match serde_json::to_string_pretty(&status) {
         Ok(pretty_json) => HttpResponse::Ok().content_type(APPLICATION_JSON).body(pretty_json),
         Err(_) => HttpResponse::Ok().json(status),

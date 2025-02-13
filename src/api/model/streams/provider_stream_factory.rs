@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 use url::Url;
 
 // TODO make this configurable
-pub const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
+pub const STREAM_QUEUE_SIZE: usize = 4096; // mpsc channel holding messages. with possible 8092byte chunks
 
 pub type ResponseStream = BoxStream<'static, Result<Bytes, StreamError>>;
 type ResponseInfo = Option<(Vec<(String, String)>, StatusCode)>;

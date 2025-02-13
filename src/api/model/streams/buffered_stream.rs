@@ -4,6 +4,7 @@ use std::{
     pin::Pin,
     sync::Arc,
 };
+use log::trace;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use crate::api::model::stream_error::StreamError;
@@ -43,7 +44,7 @@ impl BufferedStream {
                     }
                 }
                 Some(Err(err)) => {
-                    eprintln!("Buffered Stream Error: {err:?}");
+                    trace!("Buffered Stream Error: {err:?}");
                     // actix_web::rt::time::sleep(sleep_duration).await;
                     // Attempt to send error to client
                     if tx.send(Err(err)).await.is_err() {

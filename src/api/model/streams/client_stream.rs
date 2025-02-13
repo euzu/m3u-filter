@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Poll};
 use futures::{Stream};
+use log::trace;
 use crate::api::model::stream_error::StreamError;
 use crate::utils::trace_if_enabled;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
@@ -35,7 +36,7 @@ impl Stream for ClientStream {
             match Pin::as_mut(&mut self.inner).poll_next(cx) {
                 Poll::Ready(Some(Ok(bytes))) => {
                     if bytes.is_empty() {
-                        eprintln!("client stream empty bytes");
+                        trace!("client stream empty bytes");
                         continue;
                     }
 
@@ -51,7 +52,7 @@ impl Stream for ClientStream {
                 }
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Some(Err(err))) => {
-                    eprintln!("client stream error: {err}");
+                    trace!("client stream error: {err}");
                 }
             }
         }
