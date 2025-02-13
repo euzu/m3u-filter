@@ -146,7 +146,6 @@ async fn xtream_player_api_stream(
 ) -> HttpResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state).await, false, format!("Could not find any user {}", stream_req.username));
     if !user.has_permissions(app_state) {
-        debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
     let target_name = &target.name;
@@ -338,7 +337,6 @@ async fn xtream_player_api_resource(
 ) -> HttpResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(resource_req.username, resource_req.password, api_req, app_state).await, false, format!("Could not find any user {}", resource_req.username));
     if !user.has_permissions(app_state) {
-        debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
     let target_name = &target.name;
@@ -589,7 +587,6 @@ async fn xtream_player_api(
         }
 
         if !user.has_permissions(app_state) {
-            debug!("User access denied: {user:?}");
             return HttpResponse::Forbidden().finish();
         }
 

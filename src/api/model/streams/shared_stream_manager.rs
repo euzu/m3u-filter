@@ -13,7 +13,7 @@ use tokio::sync::mpsc::{Sender};
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use log::{trace};
 use tokio::sync::{mpsc};
 use tokio::sync::mpsc::error::TrySendError;
@@ -40,6 +40,14 @@ where
         }
     }
 }
+
+
+// impl<S> Drop for ReceiverStreamWrapper<S>
+// {
+//     fn drop(&mut self) {
+//         println!("receiver_dropped");
+//     }
+// }
 
 fn convert_stream(stream: BoxStream<Bytes>) -> BoxStream<Result<Bytes, StreamError>> {
     Box::pin(ReceiverStreamWrapper { stream }.boxed())
@@ -78,6 +86,7 @@ impl SharedStreamState {
     {
         let starving_size = self.buf_size-4;
         let sleep_duration = Duration::from_millis(10);
+        let sleep_duration_starve = Duration::from_millis(100);
         let mut source_stream = Box::pin(bytes_stream);
         let subscriber = Arc::clone(&self.subscribers);
         let streaming_url = stream_url.to_string();
@@ -86,23 +95,26 @@ impl SharedStreamState {
         actix_rt::spawn(async move {
             while let Some(item) = source_stream.next().await {
                 if let Ok(data) = item {
-
                     if subscriber.read().is_empty() {
-                        debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
-                        break;
-                    }
-
-                    while !subscriber.read().iter().any(|sender| sender.capacity() == starving_size) {
-                        actix_web::rt::time::sleep(sleep_duration).await;
-                    }
-
-                    let mut subs = subscriber.write();
-                    if subs.is_empty() {
                         debug_if_enabled!("No active subscribers. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
                         // Cleanup for removing unused shared streams
                         shared_streams.unregister(&streaming_url);
                         break;
                     }
+
+                    let start_time = Instant::now();
+                    loop {
+                        if subscriber.read().iter().any(|sender| sender.capacity() > starving_size) {
+                            break;
+                        }
+                        actix_web::rt::time::sleep(sleep_duration_starve).await;
+                        if start_time.elapsed().as_secs() > 5 {
+                            break;
+                        }
+                    }
+
+                    let mut subs =  subscriber.write();
+                    // TODO use drain_filter
                     (*subs).retain(|sender| {
                         match sender.try_send(data.clone()) {
                             Ok(()) => true,

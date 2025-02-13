@@ -42,7 +42,6 @@ async fn hls_api_stream(
         false,
         format!("Could not find any user {username}"));
     if !user.has_permissions(app_state) {
-        debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
 

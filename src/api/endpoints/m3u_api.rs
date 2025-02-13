@@ -69,7 +69,6 @@ async fn m3u_api_stream(
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
     else { return HttpResponse::BadRequest().finish() };
     if !user.has_permissions(&app_state) {
-        debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
 
@@ -114,7 +113,6 @@ async fn m3u_api_resource(
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
     else { return HttpResponse::BadRequest().finish() };
     if !user.has_permissions(&app_state) {
-        debug!("User access denied: {user:?}");
         return HttpResponse::Forbidden().finish();
     }
 

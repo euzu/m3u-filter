@@ -164,15 +164,18 @@ impl ProxyUserCredentials {
             if let Some(exp_date) = self.exp_date.as_ref() {
                 let now = Local::now();
                 if (exp_date - now.timestamp()) < 0 {
+                    debug!("User access denied, expired: {}", self.username);
                     return false;
                 }
             }
             if let Some(max_connections) = self.max_connections.as_ref() {
                 if *max_connections < app_state.get_active_connections_for_user(&self.username) {
+                    debug!("User access denied, too many connections: {}", self.username);
                     return false;
                 }
             }
             if let Some(status) = &self.status {
+                debug!("User access denied, status invalid: {}", self.username);
                 return matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial);
             }
         }
