@@ -76,7 +76,7 @@ impl SharedStreamState {
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static,
         E: std::fmt::Debug
     {
-        let buf_size = self.buf_size;
+        let starving_size = self.buf_size-4;
         let sleep_duration = Duration::from_millis(10);
         let mut source_stream = Box::pin(bytes_stream);
         let subscriber = Arc::clone(&self.subscribers);
@@ -92,7 +92,7 @@ impl SharedStreamState {
                         break;
                     }
 
-                    while !subscriber.read().iter().any(|sender| sender.capacity() == buf_size) {
+                    while !subscriber.read().iter().any(|sender| sender.capacity() == starving_size) {
                         actix_web::rt::time::sleep(sleep_duration).await;
                     }
 
