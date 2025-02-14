@@ -104,7 +104,7 @@ impl SharedStreamState {
 
                     let start_time = Instant::now();
                     loop {
-                        if subscriber.read().iter().any(|sender| sender.capacity() > starving_size) {
+                        if subscriber.read().iter().any(|sender| sender.capacity() >= starving_size) {
                             break;
                         }
                         actix_web::rt::time::sleep(sleep_duration_starve).await;
