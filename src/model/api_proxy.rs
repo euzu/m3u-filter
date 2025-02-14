@@ -175,8 +175,10 @@ impl ProxyUserCredentials {
                 }
             }
             if let Some(status) = &self.status {
-                debug!("User access denied, status invalid: {}", self.username);
-                return matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial);
+                if !matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial) {
+                    debug!("User access denied, status invalid: {status} for user: {}", self.username);
+                    return false;
+                }
             }
         }
         true

@@ -30,6 +30,8 @@ use crate::utils::file::file_utils::file_reader;
 use crate::utils::size_utils::parse_size_base_2;
 use crate::utils::sys_utils::exit;
 
+const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15";
+
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
     "name", "title", "group", "id", "chno", "logo",
     "logo_small", "parent_code", "audio_track",
@@ -49,6 +51,7 @@ macro_rules! valid_property {
 }
 pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
+use crate::utils::string_utils::get_trimmed_string;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
 pub enum TargetType {
@@ -535,6 +538,46 @@ pub struct InputUserInfo {
     pub password: String,
 }
 
+macro_rules! check_input_credentials {
+    ($this:ident, $input_type:expr) => {
+     match $input_type {
+            InputType::M3u => {
+                if $this.username.is_some() || $this.password.is_some() {
+                    debug!("for input type m3u: username and password are ignored");
+                }
+            }
+            InputType::Xtream => {
+                if $this.username.is_none() || $this.password.is_none() {
+                    return Err(info_err!("for input type xtream: username and password are mandatory".to_string()));
+                }
+            }
+        }
+    };
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ConfigInputAlias {
+    pub url: String,
+    pub username: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
+}
+
+
+impl ConfigInputAlias {
+    pub fn prepare(&mut self, input_type: &InputType) -> Result<(), M3uFilterError> {
+        self.url = self.url.trim().to_string();
+        if self.url.is_empty() {
+            return Err(info_err!("url for input is mandatory".to_string()));
+        }
+        self.username = get_trimmed_string(&self.username);
+        self.password = get_trimmed_string(&self.password);
+        check_input_credentials!(self, input_type);
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigInput {
@@ -562,45 +605,29 @@ pub struct ConfigInput {
     pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<ConfigInputOptions>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aliases: Option<Vec<ConfigInputAlias>>,
 }
 
 impl ConfigInput {
     pub fn prepare(&mut self, id: u16) -> Result<(), M3uFilterError> {
         self.id = id;
-        if self.name.trim().is_empty() {
+        self.name = self.name.trim().to_string();
+        if self.name.is_empty() {
             return Err(info_err!("name for input is mandatory".to_string()));
         }
-        if self.url.trim().is_empty() {
+        self.url = self.url.trim().to_string();
+        if self.url.is_empty() {
             return Err(info_err!("url for input is mandatory".to_string()));
         }
-        if let Some(user_name) = &self.username {
-            if user_name.trim().is_empty() {
-                self.username = None;
-            }
+        self.username = get_trimmed_string(&self.username);
+        self.password = get_trimmed_string(&self.password);
+        check_input_credentials!(self, self.input_type);
+        self.persist = get_trimmed_string(&self.persist);
+        if let Some(aliases) = self.aliases.as_mut() {
+            let input_type = &self.input_type;
+            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().map(|a| a.prepare(input_type)));
         }
-        if let Some(password) = &self.password {
-            if password.trim().is_empty() {
-                self.password = None;
-            }
-        }
-        match self.input_type {
-            InputType::M3u => {
-                if self.username.is_some() || self.password.is_some() {
-                    debug!("for input type m3u: username and password are ignored");
-                }
-            }
-            InputType::Xtream => {
-                if self.username.is_none() || self.password.is_none() {
-                    return Err(info_err!("for input type xtream: username and password are mandatory".to_string()));
-                }
-            }
-        }
-        if let Some(persist_path) = &self.persist {
-            if persist_path.trim().is_empty() {
-                self.persist = None;
-            }
-        }
-
         Ok(())
     }
 
@@ -749,8 +776,7 @@ impl VideoConfig {
             Some(downl) => {
                 if downl.headers.is_empty() {
                     downl.headers.borrow_mut().insert("Accept".to_string(), "video/*".to_string());
-                    downl.headers.borrow_mut().insert("User-Agent".to_string(), "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15
-".to_string());
+                    downl.headers.borrow_mut().insert("User-Agent".to_string(), DEFAULT_USER_AGENT.to_string());
                 }
 
                 if let Some(episode_pattern) = &downl.episode_pattern {

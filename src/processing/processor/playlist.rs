@@ -1,7 +1,7 @@
 extern crate unidecode;
 
 use crate::Config;
-use crate::model::config::ConfigRename;
+use crate::model::config::{ConfigInput, ConfigRename};
 use crate::utils::network::epg;
 use crate::utils::network::m3u;
 use crate::utils::network::xtream;
@@ -292,7 +292,9 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
 // If no input is enabled but the user set the target as command line argument,
 // we force the input to be enabled.
 // If there are enabled input, then only these are used.
-fn is_input_enabled(enabled_inputs: usize, input_enabled: bool, input_id: u16, user_targets: &ProcessTargets) -> bool {
+fn is_input_enabled(enabled_inputs: usize, input: &ConfigInput, user_targets: &ProcessTargets) -> bool {
+    let input_enabled = input.enabled;
+    let input_id = input.id;
     if enabled_inputs == 0 {
         return user_targets.enabled && user_targets.has_input(input_id);
     }
@@ -309,10 +311,10 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
     let mut input_stats = HashMap::<String, InputStats>::new();
     let mut target_stats = Vec::<TargetStats>::new();
     let mut source_playlists = Vec::with_capacity(128);
-    let enabled_inputs = source.inputs.iter().filter(|item| item.enabled).count();
-    // Downlod the sources
+    let enabled_inputs = source.inputs.iter().filter(|&input| input.enabled).count();
+    // Download the sources
     for input in &source.inputs {
-        if is_input_enabled(enabled_inputs, input.enabled, input.id, &user_targets) {
+        if is_input_enabled(enabled_inputs, input, &user_targets) {
             let start_time = Instant::now();
             let (mut playlistgroups, mut error_list) = match input.input_type {
                 InputType::M3u => m3u::get_m3u_playlist(Arc::clone(&client), &cfg, input, &cfg.working_dir).await,

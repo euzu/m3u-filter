@@ -1,4 +1,21 @@
 # Changelog
+# 2.2.2 (2025-02-xx)
+- input alias definition for same provider with same content but different credentials
+```yaml
+- sources:
+- inputs:
+  - url: 'http://provider.net'
+    name: my_provider
+    username: xyz
+    password: secret1
+    aliases:
+    - url: 'http://provider.net'
+      username: abcd
+      password: secret2
+  targets:
+  - name: test
+```
+
 # 2.2.1 (2025-02-14)
 - Added more info to `/status`.
 - Refactored unavailable channel replacement streaming.

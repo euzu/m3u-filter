@@ -88,6 +88,7 @@ async fn m3u_api_stream(
 
     if user.proxy == ProxyType::Redirect {
         let redirect_url = if is_hls_request { &replace_extension(&m3u_item.url, "m3u8") } else { &m3u_item.url };
+        // TODO alias processing
         debug_if_enabled!("Redirecting m3u stream request to {}", sanitize_sensitive_info(redirect_url));
         return HttpResponse::Found().insert_header(("Location", redirect_url.as_str())).finish();
     }

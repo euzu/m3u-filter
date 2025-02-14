@@ -31,3 +31,13 @@ impl Capitalize for String {
         self.as_str().capitalize()  // Reuse the &str implementation
     }
 }
+
+pub fn get_trimmed_string(value: &Option<String>) -> Option<String> {
+    if let Some(v) = value {
+        let trimmed = v.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+    None
+}

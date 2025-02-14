@@ -13,12 +13,14 @@
 - Schedule updates in server mode.
 - Running as a CLI tool to deliver playlists through web servers (e.g., Nginx, Apache).
 - Define multiple filtering targets to create several playlists from a large one.
-- Using regular expressions for matching and defining templates for reusability.
 - DRY (Don't Repeat Yourself): Define templates and reuse them.
+- Using regular expressions for matching and defining templates for reusability.
 - Define filters with statements, e.g.: filter:
    `(Group ~ "^FR.*") AND NOT (Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~ ".*MOVIES.*")`
-- Sending alerts via Telegram bot or REST when issues arise.
+- Sending alerts via Telegram bot, Pushover or REST when issues arise.
 - Monitoring group changes and sending notifications.
+- Sharing live tv connections
+- Display own video stream when channel is unavailable
 
 If you need to exclude certain entries from a playlist, you can create filters using headers and apply regex-based renaming or mapping.
 Run `m3u-filter` as a CLI or in server mode for a web-based UI to manage playlist content and save filtered groups.
