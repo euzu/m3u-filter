@@ -3,6 +3,13 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// This struct represents an individual provider configuration with fields like:
+///
+/// `id`, `name`, `url`, `username`, `password`
+/// `input_type`: Determines the type of input the provider supports.
+/// `max_connections`: Maximum allowed concurrent connections.
+/// `priority`: Priority level for selecting providers.
+/// `current_connections`: A `RwLock` to safely track the number of active connections.
 #[derive(Debug)]
 pub struct ProviderConfig {
     pub id: u16,
@@ -72,6 +79,10 @@ impl ProviderConfig {
     }
 }
 
+/// This manages different types of provider lineups:
+///
+/// `Single(SingleProviderLineup)`: A single provider.
+/// `Multi(MultiProviderLineup)`: A set of providers grouped by priority.
 #[derive(Debug)]
 enum ProviderLineup {
     Single(SingleProviderLineup),
@@ -94,6 +105,7 @@ impl ProviderLineup {
     }
 }
 
+/// Handles a single provider and ensures safe allocation/release of connections.
 #[derive(Debug)]
 struct SingleProviderLineup {
     provider: ProviderConfig,
@@ -121,6 +133,11 @@ impl SingleProviderLineup {
     }
 }
 
+
+/// Manages provider groups based on priority:
+///
+/// `SingleProviderGroup(ProviderConfig)`: A single provider.
+/// `MultiProviderGroup(AtomicUsize, Vec<ProviderConfig>)`: A list of providers with a priority index.
 #[derive(Debug)]
 enum ProviderPriorityGroup {
     SingleProviderGroup(ProviderConfig),
@@ -136,6 +153,8 @@ impl ProviderPriorityGroup {
     }
 }
 
+
+/// Manages multiple providers, ensuring that connections are allocated in a round-robin manner based on priority.
 #[derive(Debug)]
 struct MultiProviderLineup {
     providers: Vec<ProviderPriorityGroup>,
@@ -173,6 +192,35 @@ impl MultiProviderLineup {
         }
     }
 
+    /// Attempts to acquire the next available provider from a specific priority group.
+    ///
+    /// # Parameters
+    /// - `group_index`: The index of the provider group to search within.
+    /// - `force`: A boolean flag indicating whether to return a provider even if all are exhausted.
+    ///
+    /// # Returns
+    /// - `Some(&ProviderConfig)`: A reference to the next available provider in the specified group.
+    /// - `None`: If no providers are available in the group and `force` is `false`.
+    ///
+    /// # Behavior
+    /// - Iterates through the providers in the given group in a round-robin manner.
+    /// - Checks if a provider has available capacity before selecting it.
+    /// - If `force` is `true`, returns a provider even if no capacity is available.
+    /// - Uses atomic operations to maintain fair provider selection.
+    ///
+    /// # Thread Safety
+    /// - Uses `RwLock` for safe concurrent access.
+    /// - Ensures fair provider allocation across multiple threads.
+    ///
+    /// # Example Usage
+    /// ```rust
+    /// let lineup = MultiProviderLineup::new(&config);
+    /// if let Some(provider) = lineup.acquire_next_provider_from_group(0, false) {
+    ///     println!("Acquired provider: {}", provider.name);
+    /// } else {
+    ///     println!("No available providers in group 0.");
+    /// }
+    /// ```
     fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup) -> Option<&ProviderConfig> {
         match priority_group {
             ProviderPriorityGroup::SingleProviderGroup(p) => {
@@ -197,6 +245,36 @@ impl MultiProviderLineup {
         None
     }
 
+    /// Attempts to acquire a provider from the lineup based on priority and availability.
+    ///
+    /// # Parameters
+    /// - `force`: A boolean flag indicating whether to force allocation even if all providers are exhausted.
+    ///
+    /// # Returns
+    /// - `Some(&ProviderConfig)`: A reference to the acquired provider if allocation was successful.
+    /// - `None`: If no providers are available and `force` is `false`.
+    ///
+    /// # Behavior
+    /// - The method iterates through provider priority groups in a round-robin fashion.
+    /// - It attempts to allocate a provider from the highest priority group first.
+    /// - If a provider has available capacity, it is returned.
+    /// - If all providers in a group are exhausted, it moves to the next group.
+    /// - If `force` is `true`, it will return a provider even if all are exhausted.
+    /// - Updates the internal index to ensure fair distribution of requests.
+    ///
+    /// # Thread Safety
+    /// - Uses atomic operations (`AtomicUsize`) for thread-safe indexing.
+    /// - Uses `RwLock` for thread-safe provider allocation.
+    ///
+    /// # Example Usage
+    /// ```rust
+    /// let lineup = MultiProviderLineup::new(&config);
+    /// if let Some(provider) = lineup.acquire(false) {
+    ///     println!("Acquired provider: {}", provider.name);
+    /// } else {
+    ///     println!("No available providers.");
+    /// }
+    /// ```
     fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
         let mut main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
