@@ -782,7 +782,7 @@ impl VideoConfig {
     ///
     /// Will panic if default `RegEx` gets invalid
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
-        self.extensions = vec!["mkv".to_string(), "avi".to_string(), "mp4".to_string()];
+        self.extensions = ["mkv", "avi", "mp4", "mpeg", "divx", "mov"].iter().map(|&arg| arg.to_string()).collect();
         match &mut self.download {
             None => {}
             Some(downl) => {

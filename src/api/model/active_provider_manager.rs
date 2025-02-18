@@ -170,7 +170,7 @@ impl MultiProviderLineup {
             }
         }
         let mut providers = HashMap::new();
-        for provider in inputs.drain(..) {
+        for provider in inputs {
             let priority = provider.priority;
             providers.entry(priority)
                 .or_insert_with(Vec::new)
