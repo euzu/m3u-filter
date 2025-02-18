@@ -558,15 +558,22 @@ macro_rules! check_input_credentials {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigInputAlias {
+    #[serde(skip)]
+    pub id: u16,
     pub url: String,
     pub username: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
+    #[serde(default)]
+    pub priority: i16,
+    #[serde(default)]
+    pub max_connections: u16,
 }
 
 
 impl ConfigInputAlias {
-    pub fn prepare(&mut self, input_type: &InputType) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, index: u16, input_type: &InputType) -> Result<(), M3uFilterError> {
+        self.id = index;
         self.url = self.url.trim().to_string();
         if self.url.is_empty() {
             return Err(info_err!("url for input is mandatory".to_string()));
@@ -607,11 +614,16 @@ pub struct ConfigInput {
     pub options: Option<ConfigInputOptions>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aliases: Option<Vec<ConfigInputAlias>>,
+    #[serde(default)]
+    pub priority: i16,
+    #[serde(default)]
+    pub max_connections: u16,
 }
 
 impl ConfigInput {
-    pub fn prepare(&mut self, id: u16) -> Result<(), M3uFilterError> {
-        self.id = id;
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
+        self.id = index;
         self.name = self.name.trim().to_string();
         if self.name.is_empty() {
             return Err(info_err!("name for input is mandatory".to_string()));
@@ -626,9 +638,9 @@ impl ConfigInput {
         self.persist = get_trimmed_string(&self.persist);
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;
-            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().map(|a| a.prepare(input_type)));
+            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16), input_type)));
         }
-        Ok(())
+        Ok(index + self.aliases.as_ref().map_or(0, std::vec::Vec::len) as u16)
     }
 
     pub fn get_user_info(&self) -> Option<InputUserInfo> {

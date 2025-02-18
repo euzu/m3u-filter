@@ -398,6 +398,7 @@ mod tests {
     use actix_web::{HttpRequest, HttpResponse};
     use futures::StreamExt;
     use std::sync::Arc;
+    use crate::model::config::Config;
 
     #[actix_rt::test]
     async fn test_stream() {
@@ -407,13 +408,14 @@ mod tests {
         let _response = test::call_service(&server, req).await;
     }
     async fn test_stream_handler(req: HttpRequest) -> HttpResponse {
+        let cfg = Config::default();
         let mut counter = 5;
         let client = Arc::new(reqwest::Client::new());
         let url = url::Url::parse("https://info.cern.ch/hypertext/WWW/TheProject.html").unwrap();
         let input = None;
 
-        let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0);
-        let value = create_provider_stream(Arc::clone(&client), &url, &req, input, options);
+        let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0, false);
+        let value = create_provider_stream(&cfg, Arc::clone(&client), &url, &req, input, options);
         let mut values = value.await;
         'outer: while let Some((ref mut stream, info)) = values.as_mut() {
             if info.is_some() {

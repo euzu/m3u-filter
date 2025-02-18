@@ -119,6 +119,22 @@ pub struct DownloadQueue {
     pub finished: Arc<RwLock<Vec<FileDownload>>>,
 }
 
+impl Default for DownloadQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DownloadQueue {
+    pub fn new() -> Self {
+        Self {
+            queue: Arc::from(Mutex::new(VecDeque::new())),
+            active: Arc::from(RwLock::new(None)),
+            finished: Arc::from(RwLock::new(Vec::new())),
+        }
+    }
+}
+
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct FileDownloadRequest {

@@ -3,9 +3,7 @@ use actix_web::middleware::Logger;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use parking_lot::{Mutex as PlMutex};
-use tokio::sync::{RwLock, Mutex};
 use log::{error, info};
-use std::collections::{VecDeque};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -29,6 +27,7 @@ use crate::tools::lru_cache::{LRUResourceCache};
 use crate::utils::size_utils::human_readable_byte_size;
 use crate::utils::sys_utils;
 use crate::{BUILD_TIMESTAMP, VERSION};
+use crate::api::model::active_provider_manager::ActiveProviderManager;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
@@ -86,17 +85,15 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
             }
         }
     });
+    let user_access_control = cfg.user_access_control;
     Data::new(AppState {
         config: Arc::clone(cfg),
-        downloads: Arc::from(DownloadQueue {
-            queue: Arc::from(Mutex::new(VecDeque::new())),
-            active: Arc::from(RwLock::new(None)),
-            finished: Arc::from(RwLock::new(Vec::new())),
-        }),
+        http_client: Arc::new(reqwest::Client::new()),
+        downloads: Arc::from(DownloadQueue::new()),
+        cache,
         shared_stream_manager: Arc::new(SharedStreamManager::new()),
         active_users: Arc::new(ActiveUserManager::new()),
-        http_client: Arc::new(reqwest::Client::new()),
-        cache,
+        active_provider: Arc::new(ActiveProviderManager::new(user_access_control)),
     })
 }
 
