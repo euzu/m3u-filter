@@ -31,10 +31,12 @@
   }
 
   &__col-key, &__col-value {
+    user-select: none;
     box-sizing: border-box;
     min-width: 12rem;
     border: 1px solid var(--border-color);
     padding: 0 4px;
+    height: 2rem;
   }
 
   &__input {

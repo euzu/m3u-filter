@@ -15,11 +15,11 @@ enum SidebarAction {
     MainConfig = 'main_config'
 }
 
-const SIDEBAR_ACTIONS: { action: SidebarAction, icon: string }[] = [
-    {action: SidebarAction.Update, icon: 'Refresh'},
-    {action: SidebarAction.User, icon: 'User'},
-    {action: SidebarAction.ApiServer, icon: 'ApiServer'},
-    {action: SidebarAction.MainConfig, icon: 'Config'},
+const SIDEBAR_ACTIONS: { action: SidebarAction, icon: string, label: string }[] = [
+    {action: SidebarAction.Update, icon: 'Refresh', label: 'Refresh'},
+    {action: SidebarAction.User, icon: 'User', label: 'User'},
+    {action: SidebarAction.ApiServer, icon: 'ApiServer', label: 'Proxy'},
+    {action: SidebarAction.MainConfig, icon: 'Config', label: 'Config'},
 ];
 
 interface PreferencesProps {
@@ -41,9 +41,9 @@ export default function Preferences(props: PreferencesProps) {
         <div className={'preferences__content'}>
             <div className={'preferences__sidebar'}>
                 {SIDEBAR_ACTIONS.map(action =>
-                    <button key={'pref_' + action.action} data-action={action.action}
-                            className={action.action === activePage ? 'selected' : ''}
-                            onClick={handleSidebarAction}>{getIconByName(action.icon)}</button>)}
+                    <div key={'pref_' + action.action} data-action={action.action}
+                            className={'preferences__sidebar-menu-action' + (action.action === activePage ? ' selected' : '')}
+                            onClick={handleSidebarAction}>{getIconByName(action.icon)} {action.label}</div>)}
             </div>
             <div className={'preferences__panels'}>
                 <Panel value={SidebarAction.Update} active={activePage}>

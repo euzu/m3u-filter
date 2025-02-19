@@ -1,5 +1,6 @@
 @use 'scss/theme';
 @use 'scss/default';
+@import '@fontsource/rubik/400.css';
 
 html {
   height: 100%;
@@ -7,13 +8,22 @@ html {
 body {
   margin: 0;
   padding: 0;
-  font-family: sans-serif;
+  font-family: "Rubik", sans-serif;
   background-color: var(--background-color);
   height: 100%;
   box-sizing: border-box;
   display: flex;
   align-content: stretch;
   align-items: stretch;
+
+  input, textarea, select, button {
+    font-family: inherit;
+  }
+
+  input {
+    height: 2rem;
+    border-radius: 6px;
+  }
 }
 
 #root {

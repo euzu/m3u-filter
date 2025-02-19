@@ -35,9 +35,8 @@ export default function Login(): JSX.Element {
         <form>
             <div className="login-view__form">
                 <input ref={usernameRef} type="text" name="username" placeholder="username"/>
-                <input ref={passwordRef} type="password" name="password" placeholder="password"
-                       onKeyDown={handleKeyDown}/>
-                <button type="button" className="btn" onClick={handleLogin}>Login</button>
+                <input ref={passwordRef} type="password" name="password" placeholder="password" onKeyDown={handleKeyDown}/>
+                <button type="button" onClick={handleLogin}>Login</button>
                 <span className={authorized ? 'hidden' : 'error-text'}>Failed to login</span>
             </div>
         </form>

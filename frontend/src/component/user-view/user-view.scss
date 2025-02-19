@@ -190,7 +190,8 @@
       }
     }
   }
-
-  @include preferences.prefsInput;
+  input {
+    @include preferences.prefsInput;
+  }
 }
 

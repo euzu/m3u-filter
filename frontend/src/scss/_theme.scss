@@ -1,9 +1,9 @@
 :root {
   --media-size-mobile: 600px;
   --text-color: #ffffff;
-  --label-color: #a1b4ff;
-  --background-color: #1b1b1d;
-  --app-header-color: #6495b1;
+  --label-color: #73d6fe;
+  --background-color: #303946; //#121212;
+  --app-header-color: #73d6fe; //#6495b1;
   --sidebar-toggle-color: #ffffff;
   --sidebar-toggle-hover-color: #47495d;
   --playlist-color: #aeb0b2;
@@ -35,7 +35,7 @@
   --attention-color: red;
   --warn-color: orange;
 
-  --card-background-color: #1b1d26;
+  --card-background-color: #202733; //#282828;
   --card-color: #ffffff;
   --card-border-color: #47495d;
 
@@ -62,7 +62,7 @@
   --scrollbar-track-color: #838383;
   --scrollbar-handle-color: #505050;
 
-  --tabset-background-color: #282A36;
+  --tabset-background-color: transparent; // #282A36;
   --tabset-border-color: #000;
   --tab-background-color: #44475A;
   --tab-color: #fff;
@@ -77,6 +77,7 @@
   --checkbox-background-color: #44475A;
   --checkbox-hover-background-color: #006fee;
   --checkbox-checked-background-color: #006fee;
+  --checkbox-border-radius: 4px;
 
   --option-active-background-color: #50FA7B;
   --option-active-color: #000;

@@ -17,13 +17,13 @@
   &__table {
     display: flex;
     flex-flow: column;
-    flex: 1 1 auto;
+    //flex: 1 1 auto;
   }
 
   &__row {
     display: flex;
     flex-flow: row nowrap;
-    flex: 1 0 auto;
+    //flex: 1 0 auto;
   }
 
   &__col {
@@ -39,8 +39,9 @@
     }
 
     &-value {
-      flex: 1 0 auto;
+      //flex: 1 0 auto;
       align-items: center;
+      width: 400px;
     }
 
     label {
@@ -53,9 +54,9 @@
     }
 
     input {
-      flex: 1 0 auto;
+      //flex: 1 0 auto;
+      @include preferences.prefsInput();
     }
-    @include preferences.prefsInput();
   }
 }
 

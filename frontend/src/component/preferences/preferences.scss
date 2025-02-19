@@ -40,14 +40,14 @@
     @media (max-width: common.$media-size-mobile) {
       flex-flow: row;
     }
-    max-width: 48px;
-    min-width: 48px;
-    width: 48px;
+    //max-width: 48px;
+    //min-width: 48px;
+    //width: 48px;
     @media (max-width: common.$media-size-mobile) {
       max-width: 32px;
       min-width: 32px;
     }
-    gap: 4px;
+    gap: 12px;
 
     button {
       @include common.iconButton();
@@ -58,6 +58,28 @@
       color: var(--icon-button-hover-color);
       background-color: var(--icon-button-hover-background-color);
       border: 1px solid var(--icon-button-hover-border-color);
+    }
+
+    &-menu-action {
+      display: flex;
+      flex-flow: row nowrap;
+      gap: 8px;
+      align-items: center;
+      cursor: pointer;
+      //color: var(--icon-button-hover-color);
+      //color: var(--icon-button-hover-background-color);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 4px;
+      user-select: none;
+
+      &:hover {
+        border: 1px solid var(--icon-button-hover-border-color);
+      }
+    }
+
+    &-menu-action.selected {
+      color: var(--label-color);
     }
   }
 

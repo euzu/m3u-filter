@@ -20,8 +20,9 @@ $input-width: 150px;
       width: $input-width;
       min-width: $input-width;
       max-width: $input-width;
+      @include preferences.prefsInput();
     }
-    @include preferences.prefsInput();
+
 
     &-toolbar {
       display: flex;

@@ -24,7 +24,8 @@
     "react-date-picker": "11.0.0",
     "react-dom": "19.0.0",
     "react-tag-input-component": "2.0.2",
-    "rxjs": "7.8.1"
+    "rxjs": "7.8.1",
+    "@fontsource/rubik": "5.1.1"
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",

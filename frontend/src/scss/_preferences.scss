@@ -10,7 +10,6 @@
 }
 
 @mixin prefsInput {
-  input {
     color: var(--text-color);
     background-color: transparent;
     padding: 0.2rem 0.5rem;
@@ -21,7 +20,6 @@
     &:hover {
       outline: none;
     }
-  }
 }
 
 @mixin prefsToolbar() {
