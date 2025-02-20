@@ -1,12 +1,12 @@
 import {
     catchError,
-    concat, concatWith, EMPTY,
+    concatWith, EMPTY,
     interval,
     map,
     noop,
     Observable,
     of,
-    ReplaySubject, startWith,
+    ReplaySubject,
     takeWhile,
     tap,
     throwError

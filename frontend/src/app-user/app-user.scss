@@ -23,14 +23,19 @@
     }
 
     &__logo {
-      svg {
-        transform: scale(1.5) translate(-10px, 2px);
+      svg, img {
+        width: 2em;
+        aspect-ratio: 1 / 1;
+        transform: translate(-10px, 0);
       }
     }
 
     &__caption {
+      height: 1em;
+      flex-flow: row nowrap;
       flex: 1 1 auto;
-      text-align:center;
+      justify-content: center;
+      align-items: center;
     }
 
     &__toolbar {

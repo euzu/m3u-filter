@@ -5,7 +5,7 @@ import {useServices} from "../../provider/service-provider";
 import {first} from "rxjs/operators";
 import {noop, tap} from "rxjs";
 import {UserRole} from "../../service/auth-service";
-import UserApp from "../../user-app/user-app";
+import AppUser from "../../app-user/app-user";
 
 export default function Authentication(): JSX.Element {
 
@@ -41,7 +41,7 @@ export default function Authentication(): JSX.Element {
     }
 
     if (authenticated === UserRole.USER) {
-        return <UserApp/>;
+        return <AppUser/>;
     }
 
     return <Login/>

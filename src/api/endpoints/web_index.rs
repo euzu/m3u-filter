@@ -28,7 +28,7 @@ async fn token(
             if !(username.is_empty() || password.is_empty()) {
                 if let Some(hash) = web_auth.get_user_password(username) {
                     if verify_password(hash, password.as_bytes()) {
-                        if let Ok(token) = create_jwt_admin(web_auth) {
+                        if let Ok(token) = create_jwt_admin(web_auth, username) {
                             req.zeroize();
                             return HttpResponse::Ok().json(HashMap::from([("token", token)]));
                         }
@@ -36,7 +36,7 @@ async fn token(
                 }
                 if let Some(credentials) = app_state.config.get_user_credentials(username) {
                     if credentials.password == password {
-                        if let Ok(token) = create_jwt_user(web_auth) {
+                        if let Ok(token) = create_jwt_user(web_auth, username) {
                             req.zeroize();
                             return HttpResponse::Ok().json(HashMap::from([("token", token)]));
                         }
@@ -64,13 +64,14 @@ async fn token_refresh(
                 return no_web_auth_token();
             }
             let secret_key = web_auth.secret.as_ref();
-            let token_data = verify_token(credentials, secret_key);
-            if token_data.is_some() {
+            let maybe_token_data = verify_token(credentials, secret_key);
+            if let Some(token_data) = maybe_token_data {
+                let username = token_data.claims.username.clone();
                 let web_auth_cfg = app_state.config.web_auth.as_ref().unwrap();
-                let new_token =  if is_admin(token_data) {
-                    create_jwt_admin(web_auth_cfg)
+                let new_token =  if is_admin(Some(token_data)) {
+                    create_jwt_admin(web_auth_cfg, &username)
                 } else {
-                    create_jwt_user(web_auth_cfg)
+                    create_jwt_user(web_auth_cfg, &username)
                 };
                 if let Ok(token) = new_token {
                     return HttpResponse::Ok().json(HashMap::from([("token", token)]));

@@ -1,7 +1,8 @@
-import React, {JSX, useCallback, useRef, useState} from 'react';
+import React, {JSX, useCallback, useMemo, useRef, useState} from 'react';
 import './login.scss';
 import {useServices} from "../../provider/service-provider";
 import {first} from "rxjs/operators";
+import {getIconByName} from "../../icons/icons";
 
 const checkUserPwd = (username: string, password: string) => username.trim().length > 0 && password.trim().length > 0;
 
@@ -10,6 +11,15 @@ export default function Login(): JSX.Element {
     const usernameRef = useRef<HTMLInputElement>(undefined);
     const passwordRef = useRef<HTMLInputElement>(undefined);
     const services = useServices();
+    const appTitle = useMemo(() => services.config().getUiConfig().app_title ?? 'm3u-filter', [services]);
+    const appLogo = useMemo(() => {
+        let logo =  services.config().getUiConfig().app_logo;
+        if (logo) {
+            return <img src={logo} alt="logo" />;
+        } else {
+            return getIconByName('Logo');
+        }
+    }, [services]);
     const [authorized, setAuthorized] = useState(true);
 
     const handleLogin = useCallback(() => {
@@ -31,7 +41,8 @@ export default function Login(): JSX.Element {
 
 
     return <div className={'login-view'}>
-        <div className={'login-view__title'}>Login to {services.config().getUiConfig().app_title ?? 'm3u-filter'}</div>
+        <div className={'login-view__logo'}>{appLogo}</div>
+        <div className={'login-view__title'}>Login to {appTitle}</div>
         <form>
             <div className="login-view__form">
                 <input ref={usernameRef} type="text" name="username" placeholder="username"/>

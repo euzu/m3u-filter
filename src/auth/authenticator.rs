@@ -11,27 +11,29 @@ const ROLE_USER: &str = "USER";
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Claims {
+    pub(crate) username: String,
     iss: String,
     iat: i64,
     exp: i64,
     roles: Vec<String>,
 }
 
-pub fn create_jwt_admin(web_auth_config: &WebAuthConfig) -> Result<String, std::io::Error> {
-    create_jwt(web_auth_config, vec![ROLE_ADMIN.to_string()])
+pub fn create_jwt_admin(web_auth_config: &WebAuthConfig, username: &str) -> Result<String, std::io::Error> {
+    create_jwt(web_auth_config, username, vec![ROLE_ADMIN.to_string()])
 }
 
-pub fn create_jwt_user(web_auth_config: &WebAuthConfig) -> Result<String, std::io::Error> {
-    create_jwt(web_auth_config, vec![ROLE_USER.to_string()])
+pub fn create_jwt_user(web_auth_config: &WebAuthConfig, username: &str) -> Result<String, std::io::Error> {
+    create_jwt(web_auth_config, username, vec![ROLE_USER.to_string()])
 }
 
-fn create_jwt(web_auth_config: &WebAuthConfig, roles: Vec<String>) -> Result<String, std::io::Error> {
+fn create_jwt(web_auth_config: &WebAuthConfig, username: &str, roles: Vec<String>) -> Result<String, std::io::Error> {
     let mut header = Header::new(Algorithm::HS256);
     header.typ = Some("JWT".to_string());
     let now = Local::now();
     let iat = now.timestamp();
     let exp = (now + Duration::minutes(30)).timestamp();
     let claims = Claims {
+        username: username.to_string(),
         iss: web_auth_config.issuer.clone(),
         iat,
         exp,
@@ -59,7 +61,6 @@ fn has_role(token_data: Option<TokenData<Claims>>, role: &str) -> bool {
     } else {
         false
     }
-
 }
 
 pub fn is_admin(token_data: Option<TokenData<Claims>>) -> bool {
@@ -78,19 +79,34 @@ pub fn verify_token_user(bearer: Option<BearerAuth>, secret_key: &[u8]) -> bool 
     has_role(verify_token(bearer, secret_key), ROLE_USER)
 }
 
-pub async fn validator_admin(
+async fn validate_request(
     req: ServiceRequest,
     credentials: Option<BearerAuth>,
+    verify_fn: fn(Option<BearerAuth>, &[u8]) -> bool, // Funktions-Parameter für Admin/User-Check
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     if let Some(app_state) = req.app_data::<web::Data<AppState>>() {
         if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
             let secret_key = web_auth_config.secret.as_ref();
-            if verify_token_admin(credentials, secret_key) {
+            if verify_fn(credentials, secret_key) {
                 return Ok(req);
             }
-        }    
+        }
     }
     Err((actix_web::error::ErrorUnauthorized("Unauthorized"), req))
+}
+
+pub async fn validator_admin(
+    req: ServiceRequest,
+    credentials: Option<BearerAuth>,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    validate_request(req, credentials, verify_token_admin).await
+}
+
+pub async fn validator_user(
+    req: ServiceRequest,
+    credentials: Option<BearerAuth>,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    validate_request(req, credentials, verify_token_user).await
 }
 
 // pub fn handle_unauthorized<B>(srvres: ServiceResponse<B>) -> actix_web::Result<ErrorHandlerResponse<B>> {

@@ -1,0 +1,37 @@
+.loading-bar-placeholder, .loading-bar-container {
+  width: 100%; // Full width of the container
+  height: 5px; // Thin height for the container
+  min-height: 5px;
+  max-height: 5px;
+}
+
+// Container for the loading bar
+.loading-bar-container {
+  background-color: var(--spinner-color); // Light gray background for the container
+  border-radius: 10px; // Optional: rounded corners for the container
+  overflow: hidden; // Prevents overflow content from showing outside the container
+}
+
+// The actual loading bar
+.loading-bar {
+  height: 100%; // Full height of the loading bar (matches the container's height)
+  width: 100%; // Start the width of the loading bar at 100%
+  background-color: var(--spinner-highlight-color);
+  position: relative;
+  animation: loading 2s infinite ease-in-out; // Animation runs infinitely with easing
+  transform-origin: center center; // The animation will scale from the center of the element
+}
+
+// The keyframes for the loading animation
+@keyframes loading {
+  0% {
+    transform: scaleX(0); // At the start, the bar is not visible (scale from the center)
+  }
+  50% {
+    transform: scaleX(1); // The bar reaches full width, expanding to the edges
+  }
+  100% {
+    transform: scaleX(0); // The bar contracts back to the center
+  }
+}
+

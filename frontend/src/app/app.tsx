@@ -27,14 +27,23 @@ interface AppProps {
 
 export default function App(props: AppProps) {
     const searchChannel = useMemo<Subject<SearchRequest>>(() => new Subject<SearchRequest>(), []);
+    const services = useServices();
     const [progress, setProgress] = useState<boolean>(false);
     const [playlist, setPlaylist] = useState<PlaylistGroup[]>([]);
     const [serverConfig, setServerConfig] = useState<ServerConfig>(undefined);
     const [preferencesVisible, setPreferencesVisible] = useState<boolean>(true);
     const clipboardChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
     const viewerRef = useRef<IPlaylistViewer>(undefined);
+    const appTitle = useMemo(() => services.config().getUiConfig().app_title ?? 'm3u-filter', [services]);
+    const appLogo = useMemo(() => {
+        let logo =  services.config().getUiConfig().app_logo;
+        if (logo) {
+            return <img src={logo} alt="logo" />;
+        } else {
+            return getIconByName('Logo');
+        }
+    }, [services]);
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
-    const services = useServices();
     const videoChannel = useMemo(() => new Subject<PlaylistItem>(), []);
     const handleDownload = useCallback((req: PlaylistRequest) => {
         setProgress(true);
@@ -145,7 +154,7 @@ export default function App(props: AppProps) {
     return (
         <div className="app">
             <div className={'app-header'}>
-                <div className={'app-header__caption'}><span className={'app-header__logo'}>{getIconByName('Logo')}</span>{services.config().getUiConfig().app_title}</div>
+                <div className={'app-header__caption'}><span className={'app-header__logo'}>{appLogo}</span>{appTitle}</div>
                 <div className={'app-header__toolbar'}><button title="Configuration" onClick={handlePreferences}>{getIconByName('Config')}</button></div>
                 <div className={'app-header__toolbar'}><button title="Logout" onClick={handleLogout}>{getIconByName('Logout')}</button></div>
             </div>

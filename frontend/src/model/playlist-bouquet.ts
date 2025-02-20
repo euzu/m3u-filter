@@ -1,0 +1,1 @@
+export type PlaylistBouquet = Record<string, boolean>;

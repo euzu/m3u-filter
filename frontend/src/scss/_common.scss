@@ -18,12 +18,12 @@ $media-size-mobile: 600px;
   @include container_common();
 }
 
-@mixin container_horz_nowrap($justify-content: flex-start) {
+@mixin container_horz_nowrap($justify-content: flex-start, $padding: 12px) {
   flex-flow: row nowrap;
   @media (max-width: $media-size-mobile) {
     flex-flow: column;
   }
-  @include container_common($justify-content);
+  @include container_common($justify-content,  $padding);
 }
 
 @mixin container_horz_no_padding() {

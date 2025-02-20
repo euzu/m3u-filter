@@ -11,6 +11,20 @@
   border-top-right-radius: 6px;
   overflow: hidden;
 
+  &__logo {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: -1;
+    svg {
+      height: 100%;
+      width: 100%;
+      color: color-mix(in srgb, var(--background-color) 80%, black 10%);
+    }
+  }
+
   &__title {
     background-color: var(--app-header-color);
     padding: 8px;

@@ -1,12 +1,12 @@
 @use '../../scss/common';
 
 .preferences {
-  @include common.container_horz();
+  @include common.container_horz_no_padding();
   overflow: hidden;
   flex: 1 1 auto;
 
   &__content {
-    @include common.container_horz_nowrap(flex-start);
+    @include common.container_horz_nowrap(flex-start, 0);
     flex: 1 1 auto;
     overflow: hidden;
   }

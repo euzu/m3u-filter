@@ -16,7 +16,7 @@ use crate::utils::network::request::sanitize_sensitive_info;
 use actix_files::NamedFile;
 use actix_web::body::{BodyStream, SizedStream};
 use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
-use actix_web::{HttpRequest, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use parking_lot::Mutex;
 use futures::TryStreamExt;
 use log::{error, log_enabled, trace};
@@ -25,6 +25,8 @@ use std::collections::HashMap;
 use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
+use actix_web_httpauth::extractors::bearer::BearerAuth;
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use url::Url;
 use crate::api::model::streams::active_client_stream::ActiveClientStream;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
@@ -69,6 +71,7 @@ macro_rules! try_result_bad_request {
 
 pub use try_option_bad_request;
 pub use try_result_bad_request;
+use crate::auth::authenticator::Claims;
 
 pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
     if file_path.exists() {
@@ -81,6 +84,13 @@ pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mi
         }
     }
     HttpResponse::NoContent().finish()
+}
+
+pub async fn get_user_target_by_username<'a>(username: &str, app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
+    if !username.is_empty() {
+        return app_state.config.get_target_for_username(username);
+    }
+    None
 }
 
 pub async fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a UserApiRequest,
@@ -290,4 +300,16 @@ pub fn separate_number_and_remainder(input: &str) -> (String, Option<String>) {
 
 pub fn empty_json_list_response() -> HttpResponse {
     HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("[]")
+}
+
+pub fn get_username_from_auth_header(credentials: Option<BearerAuth>, app_state: &web::Data<AppState>) -> Option<String> {
+    if let Some(bearer) = credentials {
+        if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
+            let secret_key = web_auth_config.secret.as_ref();
+            if let Ok(token_data) = decode::<Claims>(bearer.token(), &DecodingKey::from_secret(secret_key), &Validation::new(Algorithm::HS256)) {
+                return Some(token_data.claims.username);
+            }
+        }
+    }
+    None
 }
