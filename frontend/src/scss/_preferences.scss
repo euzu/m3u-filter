@@ -1,11 +1,8 @@
 @use './common';
 
 @mixin prefsRoot {
-  display: flex;
-  flex-flow: column;
-  gap: 20px;
+  @include common.container_vert_no_padding(flex-start);
   align-content: flex-start;
-  justify-content: center;
   overflow: hidden;
 }
 

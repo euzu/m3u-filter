@@ -3,27 +3,22 @@
 @use '../../scss/date-picker';
 
 .form-view {
-  display: flex;
-  flex-flow: column;
-  box-sizing: border-box;
+  @include common.container_vert_no_padding();
 
   &__map-editor {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 10px;
-    flex: 1;
+    @include common.container_horz_nowrap();
+    flex: 1 1 auto;
+    overflow: hidden;
+    padding:0;
   }
 
   &__table {
-    display: flex;
-    flex-flow: column;
-    //flex: 1 1 auto;
+    @include common.container_vert_no_padding();
   }
 
   &__row {
-    display: flex;
-    flex-flow: row nowrap;
-    //flex: 1 0 auto;
+    @include common.container_horz_nowrap(flex-start);
+    padding:0;
   }
 
   &__col {
@@ -32,16 +27,16 @@
     padding: 6px;
 
     &-label {
-      text-align: right;
       width: 7em;
       justify-content: flex-end;
       align-items: flex-start;
     }
 
     &-value {
-      //flex: 1 0 auto;
-      align-items: center;
-      width: 400px;
+      display: flex;
+      flex: 1 1 auto;
+      align-items: flex-start;
+      overflow: hidden;
     }
 
     label {

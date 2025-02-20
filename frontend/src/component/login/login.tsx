@@ -3,7 +3,7 @@ import './login.scss';
 import {useServices} from "../../provider/service-provider";
 import {first} from "rxjs/operators";
 
-const checkUserPwd = (username: string, password: string) => username.trim().length > 0 && password.trim().length > 8;
+const checkUserPwd = (username: string, password: string) => username.trim().length > 0 && password.trim().length > 0;
 
 export default function Login(): JSX.Element {
 
@@ -22,7 +22,7 @@ export default function Login(): JSX.Element {
     }, [services]);
 
     const handleKeyDown = useCallback((event: any) => {
-        if (event.key === 'Enter') {
+        if (event.code === 'Enter') {
             if (checkUserPwd(usernameRef.current.value, passwordRef.current.value)) {
                 handleLogin();
             }
@@ -31,7 +31,7 @@ export default function Login(): JSX.Element {
 
 
     return <div className={'login-view'}>
-        <div className={'login-view__title'}>Login to m3u-filter</div>
+        <div className={'login-view__title'}>Login to {services.config().getUiConfig().app_title ?? 'm3u-filter'}</div>
         <form>
             <div className="login-view__form">
                 <input ref={usernameRef} type="text" name="username" placeholder="username"/>

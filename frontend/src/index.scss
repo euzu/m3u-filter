@@ -11,6 +11,8 @@ body {
   font-family: "Rubik", sans-serif;
   background-color: var(--background-color);
   height: 100%;
+  max-width: 100vw;
+  overflow: hidden;
   box-sizing: border-box;
   display: flex;
   align-content: stretch;
@@ -31,4 +33,6 @@ body {
   flex-flow: column;
   flex: 1 1 auto;
   box-sizing: border-box;
+  overflow: hidden;
+  max-width: 100%;
 }

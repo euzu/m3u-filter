@@ -1,6 +1,6 @@
 @use '../scss/common';
 
-.app {
+.user-app {
   display: flex;
   flex-flow: column;
   justify-content: center;
@@ -10,7 +10,7 @@
   max-width: 100%;
   color: var(--text-color);
 
-  .app-header {
+  &__header {
     display: flex;
     flex-flow: row;
     font-size: 2rem;
@@ -42,7 +42,7 @@
     }
   }
 
-  .app-main {
+  &__main {
     display: flex;
     flex-flow: column;
     justify-content: center;
@@ -50,14 +50,13 @@
     overflow: hidden;
     box-sizing: border-box;
     max-width: 100%;
-
-    .app-content {
-      display: flex;
-      flex-flow: column;
-      flex: 1 1 auto;
-      box-sizing: border-box;
-      overflow: hidden;
-      max-width: 100%;
-    }
+  }
+  &__content {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+    box-sizing: border-box;
+    overflow: hidden;
+    max-width: 100%;
   }
 }

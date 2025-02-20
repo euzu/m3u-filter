@@ -1,6 +1,7 @@
+@use '../../scss/common';
+
 .panel {
-  display: flex;
-  flex-flow: column;
+  @include common.container_vert_no_padding();
   overflow: hidden;
 }
 .hidden {

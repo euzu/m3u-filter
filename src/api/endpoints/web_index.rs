@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-
 use actix_files::NamedFile;
 use actix_web::{HttpRequest, HttpResponse, web};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use crate::api::model::app_state::AppState;
-use crate::auth::authenticator::{create_jwt, verify_token};
+use crate::auth::authenticator::{create_jwt_admin, create_jwt_user, is_admin, verify_token};
 use crate::auth::password::verify_password;
 use crate::auth::user::UserCredential;
 
@@ -29,13 +28,22 @@ async fn token(
             if !(username.is_empty() || password.is_empty()) {
                 if let Some(hash) = web_auth.get_user_password(username) {
                     if verify_password(hash, password.as_bytes()) {
-                        req.zeroize();
-                        if let Ok(token) = create_jwt(web_auth) {
+                        if let Ok(token) = create_jwt_admin(web_auth) {
+                            req.zeroize();
                             return HttpResponse::Ok().json(HashMap::from([("token", token)]));
                         }
-                    };
+                    }
+                }
+                if let Some(credentials) = app_state.config.get_user_credentials(username) {
+                    if credentials.password == password {
+                        if let Ok(token) = create_jwt_user(web_auth) {
+                            req.zeroize();
+                            return HttpResponse::Ok().json(HashMap::from([("token", token)]));
+                        }
+                    }
                 }
             }
+
             req.zeroize();
             HttpResponse::BadRequest().finish()
         }
@@ -56,8 +64,15 @@ async fn token_refresh(
                 return no_web_auth_token();
             }
             let secret_key = web_auth.secret.as_ref();
-            if verify_token(credentials, secret_key) {
-                if let Ok(token) = create_jwt(app_state.config.web_auth.as_ref().unwrap()) {
+            let token_data = verify_token(credentials, secret_key);
+            if token_data.is_some() {
+                let web_auth_cfg = app_state.config.web_auth.as_ref().unwrap();
+                let new_token =  if is_admin(token_data) {
+                    create_jwt_admin(web_auth_cfg)
+                } else {
+                    create_jwt_user(web_auth_cfg)
+                };
+                if let Ok(token) = new_token {
                     return HttpResponse::Ok().json(HashMap::from([("token", token)]));
                 }
             }

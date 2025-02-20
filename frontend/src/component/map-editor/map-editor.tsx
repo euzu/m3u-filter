@@ -67,13 +67,13 @@ export default function MapEditor(props: MapEditorProps) {
         <div className={'map-editor__table'}>
             {data?.map((keyValue: KeyValue, idx) =>
                 <div key={uuid + '-' + keyValue.key + idx} className={'map-editor__row'}>
-                    <div className={'map-editor__col map-editor__col-key'}>{keyValue.key}</div>
-                    <div className={'map-editor__col map-editor__col-value'}>{keyValue.value}</div>
                     <div className={'map-editor__col map-editor__toolbar'}>
                            <span data-key={keyValue.key} onClick={handleHeaderRemove}>
                                {getIconByName('Delete')}
                            </span>
                     </div>
+                    <div className={'map-editor__col map-editor__col-key'}>{keyValue.key}</div>
+                    <div className={'map-editor__col map-editor__col-value'}>{keyValue.value}</div>
                 </div>
             )}
         </div>

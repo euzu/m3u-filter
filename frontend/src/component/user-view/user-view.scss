@@ -16,10 +16,7 @@
 
   &__content {
     & {
-      display: flex;
-      flex-flow: column;
-      flex: 1 1 auto;
-      justify-content: flex-start;
+      @include  common.container_vert_no_padding(flex-start);
       overflow: hidden;
     }
     label {

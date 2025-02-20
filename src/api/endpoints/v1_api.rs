@@ -10,7 +10,7 @@ use crate::api::endpoints::download_api;
 use crate::api::model::app_state::AppState;
 use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::api::model::request::PlaylistRequest;
-use crate::auth::authenticator::validator;
+use crate::auth::authenticator::validator_admin;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, TargetUser};
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
@@ -236,7 +236,7 @@ async fn config(
 pub fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) {
     move |cfg: &mut web::ServiceConfig| {
         cfg.service(web::scope("/api/v1")
-            .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator)))
+            .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator_admin)))
             .route("/config", web::get().to(config))
             .route("/config/main", web::post().to(save_config_main))
             .route("/config/user", web::post().to(save_config_api_proxy_user))

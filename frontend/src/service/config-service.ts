@@ -1,9 +1,23 @@
 import ConfigApiService, {DefaultConfigApiService} from "../api/config-api-service";
 import {Observable} from "rxjs";
 import ServerConfig, {ApiProxyServerInfo, ServerMainConfig, TargetUser} from "../model/server-config";
+import {DefaultUiConfig, UiConfig} from "../model/ui-config";
 
 export default class ConfigService {
+
+    private uiConfig: UiConfig = DefaultUiConfig;
+
     constructor(private configApiService: ConfigApiService = new DefaultConfigApiService()) {
+    }
+
+    setUiConfig(uiConfig: UiConfig): void {
+        if (uiConfig) {
+            this.uiConfig = uiConfig;
+        }
+    }
+
+    getUiConfig(): UiConfig {
+        return this.uiConfig;
     }
 
     getServerConfig(): Observable<ServerConfig> {
