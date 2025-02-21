@@ -22,7 +22,8 @@ export default function Authentication(): JSX.Element {
             error: () => setAuthenticated(UserRole.NONE),
         })
 
-        const noAuthCheck = () => services.auth().authenticate('test', 'test').pipe(tap(() => setLoading(false)), first()).subscribe(noop);
+        const noAuthCheck = () => services.auth().authenticate('test', 'test')
+            .pipe(tap(() => setLoading(false)), first()).subscribe(noop);
 
         services.auth().refresh().pipe(first()).subscribe({
             next: (authenticated) =>!authenticated && noAuthCheck(),

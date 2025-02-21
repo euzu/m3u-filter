@@ -170,6 +170,7 @@ fn create_directories(cfg: &Config, temp_path: &Path) {
     let paths_strings = [
         Some(cfg.working_dir.clone()),
         cfg.backup_dir.clone(),
+        cfg.user_config_dir.clone(),
         cfg.video.as_ref().and_then(|v| v.download.as_ref()).and_then(|d| d.directory.clone()),
         cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref().and_then(|c| if c.enabled { c.dir.clone() } else { None }))
     ];

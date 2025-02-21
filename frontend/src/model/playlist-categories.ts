@@ -1,7 +1,6 @@
 export interface PlaylistCategory {
-    category_id: number,
-    category_name: string,
-    parent_id: number,
+    id: number,
+    name: string,
 }
 
 export interface PlaylistCategories {

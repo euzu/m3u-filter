@@ -44,6 +44,7 @@ pub struct ServerConfig {
     pub threads: u8,
     pub working_dir: String,
     pub backup_dir: Option<String>,
+    pub user_config_dir: Option<String>,
     pub schedules: Option<Vec<ScheduleConfig>>,
     pub reverse_proxy: Option<ReverseProxyConfig>,
     pub sources: Vec<ServerSourceConfig>,

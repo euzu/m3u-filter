@@ -29,7 +29,7 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
 
     return <div className={'playlist-filter'}>
         <InputField label={'Search'}>
-            <input ref={textField} onKeyUp={handleKeyPress}/>
+            <input type="text" ref={textField} onKeyUp={handleKeyPress}/>
             <button title={'Regexp'} className={useRegexp ? 'playlist-filter__option-active' : ''} onClick={handleRegexp}>{getIconByName('Regexp')}</button>
             <button title={'Search'} onClick={handleSearch}>{getIconByName('Search')}</button>
         </InputField>

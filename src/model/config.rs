@@ -822,6 +822,8 @@ pub struct ConfigDto {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_dir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_config_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub video: Option<VideoConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<Vec<ScheduleConfig>>,
@@ -1045,6 +1047,8 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_dir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_config_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel_unavailable_file: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub templates: Option<Vec<PatternTemplate>>,
@@ -1242,6 +1246,17 @@ impl Config {
                     config_reader::resolve_env_var(backup_dir)
                 } else {
                     backup_dir.to_owned()
+                }
+            }).map(|dir| dir.to_string());
+        }
+        if self.user_config_dir.is_none() {
+            self.user_config_dir = Some(PathBuf::from(&self.working_dir).join("user_config").clean().to_string_lossy().to_string());
+        } else {
+            self.user_config_dir = self.user_config_dir.as_ref().map(|user_config_dir| {
+                if resolve_var {
+                    config_reader::resolve_env_var(user_config_dir)
+                } else {
+                    user_config_dir.to_owned()
                 }
             }).map(|dir| dir.to_string());
         }

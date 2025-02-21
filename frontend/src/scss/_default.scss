@@ -96,3 +96,6 @@ select {
 :not(input[type="text"]) {
   caret-color: transparent;
 }
+input[type="text"] {
+  caret-color: auto;
+}

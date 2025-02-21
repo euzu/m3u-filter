@@ -16,13 +16,17 @@
     font-size: 2rem;
     font-weight: bold;
     color: var(--app-header-color);
-    text-align:center;
-    padding: 10px 68px;
+    align-content: center;
+    padding: 10px;
     @media (max-width: common.$media-size-mobile) {
       padding: 10px 0;
     }
 
     &__logo {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
       svg, img {
         width: 2em;
         aspect-ratio: 1 / 1;
@@ -31,7 +35,6 @@
     }
 
     &__caption {
-      height: 1em;
       display: flex;
       flex-flow: row nowrap;
       flex: 1 1 auto;
@@ -40,7 +43,8 @@
     }
 
     &__toolbar {
-      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
       button {
         @include common.iconButton();
       }

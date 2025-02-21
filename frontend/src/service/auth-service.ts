@@ -22,6 +22,7 @@ export enum UserRole {
 }
 
 const AUTH_TOKEN_KEY = "auth-token";
+const NO_AUTHORIZATION_TOKEN = "authorized";
 
 const REFRESH_INTERVAL = 1000 * 60 * 15; // 15 mins
 
@@ -32,15 +33,31 @@ export default class AuthService {
 
     constructor(private authApiService: AuthApiService = new DefaultAuthApiService()) {
         this.token = localStorage.getItem(AUTH_TOKEN_KEY);
-        this.subject.next(this.getRole());
         interval(REFRESH_INTERVAL).pipe(
-            takeWhile(() => this.token !== 'authorized'),
-            concatWith(EMPTY)).subscribe(() => this.refresh().pipe(first()).subscribe(noop));
+            takeWhile(() => this.token !== NO_AUTHORIZATION_TOKEN),
+            concatWith(EMPTY)).subscribe(() => this.refresh().pipe(first()).subscribe({
+            next: (success: boolean) => {
+                if (success) {
+                    this.subject.next(this.getRole());
+                } else {
+                    this.clearToken();
+                }
+            },
+            error: () => this.clearToken(),
+        }));
+    }
+
+    private clearToken() {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        this.subject.next(UserRole.NONE);
     }
 
     private getRole(): UserRole {
         if (this.token) {
             try {
+                if (this.token === NO_AUTHORIZATION_TOKEN) {
+                    return UserRole.ADMIN;
+                }
                 const claims: any = jwtDecode(this.token);
                 if (claims?.roles?.includes("ADMIN")) {
                     return UserRole.ADMIN;
@@ -49,7 +66,7 @@ export default class AuthService {
                     return UserRole.USER;
                 }
             } catch(err) {
-                localStorage.removeItem(AUTH_TOKEN_KEY);
+                this.clearToken();
             }
         }
         return UserRole.NONE;
@@ -82,7 +99,10 @@ export default class AuthService {
             return auth.token != undefined
         }), tap(data => {
             this.subject.next(this.getRole());
-        }), catchError(() => of(false)));
+        }), catchError(() => {
+            this.clearToken();
+            return of(false);
+        }));
     }
 
     isAuthenticated(): boolean {

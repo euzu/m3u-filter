@@ -11,4 +11,5 @@ pub mod epg_repository;
 pub mod kodi_repository;
 pub mod m3u_playlist_iterator;
 pub mod xtream_playlist_iterator;
+pub mod user_repository;
 

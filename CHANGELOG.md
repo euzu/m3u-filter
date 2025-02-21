@@ -16,6 +16,7 @@
   - name: test
 ```
 - The Web UI now includes a login feature for playlist users, allowing them to set their group for filtering and managing their own boutique.
+- Added `user_config_dir` to `config.yml`. It is the storage path for user configurations (f.e. bouquets).
 
 # 2.2.1 (2025-02-14)
 - Added more info to `/status`.

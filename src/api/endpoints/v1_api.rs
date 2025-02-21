@@ -204,6 +204,7 @@ async fn config(
         threads: config.threads,
         working_dir: config.working_dir.clone(),
         backup_dir: config.backup_dir.clone(),
+        user_config_dir: config.user_config_dir.clone(),
         log: config.log.clone(),
         update_on_boot: config.update_on_boot,
         web_ui_enabled: config.web_ui_enabled,

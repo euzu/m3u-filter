@@ -6,3 +6,4 @@ pub mod stats;
 pub mod xmltv;
 pub mod xtream;
 pub mod healthcheck;
+pub mod playlist_categories;
