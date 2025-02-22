@@ -424,14 +424,14 @@ pub fn xtream_get_item_for_stream_id(
     }
 }
 
-pub fn xtream_load_rewrite_playlist(
+pub async fn xtream_load_rewrite_playlist(
     cluster: XtreamCluster,
     config: &Config,
     target: &ConfigTarget,
     category_id: u32,
     user: &ProxyUserCredentials,
 ) -> Result<Box<dyn Iterator<Item=String>>, M3uFilterError> {
-    Ok(Box::new(XtreamPlaylistIterator::new(cluster, config, target, category_id, user)?))
+    Ok(Box::new(XtreamPlaylistIterator::new(cluster, config, target, category_id, user).await?))
 }
 
 pub fn xtream_write_series_info(

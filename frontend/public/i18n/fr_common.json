@@ -1,0 +1,112 @@
+{
+  "LABEL": {
+    "LIVE": "En direct",
+    "VOD": "VOD",
+    "SERIES": "Séries",
+    "SAVE": "Enregistrer",
+    "SHOW_SELECTED": "Afficher la sélection",
+    "SELECT_ALL": "Tout sélectionner",
+    "DESELECT_ALL": "Tout désélectionner",
+    "SEARCH": "Rechercher",
+    "CLEAR": "Effacer",
+    "REGEXP": "Expression régulière",
+    "LOGOUT": "Se déconnecter",
+    "CONFIGURATION": "Configuration",
+    "HOST": "Hôte",
+    "PORT": "Port",
+    "WEB_ROOT": "Racine Web",
+    "THREADS": "Threads",
+    "WORKING_DIR": "Répertoire de travail",
+    "BACKUP_DIR": "Répertoire de sauvegarde",
+    "UPDATE_ON_BOOT": "Mettre à jour au démarrage",
+    "WEB_UI": "Interface Web",
+    "SCHEDULES": "Programmes",
+    "SANITIZE_SENSITIVE_INFO": "Assainir les informations sensibles",
+    "ACTIVE_CLIENTS": "Clients actifs",
+    "RESOURCE_REWRITE_DISABLE": "Désactiver la réécriture des ressources",
+    "RECONNECT": "Se reconnecter",
+    "BUFFER_ENABLED": "Mise en mémoire tampon activée",
+    "BUFFER_SIZE": "Taille du tampon",
+    "ENABLED": "Activé",
+    "SIZE": "Taille",
+    "CACHE_DIR": "Répertoire du cache",
+    "NOTIFY_ON": "Notifier lorsqu'il y a",
+    "BOT_TOKEN": "Jeton du bot",
+    "CHAT_IDS": "Identifiants de chat",
+    "URL": "URL",
+    "USER": "Utilisateur",
+    "TOKEN": "Jeton",
+    "WEB_SEARCH_URL": "URL de recherche Web",
+    "EXTENSIONS": "Extensions",
+    "HEADERS": "En-têtes",
+    "DIRECTORY": "Répertoire",
+    "ORGANIZE_INTO_DIRECTORIES": "Organiser dans des répertoires",
+    "EPISODE_PATTERN": "Modèle d'épisode",
+    "API": "API",
+    "MAIN": "Principal",
+    "REVERSE_PROXY": "Proxy inverse",
+    "MESSAGING": "Messagerie",
+    "VIDEO": "Vidéo",
+    "EXAMPLES": "Exemples",
+    "UPDATE": "Mettre à jour",
+    "START": "Démarrer",
+    "CACHE": "Cache",
+    "STREAM": "Diffusion",
+    "LOG": "Journal",
+    "CONFIG": "Configuration",
+    "TELEGRAM": "Telegram",
+    "REST": "Rest",
+    "PUSHOVER": "Pushover",
+    "PROXY": "Proxy",
+    "REFRESH": "Rafraîchir",
+    "STATUS": "Statut",
+    "MAX_CON": "MaxCon",
+    "EXP_DATE": "Date d'expiration",
+    "USERNAME": "Nom d'utilisateur",
+    "PASSWORD": "Mot de passe",
+    "SERVER": "Serveur",
+    "TIMEZONE": "Fuseau horaire",
+    "PATH": "Chemin",
+    "MESSAGE": "Message",
+    "PROTOCOL": "Protocole",
+    "NAME": "Nom"
+  },
+  "TITLE": {
+    "USER_BOUQUET_EDITOR": "Éditeur de bouquet utilisateur"
+  },
+  "MESSAGES": {
+    "INVALID_REGEXP": "Expression régulière invalide",
+    "INVALID_FILETYPE": "Type de fichier invalide",
+    "DOWNLOAD": {
+      "SUCCESS": "Téléchargement réussi",
+      "FAIL": "Échec du téléchargement!",
+      "PLAYLIST": {
+        "SUCCESS": "Liste de lecture téléchargée avec succès",
+        "FAIL": "Échec du téléchargement de la liste de lecture!"
+      },
+      "SERVER_CONFIG": {
+        "FAIL": "Échec du téléchargement de la configuration du serveur!"
+      }
+    },
+    "SAVE": {
+      "MAIN_CONFIG": {
+        "SUCCESS": "Configuration principale enregistrée!",
+        "FAIL": "Échec de l'enregistrement de la configuration principale!"
+      },
+      "BOUQUET": {
+        "SUCCESS": "Bouquet enregistré avec succès",
+        "FAIL": "Échec de l'enregistrement du bouquet!"
+      },
+      "USER": {
+        "SUCCESS": "Utilisateur enregistré avec succès",
+        "FAIL": "Échec de l'enregistrement de l'utilisateur!"
+      }
+    }
+  },
+  "INFO": {
+    "RESTART_TO_APPLY_CHANGES": "Vous devez redémarrer pour appliquer les modifications.",
+    "SCHEDULE_EXAMPLE": "Exemple de programme",
+    "THREADS": "Threads: laissez-le à 0 si vous n'avez aucun problème. Augmentez-le si vous avez plusieurs fournisseurs. L'accès parallèle à votre fournisseur peut entraîner un ban.",
+    "WEB_ROOT": "Racine Web: Contient les fichiers de l'interface web. Ils sont normalement placés dans le même répertoire sous ./web"
+  }
+}

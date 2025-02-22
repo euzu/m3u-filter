@@ -14,6 +14,7 @@ export default interface PlaylistApiService extends ApiService {
 
 export class DefaultPlaylistApiService extends DefaultApiService implements PlaylistApiService {
     getPlaylist(req: PlaylistRequest): Observable<PlaylistGroup[]> {
+        // eslint-disable-next-line eqeqeq
         if (req.url || req.input_id != undefined) {
             return this.post<PlaylistGroup[]>(PLAYLIST_API_PATH, req);
         }

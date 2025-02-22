@@ -3,7 +3,6 @@ import {
     concatWith, EMPTY,
     interval,
     map,
-    noop,
     Observable,
     of,
     ReplaySubject,
@@ -81,6 +80,7 @@ export default class AuthService {
             return this.authApiService.refresh().pipe(map(auth => {
                 this.token = auth.token;
                 localStorage.setItem(AUTH_TOKEN_KEY, auth.token);
+                // eslint-disable-next-line eqeqeq
                 return auth.token != undefined
             }), tap(data => {
                 this.subject.next(this.getRole());
@@ -96,6 +96,7 @@ export default class AuthService {
         return this.authApiService.authenticate(username, password).pipe(map(auth => {
             this.token = auth.token;
             localStorage.setItem(AUTH_TOKEN_KEY, auth.token);
+            // eslint-disable-next-line eqeqeq
             return auth.token != undefined
         }), tap(data => {
             this.subject.next(this.getRole());
@@ -106,6 +107,7 @@ export default class AuthService {
     }
 
     isAuthenticated(): boolean {
+        // eslint-disable-next-line eqeqeq
         return this.token != undefined;
     }
 

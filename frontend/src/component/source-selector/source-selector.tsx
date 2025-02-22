@@ -50,6 +50,7 @@ export default function SourceSelector(props: SourceSelectorProps) {
 
     const handleMenuClick = useCallback((evt: any) => {
         const idx = evt.target.dataset.idx;
+        // eslint-disable-next-line eqeqeq
         if (idx != undefined) {
             setPopupVisible(undefined);
             setSelected(sources[idx]);

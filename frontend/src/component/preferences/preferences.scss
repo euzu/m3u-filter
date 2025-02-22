@@ -67,6 +67,7 @@
       border-radius: 4px;
       padding: 4px;
       user-select: none;
+      white-space: nowrap;
 
       &:hover {
         border: 1px solid var(--icon-button-hover-border-color);

@@ -23,6 +23,7 @@ export default function TagSelect(props: TagSelectProps) {
             const selections: Record<number, boolean> = {}
             for (let i = 0; i < options.length; i++) {
                 const optionValue = options[i].value;
+                // eslint-disable-next-line eqeqeq
                 selections[i] = valueIsArray ? defaultValues.includes(optionValue) : defaultValues == optionValue;
             }
             setSelected(selections);

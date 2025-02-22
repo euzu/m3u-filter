@@ -1,0 +1,112 @@
+{
+  "LABEL": {
+    "LIVE": "Canlı",
+    "VOD": "Video",
+    "SERIES": "Diziler",
+    "SAVE": "Kaydet",
+    "SHOW_SELECTED": "Seçilenleri Göster",
+    "SELECT_ALL": "Tümünü Seç",
+    "DESELECT_ALL": "Tümünü Seçimden Çıkar",
+    "SEARCH": "Ara",
+    "CLEAR": "Sil",
+    "REGEXP": "RegExp",
+    "LOGOUT": "Çıkış Yap",
+    "CONFIGURATION": "Yapılandırma",
+    "HOST": "Sunucu",
+    "PORT": "Port",
+    "WEB_ROOT": "Web Klasörü",
+    "THREADS": "İşlemciler",
+    "WORKING_DIR": "Çalışma Klasörü",
+    "BACKUP_DIR": "Yedekleme Klasörü",
+    "UPDATE_ON_BOOT": "Başlangıçta Güncelle",
+    "WEB_UI": "Web UI",
+    "SCHEDULES": "Programlar",
+    "SANITIZE_SENSITIVE_INFO": "Hassas Bilgileri Temizle",
+    "ACTIVE_CLIENTS": "Aktif Kullanıcılar",
+    "RESOURCE_REWRITE_DISABLE": "Url Yönlendirme Devre Dışı",
+    "RECONNECT": "Yeniden Bağlan",
+    "BUFFER_ENABLED": "Arabellek Aktif",
+    "BUFFER_SIZE": "Arabellek Boyutu",
+    "ENABLED": "Aktif",
+    "SIZE": "Boyut",
+    "CACHE_DIR": "Önbellek Dizin",
+    "NOTIFY_ON": "Bildirimler",
+    "BOT_TOKEN": "Bot Token'i",
+    "CHAT_IDS": "Chat ID'leri",
+    "URL": "URL",
+    "USER": "Kullanıcı",
+    "TOKEN": "Token",
+    "WEB_SEARCH_URL": "Web Arama URL'si",
+    "EXTENSIONS": "Eklentiler",
+    "HEADERS": "Başlıklar",
+    "DIRECTORY": "Klasör",
+    "ORGANIZE_INTO_DIRECTORIES": "Klasörlere ayır",
+    "EPISODE_PATTERN": "Bölüm Pattern'i",
+    "API": "API",
+    "MAIN": "Ana",
+    "REVERSE_PROXY": "Ters Proxy",
+    "MESSAGING": "Mesajlaşma",
+    "VIDEO": "Video",
+    "EXAMPLES": "Örnekler",
+    "UPDATE": "Güncelle",
+    "START": "Başlat",
+    "CACHE": "Önbellek",
+    "STREAM": "Yayın",
+    "LOG": "Kayıt",
+    "CONFIG": "Yapılandırma",
+    "TELEGRAM": "Telegram",
+    "REST": "Rest",
+    "PUSHOVER": "Pushover",
+    "PROXY": "Proxy",
+    "REFRESH": "Yenile",
+    "STATUS": "Durum",
+    "MAX_CON": "Max. Bağlantı",
+    "EXP_DATE": "Son Kullanma Tarihi",
+    "USERNAME": "Kullanıcı Adı",
+    "PASSWORD": "Şifre",
+    "SERVER": "Sunucu",
+    "TIMEZONE": "Zaman Dilimi",
+    "PATH": "Yol",
+    "MESSAGE": "Mesaj",
+    "PROTOCOL": "Protokol",
+    "NAME": "Ad"
+  },
+  "TITLE": {
+    "USER_BOUQUET_EDITOR": "Kullanıcı Buket Editörü"
+  },
+  "MESSAGES": {
+    "INVALID_REGEXP": "Geçersiz regexp",
+    "INVALID_FILETYPE": "Geçersiz dosya türü",
+    "DOWNLOAD": {
+      "SUCCESS": "Başarıyla indirildi",
+      "FAIL": "İndirme başarısız!",
+      "PLAYLIST": {
+        "SUCCESS": "Liste başarıyla indirildi",
+        "FAIL": "Liste indirilemedi!"
+      },
+      "SERVER_CONFIG": {
+        "FAIL": "Sunucu yapılandırması indirilemedi!"
+      }
+    },
+    "SAVE": {
+      "MAIN_CONFIG": {
+        "SUCCESS": "Ana yapılandırma kaydedildi!",
+        "FAIL": "Ana yapılandırma kaydedilemedi!"
+      },
+      "BOUQUET": {
+        "SUCCESS": "Buket başarıyla kaydedildi",
+        "FAIL": "Buket kaydedilemedi!"
+      },
+      "USER": {
+        "SUCCESS": "Kullanıcı başarıyla kaydedildi",
+        "FAIL": "Kullanıcı kaydedilemedi!"
+      }
+    }
+  },
+  "INFO": {
+    "RESTART_TO_APPLY_CHANGES": "Değişiklikleri uygulamak için yeniden başlatmanız gerekmektedir.",
+    "SCHEDULE_EXAMPLE": "Program örneği",
+    "THREADS": "İşlemciler: Eğer bir sorununuz yoksa 0 olarak bırakın. Birden fazla sağlayıcı kullanıyorsanız artırabilirsiniz. Sağlayıcınıza paralel erişim, yasaklanmanıza neden olabilir.",
+    "WEB_ROOT": "Web klassörü: Web-UI dosyalarını içerir. Genellikle ./web altında aynı dizine yerleştirilir."
+  }
+}

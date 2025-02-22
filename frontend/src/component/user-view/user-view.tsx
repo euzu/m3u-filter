@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useState} from "react";
 import './user-view.scss';
 import ServerConfig, {TargetUser} from "../../model/server-config";
 import {getIconByName} from "../../icons/icons";
@@ -9,10 +9,11 @@ import ConfigUtils from "../../utils/config-utils";
 import TabSet, {TabSetTab} from "../tab-set/tab-set";
 import TagSelect from "../tag-select/tags-select";
 import DatePicker from "react-date-picker";
+import useTranslator from "../../hook/use-translator";
 
 const PROXY_OPTIONS = [
-    { value: 'reverse', label: 'Reverse' },
-    { value: 'redirect', label: 'Redirect' }
+    {value: 'reverse', label: 'Reverse'},
+    {value: 'redirect', label: 'Redirect'}
 ];
 const STATUS_OPTIONS = [
     {value: 'Active', label: 'Active'},
@@ -27,9 +28,10 @@ const prepareCredentials = (targetUser: TargetUser[]) => {
     targetUser.forEach((user) => {
         user.credentials.forEach((credential) => {
             if (credential.exp_date) {
-                credential.exp_date = new Date(credential.exp_date*1000) as any;
+                credential.exp_date = new Date(credential.exp_date * 1000) as any;
             }
-    })});
+        })
+    });
 }
 
 const prepareTargetUserForSave = (targetUser: TargetUser[]): TargetUser[] => {
@@ -51,15 +53,21 @@ interface UserViewProps {
 export default function UserView(props: UserViewProps) {
     const {config} = props;
     const services = useServices();
+    const translate = useTranslator();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [targets, setTargets] = useState<TargetUser[]>([]);
     const [activeTarget, setActiveTarget] = useState<string>(undefined);
     const [tabs, setTabs] = useState<TabSetTab[]>([]);
-    const [serverOptions, setServerOptions] = useState<{value: string, label: string}[]>([]);
+    const [serverOptions, setServerOptions] = useState<{ value: string, label: string }[]>([]);
+    const proxy_options = useMemo(() => PROXY_OPTIONS.map(c => ({...c, label: translate(c.label)})), [translate]);
+    const status_options = useMemo(() => STATUS_OPTIONS.map(c => ({...c, label: translate(c.label)})), [translate]);
 
     useEffect(() => {
         if (config) {
-            const serverOptions =  config?.api_proxy?.server?.map(serverInfo => ({ value: serverInfo.name, label: serverInfo.name }));
+            const serverOptions = config?.api_proxy?.server?.map(serverInfo => ({
+                value: serverInfo.name,
+                label: serverInfo.name
+            }));
             setServerOptions(serverOptions || []);
             const target_names = ConfigUtils.getTargetNames(config);
             const missing = config?.api_proxy?.user.filter(target => !target_names.includes(target.target));
@@ -175,8 +183,10 @@ export default function UserView(props: UserViewProps) {
                 }
                 usernames[user.username] = true;
 
-                if (user.max_connections != null) {
+                // eslint-disable-next-line eqeqeq
+                if (user.max_connections != undefined) {
                     const max_con = parseInt(user.max_connections as any);
+                    // eslint-disable-next-line eqeqeq
                     if (isNaN(max_con) || max_con < 0 || (('' + max_con) != user.max_connections as any)) {
                         enqueueSnackbar("MaxConnections invalid! " + user.max_connections, {variant: 'error'});
                         return;
@@ -200,10 +210,10 @@ export default function UserView(props: UserViewProps) {
         });
         const toSaveTargetUser = prepareTargetUserForSave(targetUser);
         services.config().saveTargetUser(toSaveTargetUser).subscribe({
-            next: () => enqueueSnackbar("User saved!", {variant: 'success'}),
-            error: (err) => enqueueSnackbar("Failed to save user!", {variant: 'error'})
+            next: () => enqueueSnackbar(translate('MESSGES.SAVE.USER.SUCCESS'), {variant: 'success'}),
+            error: (err) => enqueueSnackbar(translate('MESSGES.SAVE.USER.FAIL'), {variant: 'error'})
         });
-    }, [targets, services, enqueueSnackbar]);
+    }, [targets, services, enqueueSnackbar, translate]);
 
     const handleTabChange = useCallback((target: string) => {
         setActiveTarget(target);
@@ -211,8 +221,8 @@ export default function UserView(props: UserViewProps) {
 
     return <div className={'user'}>
 
-        <div className={'user__toolbar'}><label>User</label>
-            <button title={'Save'} onClick={handleSave}>Save</button>
+        <div className={'user__toolbar'}><label>{translate('LABEL.USER')}</label>
+            <button title={'Save'} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
         <TabSet tabs={tabs} active={activeTarget} onTabChange={handleTabChange}></TabSet>
         <div className={'user__content'}>
@@ -232,21 +242,21 @@ export default function UserView(props: UserViewProps) {
                             <div className={'user__target-user-table'}>
                                 <div className={'user__target-user-row user__target-user-table-header'}>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>Username</label></div>
+                                        <label>{translate('LABEL.USERNAME')}</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>Password</label></div>
+                                        <label>{translate('LABEL.PASSWORD')}</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>Token</label></div>
+                                        <label>{translate('LABEL.TOKEN')}</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>Server</label></div>
+                                        <label>{translate('LABEL.SERVER')}</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>Proxy</label></div>
+                                        <label>{translate('LABEL.PROXY')}</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>MaxCon</label></div>
+                                        <label>{translate('LABEL.MAX_CON')}</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>Status</label></div>
+                                        <label>{translate('LABEL.STATUS')}</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>Exp.Date</label></div>
+                                        <label>{translate('LABEL.EXP_DATE')}</label></div>
                                     <div className={'user__target-user-col user__target-user-col-header'}></div>
                                 </div>
 
@@ -255,7 +265,8 @@ export default function UserView(props: UserViewProps) {
                                         {['username', 'password', 'token'].map((field) =>
                                             <div key={'target_' + target.target + '_' + field + '_' + usr.username}
                                                  className={'user__target-user-col'}>
-                                                <div className={'user__target-user-col-label'}><label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                                <div className={'user__target-user-col-label'}>
+                                                    <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
                                                 </div>
                                                 <input data-target={target.target} data-idx={idx}
                                                        defaultValue={(usr as any)[field]}
@@ -264,20 +275,27 @@ export default function UserView(props: UserViewProps) {
                                         )}
                                         <div key={'target_' + target.target + '_server_' + usr.username}
                                              className={'user__target-user-col '}>
-                                            <div className={'user__target-user-col-label'}><label>Server</label></div>
-                                            <TagSelect options={serverOptions} name={target.target + '@' + idx + '@server'}
-                                                       defaultValues={(usr as any)?.['server']} radio={true} multi={false} onSelect={handleChange}></TagSelect>
+                                            <div className={'user__target-user-col-label'}>
+                                                <label>{translate('LABEL.SERVER')}</label></div>
+                                            <TagSelect options={serverOptions}
+                                                       name={target.target + '@' + idx + '@server'}
+                                                       defaultValues={(usr as any)?.['server']} radio={true}
+                                                       multi={false} onSelect={handleChange}></TagSelect>
                                         </div>
                                         <div key={'target_' + target.target + '_proxy_' + usr.username}
                                              className={'user__target-user-col '}>
-                                            <div className={'user__target-user-col-label'}><label>Proxy</label></div>
-                                            <TagSelect options={PROXY_OPTIONS} name={target.target + '@' + idx + '@proxy'}
-                                                       defaultValues={(usr as any)?.['proxy']} radio={true} multi={false} onSelect={handleChange}></TagSelect>
+                                            <div className={'user__target-user-col-label'}>
+                                                <label>{translate('LABEL.PROXY')}</label></div>
+                                            <TagSelect options={proxy_options}
+                                                       name={target.target + '@' + idx + '@proxy'}
+                                                       defaultValues={(usr as any)?.['proxy']} radio={true}
+                                                       multi={false} onSelect={handleChange}></TagSelect>
                                         </div>
                                         {['max_connections'].map((field) =>
                                             <div key={'target_' + target.target + '_' + field + '_' + usr.username}
                                                  className={'user__target-user-col'}>
-                                                <div className={'user__target-user-col-label'}><label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                                <div className={'user__target-user-col-label'}>
+                                                    <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
                                                 </div>
                                                 <input data-target={target.target} data-idx={idx}
                                                        defaultValue={(usr as any)[field]}
@@ -287,9 +305,12 @@ export default function UserView(props: UserViewProps) {
                                         )}
                                         <div key={'target_' + target.target + '_status_' + usr.username}
                                              className={'user__target-user-col '}>
-                                            <div className={'user__target-user-col-label'}><label>Status</label></div>
-                                            <select name={target.target + '@' + idx + '@status'} defaultValue={(usr as any)?.['status']} onChange={handleSelectChange}>
-                                                {STATUS_OPTIONS.map(option =>
+                                            <div className={'user__target-user-col-label'}>
+                                                <label>{translate('LABEL.STATUS')}</label></div>
+                                            <select name={target.target + '@' + idx + '@status'}
+                                                    defaultValue={(usr as any)?.['status']}
+                                                    onChange={handleSelectChange}>
+                                                {status_options.map(option =>
                                                     <option key={option.value + idx}>{option.label}</option>
                                                 )}
                                             </select>
@@ -297,21 +318,22 @@ export default function UserView(props: UserViewProps) {
                                         {['exp_date'].map((field) =>
                                             <div key={'target_' + target.target + '_' + field + '_' + usr.username}
                                                  className={'user__target-user-col'}>
-                                                <div className={'user__target-user-col-label'}><label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                                <div className={'user__target-user-col-label'}>
+                                                    <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
                                                 </div>
                                                 <DatePicker
-                                                       value={(usr as any)[field]}
-                                                       className={'user__target-user-col-date'}
-                                                       onChange={(date: any) => handleValueChange({
-                                                    target: {
-                                                        value: date,
-                                                        dataset: {
-                                                            target: target.target,
-                                                            idx,
-                                                            field,
-                                                        }
-                                                    },
-                                                })}></DatePicker>
+                                                    value={(usr as any)[field]}
+                                                    className={'user__target-user-col-date'}
+                                                    onChange={(date: any) => handleValueChange({
+                                                        target: {
+                                                            value: date,
+                                                            dataset: {
+                                                                target: target.target,
+                                                                idx,
+                                                                field,
+                                                            }
+                                                        },
+                                                    })}></DatePicker>
                                             </div>
                                         )}
                                         <div className={'user__target-user-col user__target-user-col-toolbar'}>

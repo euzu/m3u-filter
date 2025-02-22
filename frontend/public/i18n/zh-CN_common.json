@@ -1,0 +1,112 @@
+{
+  "LABEL": {
+    "LIVE": "直播",
+    "VOD": "点播",
+    "SERIES": "系列",
+    "SAVE": "保存",
+    "SHOW_SELECTED": "显示已选",
+    "SELECT_ALL": "全选",
+    "DESELECT_ALL": "取消全选",
+    "SEARCH": "搜索",
+    "CLEAR": "清除",
+    "REGEXP": "正则表达式",
+    "LOGOUT": "登出",
+    "CONFIGURATION": "配置",
+    "HOST": "主机",
+    "PORT": "端口",
+    "WEB_ROOT": "Web根目录",
+    "THREADS": "线程",
+    "WORKING_DIR": "工作目录",
+    "BACKUP_DIR": "备份目录",
+    "UPDATE_ON_BOOT": "开机时更新",
+    "WEB_UI": "Web界面",
+    "SCHEDULES": "计划",
+    "SANITIZE_SENSITIVE_INFO": "清理敏感信息",
+    "ACTIVE_CLIENTS": "活跃用户",
+    "RESOURCE_REWRITE_DISABLE": "禁用资源重写",
+    "RECONNECT": "重新连接",
+    "BUFFER_ENABLED": "启用缓冲",
+    "BUFFER_SIZE": "缓冲大小",
+    "ENABLED": "启用",
+    "SIZE": "大小",
+    "CACHE_DIR": "缓存目录",
+    "NOTIFY_ON": "通知开启",
+    "BOT_TOKEN": "机器人令牌",
+    "CHAT_IDS": "聊天ID",
+    "URL": "网址",
+    "USER": "用户",
+    "TOKEN": "令牌",
+    "WEB_SEARCH_URL": "Web搜索网址",
+    "EXTENSIONS": "扩展",
+    "HEADERS": "头部信息",
+    "DIRECTORY": "目录",
+    "ORGANIZE_INTO_DIRECTORIES": "按目录组织",
+    "EPISODE_PATTERN": "集模式",
+    "API": "API",
+    "MAIN": "主界面",
+    "REVERSE_PROXY": "反向代理",
+    "MESSAGING": "消息",
+    "VIDEO": "视频",
+    "EXAMPLES": "示例",
+    "UPDATE": "更新",
+    "START": "开始",
+    "CACHE": "缓存",
+    "STREAM": "流",
+    "LOG": "日志",
+    "CONFIG": "配置",
+    "TELEGRAM": "Telegram",
+    "REST": "Rest",
+    "PUSHOVER": "Pushover",
+    "PROXY": "代理",
+    "REFRESH": "刷新",
+    "STATUS": "状态",
+    "MAX_CON": "最大连接数",
+    "EXP_DATE": "到期日期",
+    "USERNAME": "用户名",
+    "PASSWORD": "密码",
+    "SERVER": "服务器",
+    "TIMEZONE": "时区",
+    "PATH": "路径",
+    "MESSAGE": "信息",
+    "PROTOCOL": "协议",
+    "NAME": "名称"
+  },
+  "TITLE": {
+    "USER_BOUQUET_EDITOR": "用户套餐编辑器"
+  },
+  "MESSAGES": {
+    "INVALID_REGEXP": "无效的正则表达式",
+    "INVALID_FILETYPE": "无效的文件类型",
+    "DOWNLOAD": {
+      "SUCCESS": "下载成功",
+      "FAIL": "下载失败！",
+      "PLAYLIST": {
+        "SUCCESS": "播放列表下载成功",
+        "FAIL": "播放列表下载失败！"
+      },
+      "SERVER_CONFIG": {
+        "FAIL": "服务器配置下载失败！"
+      }
+    },
+    "SAVE": {
+      "MAIN_CONFIG": {
+        "SUCCESS": "主配置已保存！",
+        "FAIL": "主配置保存失败！"
+      },
+      "BOUQUET": {
+        "SUCCESS": "套餐保存成功",
+        "FAIL": "套餐保存失败！"
+      },
+      "USER": {
+        "SUCCESS": "用户保存成功",
+        "FAIL": "用户保存失败！"
+      }
+    }
+  },
+  "INFO": {
+    "RESTART_TO_APPLY_CHANGES": "您需要重新启动以应用更改。",
+    "SCHEDULE_EXAMPLE": "计划示例",
+    "THREADS": "线程：如果没有问题，请保持为0。如果有多个提供者，可以增加此值。并行访问提供者可能会导致封禁。",
+    "WEB_ROOT": "Web根目录：包含Web UI文件，通常位于./web目录下"
+  }
+}

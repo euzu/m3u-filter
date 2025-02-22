@@ -1,13 +1,13 @@
-use crate::api::api_utils::{get_user_target_by_username, get_username_from_auth_header, serve_file};
+use crate::api::api_utils::{get_user_target_by_username, get_username_from_auth_header};
 use crate::api::model::app_state::AppState;
 use crate::auth::authenticator::validator_user;
 use crate::model::config::TargetType;
 use crate::model::playlist_categories::PlaylistCategoriesDto;
-use crate::repository::user_repository::{save_user_bouquet, user_get_bouquet_path};
+use crate::repository::user_repository::{load_user_bouquet_as_json, save_user_bouquet};
 use crate::repository::xtream_repository;
 use actix_web::body::BodyStream;
 use actix_web::middleware::Compress;
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{web, HttpResponse};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use actix_web_httpauth::middleware::HttpAuthentication;
 use bytes::Bytes;
@@ -26,13 +26,11 @@ struct PlaylistXtreamCategory {
 }
 
 async fn get_categories_content(action: Result<(Option<PathBuf>, Option<String>), Error>) -> Option<String> {
-    if let Ok((path, _content)) = action {
-        if let Some(file_path) = path {
-            if let Some(content) = tokio::fs::read_to_string(&file_path).await.ok() {
-                // TODO deserialize like sax parser
-                if let Ok(categories) = serde_json::from_str::<Vec<PlaylistXtreamCategory>>(&content) {
-                    return serde_json::to_string(&categories).ok();
-                }
+    if let Ok((Some(file_path), _content)) = action {
+        if let Ok(content) = tokio::fs::read_to_string(&file_path).await {
+            // TODO deserialize like sax parser
+            if let Ok(categories) = serde_json::from_str::<Vec<PlaylistXtreamCategory>>(&content) {
+                return serde_json::to_string(&categories).ok();
             }
         }
     }
@@ -62,7 +60,7 @@ async fn playlist_categories(
                         Ok::<Bytes, String>(Bytes::from(vod_categories.unwrap_or("null".to_string()))),
                         Ok::<Bytes, String>(Bytes::from(r#", "series": "#.to_string())),
                         Ok::<Bytes, String>(Bytes::from(series_categories.unwrap_or("null".to_string()))),
-                        Ok::<Bytes, String>(Bytes::from(r#"}"#.to_string())),
+                        Ok::<Bytes, String>(Bytes::from(r"}".to_string())),
                     ]);
                 return HttpResponse::Ok()
                     .content_type(mime::APPLICATION_JSON)
@@ -99,15 +97,14 @@ async fn save_playlist_bouquet(
 async fn playlist_bouquet(
     credentials: Option<BearerAuth>,
     app_state: web::Data<AppState>,
-    req: HttpRequest,
 ) -> HttpResponse {
     if let Some(username) = get_username_from_auth_header(credentials, &app_state) {
         if let Some((user, _target)) = get_user_target_by_username(username.as_str(), &app_state).await {
             if !user.has_permissions(&app_state) {
                 return HttpResponse::Forbidden().finish();
             }
-            if let Some(file_path) = user_get_bouquet_path( &app_state.config, &username) {
-                return serve_file(&file_path, &req, mime::APPLICATION_JSON).await;
+            if let Some(bouquet) = load_user_bouquet_as_json(&app_state.config, &username).await {
+                return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(bouquet);
             }
         }
     }

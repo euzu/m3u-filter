@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import './user-playlist.scss';
 import {useServices} from "../../provider/service-provider";
 import {finalize, first, zip} from 'rxjs';
@@ -9,11 +9,12 @@ import Checkbox from "../checkbox/checkbox";
 import {enqueueSnackbar} from "notistack";
 import {getIconByName} from "../../icons/icons";
 import PlaylistFilter from "../playlist-filter/playlist-filter";
+import useTranslator from "../../hook/use-translator";
 
 const CATEGORY_TABS = [
-    {label: "Live", key: "live"},
-    {label: "VOD", key: "vod"},
-    {label: "Series", key: "series"}
+    {label: "LABEL.LIVE", key: "live"},
+    {label: "LABEL.VOD", key: "vod"},
+    {label: "LABEL.SERIES", key: "series"}
 ];
 
 function isEmpty(value: any): boolean {
@@ -38,12 +39,14 @@ interface UserPlaylistProps {
 
 export default function UserPlaylist(props: UserPlaylistProps) {
     const services = useServices();
+    const translate = useTranslator();
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<PlaylistCategories>(undefined);
     const [filteredCategories, setFilteredCategories] = useState<PlaylistCategories>({} as any);
     const [selections, setSelections] = useState<Record<string, boolean>>({});
     const [activeTab, setActiveTab] = useState<string>(CATEGORY_TABS[0].key);
     const [showSelected, setShowSelected] = useState<boolean>(false);
+    const tabs = useMemo(() => CATEGORY_TABS.map(d => ({key: d.key, label: translate(d.label) })), [translate])
 
     const getActiveCategories =  useCallback((key: string) => {
             let active = ((filteredCategories as any)?.[key] ?? (categories as any)?.[key]) as any;
@@ -52,7 +55,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
             }
             return active;
         },
-        [categories, filteredCategories, showSelected]);
+        [categories, filteredCategories, showSelected, selections]);
 
     useEffect(() => {
         setLoading(true);
@@ -70,7 +73,10 @@ export default function UserPlaylist(props: UserPlaylistProps) {
                 });
                 if (bouquet || categories) {
                     const user_bouquet: any = {}
-                    Object.values(bouquet ?? categories).filter(Boolean).flat().forEach(c => user_bouquet[c.id] = true);
+                    CATEGORY_TABS.map(t => t.key).forEach(key => {
+                        let current_bouquet: PlaylistCategory[] = ((bouquet as any)?.[key]?.length ?  (bouquet as any)[key] : (categories as any)?.[key]) ?? [];
+                        Object.values(current_bouquet).forEach((c: PlaylistCategory) => user_bouquet[c.id] = true);
+                    });
                     setSelections(user_bouquet);
                 }
                 setCategories(categories ?? undefined);
@@ -102,13 +108,13 @@ export default function UserPlaylist(props: UserPlaylistProps) {
         const bouquet: PlaylistCategories = {live, series, vod};
         services.userConfig().savePlaylistBouquet(bouquet).pipe(first(), finalize(() => setLoading(false))).subscribe({
             next: () => {
-                enqueueSnackbar('Successfully save bouquet', {variant: 'success'})
+                enqueueSnackbar(translate('MESSAGES.SAVE.BOUQUET.SUCCESS'), {variant: 'success'})
             },
             error: () => {
-                enqueueSnackbar('Failed to save bouquet', {variant: 'error'})
+                enqueueSnackbar(translate('MESSAGES.SAVE.BOUQUET.FAIL'), {variant: 'error'})
             }
         })
-    }, [services, categories, selections]);
+    }, [services, categories, selections, translate]);
 
     const handleSelectAll = useCallback(() => {
         let activeCategories = getActiveCategories(activeTab);
@@ -125,15 +131,17 @@ export default function UserPlaylist(props: UserPlaylistProps) {
     }, [activeTab, getActiveCategories]);
 
     const handleFilter = useCallback((filter: string, regexp: boolean): void => {
+        let filer_value = regexp ? filter : filter.toLowerCase();
         const filtered = (categories as any)?.[activeTab]?.filter((cat: PlaylistCategory) => {
             if (regexp) {
-                return cat.name.trim().match(filter) != undefined;
+                // eslint-disable-next-line eqeqeq
+                return cat.name.trim().match(filer_value) != undefined;
             } else {
-                return (cat.name.trim().toLowerCase().indexOf(filter) > -1);
+                return (cat.name.trim().toLowerCase().indexOf(filer_value) > -1);
             }
         }) ?? [];
         setFilteredCategories(filteredCategories => ({...filteredCategories, [activeTab]: filtered}));
-    }, [categories]);
+    }, [activeTab, categories]);
 
     const handleShowSelected = useCallback((event: any) => {
         event.target.blur();
@@ -144,18 +152,18 @@ export default function UserPlaylist(props: UserPlaylistProps) {
         <LoadingIndicator loading={loading}></LoadingIndicator>
         <div className="user-playlist">
             <div className="user-playlist__toolbar">
-                <label>User boutique editor</label>
-                <button title={'Save'} onClick={handleSave}>Save</button>
+                <label>{translate('TITLE.USER_BOUQUET_EDITOR')}</label>
+                <button title={translate('LABEL.SAVE')} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
             </div>
-            <TabSet tabs={CATEGORY_TABS} active={activeTab} onTabChange={handleTabChange}></TabSet>
+            <TabSet tabs={tabs} active={activeTab} onTabChange={handleTabChange}></TabSet>
             {CATEGORY_TABS.map(tab => <div className={'user-playlist__categories-panel' + (activeTab !== tab.key ? ' hidden' : '')}>
                 <div className={'user-playlist__categories__toolbar'}>
                     <div className={'user-playlist__categories__toolbar-filter'}>
                         <PlaylistFilter onFilter={handleFilter}></PlaylistFilter>
                      </div>
-                    <button title={'Show selected'} onClick={handleShowSelected} className={showSelected ? 'button-active': ''}>{getIconByName('Checked')}</button>
-                    <button title={'Select All'} onClick={handleSelectAll}>{getIconByName('SelectAll')}</button>
-                    <button title={'Deselect all'} onClick={handleDeselectAll}>{getIconByName('DeselectAll')}</button>
+                    <button title={translate('LABEL.SHOW_SELECTED')} onClick={handleShowSelected} className={showSelected ? 'button-active': ''}>{getIconByName('Checked')}</button>
+                    <button title={translate('LABEL.SELECT_ALL')} onClick={handleSelectAll}>{getIconByName('SelectAll')}</button>
+                    <button title={translate('LABEL.DESELECT_ALL')} onClick={handleDeselectAll}>{getIconByName('DeselectAll')}</button>
                 </div>
                 <div className={'user-playlist__categories'}>
                     {getActiveCategories(tab.key)?.map(renderCat)}

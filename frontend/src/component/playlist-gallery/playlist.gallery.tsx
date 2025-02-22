@@ -36,6 +36,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                 const group = data[i];
                 for (let j = 0, clen = group.channels.length; j < clen; j++) {
                     const plitem = group.channels[j];
+                    // eslint-disable-next-line eqeqeq
                     if (plitem.id == id) {
                         return plitem;
                     }

@@ -21,9 +21,10 @@
     }
   }
 
-  &__content-help{
+  &__content-help {
     display: flex;
     flex-flow: row;
+    justify-content: center;
     gap: 4px;
     align-items: center;
     &-warn-icon {

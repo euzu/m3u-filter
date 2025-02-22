@@ -11,8 +11,6 @@ pub(in crate::repository) const FILE_SUFFIX_INDEX: &str = "idx";
 
 const FILE_ID_MAPPING: &str = "id_mapping.db";
 
-
-
 #[inline]
 pub fn hash_bytes(bytes: &[u8]) -> UUIDType {
     blake3::hash(bytes).into()

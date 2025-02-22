@@ -19,6 +19,8 @@ import {getIconByName} from "../icons/icons";
 import Preferences from "../component/preferences/preferences";
 import FileDownload from "../component/file-download/file-download";
 import {FileDownloadInfo} from "../model/file-download";
+import useTranslator, {LANGUAGE} from "../hook/use-translator";
+import i18next from "i18next";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface AppProps {
@@ -35,6 +37,7 @@ export default function App(props: AppProps) {
     const clipboardChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
     const viewerRef = useRef<IPlaylistViewer>(undefined);
     const appTitle = useMemo(() => services.config().getUiConfig().app_title ?? 'm3u-filter', [services]);
+    const translate = useTranslator();
     const appLogo = useMemo(() => {
         let logo =  services.config().getUiConfig().app_logo;
         if (logo) {
@@ -49,16 +52,16 @@ export default function App(props: AppProps) {
         setProgress(true);
         services.playlist().getPlaylist(req).pipe(first()).subscribe({
             next: (pl: PlaylistGroup[]) => {
-                enqueueSnackbar('Successfully downloaded playlist', {variant: 'success'})
+                enqueueSnackbar(translate( "MESSAGES.DOWNLOAD.PLAYLIST.SUCCESS"), {variant: 'success'})
                 setPlaylist(pl);
             },
             error: (err) => {
                 setProgress(false);
-                enqueueSnackbar('Failed to download playlist!', {variant: 'error'});
+                enqueueSnackbar(translate( "MESSAGES.DOWNLOAD.PLAYLIST.FAIL"), {variant: 'error'});
             },
             complete: () => setProgress(false),
         });
-    }, [enqueueSnackbar, services]);
+    }, [enqueueSnackbar, services, translate]);
 
     const handleSave = useCallback(() => {
         const filteredPlaylist = viewerRef.current.getFilteredPlaylist();
@@ -66,7 +69,6 @@ export default function App(props: AppProps) {
             services.file().save(filteredPlaylist);
         }
     }, [services]);
-
 
     const handleFilter = useCallback((filter: string, regexp: boolean): void => {
         searchChannel.next({filter, regexp});
@@ -99,13 +101,13 @@ export default function App(props: AppProps) {
             }).pipe(first()).subscribe({
                 next: (_: FileDownloadInfo) => {
                 },
-                error: _ => enqueueSnackbar("Download failed!", {variant: 'error'}),
+                error: _ => enqueueSnackbar(translate( "MESSAGES.DOWNLOAD.FAIL"), {variant: 'error'}),
                 complete: noop,
             });
         } else {
-            enqueueSnackbar("Invalid filetype!", {variant: 'error'})
+            enqueueSnackbar(translate( "MESSAGES.INVALID_FILETYPE"), {variant: 'error'})
         }
-    }, [serverConfig, enqueueSnackbar, services]);
+    }, [serverConfig, enqueueSnackbar, services, translate]);
 
     const handleOnWebSearch = useCallback((playlistItem: PlaylistItem): void => {
         if (playlistItem) {
@@ -135,12 +137,12 @@ export default function App(props: AppProps) {
                 setServerConfig(cfg);
             },
             error: (err) => {
-                enqueueSnackbar('Failed to download server config!', {variant: 'error'});
+                enqueueSnackbar(translate( "MESSAGES.DOWNLOAD.SERVER_CONFIG.FAIL"), {variant: 'error'});
             },
             complete: noop,
         });
         return noop
-    }, [enqueueSnackbar, services]);
+    }, [enqueueSnackbar, services, translate]);
 
     const handlePreferences = useCallback(() => {
        setPreferencesVisible((value:boolean) => !value);
@@ -148,15 +150,20 @@ export default function App(props: AppProps) {
 
     const handleLogout = useCallback(() => {
         services.auth().logout();
-    }, []);
+    }, [services]);
 
+    const handleLanguage = useCallback((event: any) => {
+        const language = event.target.value;
+        LANGUAGE.next(language);
+    }, []);
 
     return (
         <div className="app">
             <div className={'app-header'}>
                 <div className={'app-header__caption'}><span className={'app-header__logo'}>{appLogo}</span>{appTitle}</div>
-                <div className={'app-header__toolbar'}><button title="Configuration" onClick={handlePreferences}>{getIconByName('Config')}</button></div>
-                <div className={'app-header__toolbar'}><button title="Logout" onClick={handleLogout}>{getIconByName('Logout')}</button></div>
+                <div className={'app-header__toolbar'}><select onChange={handleLanguage}>{services.config().getUiConfig().languages.map(l => <option key={l} value={l} selected={l === i18next.language}>{l}</option>)}</select></div>
+                <div className={'app-header__toolbar'}><button title={translate('LABEL.CONFIGURATION')} onClick={handlePreferences}>{getIconByName('Config')}</button></div>
+                <div className={'app-header__toolbar'}><button title={translate('LABEL.LOGOUT')} onClick={handleLogout}>{getIconByName('Logout')}</button></div>
             </div>
             <div className={'app-main' + (preferencesVisible ? '' : '  hidden')}>
                 <div className={'app-content'}>

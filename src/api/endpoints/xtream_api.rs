@@ -2,7 +2,7 @@
 
 use crate::api::api_utils::{try_option_bad_request, try_result_bad_request};
 use crate::utils::trace_if_enabled;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 use std::rc::Rc;
@@ -29,7 +29,7 @@ use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, Playlist
 use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH, SEASON_RESOURCE_PREFIX};
 use crate::repository::playlist_repository::{get_target_id_mapping, HLS_EXT};
 use crate::repository::storage::{get_target_storage_path, hex_encode};
-use crate::repository::xtream_repository;
+use crate::repository::{user_repository, xtream_repository};
 use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils::get_u32_from_serde_value;
@@ -100,7 +100,7 @@ impl<'a> XtreamApiStreamRequest<'a> {
     }
 }
 
-pub fn serve_query(file_path: &Path, filter: &HashMap<&str, &str>) -> HttpResponse {
+pub fn serve_query(file_path: &Path, filter: &HashMap<&str, HashSet<String>>) -> HttpResponse {
     let filtered = json_utils::json_filter_file(file_path, filter);
     HttpResponse::Ok().json(filtered)
 }
@@ -110,7 +110,7 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStre
         let ctx = match context {
             XtreamApiStreamContext::LiveAlt |
             XtreamApiStreamContext::Live => {
-                let use_prefix = input.options.as_ref().map_or(true, |o| o.xtream_live_stream_use_prefix);
+                let use_prefix = input.options.as_ref().is_none_or(|o| o.xtream_live_stream_use_prefix);
                 String::from( if use_prefix { "live" } else { "" })
             },
             XtreamApiStreamContext::Movie
@@ -504,7 +504,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
     get_empty_epg_response()
 }
 
-async fn xtream_player_api_handle_content_action(config: &Config, target_name: &str, action: &str, category_id: &str, req: &HttpRequest) -> Option<HttpResponse> {
+async fn xtream_player_api_handle_content_action(config: &Config, target_name: &str, action: &str, category_id: &str, user: &ProxyUserCredentials,  req: &HttpRequest) -> Option<HttpResponse> {
     if let Ok((path, content)) = match action {
         ACTION_GET_LIVE_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_LIVE),
         ACTION_GET_VOD_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_VOD),
@@ -512,9 +512,15 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
         _ => Err(str_to_io_error(""))
     } {
         if let Some(file_path) = path {
-            let category_id = category_id.trim();
-            if !category_id.is_empty() {
-                return Some(serve_query(&file_path, &HashMap::from([(TAG_CATEGORY_ID, category_id)])));
+            // load user bouquet
+            let filter = match action {
+                ACTION_GET_LIVE_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, XtreamCluster::Live).await,
+                ACTION_GET_VOD_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, XtreamCluster::Video).await,
+                ACTION_GET_SERIES_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, XtreamCluster::Series).await,
+                _ => None
+            };
+            if let Some(flt) = filter {
+                return Some(serve_query(&file_path, &HashMap::from([(TAG_CATEGORY_ID, flt)])));
             }
             return Some(serve_file(&file_path, req, mime::APPLICATION_JSON).await);
         } else if let Some(payload) = content {
@@ -620,7 +626,7 @@ async fn xtream_player_api(
 
         // Handle general content actions
         if let Some(response) = xtream_player_api_handle_content_action(
-            &app_state.config, &target.name, action, api_req.category_id.trim(), req,
+            &app_state.config, &target.name, action, api_req.category_id.trim(), &user, req,
         ).await {
             return response;
         }
@@ -628,11 +634,11 @@ async fn xtream_player_api(
         let category_id = api_req.category_id.trim().parse::<u32>().unwrap_or(0);
         let result = match action {
             ACTION_GET_LIVE_STREAMS =>
-                skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id, &user)),
+                skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id, &user).await),
             ACTION_GET_VOD_STREAMS =>
-                skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id, &user)),
+                skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id, &user).await),
             ACTION_GET_SERIES =>
-                skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id, &user)),
+                skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id, &user).await),
             _ => Some(Err(info_err!(format!("Cant find action: {action} for target: {}", &target.name))
             )),
         };

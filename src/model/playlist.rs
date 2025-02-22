@@ -515,7 +515,7 @@ impl PlaylistItem {
         if header.xtream_cluster != XtreamCluster::Live {
             let add_ext = match header.get_additional_property("container_extension") {
                 None => true,
-                Some(ext) => ext.as_str().map_or(true, str::is_empty)
+                Some(ext) => ext.as_str().is_none_or(str::is_empty)
             };
             if add_ext {
                 if let Some(cont_ext) = extract_extension_from_url(&header.url) {

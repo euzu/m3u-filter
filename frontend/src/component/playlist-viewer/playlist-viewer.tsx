@@ -18,6 +18,7 @@ function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: bool
 
 function textMatch(text: string, searchRequest: SearchRequest): boolean {
     if (searchRequest.regexp) {
+        // eslint-disable-next-line eqeqeq
         return text.toLowerCase().match(searchRequest.filter) != undefined;
     } else {
         return (text.toLowerCase().indexOf(searchRequest.filter) > -1);
@@ -103,6 +104,7 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
     useEffect(() => {
         const sub = searchChannel.subscribe((searchRequest: SearchRequest) => {
             let criteria = searchRequest.filter;
+            // eslint-disable-next-line eqeqeq
             if (criteria == undefined || !criteria.length || !criteria.trim().length) {
                 setData(playlist);
             } else {

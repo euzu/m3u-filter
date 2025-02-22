@@ -1,0 +1,112 @@
+{
+  "LABEL": {
+    "LIVE": "Live",
+    "VOD": "VOD",
+    "SERIES": "Serien",
+    "SAVE": "Speichern",
+    "SHOW_SELECTED": "Ausgewählte anzeigen",
+    "SELECT_ALL": "Alle auswählen",
+    "DESELECT_ALL": "Alle abwählen",
+    "SEARCH": "Suche",
+    "CLEAR": "Löschen",
+    "REGEXP": "RegExp",
+    "LOGOUT": "Abmelden",
+    "CONFIGURATION": "Konfiguration",
+    "HOST": "Host",
+    "PORT": "Port",
+    "WEB_ROOT": "Web-Root",
+    "THREADS": "Threads",
+    "WORKING_DIR": "Arbeitsverzeichnis",
+    "BACKUP_DIR": "Backup-Verzeichnis",
+    "UPDATE_ON_BOOT": "Update beim Start",
+    "WEB_UI": "Web-UI",
+    "SCHEDULES": "Zeitpläne",
+    "SANITIZE_SENSITIVE_INFO": "Sensiblen Inhalt bereinigen",
+    "ACTIVE_CLIENTS": "Aktive Clients",
+    "RESOURCE_REWRITE_DISABLE": "Ressourcenumschreibung deaktivieren",
+    "RECONNECT": "Erneut verbinden",
+    "BUFFER_ENABLED": "Puffer aktiviert",
+    "BUFFER_SIZE": "Puffergröße",
+    "ENABLED": "Aktiviert",
+    "SIZE": "Größe",
+    "CACHE_DIR": "Cache-Verzeichnis",
+    "NOTIFY_ON": "Benachrichtigen bei",
+    "BOT_TOKEN": "Bot-Token",
+    "CHAT_IDS": "Chat-IDs",
+    "URL": "URL",
+    "USER": "Benutzer",
+    "TOKEN": "Token",
+    "WEB_SEARCH_URL": "Web-Such-URL",
+    "EXTENSIONS": "Erweiterungen",
+    "HEADERS": "Header",
+    "DIRECTORY": "Verzeichnis",
+    "ORGANIZE_INTO_DIRECTORIES": "In Verzeichnisse organisieren",
+    "EPISODE_PATTERN": "Episoden-Muster",
+    "API": "API",
+    "MAIN": "Haupt",
+    "REVERSE_PROXY": "ReverseProxy",
+    "MESSAGING": "Nachrichten",
+    "VIDEO": "Video",
+    "EXAMPLES": "Beispiele",
+    "UPDATE": "Aktualisieren",
+    "START": "Starten",
+    "CACHE": "Cache",
+    "STREAM": "Stream",
+    "LOG": "Protokoll",
+    "CONFIG": "Konfiguration",
+    "TELEGRAM": "Telegram",
+    "REST": "Rest",
+    "PUSHOVER": "Pushover",
+    "PROXY": "Proxy",
+    "REFRESH": "Aktualisieren",
+    "STATUS": "Status",
+    "MAX_CON": "MaxCon",
+    "EXP_DATE": "Ablaufdatum",
+    "USERNAME": "Benutzername",
+    "PASSWORD": "Passwort",
+    "SERVER": "Server",
+    "TIMEZONE": "Zeitzone",
+    "PATH": "Pfad",
+    "MESSAGE": "Nachricht",
+    "PROTOCOL": "Protokoll",
+    "NAME": "Name"
+  },
+  "TITLE": {
+    "USER_BOUQUET_EDITOR": "Benutzer-Bouquet-Editor"
+  },
+  "MESSAGES": {
+    "INVALID_REGEXP": "Ungültiger regulärer Ausdruck",
+    "INVALID_FILETYPE": "Ungültiger Dateityp",
+    "DOWNLOAD": {
+      "SUCCESS": "Erfolgreich heruntergeladen",
+      "FAIL": "Fehler beim Herunterladen!",
+      "PLAYLIST": {
+        "SUCCESS": "Playlist erfolgreich heruntergeladen",
+        "FAIL": "Fehler beim Herunterladen der Playlist!"
+      },
+      "SERVER_CONFIG": {
+        "FAIL": "Fehler beim Herunterladen der Serverkonfiguration!"
+      }
+    },
+    "SAVE": {
+      "MAIN_CONFIG": {
+        "SUCCESS": "Hauptkonfiguration gespeichert!",
+        "FAIL": "Fehler beim Speichern der Hauptkonfiguration!"
+      },
+      "BOUQUET": {
+        "SUCCESS": "Bouquet erfolgreich gespeichert",
+        "FAIL": "Fehler beim Speichern des Bouquets!"
+      },
+      "USER": {
+        "SUCCESS": "Benutzer erfolgreich gespeichert",
+        "FAIL": "Fehler beim Speichern des Benutzers!"
+      }
+    }
+  },
+  "INFO": {
+    "RESTART_TO_APPLY_CHANGES": "Sie müssen neu starten, um Änderungen anzuwenden.",
+    "SCHEDULE_EXAMPLE": "Beispiel für Zeitplan",
+    "THREADS": "Threads: Lassen Sie es auf 0, wenn keine Probleme bestehen. Erhöhen Sie es, wenn Sie mehrere Anbieter haben. Der parallele Zugriff auf Ihren Anbieter kann zu einer Sperrung führen.",
+    "WEB_ROOT": "Web-Root: Enthält die Web-UI-Dateien. Normalerweise befinden sie sich im gleichen Verzeichnis unter ./web"
+  }
+}

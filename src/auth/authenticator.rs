@@ -79,7 +79,7 @@ pub fn verify_token_user(bearer: Option<BearerAuth>, secret_key: &[u8]) -> bool 
     has_role(verify_token(bearer, secret_key), ROLE_USER)
 }
 
-async fn validate_request(
+fn validate_request(
     req: ServiceRequest,
     credentials: Option<BearerAuth>,
     verify_fn: fn(Option<BearerAuth>, &[u8]) -> bool, // Funktions-Parameter für Admin/User-Check
@@ -99,14 +99,14 @@ pub async fn validator_admin(
     req: ServiceRequest,
     credentials: Option<BearerAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    validate_request(req, credentials, verify_token_admin).await
+    validate_request(req, credentials, verify_token_admin)
 }
 
 pub async fn validator_user(
     req: ServiceRequest,
     credentials: Option<BearerAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    validate_request(req, credentials, verify_token_user).await
+    validate_request(req, credentials, verify_token_user)
 }
 
 // pub fn handle_unauthorized<B>(srvres: ServiceResponse<B>) -> actix_web::Result<ErrorHandlerResponse<B>> {

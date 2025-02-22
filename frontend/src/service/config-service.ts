@@ -12,7 +12,7 @@ export default class ConfigService {
 
     setUiConfig(uiConfig: UiConfig): void {
         if (uiConfig) {
-            this.uiConfig = uiConfig;
+            this.uiConfig = {...DefaultUiConfig, ...uiConfig};
         }
     }
 

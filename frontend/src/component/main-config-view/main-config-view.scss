@@ -57,6 +57,10 @@
 
   &__restart {
     @include common.container_horz_no_padding();
+    border-top: 1px solid var(--border-color);
+    padding-top: 12px;
+    margin-top: 12px;
+    justify-content: center;
     align-items: center;
     color: var(--label-color);
 

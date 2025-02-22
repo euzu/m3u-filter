@@ -5,6 +5,7 @@ import ConfigUtils from "../../utils/config-utils";
 import Checkbox from "../checkbox/checkbox";
 import {useServices} from "../../provider/service-provider";
 import {useSnackbar} from "notistack";
+import useTranslator from "../../hook/use-translator";
 
 interface TargetUpdateViewProps {
     config: ServerConfig
@@ -14,6 +15,7 @@ export default function TargetUpdateView(props: TargetUpdateViewProps) {
     const {config} = props;
 
     const services = useServices();
+    const translate = useTranslator();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const targets = useMemo(() => ConfigUtils.getTargetNames(config), [config]);
     const selected = useRef([]);
@@ -29,13 +31,13 @@ export default function TargetUpdateView(props: TargetUpdateViewProps) {
 
     const handleUpdate = useCallback((evt: any) => {
         services.playlist().update(selected.current).subscribe({
-            next: () => enqueueSnackbar('Playlist update started', {variant: 'success'}),
-            error: (err) => enqueueSnackbar('Failed to update:' + err, {variant: 'error'}),
+            next: () => enqueueSnackbar(translate('MESSAGE.PLAYLIST_UPDATE.SUCCESS'), {variant: 'success'}),
+            error: (err) => enqueueSnackbar(translate('MESSAGE.PLAYLIST_UPDATE.FAILED') + err, {variant: 'error'}),
         });
-    }, [services, enqueueSnackbar]);
+    }, [services, enqueueSnackbar, translate]);
 
     return <div className={'target-update'}>
-        <div className={'target-update__toolbar'}><label>Update</label><button title={'Update'} onClick={handleUpdate}>Start</button></div>
+        <div className={'target-update__toolbar'}><label>{translate('LABEL.UPDATE')}</label><button title={'Update'} onClick={handleUpdate}>{translate('LABEL.START')}</button></div>
         <div className={'target-update__content'}>
             <ul>
                 {targets.map(t => <li key={t}><Checkbox label={t} value={t} checked={false} onSelect={handleSelect}></Checkbox></li>)}

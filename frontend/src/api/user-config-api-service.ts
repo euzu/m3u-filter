@@ -1,4 +1,4 @@
-import {Observable, of} from "rxjs";
+import {Observable} from "rxjs";
 import ApiService, {DefaultApiService} from "./api-service";
 import {PlaylistCategories} from "../model/playlist-categories";
 

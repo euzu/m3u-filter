@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from "react";
+import React, {useCallback, useMemo, useState} from "react";
 import './preferences.scss';
 import ServerConfig from "../../model/server-config";
 import UserView from "../user-view/user-view";
@@ -7,6 +7,7 @@ import ApiProxyView from "../api-proxy-view/api-proxy-view";
 import {getIconByName} from "../../icons/icons";
 import Panel from "../panel/panel";
 import MainConfigView from "../main-config-view/main-config-view";
+import useTranslator from "../../hook/use-translator";
 
 enum SidebarAction {
     Update = 'update',
@@ -16,10 +17,10 @@ enum SidebarAction {
 }
 
 const SIDEBAR_ACTIONS: { action: SidebarAction, icon: string, label: string }[] = [
-    {action: SidebarAction.Update, icon: 'Refresh', label: 'Refresh'},
-    {action: SidebarAction.User, icon: 'User', label: 'User'},
-    {action: SidebarAction.ApiServer, icon: 'ApiServer', label: 'Proxy'},
-    {action: SidebarAction.MainConfig, icon: 'Config', label: 'Config'},
+    {action: SidebarAction.Update, icon: 'Refresh', label: 'LABEL.REFRESH'},
+    {action: SidebarAction.User, icon: 'User', label: 'LABEL.USER'},
+    {action: SidebarAction.ApiServer, icon: 'ApiServer', label: 'LABEL.PROXY'},
+    {action: SidebarAction.MainConfig, icon: 'Config', label: 'LABEL.CONFIG'},
 ];
 
 interface PreferencesProps {
@@ -28,7 +29,9 @@ interface PreferencesProps {
 
 export default function Preferences(props: PreferencesProps) {
     const {config} = props;
+    const translate = useTranslator();
     const [activePage, setActivePage] = useState(SidebarAction.Update);
+    const sidebar_actions = useMemo(() => SIDEBAR_ACTIONS.map(a => ({...a, label: translate(a.label)})), [translate])
 
     const handleSidebarAction = useCallback((event: any) => {
         const action = event.target.dataset.action;
@@ -40,7 +43,7 @@ export default function Preferences(props: PreferencesProps) {
     return <div className={'preferences'}>
         <div className={'preferences__content'}>
             <div className={'preferences__sidebar'}>
-                {SIDEBAR_ACTIONS.map(action =>
+                {sidebar_actions.map(action =>
                     <div key={'pref_' + action.action} data-action={action.action}
                             className={'preferences__sidebar-menu-action' + (action.action === activePage ? ' selected' : '')}
                             onClick={handleSidebarAction}>{getIconByName(action.icon)} {action.label}</div>)}

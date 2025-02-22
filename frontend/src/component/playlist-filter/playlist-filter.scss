@@ -12,4 +12,14 @@
       color: var(--option-active-color) !important;
     }
   }
+
+
+  &__error-message {
+    display: flex;
+    flex-flow: row;
+    color: var(--attention-color);
+    white-space: nowrap;
+    align-items: center;
+    margin-left: 8px;
+  }
 }

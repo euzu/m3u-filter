@@ -1,0 +1,112 @@
+{
+  "LABEL": {
+    "LIVE": "In diretta",
+    "VOD": "VOD",
+    "SERIES": "Serie",
+    "SAVE": "Salva",
+    "SHOW_SELECTED": "Mostra selezionati",
+    "SELECT_ALL": "Seleziona tutto",
+    "DESELECT_ALL": "Deseleziona tutto",
+    "SEARCH": "Cerca",
+    "CLEAR": "Cancella",
+    "REGEXP": "Espressione regolare",
+    "LOGOUT": "Esci",
+    "CONFIGURATION": "Configurazione",
+    "HOST": "Host",
+    "PORT": "Porta",
+    "WEB_ROOT": "Root web",
+    "THREADS": "Thread",
+    "WORKING_DIR": "Cartella di lavoro",
+    "BACKUP_DIR": "Cartella di backup",
+    "UPDATE_ON_BOOT": "Aggiorna all'avvio",
+    "WEB_UI": "Interfaccia web",
+    "SCHEDULES": "Orari",
+    "SANITIZE_SENSITIVE_INFO": "Sanitizza informazioni sensibili",
+    "ACTIVE_CLIENTS": "Client attivi",
+    "RESOURCE_REWRITE_DISABLE": "Disabilita riscrittura risorse",
+    "RECONNECT": "Riconnetti",
+    "BUFFER_ENABLED": "Buffer attivato",
+    "BUFFER_SIZE": "Dimensione buffer",
+    "ENABLED": "Abilitato",
+    "SIZE": "Dimensione",
+    "CACHE_DIR": "Cartella cache",
+    "NOTIFY_ON": "Notifica su",
+    "BOT_TOKEN": "Token bot",
+    "CHAT_IDS": "ID chat",
+    "URL": "URL",
+    "USER": "Utente",
+    "TOKEN": "Token",
+    "WEB_SEARCH_URL": "URL ricerca web",
+    "EXTENSIONS": "Estensioni",
+    "HEADERS": "Intestazioni",
+    "DIRECTORY": "Cartella",
+    "ORGANIZE_INTO_DIRECTORIES": "Organizza in cartelle",
+    "EPISODE_PATTERN": "Pattern episodio",
+    "API": "API",
+    "MAIN": "Principale",
+    "REVERSE_PROXY": "Proxy inverso",
+    "MESSAGING": "Messaggistica",
+    "VIDEO": "Video",
+    "EXAMPLES": "Esempi",
+    "UPDATE": "Aggiorna",
+    "START": "Avvia",
+    "CACHE": "Cache",
+    "STREAM": "Flusso",
+    "LOG": "Registro",
+    "CONFIG": "Configurazione",
+    "TELEGRAM": "Telegram",
+    "REST": "Rest",
+    "PUSHOVER": "Pushover",
+    "PROXY": "Proxy",
+    "REFRESH": "Ricarica",
+    "STATUS": "Stato",
+    "MAX_CON": "MaxCon",
+    "EXP_DATE": "Data di scadenza",
+    "USERNAME": "Nome utente",
+    "PASSWORD": "Password",
+    "SERVER": "Server",
+    "TIMEZONE": "Fuso orario",
+    "PATH": "Percorso",
+    "MESSAGE": "Messaggio",
+    "PROTOCOL": "Protocollo",
+    "NAME": "Nome"
+  },
+  "TITLE": {
+    "USER_BOUQUET_EDITOR": "Editor bouquet utente"
+  },
+  "MESSAGES": {
+    "INVALID_REGEXP": "Espressione regolare non valida",
+    "INVALID_FILETYPE": "Tipo di file non valido",
+    "DOWNLOAD": {
+      "SUCCESS": "Scaricato con successo",
+      "FAIL": "Download fallito!",
+      "PLAYLIST": {
+        "SUCCESS": "Playlist scaricata con successo",
+        "FAIL": "Download playlist fallito!"
+      },
+      "SERVER_CONFIG": {
+        "FAIL": "Download configurazione server fallito!"
+      }
+    },
+    "SAVE": {
+      "MAIN_CONFIG": {
+        "SUCCESS": "Configurazione principale salvata!",
+        "FAIL": "Salvataggio configurazione principale fallito!"
+      },
+      "BOUQUET": {
+        "SUCCESS": "Bouquet salvato con successo",
+        "FAIL": "Salvataggio bouquet fallito!"
+      },
+      "USER": {
+        "SUCCESS": "Utente salvato con successo",
+        "FAIL": "Salvataggio utente fallito!"
+      }
+    }
+  },
+  "INFO": {
+    "RESTART_TO_APPLY_CHANGES": "È necessario riavviare per applicare le modifiche.",
+    "SCHEDULE_EXAMPLE": "Esempio di programma",
+    "THREADS": "Thread: lascia 0 se non hai problemi. Aumenta se hai più provider. L'accesso parallelo ai tuoi provider potrebbe causare un ban.",
+    "WEB_ROOT": "Root Web: Contiene i file dell'interfaccia web. Di solito vengono posizionati nella stessa cartella sotto ./web"
+  }
+}

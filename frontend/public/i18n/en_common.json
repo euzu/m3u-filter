@@ -1,0 +1,117 @@
+{
+  "LABEL": {
+    "LIVE": "Live",
+    "VOD": "VOD",
+    "SERIES": "Series",
+    "SAVE": "Save",
+    "SHOW_SELECTED": "Show selected",
+    "SELECT_ALL": "Select All",
+    "DESELECT_ALL": "Deselect all",
+    "SEARCH": "Search",
+    "CLEAR": "Clear",
+    "REGEXP": "Regexp",
+    "LOGOUT": "Logout",
+    "CONFIGURATION": "Configuration",
+    "HOST": "Host",
+    "PORT": "Port",
+    "WEB_ROOT": "Web-Root",
+    "THREADS": "Threads",
+    "WORKING_DIR": "Working dir",
+    "BACKUP_DIR": "Backup dir",
+    "UPDATE_ON_BOOT": "Update on boot",
+    "WEB_UI": "Web UI",
+    "SCHEDULES": "Schedules",
+    "SANITIZE_SENSITIVE_INFO": "Sanitize sensitive info",
+    "ACTIVE_CLIENTS": "Active Clients",
+    "RESOURCE_REWRITE_DISABLE": "Resource Rewrite disable",
+    "RECONNECT": "Reconnect",
+    "BUFFER_ENABLED": "Buffer Enabled",
+    "BUFFER_SIZE": "Buffer Size",
+    "ENABLED": "Enabled",
+    "SIZE": "Size",
+    "CACHE_DIR": "Cache dir",
+    "NOTIFY_ON": "Notify on",
+    "BOT_TOKEN": "Bot Token",
+    "CHAT_IDS": "Chat Ids",
+    "URL": "Url",
+    "USER": "User",
+    "TOKEN": "Token",
+    "WEB_SEARCH_URL": "Web Search Url",
+    "EXTENSIONS": "Extensions",
+    "HEADERS": "Headers",
+    "DIRECTORY": "Directory",
+    "ORGANIZE_INTO_DIRECTORIES": "Organize Into Directorie",
+    "EPISODE_PATTERN": "Episode Pattern",
+    "API": "Api",
+    "MAIN": "Main",
+    "REVERSE_PROXY": "ReverseProxy",
+    "MESSAGING": "Messaging",
+    "VIDEO": "Video",
+    "EXAMPLES": "Examples",
+    "UPDATE": "Update",
+    "START": "Start",
+    "CACHE": "Cache",
+    "STREAM": "Stream",
+    "LOG": "Log",
+    "CONFIG": "Config",
+    "TELEGRAM": "Telegram",
+    "REST": "Rest",
+    "PUSHOVER": "Pushover",
+    "PROXY": "Proxy",
+    "REFRESH": "Refresh",
+    "STATUS": "Status",
+    "MAX_CON": "MaxCon",
+    "EXP_DATE": "ExpDate",
+    "USERNAME": "Username",
+    "PASSWORD": "Password",
+    "SERVER": "Server",
+    "TIMEZONE": "Timezone",
+    "PATH": "Path",
+    "MESSAGE": "Message",
+    "PROTOCOL": "Protocol",
+    "NAME": "Name",
+    "API_PROXY": "Api-Proxy"
+  },
+  "TITLE": {
+    "USER_BOUQUET_EDITOR": "User bouquet editor"
+  },
+  "MESSAGES": {
+    "INVALID_REGEXP": "Invalid regexp",
+    "INVALID_FILETYPE": "Invalid filetype",
+    "DOWNLOAD": {
+      "SUCCESS": "Successfully downloaded",
+      "FAIL": "Failed to download!",
+      "PLAYLIST": {
+        "SUCCESS": "Successfully downloaded playlist",
+        "FAIL": "Failed to download playlist!"
+      },
+      "SERVER_CONFIG": {
+        "FAIL": "Failed to download server config!"
+      }
+    },
+    "SAVE": {
+      "MAIN_CONFIG": {
+        "SUCCESS": "Main config saved!",
+        "FAIL": "Failed to save main config!"
+      },
+      "BOUQUET": {
+        "SUCCESS": "Successfully saved bouquet",
+        "FAIL": "Failed to save bouquet!"
+      },
+      "USER": {
+        "SUCCESS": "Successfully saved user",
+        "FAIL": "Failed to save user!"
+      },
+      "PLAYLIST_UPDATE": {
+        "SUCCESS": "Successfully started playlist update!",
+        "FAIL": "Playlist update failed!"
+      }
+    }
+  },
+  "INFO": {
+    "RESTART_TO_APPLY_CHANGES": "You need to restart to apply changes.",
+    "SCHEDULE_EXAMPLE": "Schedule example",
+    "THREADS": "Threads: keep it 0 if you have no problems. Increase it if you have multiple providers. Accessing you provider parallel can cause a ban.",
+    "WEB_ROOT": "Web-Root: Contains the web-ui files. They are normally placed in the same directory under ./web"
+  }
+}

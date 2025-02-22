@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufReader, Error, Read, Write};
 use std::path::Path;
@@ -64,7 +64,7 @@ pub fn json_iter_array<T: DeserializeOwned, R: Read>(
     std::iter::from_fn(move || yield_next_obj(&mut reader, &mut at_start).transpose())
 }
 
-pub fn json_filter_file<S: ::std::hash::BuildHasher>(file_path: &Path, filter: &HashMap<&str, &str, S>) -> Vec<serde_json::Value> {
+pub fn json_filter_file<S: ::std::hash::BuildHasher>(file_path: &Path, filter: &HashMap<&str, HashSet<String, S>, S>) -> Vec<serde_json::Value> {
     let mut filtered: Vec<serde_json::Value> = Vec::with_capacity(1024);
     if !file_path.exists() {
         return filtered; // Return early if the file does not exist
@@ -77,10 +77,10 @@ pub fn json_filter_file<S: ::std::hash::BuildHasher>(file_path: &Path, filter: &
     let reader = file_reader(file);
     for entry in json_iter_array::<serde_json::Value, BufReader<File>>(reader).flatten() {
         if let Some(item) = entry.as_object() {
-            if filter.iter().all(|(&key, &value)| {
+            if filter.iter().all(|(&key, filter_set)| {
                 item.get(key).is_some_and(|field_value| match field_value {
-                    Value::String(s) => s == value,
-                    Value::Number(n) => value.parse::<i64>().ok() == n.as_i64(),
+                    Value::String(s) => filter_set.contains(s.as_str()),
+                    Value::Number(n) => filter_set.contains(n.as_str()),
                     _ => false,
                 })
             }) {

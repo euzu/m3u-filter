@@ -18,6 +18,7 @@
     color: var(--app-header-color);
     align-content: center;
     padding: 10px;
+    gap: 8px;
     @media (max-width: common.$media-size-mobile) {
       padding: 10px 0;
     }

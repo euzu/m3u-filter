@@ -1,0 +1,112 @@
+{
+  "LABEL": {
+    "LIVE": "En vivo",
+    "VOD": "VOD",
+    "SERIES": "Series",
+    "SAVE": "Guardar",
+    "SHOW_SELECTED": "Mostrar seleccionados",
+    "SELECT_ALL": "Seleccionar todo",
+    "DESELECT_ALL": "Deseleccionar todo",
+    "SEARCH": "Buscar",
+    "CLEAR": "Borrar",
+    "REGEXP": "Expresión regular",
+    "LOGOUT": "Cerrar sesión",
+    "CONFIGURATION": "Configuración",
+    "HOST": "Host",
+    "PORT": "Puerto",
+    "WEB_ROOT": "Raíz web",
+    "THREADS": "Hilos",
+    "WORKING_DIR": "Directorio de trabajo",
+    "BACKUP_DIR": "Directorio de respaldo",
+    "UPDATE_ON_BOOT": "Actualizar al arrancar",
+    "WEB_UI": "Interfaz web",
+    "SCHEDULES": "Horarios",
+    "SANITIZE_SENSITIVE_INFO": "Sanitizar información sensible",
+    "ACTIVE_CLIENTS": "Clientes activos",
+    "RESOURCE_REWRITE_DISABLE": "Desactivar reescritura de recursos",
+    "RECONNECT": "Reconectar",
+    "BUFFER_ENABLED": "Búfer activado",
+    "BUFFER_SIZE": "Tamaño del búfer",
+    "ENABLED": "Habilitado",
+    "SIZE": "Tamaño",
+    "CACHE_DIR": "Directorio de caché",
+    "NOTIFY_ON": "Notificar en",
+    "BOT_TOKEN": "Token del bot",
+    "CHAT_IDS": "IDs de chat",
+    "URL": "URL",
+    "USER": "Usuario",
+    "TOKEN": "Token",
+    "WEB_SEARCH_URL": "URL de búsqueda web",
+    "EXTENSIONS": "Extensiones",
+    "HEADERS": "Encabezados",
+    "DIRECTORY": "Directorio",
+    "ORGANIZE_INTO_DIRECTORIES": "Organizar en directorios",
+    "EPISODE_PATTERN": "Patrón de episodio",
+    "API": "API",
+    "MAIN": "Principal",
+    "REVERSE_PROXY": "Proxy inverso",
+    "MESSAGING": "Mensajería",
+    "VIDEO": "Video",
+    "EXAMPLES": "Ejemplos",
+    "UPDATE": "Actualizar",
+    "START": "Iniciar",
+    "CACHE": "Caché",
+    "STREAM": "Flujo",
+    "LOG": "Registro",
+    "CONFIG": "Configuración",
+    "TELEGRAM": "Telegram",
+    "REST": "Rest",
+    "PUSHOVER": "Pushover",
+    "PROXY": "Proxy",
+    "REFRESH": "Actualizar",
+    "STATUS": "Estado",
+    "MAX_CON": "MaxCon",
+    "EXP_DATE": "Fecha de expiración",
+    "USERNAME": "Nombre de usuario",
+    "PASSWORD": "Contraseña",
+    "SERVER": "Servidor",
+    "TIMEZONE": "Zona horaria",
+    "PATH": "Ruta",
+    "MESSAGE": "Mensaje",
+    "PROTOCOL": "Protocolo",
+    "NAME": "Nombre"
+  },
+  "TITLE": {
+    "USER_BOUQUET_EDITOR": "Editor de bouquet de usuario"
+  },
+  "MESSAGES": {
+    "INVALID_REGEXP": "Expresión regular no válida",
+    "INVALID_FILETYPE": "Tipo de archivo no válido",
+    "DOWNLOAD": {
+      "SUCCESS": "Descargado con éxito",
+      "FAIL": "¡Error al descargar!",
+      "PLAYLIST": {
+        "SUCCESS": "Lista de reproducción descargada con éxito",
+        "FAIL": "¡Error al descargar la lista de reproducción!"
+      },
+      "SERVER_CONFIG": {
+        "FAIL": "¡Error al descargar la configuración del servidor!"
+      }
+    },
+    "SAVE": {
+      "MAIN_CONFIG": {
+        "SUCCESS": "¡Configuración principal guardada!",
+        "FAIL": "¡Error al guardar la configuración principal!"
+      },
+      "BOUQUET": {
+        "SUCCESS": "Bouquet guardado con éxito",
+        "FAIL": "¡Error al guardar el bouquet!"
+      },
+      "USER": {
+        "SUCCESS": "Usuario guardado con éxito",
+        "FAIL": "¡Error al guardar el usuario!"
+      }
+    }
+  },
+  "INFO": {
+    "RESTART_TO_APPLY_CHANGES": "Necesitas reiniciar para aplicar los cambios.",
+    "SCHEDULE_EXAMPLE": "Ejemplo de horario",
+    "THREADS": "Hilos: mantén en 0 si no tienes problemas. Aumenta si tienes varios proveedores. Acceder a tu proveedor en paralelo puede causar un baneo.",
+    "WEB_ROOT": "Raíz web: contiene los archivos de la interfaz web. Normalmente se colocan en el mismo directorio bajo ./web"
+  }
+}

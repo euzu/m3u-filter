@@ -1092,7 +1092,7 @@ impl Config {
     }
 
     pub fn is_reverse_proxy_resource_rewrite_enabled(&self) -> bool {
-        self.reverse_proxy.as_ref().map_or(true, |r| !r.resource_rewrite_disabled)
+        self.reverse_proxy.as_ref().is_none_or(|r| !r.resource_rewrite_disabled)
     }
 
     fn intern_get_target_for_user(&self, user_target: Option<(ProxyUserCredentials, String)>) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
