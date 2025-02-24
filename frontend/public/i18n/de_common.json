@@ -75,7 +75,7 @@
     "NAME": "Name"
   },
   "TITLE": {
-    "USER_BOUQUET_EDITOR": "Benutzer-Bouquet-Editor"
+    "USER_BOUQUET_EDITOR": "Benutzer-Gruppen-Editor"
   },
   "MESSAGES": {
     "INVALID_REGEXP": "Ungültiger regulärer Ausdruck",

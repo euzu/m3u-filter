@@ -76,7 +76,7 @@
     "API_PROXY": "Api-Proxy"
   },
   "TITLE": {
-    "USER_BOUQUET_EDITOR": "User bouquet editor"
+    "USER_BOUQUET_EDITOR": "User group editor"
   },
   "MESSAGES": {
     "INVALID_REGEXP": "Invalid regexp",
