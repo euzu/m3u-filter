@@ -32,31 +32,33 @@ export default function MapEditor(props: MapEditorProps) {
         }
     }, [values]);
 
-    useEffect(() => {
-        onChange(name, listToMap(data));
-    }, [data, name, onChange]);
-
     const handleHeaderRemove = useCallback((event: any) => {
         const key = event.target.dataset.key;
         if (key) {
-            setData(data => data?.filter((keyValue: KeyValue) => keyValue.key !== key));
+            setData(data => {
+                const newData = data?.filter((keyValue: KeyValue) => keyValue.key !== key);
+                onChange(name, listToMap(newData));
+                return newData;
+            });
         }
 
-    }, []);
+    }, [name, onChange]);
 
     const handleAddKeyValue = useCallback((event: any) => {
         let key = keyRef.current?.value?.trim();
         let value = valRef.current?.value?.trim();
         if (key.length> 0 && value.length > 0) {
             setData(data => {
+                let result = data;
                 if (!containsKey(key, data)) {
                     data.push({key, value});
-                    return [...data];
+                    result = [...data];
                 }
-                return data;
+                onChange(name, listToMap(result));
+                return result;
             });
         }
-    }, []);
+    }, [name, onChange]);
 
     return <div className={'map-editor'}>
         <div className={'map-editor__input'}>

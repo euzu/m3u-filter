@@ -5,7 +5,7 @@ interface CheckboxProps {
     label?: string;
     value: any;
     checked: boolean;
-    onSelect: (checked: boolean, value: any, evt?: any) => void;
+    onSelect: (value: any, checked: boolean, evt?: any) => void;
 }
 
 export default function Checkbox(props: CheckboxProps) {
@@ -17,7 +17,7 @@ export default function Checkbox(props: CheckboxProps) {
         evt.preventDefault();
         evt.stopPropagation();
         inputRef.current.checked = !inputRef.current.checked;
-        onSelect?.(inputRef.current.checked, value, evt);
+        onSelect?.(value, inputRef.current.checked, evt);
     }, [value, onSelect]);
 
     useLayoutEffect(() => {

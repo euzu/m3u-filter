@@ -128,6 +128,8 @@ pub enum ItemField {
     Title,
     #[serde(rename = "url")]
     Url,
+    #[serde(rename = "input")]
+    Input,
     #[serde(rename = "type")]
     Type,
 }
@@ -137,6 +139,7 @@ impl ItemField {
     const NAME: &'static str = "Name";
     const TITLE: &'static str = "Title";
     const URL: &'static str = "Url";
+    const INPUT: &'static str = "Input";
     const TYPE: &'static str = "Type";
 }
 
@@ -147,6 +150,7 @@ impl Display for ItemField {
             Self::Name => Self::NAME,
             Self::Title => Self::TITLE,
             Self::Url => Self::URL,
+            Self::Input => Self::INPUT,
             Self::Type => Self::TYPE,
         })
     }

@@ -526,7 +526,7 @@ There is a difference for `xtream_resolve_vod` and `xtream_resolve_series`.
 The filter is a string with a filter statement.
 The filter can have UnaryExpression `NOT`, BinaryExpression `AND OR`, Regexp Comparison `(Group|Title|Name|Url) ~ "regexp"`
 and Type Comparsison `Type = vod` or `Type = live` or `Type = series`.
-Filter fields are `Group`, `Title`, `Name`, `Url` and `Type`.
+Filter fields are `Group`, `Title`, `Name`, `Url`, `Input` and `Type`.
 Example filter:  `((Group ~ "^DE.*") AND (NOT Title ~ ".*Shopping.*")) OR (Group ~ "^AU.*")`
 
 If you use characters like `+ | [ ] ( )` in filters don't forget to escape them!!
@@ -703,7 +703,7 @@ It is optional and allows you to filter the content.
 #### 2.3.3.2 `pattern`
 The pattern is a string with a statement (@see filter statements).
 The pattern can have UnaryExpression `NOT`, BinaryExpression `AND OR`, and Comparison `(Group|Title|Name|Url) ~ "regexp"`.
-Filter fields are `Group`, `Title`, `Name` and `Url`.
+Filter fields are `Group`, `Title`, `Name`, `Url`, `Input` and `Type`.
 Example filter:  `NOT Title ~ ".*Shopping.*"`
 
 The pattern for the mapper works different from a filter expression.

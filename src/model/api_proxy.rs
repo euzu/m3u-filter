@@ -159,6 +159,16 @@ impl ProxyUserCredentials {
         }
     }
 
+    pub fn validate(&self) -> Result<(), M3uFilterError> {
+        if self.username.is_empty() {
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Username required".to_string()));
+        }
+        if self.password.is_empty() {
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Password required".to_string()));
+        }
+        Ok(())
+    }
+
     pub fn has_permissions(&self, app_state: &AppState) -> bool {
         if app_state.config.user_access_control {
             if let Some(exp_date) = self.exp_date.as_ref() {

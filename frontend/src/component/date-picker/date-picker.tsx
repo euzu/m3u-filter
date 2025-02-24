@@ -1,4 +1,4 @@
-import React, {useCallback} from "react";
+import React, {useCallback, useEffect} from "react";
 import "./date-picker.scss";
 import ReactDatePicker from "react-datepicker";
 import {getIconByName} from "../../icons/icons";
@@ -15,6 +15,10 @@ export default function DatePicker(props: DatePickerProps) {
     const [selected, setSelected] = React.useState<any>(value);
     const datePickerRef = React.useRef<ReactDatePicker>(null);
 
+    useEffect(() => {
+        setSelected(value);
+    }, [value]);
+
     const handleDateChange = useCallback((date: any) => {
         setSelected(date);
         datePickerRef.current.setOpen(false);
@@ -22,12 +26,10 @@ export default function DatePicker(props: DatePickerProps) {
     }, [name, onChange]);
 
     const handleClick = useCallback(() => {
-        console.log(datePickerRef.current.isCalendarOpen())
         if (!datePickerRef.current.isCalendarOpen()) {
             datePickerRef.current.setOpen(true);
         }
     }, []);
-
 
     return (
         <div className="date-picker-container" onClick={handleClick}>

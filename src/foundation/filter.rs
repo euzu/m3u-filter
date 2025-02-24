@@ -23,6 +23,7 @@ pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<String> {
         ItemField::Name => &header.name,
         ItemField::Title => &header.title,
         ItemField::Url => &header.url,
+        ItemField::Input => &header.input_name,
         ItemField::Type => &Rc::new(header.item_type.to_string()),
     };
     Rc::clone(value)
@@ -35,6 +36,7 @@ pub fn set_field_value(pli: &PlaylistItem, field: &ItemField, value: Rc<String>)
         ItemField::Name => header.name = value,
         ItemField::Title => header.title = value,
         ItemField::Url => header.url = value,
+        ItemField::Input => header.input_name = value,
         ItemField::Type => {}
     };
 }

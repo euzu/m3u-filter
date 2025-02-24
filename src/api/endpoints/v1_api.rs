@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use actix_web::middleware::Condition;
@@ -13,7 +14,7 @@ use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceCon
 use crate::api::model::request::PlaylistRequest;
 use crate::auth::authenticator::{validator_admin};
 use crate::m3u_filter_error::M3uFilterError;
-use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, TargetUser};
+use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
 use crate::processing::processor::playlist;
 use crate::utils::network::request::sanitize_sensitive_info;
@@ -47,7 +48,19 @@ async fn save_config_api_proxy_user(
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
     let mut users = req.0;
-    users.iter_mut().flat_map(|t| &mut t.credentials).for_each(ProxyUserCredentials::trim);
+    let mut usernames = HashSet::new();
+    for target_user in &mut users {
+        for credential in &mut target_user.credentials {
+            credential.trim();
+            if let Err(err) = credential.validate() {
+                return HttpResponse::BadRequest().json(json!({"error": err.to_string()}));
+            }
+            if usernames.contains(&credential.username) {
+                return HttpResponse::BadRequest().json(json!({"error": format!("Duplicate usewrname {}", &credential.username)}));
+            }
+            usernames.insert(&credential.username);
+        }
+    }
     if let Some(api_proxy) = app_state.config.t_api_proxy.write().as_mut() {
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         api_proxy.user = users;

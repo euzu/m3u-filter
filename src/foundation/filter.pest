@@ -1,5 +1,5 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n"}
-field = { ^"group" | ^"title" | ^"name" | ^"url" }
+field = { ^"group" | ^"title" | ^"name" | ^"url" | ^"input"}
 and = { ^"and" }
 or = { ^"or" }
 not = { ^"not" }

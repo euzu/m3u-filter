@@ -16,7 +16,9 @@
   - name: test
 ```
 - The Web UI now includes a login feature for playlist users, allowing them to set their group for filtering and managing their own boutique.
+ The playlist user can login with his credentials and can select the desired groups for his playlist. 
 - Added `user_config_dir` to `config.yml`. It is the storage path for user configurations (f.e. bouquets).
+- New Filter field `input` can be used along `name`, `group`, `title`, `url` and `type`. Input is a `regexp` filter. `input ~ "provider\-\d+"`
 
 # 2.2.1 (2025-02-14)
 - Added more info to `/status`.

@@ -83,7 +83,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
             });
     }, [services]);
 
-    const handleCheckboxChange = useCallback((checked:boolean, value: string) => {
+    const handleCheckboxChange = useCallback((value: string, checked:boolean) => {
         setSelections(selections => ({...selections, [value]: checked}));
     }, []);
 

@@ -20,7 +20,7 @@ export default function TargetUpdateView(props: TargetUpdateViewProps) {
     const targets = useMemo(() => ConfigUtils.getTargetNames(config), [config]);
     const selected = useRef([]);
 
-    const handleSelect = useCallback((checked: boolean, target: string) => {
+    const handleSelect = useCallback((target: string,checked: boolean) => {
         if (checked) {
             selected.current.push(target);
         } else {

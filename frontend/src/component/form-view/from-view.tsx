@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import './form-view.scss';
 import Checkbox from "../checkbox/checkbox";
 import TagSelect from "../tag-select/tags-select";
@@ -41,9 +41,11 @@ export default function FormView(props: FormViewProps) {
     const {data, fields} = props;
     const uuid = useMemo(() => genUuid(), []);
     const inputIds= useRef([]);
+    const [formData, setFormData] = useState(data || {});
 
     useEffect(() => {
        if (data) {
+           setFormData(data);
            inputIds.current.forEach((id)=> {
               let elem: any = document.getElementById(id);
               if (elem) {
@@ -58,43 +60,40 @@ export default function FormView(props: FormViewProps) {
 
     const handleInputValueChange = useCallback((evt: any) => {
         const field = evt.target.dataset.field;
+        const value = evt.target.value;
         if (data) {
-            data[field] = evt.target.value ?? '';
+            data[field] = value;
         }
-    }, [data]);
-
-    const handleCheckboxChange = useCallback((checked: boolean, value: any, evt?: any) => {
-        if (data) {
-            data[value] = checked;
-        }
+        setFormData((prevData: any) => ({...prevData, [field]: value ?? ''}));
     }, [data]);
 
     const handleChange = useCallback((field: string, value: any) => {
         if (data) {
             data[field] = value;
         }
+        setFormData((prevData: any) => ({...prevData, [field]: value}));
     }, [data]);
 
     const getFieldInput = useCallback((field: FormField) => {
         switch (field.fieldType) {
             case FormFieldType.READONLY:
-                return <span>{data?.[field.name]}</span>;
+                return <span>{formData?.[field.name]}</span>;
             case FormFieldType.CHECK:
-                return <Checkbox label={undefined} value={field.name} checked={data?.[field.name]} onSelect={handleCheckboxChange}></Checkbox>
+                return <Checkbox label={undefined} value={field.name} checked={formData?.[field.name]} onSelect={handleChange}></Checkbox>
             case FormFieldType.MULTI_SELECT:
                 return <TagSelect options={field.options} name={field.name}
-                                  defaultValues={data?.[field.name]} multi={true} onSelect={handleChange}></TagSelect>
+                                  defaultValues={formData?.[field.name]} multi={true} onSelect={handleChange}></TagSelect>
             case FormFieldType.SINGLE_SELECT:
                 return <TagSelect options={field.options} name={field.name}
-                                  defaultValues={data?.[field.name]} multi={false} onSelect={handleChange}></TagSelect>
+                                  defaultValues={formData?.[field.name]} multi={false} onSelect={handleChange}></TagSelect>
             case FormFieldType.MAP:
-                return <div className="form-view__map-editor"><MapEditor onChange={handleChange} name={field.name} values={data?.[field.name]}></MapEditor></div>
+                return <div className="form-view__map-editor"><MapEditor onChange={handleChange} name={field.name} values={formData?.[field.name]}></MapEditor></div>
             case FormFieldType.TAGS:
-                return <TagInput placeHolder={''} onChange={handleChange} name={field.name} values={data?.[field.name] || []}></TagInput>
+                return <TagInput placeHolder={''} onChange={handleChange} name={field.name} values={formData?.[field.name] || []}></TagInput>
             case FormFieldType.SCHEDULE:
-                return <ScheduleEditor onChange={handleChange} name={field.name} values={data?.[field.name] || []} sources={data?.sources || []}></ScheduleEditor>
+                return <ScheduleEditor onChange={handleChange} name={field.name} values={formData?.[field.name] || []} sources={data?.sources || []}></ScheduleEditor>
             case FormFieldType.DATE:
-                return <DatePicker  name={field.name} onChange={handleChange} value={data?.[field.name] || undefined}></DatePicker>
+                return <DatePicker  name={field.name} onChange={handleChange} value={formData?.[field.name] || undefined}></DatePicker>
             case FormFieldType.NUMBER:
             case FormFieldType.TEXT:
             default: {
@@ -103,7 +102,7 @@ export default function FormView(props: FormViewProps) {
                 return <input id={input_id} type={'text'} data-field={field.name} onChange={handleInputValueChange}></input>;
             }
         }
-    }, [uuid, data, inputIds, handleChange, handleInputValueChange,handleCheckboxChange]);
+    }, [uuid, formData, data, inputIds, handleChange, handleInputValueChange]);
 
     return <div className={'form-view'}>
         <div className={'form-view__table'}>

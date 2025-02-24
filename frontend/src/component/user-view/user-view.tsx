@@ -223,8 +223,8 @@ export default function UserView(props: UserViewProps) {
         });
         const toSaveTargetUser = prepareTargetUserForSave(targetUser);
         services.config().saveTargetUser(toSaveTargetUser).subscribe({
-            next: () => enqueueSnackbar(translate('MESSGES.SAVE.USER.SUCCESS'), {variant: 'success'}),
-            error: (err) => enqueueSnackbar(translate('MESSGES.SAVE.USER.FAIL'), {variant: 'error'})
+            next: () => enqueueSnackbar(translate('MESSAGES.SAVE.USER.SUCCESS'), {variant: 'success'}),
+            error: (err) => enqueueSnackbar(translate('MESSAGES.SAVE.USER.FAIL'), {variant: 'error'})
         });
     }, [targets, services, enqueueSnackbar, translate]);
 
