@@ -96,10 +96,6 @@ export default function UserPlaylist(props: UserPlaylistProps) {
         </div>;
     }, [handleCheckboxChange, selections]);
 
-    const handleTabChange = useCallback((target: string) => {
-        setActiveTab(target);
-    }, []);
-
     const handleSave = useCallback(() => {
         setLoading(true);
         const live = categories?.live?.filter(c => selections[c.id]);
@@ -159,7 +155,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
                 <label>{translate('TITLE.USER_BOUQUET_EDITOR')}</label>
                 <button title={translate('LABEL.SAVE')} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
             </div>
-            <TabSet tabs={tabs} active={activeTab} onTabChange={handleTabChange}></TabSet>
+            <TabSet tabs={tabs} active={activeTab} onTabChange={setActiveTab}></TabSet>
             {CATEGORY_TABS.map(tab => <div key={tab.key} className={'user-playlist__categories-panel' + (activeTab !== tab.key ? ' hidden' : '')}>
                 <div className={'user-playlist__categories__toolbar'}>
                     <div className={'user-playlist__categories__toolbar-filter'}>

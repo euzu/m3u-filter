@@ -1,11 +1,12 @@
-import React, {useCallback} from "react";
+import React, {useCallback, useEffect, useMemo, useRef} from "react";
 import './form-view.scss';
 import Checkbox from "../checkbox/checkbox";
 import TagSelect from "../tag-select/tags-select";
 import MapEditor from "../map-editor/map-editor";
 import TagInput from "../tag-input/tag-input";
 import ScheduleEditor from "../schedule-editor/schedule-editor";
-import DatePicker from "react-date-picker";
+import DatePicker from "../date-picker/date-picker";
+import {genUuid} from "../../utils/uuid";
 // export const isNumber = (value: string): boolean => {
 //     return !isNaN(value as any);
 // }
@@ -38,11 +39,27 @@ interface FormViewProps {
 
 export default function FormView(props: FormViewProps) {
     const {data, fields} = props;
+    const uuid = useMemo(() => genUuid(), []);
+    const inputIds= useRef([]);
 
-    const handleValueChange = useCallback((evt: any) => {
+    useEffect(() => {
+       if (data) {
+           inputIds.current.forEach((id)=> {
+              let elem: any = document.getElementById(id);
+              if (elem) {
+                  const field = elem.dataset.field;
+                  if (field) {
+                      elem.value = data[field]  ?? '';
+                  }
+              }
+           });
+       }
+    }, [data])
+
+    const handleInputValueChange = useCallback((evt: any) => {
         const field = evt.target.dataset.field;
         if (data) {
-            data[field] = evt.target.value;
+            data[field] = evt.target.value ?? '';
         }
     }, [data]);
 
@@ -77,14 +94,16 @@ export default function FormView(props: FormViewProps) {
             case FormFieldType.SCHEDULE:
                 return <ScheduleEditor onChange={handleChange} name={field.name} values={data?.[field.name] || []} sources={data?.sources || []}></ScheduleEditor>
             case FormFieldType.DATE:
-                return <DatePicker onChange={handleValueChange} name={field.name} value={data?.[field.name] || []}></DatePicker>
+                return <DatePicker  name={field.name} onChange={handleChange} value={data?.[field.name] || undefined}></DatePicker>
             case FormFieldType.NUMBER:
             case FormFieldType.TEXT:
-            default:
-                return <input defaultValue={data?.[field.name]} data-field={field.name}
-                              onChange={handleValueChange}></input>;
+            default: {
+                const input_id = uuid + field.name;
+                inputIds.current.push(input_id);
+                return <input id={input_id} type={'text'} data-field={field.name} onChange={handleInputValueChange}></input>;
+            }
         }
-    }, [data, handleChange, handleValueChange,handleCheckboxChange]);
+    }, [uuid, data, inputIds, handleChange, handleInputValueChange,handleCheckboxChange]);
 
     return <div className={'form-view'}>
         <div className={'form-view__table'}>

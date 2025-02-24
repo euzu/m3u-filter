@@ -1,6 +1,5 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
-@use '../../scss/date-picker';
 
 .form-view {
   @include common.container_vert_no_padding();

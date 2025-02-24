@@ -10,7 +10,7 @@ export default function Toolbar(props: ToolbarProps) {
     const translate = useTranslator();
     return <div className={'toolbar'}>
         <button title={translate('LABEL.SAVE')} onClick={props.onDownload}>
-            Save
+            {translate('LABEL.SAVE')}
         </button>
     </div>
 }

@@ -4,6 +4,9 @@
     "VOD": "VOD",
     "SERIES": "Series",
     "SAVE": "Save",
+    "SUBMIT": "Submit",
+    "OK": "Ok",
+    "CANCEL": "Cancel",
     "SHOW_SELECTED": "Show selected",
     "SELECT_ALL": "Select All",
     "DESELECT_ALL": "Deselect all",
@@ -100,7 +103,11 @@
       },
       "USER": {
         "SUCCESS": "Successfully saved user",
-        "FAIL": "Failed to save user!"
+        "FAIL": "Failed to save user!",
+        "USERNAME_REQUIRED": "Username required",
+        "DUPLICATE_USERNAME": "Duplicate username!",
+        "TARGET_NOT_FOUND": "Target not found!",
+        "MAX_CONNECTIONS_INVALID": "MaxConnections invalid"
       },
       "PLAYLIST_UPDATE": {
         "SUCCESS": "Successfully started playlist update!",

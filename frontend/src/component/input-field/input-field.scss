@@ -6,8 +6,9 @@
   flex-flow: row nowrap;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  flex: 1 1 auto;
   font-size: inherit;
+  width: 100%;
+  box-sizing: border-box;
 
   &__content {
     display: flex;

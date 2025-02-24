@@ -31,31 +31,29 @@ export default function TagSelect(props: TagSelectProps) {
         return noop;
     }, [defaultValues, options]);
 
-    useEffect(() => {
-        const selections = Object.keys(selected).map((key: any) =>
-            selected[key] ? options[key].value : undefined
-        ).filter(Boolean);
-        onSelect(name, multi ? selections : (selections.length ? selections[0] : undefined));
-        return noop;
-    }, [name, selected, multi, onSelect, options]);
-
     const handleTagClick = useCallback((evt: any) => {
         const idx = evt.target.dataset.idx;
         setSelected((selections) => {
-            if (multi) {
-                selections[idx] = !!!selections[idx];
-                return {...selections};
-            }
-            if (radio) {
-                if (!!selections[idx]) {
-                    return selections;
-                } else {
-                    return {[idx]: !!!selections[idx]} as any;
+            const getSelections = () => {
+                if (multi) {
+                    selections[idx] = !!!selections[idx];
+                    return {...selections};
                 }
-            }
-            return {[idx]: !!!selections[idx]} as any;
+                if (radio) {
+                    if (!!selections[idx]) {
+                        return selections;
+                    } else {
+                        return {[idx]: !!!selections[idx]} as any;
+                    }
+                }
+                return {[idx]: !!!selections[idx]} as any;
+            };
+            const result = getSelections();
+            const newSelections = Object.keys(result).map((key: any) => result[key] ? options[key].value : undefined).filter(Boolean);
+            onSelect(name, multi ? selections : (newSelections.length ? newSelections[0] : undefined));
+            return result;
         });
-    }, [multi, radio]);
+    }, [multi, radio, onSelect, name, options]);
 
     return <div className={'tag-select'}>
         {options.map((o, idx) =>

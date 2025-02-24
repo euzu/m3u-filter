@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from "react";
+import React, {useCallback, useEffect, useRef, useState} from "react";
 import './user-view.scss';
 import ServerConfig, {Credentials, TargetUser} from "../../model/server-config";
 import {getIconByName} from "../../icons/icons";
@@ -9,6 +9,8 @@ import TabSet, {TabSetTab} from "../tab-set/tab-set";
 import useTranslator from "../../hook/use-translator";
 import DateUtils from "../../utils/date-utils";
 import PlaylistFilter from "../playlist-filter/playlist-filter";
+import UserEditor from "../user-editor/user-editor";
+import TextGenerator from "../../utils/text-generator";
 
 const COLUMNS = [
     {field: 'username', label: 'LABEL.USERNAME'},
@@ -49,6 +51,63 @@ const prepareTargetUserForSave = (targetUser: TargetUser[]): TargetUser[] => {
     });
 }
 
+const usernameExists = (uname: string, targets: TargetUser[]): boolean => {
+    for (const target of targets) {
+        if (target.credentials.find(c => c.username === uname)) {
+            return true;
+        }
+    }
+    return false;
+};
+
+const checkuser = (user: Credentials): string | undefined => {
+    if (!user.username?.trim().length) {
+        return "MESSAGES.USER.USERNAME_REQUIRED";
+    }
+    // eslint-disable-next-line eqeqeq
+    if (user.max_connections != undefined) {
+        const max_con = parseInt(user.max_connections as any);
+        // eslint-disable-next-line eqeqeq
+        if (isNaN(max_con) || max_con < 0 || (('' + max_con) != user.max_connections as any)) {
+            return 'MESSAGES.USER.MAX_CONNECTIONS_INVALID';
+        } else {
+            if (max_con < 1) {
+                user.max_connections = undefined;
+            } else {
+                user.max_connections = max_con;
+            }
+        }
+    }
+    return undefined;
+}
+
+
+const createNewUser = (targets: TargetUser[]): Credentials => {
+    let cnt = 0;
+    let username = TextGenerator.generateUsername().toLowerCase();
+    while (usernameExists(username, targets)) {
+        username = TextGenerator.generateUsername().toLowerCase();
+        cnt++;
+        if (cnt > 1000) {
+            username = "";
+            break;
+        }
+    }
+    const created_at = Math.floor(Date.now() / 1000);
+    return {
+            username,
+            password: TextGenerator.generatePassword(),
+            token: TextGenerator.generatePassword(),
+            proxy: 'reverse',
+            created_at,
+            exp_date: undefined,
+            max_connections: undefined,
+            status: "Active",
+            // @ts-ignore
+            _ref: undefined, // an indicator for new user
+    };
+}
+
 interface UserViewProps {
     config: ServerConfig;
 }
@@ -57,6 +116,7 @@ export default function UserView(props: UserViewProps) {
     const {config} = props;
     const services = useServices();
     const translate = useTranslator();
+    const userEditorRef = useRef(null);
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [serverOptions, setServerOptions] = useState<{ value: string, label: string }[]>([]);
     const [targets, setTargets] = useState<TargetUser[]>([]);
@@ -94,6 +154,9 @@ export default function UserView(props: UserViewProps) {
                 const hiddenFields = COLUMNS.filter(c => c.hidden);
                 const hidden: any = {};
                 targets.forEach(target => target.credentials.forEach(c => {
+                    if (!c.server) {
+                        c.server = serverOptions?.[0]?.value;
+                    }
                     hiddenFields.forEach(h => {
                         hidden[c.username + h.field] = true
                     });
@@ -105,41 +168,13 @@ export default function UserView(props: UserViewProps) {
     }, [config])
 
     const handleUserAdd = useCallback((evt: any) => {
-        //     const target_name = evt.target.dataset.target;
-        //     const target = targets.find(target => target.target === target_name);
-        //     if (target) {
-        //         const usernameExists = (uname: string): boolean => {
-        //             for (const target of targets) {
-        //                 if (target.credentials.find(c => c.username === uname)) {
-        //                     return true;
-        //                 }
-        //             }
-        //             return false;
-        //         };
-        //         let cnt = 0;
-        //         let username = TextGenerator.generateUsername().toLowerCase();
-        //         while (usernameExists(username)) {
-        //             username = TextGenerator.generateUsername().toLowerCase();
-        //             cnt++;
-        //             if (cnt > 1000) {
-        //                 username = "";
-        //                 break;
-        //             }
-        //         }
-        //         const created_at = Math.floor(Date.now() / 1000);
-        //         target.credentials.push({
-        //             username,
-        //             password: TextGenerator.generatePassword(),
-        //             token: TextGenerator.generatePassword(),
-        //             proxy: 'reverse',
-        //             created_at,
-        //             exp_date: undefined,
-        //             max_connections: undefined,
-        //             status: "Active",
-        //         });
-        //         setTargets([...targets]);
-        //     }
-    }, []);
+        const target_name = evt.target.dataset.target;
+        const target = targets.find(target => target.target === target_name);
+        if (target) {
+            const user = createNewUser(targets);
+            userEditorRef.current.edit(user, target_name);
+        }
+    }, [targets]);
 
     const handleUserRemove = useCallback((evt: any) => {
         const username = evt.target.dataset.user;
@@ -161,7 +196,7 @@ export default function UserView(props: UserViewProps) {
         if (target) {
             const user = target.credentials.find(c => c.username === username);
             if (user) {
-
+                userEditorRef.current.edit({...user, _ref: user.username}, target_name);
             }
         }
     }, [targets]);
@@ -170,31 +205,12 @@ export default function UserView(props: UserViewProps) {
         const usernames: any = {};
         for (const target of targets) {
             for (const user of target.credentials) {
-                if (!user.username?.trim().length) {
-                    enqueueSnackbar("Username empty!", {variant: 'error'});
-                    return;
-                }
-                if (usernames[user.username]) {
-                    enqueueSnackbar("Duplicate Username! " + user.username, {variant: 'error'});
+                const err = checkuser(user);
+                if (err) {
+                    enqueueSnackbar(translate(err), {variant: 'error'});
                     return;
                 }
                 usernames[user.username] = true;
-
-                // eslint-disable-next-line eqeqeq
-                if (user.max_connections != undefined) {
-                    const max_con = parseInt(user.max_connections as any);
-                    // eslint-disable-next-line eqeqeq
-                    if (isNaN(max_con) || max_con < 0 || (('' + max_con) != user.max_connections as any)) {
-                        enqueueSnackbar("MaxConnections invalid! " + user.max_connections, {variant: 'error'});
-                        return;
-                    } else {
-                        if (max_con < 1) {
-                            user.max_connections = undefined;
-                        } else {
-                            user.max_connections = max_con;
-                        }
-                    }
-                }
             }
         }
         const targetUser = targets.map(t => {
@@ -215,11 +231,6 @@ export default function UserView(props: UserViewProps) {
     const handleVisibility = useCallback((evt: any) => {
         let key = evt.target.dataset.hiddenkey;
         setShowHiddenFields((hiddenFields: any) => ({...hiddenFields, [key]: !hiddenFields[key]}));
-    }, []);
-
-    const handleTabChange = useCallback((target: string) => {
-
-        setActiveTarget(target);
     }, []);
 
     const handleFilter = useCallback((filter: string, regexp: boolean): void => {
@@ -249,13 +260,41 @@ export default function UserView(props: UserViewProps) {
         }
     }, [activeTarget, targets]);
 
+    const handleUserEditorSubmit = useCallback((user: Credentials, target_name: string): boolean => {
+        const userRef = (user as any)._ref;
+        const err = checkuser(user);
+        if (err) {
+            enqueueSnackbar(translate(err), {variant: 'error'});
+            return false;
+        }
+        if ((userRef && user.username === userRef) || !usernameExists(user.username, targets)) {
+            const target = targets.find(target => target.target === target_name);
+            if (target) {
+                delete (user as any)._ref;
+                if (userRef) {
+                    const index = target.credentials.findIndex(c => c.username === userRef);
+                    target.credentials.splice(index, 1, user);
+                } else {
+                    target.credentials.push(user);
+                }
+                setTargets(targets.slice());
+                return true;
+            } else {
+                enqueueSnackbar(translate("MESSAGES.USER.TARGET_NOT_FOUND") + target_name, {variant: 'error'});
+            }
+        } else {
+            enqueueSnackbar(translate("MESSAGES.USER.DUPLICATE_USERNAME") + user.username, {variant: 'error'});
+        }
+        return false;
+    }, [targets, translate, enqueueSnackbar]);
+
     return <div className={'user'}>
 
         <div className={'user__toolbar'}><label>{translate('LABEL.USER')}</label>
             <PlaylistFilter onFilter={handleFilter} options={filteredUser[activeTarget]}></PlaylistFilter>
-            <button title={'Save'} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
+            <button title={translate('LABEL.SAVE')} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
-        <TabSet tabs={tabs} active={activeTarget} onTabChange={handleTabChange}></TabSet>
+        <TabSet tabs={tabs} active={activeTarget} onTabChange={setActiveTarget}></TabSet>
         <div className={'user__content'}>
             <div className={'user__content-targets'}>
                 {
@@ -311,5 +350,6 @@ export default function UserView(props: UserViewProps) {
                     </div>)}
             </div>
         </div>
+        <UserEditor onSubmit={handleUserEditorSubmit} ref={userEditorRef} serverOptions={serverOptions}></UserEditor>
     </div>
 }

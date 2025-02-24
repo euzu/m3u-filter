@@ -139,6 +139,7 @@ export interface Credentials {
     username: string;
     password: string;
     token: string;
+    server: string;
     proxy: 'redirect' | 'reverse';
     created_at: number,
     exp_date: number,

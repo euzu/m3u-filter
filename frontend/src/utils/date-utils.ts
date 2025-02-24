@@ -12,7 +12,6 @@ function formatDate(date: any): string {
 const DateUtils = {
     formatDate: (date: any) => {
         if (date) {
-            console.log(date);
             return formatDate(date);
         }
         return '';

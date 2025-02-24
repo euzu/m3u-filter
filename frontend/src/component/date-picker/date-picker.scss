@@ -1,0 +1,31 @@
+@import "react-datepicker/dist/react-datepicker.css";
+
+.react-datepicker__header {
+  h2 {
+    display: none;
+  }
+}
+
+.react-datepicker__input-container {
+  display: flex;
+  flex-flow: row-reverse nowrap;
+  padding: 0 4px;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  user-select: none;
+  cursor: pointer;
+
+  input {
+    user-select: none;
+    pointer-events: none;
+    border: none !important;
+    caret: transparent;
+    &:focus {
+      background-color: transparent !important;
+    }
+  }
+  svg {
+    fill: var(--icon-button-color);
+  }
+}

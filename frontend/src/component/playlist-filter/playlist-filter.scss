@@ -1,9 +1,18 @@
+@use "../../scss/common";
+
 .playlist-filter {
+  overflow: hidden;
   display: flex;
   flex-flow: row nowrap;
   padding: 10px 0 10px 0;
   max-height: 2.5rem;
   font-size: 0.5rem;
+  flex: 1 1 auto;
+  max-width: 400px;
+  @media (max-width: common.$media-size-mobile) {
+    width: 100px;
+  }
+
 
   &__option-active {
     box-sizing: border-box !important;

@@ -46,7 +46,7 @@ export default function Preferences(props: PreferencesProps) {
                 {sidebar_actions.map(action =>
                     <div key={'pref_' + action.action} data-action={action.action}
                             className={'preferences__sidebar-menu-action' + (action.action === activePage ? ' selected' : '')}
-                            onClick={handleSidebarAction}>{getIconByName(action.icon)} {action.label}</div>)}
+                            onClick={handleSidebarAction}>{getIconByName(action.icon)}<label>{action.label}</label></div>)}
             </div>
             <div className={'preferences__panels'}>
                 <Panel value={SidebarAction.Update} active={activePage}>

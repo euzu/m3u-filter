@@ -1,0 +1,30 @@
+@use '../../scss/common';
+@use '../../scss/preferences';
+
+.tag-select {
+  min-width: 160px;
+}
+
+dialog {
+  border: none;
+  background-color: var(--card-background-color);
+  &::backdrop {
+    background: rgba(0, 0, 0, 0.6); /* Schwarzer, halbtransparenter Hintergrund */
+  }
+}
+
+.user-editor {
+  & {
+    min-height: 400px;
+    @include preferences.prefsToolbar();
+  }
+
+  &__content {
+    @media (max-width: common.$media-size-mobile) {
+      .form-view__col-label {
+        justify-content: flex-start;
+      }
+    }
+  }
+}
+

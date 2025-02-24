@@ -46,7 +46,7 @@ export default function ApiProxyView(props: ApiProxyViewProps) {
 
     return <div className={'api-proxy'}>
         <div className={'api-proxy__toolbar'}><label>{translate('LABEL.API_PROXY')}</label>
-            <button title={translate('LABEL.SAVE')} onClick={handleSave}>Save</button>
+            <button title={translate('LABEL.SAVE')} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
         <div className={'api-proxy__content'}>
             <div className={'api-proxy__content-area'}>
