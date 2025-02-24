@@ -1,28 +1,31 @@
-import React, {useCallback, useEffect, useMemo, useState} from "react";
+import React, {useCallback, useEffect, useState} from "react";
 import './user-view.scss';
-import ServerConfig, {TargetUser} from "../../model/server-config";
+import ServerConfig, {Credentials, TargetUser} from "../../model/server-config";
 import {getIconByName} from "../../icons/icons";
-import TextGenerator from "../../utils/text-generator";
 import {useSnackbar} from "notistack";
 import {useServices} from "../../provider/service-provider";
 import ConfigUtils from "../../utils/config-utils";
 import TabSet, {TabSetTab} from "../tab-set/tab-set";
-import TagSelect from "../tag-select/tags-select";
-import DatePicker from "react-date-picker";
 import useTranslator from "../../hook/use-translator";
+import DateUtils from "../../utils/date-utils";
+import PlaylistFilter from "../playlist-filter/playlist-filter";
 
-const PROXY_OPTIONS = [
-    {value: 'reverse', label: 'Reverse'},
-    {value: 'redirect', label: 'Redirect'}
-];
-const STATUS_OPTIONS = [
-    {value: 'Active', label: 'Active'},
-    {value: 'Expired', label: 'Expired'},
-    {value: 'Banned', label: 'Banned'},
-    {value: 'Trial', label: 'Trial'},
-    {value: 'Disabled', label: 'Disabled'},
-    {value: 'Pending', label: 'Pending'},
-];
+const COLUMNS = [
+    {field: 'username', label: 'LABEL.USERNAME'},
+    {field: 'password', label: 'LABEL.PASSWORD', hidden: true},
+    {field: 'token', label: 'LABEL.TOKEN', hidden: true},
+    {field: 'server', label: 'LABEL.SERVER'},
+    {field: 'proxy', label: 'LABEL.PROXY'},
+    {field: 'max_connections', label: 'LABEL.MAX_CON'},
+    {field: 'status', label: 'LABEL.STATUS'},
+    {field: 'exp_date', label: 'LABEL.EXP_DATE', render: (value: any, hidden?: boolean) => DateUtils.formatDate(value)},
+]
+
+COLUMNS.forEach(col => {
+    if (!col.render) {
+        col.render = (value: any, hidden?: boolean) => value ? (hidden ? '***' : '' + value) : '';
+    }
+})
 
 const prepareCredentials = (targetUser: TargetUser[]) => {
     targetUser.forEach((user) => {
@@ -55,12 +58,16 @@ export default function UserView(props: UserViewProps) {
     const services = useServices();
     const translate = useTranslator();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
+    const [serverOptions, setServerOptions] = useState<{ value: string, label: string }[]>([]);
     const [targets, setTargets] = useState<TargetUser[]>([]);
     const [activeTarget, setActiveTarget] = useState<string>(undefined);
     const [tabs, setTabs] = useState<TabSetTab[]>([]);
-    const [serverOptions, setServerOptions] = useState<{ value: string, label: string }[]>([]);
-    const proxy_options = useMemo(() => PROXY_OPTIONS.map(c => ({...c, label: translate(c.label)})), [translate]);
-    const status_options = useMemo(() => STATUS_OPTIONS.map(c => ({...c, label: translate(c.label)})), [translate]);
+    const [showHiddenFields, setShowHiddenFields] = useState<Record<string, boolean>>({});
+    const [filteredUser, setFilteredUser] = useState<Record<string, {
+        filter: string,
+        regexp: boolean,
+        user: Credentials[]
+    }>>({});
 
     useEffect(() => {
         if (config) {
@@ -80,92 +87,82 @@ export default function UserView(props: UserViewProps) {
             missing?.forEach(target => {
                 result.push({src: false, target: target.target, credentials: target.credentials} as any);
             });
-            const targets = result || [];
+            const targets: TargetUser [] = result || [];
             setTargets(targets);
             if (targets?.length) {
                 setActiveTarget(targets[0].target);
+                const hiddenFields = COLUMNS.filter(c => c.hidden);
+                const hidden: any = {};
+                targets.forEach(target => target.credentials.forEach(c => {
+                    hiddenFields.forEach(h => {
+                        hidden[c.username + h.field] = true
+                    });
+                }));
+                setShowHiddenFields(hidden);
             }
             setTabs(targets.map(target => ({key: target.target, label: target.target})));
         }
     }, [config])
 
     const handleUserAdd = useCallback((evt: any) => {
-        const target_name = evt.target.dataset.target;
-        const target = targets.find(target => target.target === target_name);
-        if (target) {
-            const usernameExists = (uname: string): boolean => {
-                for (const target of targets) {
-                    if (target.credentials.find(c => c.username === uname)) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-            let cnt = 0;
-            let username = TextGenerator.generateUsername().toLowerCase();
-            while (usernameExists(username)) {
-                username = TextGenerator.generateUsername().toLowerCase();
-                cnt++;
-                if (cnt > 1000) {
-                    username = "";
-                    break;
-                }
-            }
-            const created_at = Math.floor(Date.now() / 1000);
-            target.credentials.push({
-                username,
-                password: TextGenerator.generatePassword(),
-                token: TextGenerator.generatePassword(),
-                proxy: 'reverse',
-                created_at,
-                exp_date: undefined,
-                max_connections: undefined,
-                status: "Active",
-            });
-            setTargets([...targets]);
-        }
-    }, [targets]);
+        //     const target_name = evt.target.dataset.target;
+        //     const target = targets.find(target => target.target === target_name);
+        //     if (target) {
+        //         const usernameExists = (uname: string): boolean => {
+        //             for (const target of targets) {
+        //                 if (target.credentials.find(c => c.username === uname)) {
+        //                     return true;
+        //                 }
+        //             }
+        //             return false;
+        //         };
+        //         let cnt = 0;
+        //         let username = TextGenerator.generateUsername().toLowerCase();
+        //         while (usernameExists(username)) {
+        //             username = TextGenerator.generateUsername().toLowerCase();
+        //             cnt++;
+        //             if (cnt > 1000) {
+        //                 username = "";
+        //                 break;
+        //             }
+        //         }
+        //         const created_at = Math.floor(Date.now() / 1000);
+        //         target.credentials.push({
+        //             username,
+        //             password: TextGenerator.generatePassword(),
+        //             token: TextGenerator.generatePassword(),
+        //             proxy: 'reverse',
+        //             created_at,
+        //             exp_date: undefined,
+        //             max_connections: undefined,
+        //             status: "Active",
+        //         });
+        //         setTargets([...targets]);
+        //     }
+    }, []);
 
     const handleUserRemove = useCallback((evt: any) => {
-        const idx = evt.target.dataset.idx;
+        const username = evt.target.dataset.user;
         const target_name = evt.target.dataset.target;
         const target = targets.find(target => target.target === target_name);
         if (target) {
-            target.credentials.splice(idx, 1);
-            setTargets([...targets]);
+            let idx = target.credentials.findIndex(c => c.username === username)
+            if (idx >= 0) {
+                target.credentials.splice(idx, 1);
+                setTargets([...targets]);
+            }
         }
     }, [targets]);
 
-    const handleValueChange = useCallback((evt: any) => {
+    const handleUserEdit = useCallback((evt: any) => {
+        const username = evt.target.dataset.user;
         const target_name = evt.target.dataset.target;
         const target = targets.find(target => target.target === target_name);
         if (target) {
-            const idx = evt.target.dataset.idx;
-            const field: any = evt.target.dataset.field;
-            (target.credentials[idx] as any)[field] = evt.target.value;
-            setTargets([...targets]); // this is needed for DatePicker for change detection
-        }
-    }, [targets]);
+            const user = target.credentials.find(c => c.username === username);
+            if (user) {
 
-    const handleChange = useCallback((fieldWithTargetAndIndex: string, value: any) => {
-        const parts = fieldWithTargetAndIndex.split('@');
-        const target_name = parts[0];
-        const target = targets.find(target => target.target === target_name);
-        if (target) {
-            const idx = parseInt(parts[1]);
-            const credentials: any = target.credentials[idx];
-            credentials[parts[2]] = value;
-        }
-    }, [targets]);
-
-    const handleSelectChange = useCallback((event: any) => {
-        const parts = event.target.name.split('@');
-        const target_name = parts[0];
-        const target = targets.find(target => target.target === target_name);
-        if (target) {
-            const idx = parseInt(parts[1]);
-            const credentials: any = target.credentials[idx];
-            credentials[parts[2]] = event.target.value;
+            }
         }
     }, [targets]);
 
@@ -215,13 +212,47 @@ export default function UserView(props: UserViewProps) {
         });
     }, [targets, services, enqueueSnackbar, translate]);
 
+    const handleVisibility = useCallback((evt: any) => {
+        let key = evt.target.dataset.hiddenkey;
+        setShowHiddenFields((hiddenFields: any) => ({...hiddenFields, [key]: !hiddenFields[key]}));
+    }, []);
+
     const handleTabChange = useCallback((target: string) => {
+
         setActiveTarget(target);
     }, []);
+
+    const handleFilter = useCallback((filter: string, regexp: boolean): void => {
+        let filter_value = regexp ? filter : filter.toLowerCase();
+        const target = targets.find(t => t.target === activeTarget);
+
+        if (target) {
+            if (filter_value?.length) {
+                const filtered = target.credentials.filter((credential: Credentials) => {
+                    if (regexp) {
+                        // eslint-disable-next-line eqeqeq
+                        return credential.username.trim().match(filter_value) != undefined;
+                    } else {
+                        return (credential.username.trim().toLowerCase().indexOf(filter_value) > -1);
+                    }
+                }) ?? [];
+                setFilteredUser((filteredUser: any) => ({
+                    ...filteredUser,
+                    [activeTarget]: {filter, regexp, user: filtered}
+                }));
+            } else {
+                setFilteredUser((filteredUser: any) => ({
+                    ...filteredUser, [activeTarget]: undefined
+                }));
+            }
+
+        }
+    }, [activeTarget, targets]);
 
     return <div className={'user'}>
 
         <div className={'user__toolbar'}><label>{translate('LABEL.USER')}</label>
+            <PlaylistFilter onFilter={handleFilter} options={filteredUser[activeTarget]}></PlaylistFilter>
             <button title={'Save'} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
         <TabSet tabs={tabs} active={activeTarget} onTabChange={handleTabChange}></TabSet>
@@ -241,104 +272,36 @@ export default function UserView(props: UserViewProps) {
                         <div className={'user__target-user-table-container'}>
                             <div className={'user__target-user-table'}>
                                 <div className={'user__target-user-row user__target-user-table-header'}>
-                                    <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>{translate('LABEL.USERNAME')}</label></div>
-                                    <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>{translate('LABEL.PASSWORD')}</label></div>
-                                    <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>{translate('LABEL.TOKEN')}</label></div>
-                                    <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>{translate('LABEL.SERVER')}</label></div>
-                                    <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>{translate('LABEL.PROXY')}</label></div>
-                                    <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>{translate('LABEL.MAX_CON')}</label></div>
-                                    <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>{translate('LABEL.STATUS')}</label></div>
-                                    <div className={'user__target-user-col user__target-user-col-header'}>
-                                        <label>{translate('LABEL.EXP_DATE')}</label></div>
+                                    {COLUMNS.map(col => <div key={col.field}
+                                                             className={'user__target-user-col user__target-user-col-header'}>
+                                        <label>{translate(col.label)}</label></div>)}
                                     <div className={'user__target-user-col user__target-user-col-header'}></div>
                                 </div>
 
-                                {target.credentials.map((usr, idx) =>
+                                {(filteredUser[target.target]?.user ?? target.credentials).map((usr, idx) =>
                                     <div key={'credential' + idx} className={'user__target-user-row'}>
-                                        {['username', 'password', 'token'].map((field) =>
-                                            <div key={'target_' + target.target + '_' + field + '_' + usr.username}
-                                                 className={'user__target-user-col'}>
-                                                <div className={'user__target-user-col-label'}>
-                                                    <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
-                                                </div>
-                                                <input data-target={target.target} data-idx={idx}
-                                                       defaultValue={(usr as any)[field]}
-                                                       data-field={field} onChange={handleValueChange}></input>
-                                            </div>
-                                        )}
-                                        <div key={'target_' + target.target + '_server_' + usr.username}
-                                             className={'user__target-user-col '}>
+                                        {COLUMNS.map(c => <div
+                                            key={'target_' + target.target + '_' + c.field + '_' + usr.username}
+                                            className={'user__target-user-col'}>
                                             <div className={'user__target-user-col-label'}>
-                                                <label>{translate('LABEL.SERVER')}</label></div>
-                                            <TagSelect options={serverOptions}
-                                                       name={target.target + '@' + idx + '@server'}
-                                                       defaultValues={(usr as any)?.['server']} radio={true}
-                                                       multi={false} onSelect={handleChange}></TagSelect>
-                                        </div>
-                                        <div key={'target_' + target.target + '_proxy_' + usr.username}
-                                             className={'user__target-user-col '}>
-                                            <div className={'user__target-user-col-label'}>
-                                                <label>{translate('LABEL.PROXY')}</label></div>
-                                            <TagSelect options={proxy_options}
-                                                       name={target.target + '@' + idx + '@proxy'}
-                                                       defaultValues={(usr as any)?.['proxy']} radio={true}
-                                                       multi={false} onSelect={handleChange}></TagSelect>
-                                        </div>
-                                        {['max_connections'].map((field) =>
-                                            <div key={'target_' + target.target + '_' + field + '_' + usr.username}
-                                                 className={'user__target-user-col'}>
-                                                <div className={'user__target-user-col-label'}>
-                                                    <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
-                                                </div>
-                                                <input data-target={target.target} data-idx={idx}
-                                                       defaultValue={(usr as any)[field]}
-                                                       className={'user__target-user-col-number'}
-                                                       data-field={field} onChange={handleValueChange}></input>
+                                                <label>{translate(c.label)}</label>
                                             </div>
-                                        )}
-                                        <div key={'target_' + target.target + '_status_' + usr.username}
-                                             className={'user__target-user-col '}>
-                                            <div className={'user__target-user-col-label'}>
-                                                <label>{translate('LABEL.STATUS')}</label></div>
-                                            <select name={target.target + '@' + idx + '@status'}
-                                                    defaultValue={(usr as any)?.['status']}
-                                                    onChange={handleSelectChange}>
-                                                {status_options.map(option =>
-                                                    <option key={option.value + idx}>{option.label}</option>
-                                                )}
-                                            </select>
-                                        </div>
-                                        {['exp_date'].map((field) =>
-                                            <div key={'target_' + target.target + '_' + field + '_' + usr.username}
-                                                 className={'user__target-user-col'}>
-                                                <div className={'user__target-user-col-label'}>
-                                                    <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
-                                                </div>
-                                                <DatePicker
-                                                    value={(usr as any)[field]}
-                                                    className={'user__target-user-col-date'}
-                                                    onChange={(date: any) => handleValueChange({
-                                                        target: {
-                                                            value: date,
-                                                            dataset: {
-                                                                target: target.target,
-                                                                idx,
-                                                                field,
-                                                            }
-                                                        },
-                                                    })}></DatePicker>
+                                            <div className={'user__target-user-col-value'}>{c.hidden &&
+                                                <span className={'visibility'} data-hiddenkey={usr.username + c.field}
+                                                      onClick={handleVisibility}>
+                                                {getIconByName('Visibility')}</span>}
+                                                {c.render((usr as any)[c.field], (showHiddenFields[usr.username + c.field] ?? c.hidden))}
                                             </div>
-                                        )}
-                                        <div className={'user__target-user-col user__target-user-col-toolbar'}>
-                                            <span data-target={target.target} data-idx={idx} onClick={handleUserRemove}>
+                                        </div>)
+                                        }
+                                        <div className={'user__target-user-col-toolbar'}>
+                                            <span data-target={target.target} data-user={usr.username}
+                                                  onClick={handleUserRemove}>
                                                 {getIconByName('PersonRemove')}
+                                            </span>
+                                            <span data-target={target.target} data-user={usr.username}
+                                                  onClick={handleUserEdit}>
+                                                {getIconByName('Edit')}
                                             </span>
                                         </div>
                                     </div>

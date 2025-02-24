@@ -131,16 +131,20 @@ export default function UserPlaylist(props: UserPlaylistProps) {
     }, [activeTab, getActiveCategories]);
 
     const handleFilter = useCallback((filter: string, regexp: boolean): void => {
-        let filer_value = regexp ? filter : filter.toLowerCase();
-        const filtered = (categories as any)?.[activeTab]?.filter((cat: PlaylistCategory) => {
-            if (regexp) {
-                // eslint-disable-next-line eqeqeq
-                return cat.name.trim().match(filer_value) != undefined;
-            } else {
-                return (cat.name.trim().toLowerCase().indexOf(filer_value) > -1);
-            }
-        }) ?? [];
-        setFilteredCategories(filteredCategories => ({...filteredCategories, [activeTab]: filtered}));
+        let filter_value = regexp ? filter : filter.toLowerCase();
+        if (filter_value?.length) {
+            const filtered = (categories as any)?.[activeTab]?.filter((cat: PlaylistCategory) => {
+                if (regexp) {
+                    // eslint-disable-next-line eqeqeq
+                    return cat.name.trim().match(filter_value) != undefined;
+                } else {
+                    return (cat.name.trim().toLowerCase().indexOf(filter_value) > -1);
+                }
+            }) ?? [];
+            setFilteredCategories(filteredCategories => ({...filteredCategories, [activeTab]: filtered}));
+        } else {
+            setFilteredCategories(filteredCategories => ({...filteredCategories, [activeTab]: (categories as any)?.[activeTab]}));
+        }
     }, [activeTab, categories]);
 
     const handleShowSelected = useCallback((event: any) => {
@@ -156,7 +160,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
                 <button title={translate('LABEL.SAVE')} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
             </div>
             <TabSet tabs={tabs} active={activeTab} onTabChange={handleTabChange}></TabSet>
-            {CATEGORY_TABS.map(tab => <div className={'user-playlist__categories-panel' + (activeTab !== tab.key ? ' hidden' : '')}>
+            {CATEGORY_TABS.map(tab => <div key={tab.key} className={'user-playlist__categories-panel' + (activeTab !== tab.key ? ' hidden' : '')}>
                 <div className={'user-playlist__categories__toolbar'}>
                     <div className={'user-playlist__categories__toolbar-filter'}>
                         <PlaylistFilter onFilter={handleFilter}></PlaylistFilter>

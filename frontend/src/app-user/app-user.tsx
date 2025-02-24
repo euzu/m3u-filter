@@ -37,7 +37,7 @@ export default function AppUser(props: AppUserProps) {
         <div className="user-app">
             <div className={'user-app__header'}>
                 <div className={'user-app__header__caption'}><span className={'user-app__header__logo'}>{appLogo}</span>{appTitle}</div>
-                <div className={'app-header__toolbar'}><select onChange={handleLanguage}>{services.config().getUiConfig().languages.map(l => <option key={l} value={l} selected={l === i18next.language}>{l}</option>)}</select></div>
+                <div className={'app-header__toolbar'}><select onChange={handleLanguage} defaultValue={i18next.language}>{services.config().getUiConfig().languages.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
                 <div className={'user-app__header__toolbar'}><button title={translate('LABEL.LOGOUT')} onClick={handleLogout}>{getIconByName('Logout')}</button></div>
             </div>
             <div className={'user-app__main'}>

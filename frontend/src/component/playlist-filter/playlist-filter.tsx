@@ -1,4 +1,4 @@
-import React, {useCallback, useRef, KeyboardEvent, useState} from "react";
+import React, {KeyboardEvent, useCallback, useEffect, useRef, useState} from "react";
 import './playlist-filter.scss';
 import {getIconByName} from "../../icons/icons";
 import InputField from "../input-field/input-field";
@@ -14,15 +14,23 @@ function isValidRegExp(pattern: string): boolean {
 }
 
 interface PlaylistFilterProps {
+    options?: { filter: string, regexp: boolean }
     onFilter: (filter: string, regexp: boolean) => void;
 }
 
 export default function PlaylistFilter(props: PlaylistFilterProps) {
-    const {onFilter} = props;
+    const {onFilter, options} = props;
     const translate = useTranslator();
     const textField = useRef<HTMLInputElement>(undefined);
     const [useRegexp, setUseRegexp] = useState<boolean>(false);
     const [errorMsg, setErrorMsg] = useState<string | undefined>(undefined);
+
+    useEffect(()=> {
+        setUseRegexp(options?.regexp ?? false);
+        if (textField.current) {
+            textField.current.value = options?.filter ?? '';
+        }
+    }, [options?.regexp, options?.filter]);
 
     const handleSearch = useCallback(() => {
         const value = textField.current.value;
@@ -36,7 +44,7 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
         } else {
             onFilter(value, useRegexp);
         }
-    }, [onFilter,useRegexp, translate]);
+    }, [onFilter, useRegexp, translate]);
 
     const handleClear = useCallback(() => {
         textField.current.value = '';
@@ -56,7 +64,8 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
     return <div className={'playlist-filter'}>
         <InputField label={translate('LABEL.SEARCH')}>
             <input type="text" ref={textField} onKeyUp={handleKeyPress}/>
-            <button title={translate('LABEL.REGEXP')} className={useRegexp ? 'playlist-filter__option-active' : ''} onClick={handleRegexp}>{getIconByName('Regexp')}</button>
+            <button title={translate('LABEL.REGEXP')} className={useRegexp ? 'playlist-filter__option-active' : ''}
+                    onClick={handleRegexp}>{getIconByName('Regexp')}</button>
             <button title={translate('LABEL.CLEAR')} onClick={handleClear}>{getIconByName('ClearSearch')}</button>
             <button title={translate('LABEL.SEARCH')} onClick={handleSearch}>{getIconByName('Search')}</button>
         </InputField>

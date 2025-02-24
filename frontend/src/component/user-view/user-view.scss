@@ -114,20 +114,24 @@
           vertical-align: middle;
           padding-left: 4px;
           padding-right: 4px;
-        }
-        input {
-          border: none !important;
-          height: 2rem;
+          white-space: nowrap;
+
         }
 
-        &-number {
-          max-width: 50px;
+        &-value {
+          display: flex;
+          flex-flow: row nowrap;
+          align-items: center;
+          gap: 4px;
         }
 
-        &-date {
-          width: 120px;
+        .visibility {
+          opacity: 0.5;
+          cursor: pointer;
+          &:hover {
+             color: var(--icon-button-hover-background-color);
+          }
         }
-
 
         &-toolbar {
           & {
@@ -173,22 +177,16 @@
         }
 
         &-col {
-          display: flex;
-          flex-flow: column;
-          padding-top: 4px;
-          padding-bottom: 4px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
           gap: 4px;
 
-          input {
-            border-top: 1px solid var(--table-border-color) !important;
-            border-bottom: 1px solid var(--table-border-color) !important;
+          &-toolbar {
+            padding-bottom: 4px;
           }
         }
       }
     }
-  }
-  input {
-    @include preferences.prefsInput;
   }
 }
 

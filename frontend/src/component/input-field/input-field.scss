@@ -7,14 +7,16 @@
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   flex: 1 1 auto;
+  font-size: inherit;
 
   &__content {
     display: flex;
     flex-flow: row nowrap;
     flex: 1 1 auto;
-    gap: 1px;
     overflow: hidden;
     border-radius: var(--border-radius);
+    font-size: inherit;
+    user-select: none;
   }
 
   &:focus-within {
@@ -25,32 +27,32 @@
     position: absolute;
     color: var(--label-color);
     transform: translate(6px, -0.8rem);
-    background-color: var(--background-color);
-    padding: 0 2px;
+    background-color: var(--card-background-color);
+    border-radius: var(--border-radius);
+    padding: 0 6px;
+    font-size: 1.1rem !important;
   }
 
   input {
     color: var(--text-color);
-    padding: 0.5rem;
-    border: none;
+    border: none !important;
     flex: 1 1 auto;
-
-    &:focus,
-    &:hover {
-      border: none;
-      outline: none;
-    }
+    height: 100%;
+    font-size: 1.1rem !important;
+    outline: none !important;
+    padding: 0 4px 0 12px;
   }
 
   button {
     @include common.iconButton();
-    border-radius: 0;
+    border: none !important;
+    border-radius: 0 !important;
     &:last-child {
       border-bottom-right-radius: var(--border-radius);
       border-top-right-radius: var(--border-radius);
     }
-    &:active {
-      transform: scale(0.95);
+    &:not(:last-child) {
+      border-right: 1px solid var(--card-background-color) !important;
     }
   }
 }

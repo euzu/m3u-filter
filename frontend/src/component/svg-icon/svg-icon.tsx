@@ -7,7 +7,7 @@ interface SvgIconProps {
 }
 
 function SvgIcon(props: SvgIconProps): React.JSX.Element {
-    return <svg className="svg-icon" focusable="false" aria-hidden="true" data-testid={props.name} viewBox='0 0 24 24'>
+    return <svg className="svg-icon" focusable="false" aria-hidden="true" fill="inherit" data-testid={props.name} viewBox='0 0 24 24'>
         <path d={props.path}/>
     </svg>;
 }

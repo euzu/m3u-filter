@@ -1,18 +1,19 @@
 .playlist-filter {
   display: flex;
   flex-flow: row nowrap;
-  padding: 10px;
+  padding: 10px 0 10px 0;
+  max-height: 2.5rem;
+  font-size: 0.5rem;
 
   &__option-active {
     box-sizing: border-box !important;
-    transform: scale(0.8);
+    transform: scale(0.9);
     background-color: var(--option-active-background-color) !important;
     color: var(--option-active-color) !important;
     svg {
       color: var(--option-active-color) !important;
     }
   }
-
 
   &__error-message {
     display: flex;
