@@ -31,8 +31,8 @@ export default function TargetUpdateView(props: TargetUpdateViewProps) {
 
     const handleUpdate = useCallback((evt: any) => {
         services.playlist().update(selected.current).subscribe({
-            next: () => enqueueSnackbar(translate('MESSAGE.PLAYLIST_UPDATE.SUCCESS'), {variant: 'success'}),
-            error: (err) => enqueueSnackbar(translate('MESSAGE.PLAYLIST_UPDATE.FAILED') + err, {variant: 'error'}),
+            next: () => enqueueSnackbar(translate('MESSAGES.PLAYLIST_UPDATE.SUCCESS'), {variant: 'success'}),
+            error: (err) => enqueueSnackbar(translate('MESSAGES.PLAYLIST_UPDATE.FAILED') + err, {variant: 'error'}),
         });
     }, [services, enqueueSnackbar, translate]);
 

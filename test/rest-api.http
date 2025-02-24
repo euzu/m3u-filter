@@ -68,3 +68,7 @@ GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=
 
 ### get stream
 {{local}}/m3u-stream/live/{{username}}/{{password}}/667
+
+
+### epg
+{{local}}/xmltv.php?username={{username}}&password={{password}}

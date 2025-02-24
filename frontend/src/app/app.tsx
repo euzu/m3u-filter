@@ -33,6 +33,7 @@ export default function App(props: AppProps) {
     const [progress, setProgress] = useState<boolean>(false);
     const [playlist, setPlaylist] = useState<PlaylistGroup[]>([]);
     const [serverConfig, setServerConfig] = useState<ServerConfig>(undefined);
+    const serverConfigLoaded = useRef(false);
     const [preferencesVisible, setPreferencesVisible] = useState<boolean>(true);
     const clipboardChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
     const viewerRef = useRef<IPlaylistViewer>(undefined);
@@ -132,15 +133,18 @@ export default function App(props: AppProps) {
     }, [serverConfig]);
 
     useEffect(() => {
-        services.config().getServerConfig().pipe(first()).subscribe({
-            next: (cfg: ServerConfig) => {
-                setServerConfig(cfg);
-            },
-            error: (err) => {
-                enqueueSnackbar(translate( "MESSAGES.DOWNLOAD.SERVER_CONFIG.FAIL"), {variant: 'error'});
-            },
-            complete: noop,
-        });
+        if (!serverConfigLoaded.current) {
+            serverConfigLoaded.current = true;
+            services.config().getServerConfig().pipe(first()).subscribe({
+                next: (cfg: ServerConfig) => {
+                    setServerConfig(cfg);
+                },
+                error: (err) => {
+                    enqueueSnackbar(translate("MESSAGES.DOWNLOAD.SERVER_CONFIG.FAIL"), {variant: 'error'});
+                },
+                complete: noop,
+            });
+        }
         return noop
     }, [enqueueSnackbar, services, translate]);
 
