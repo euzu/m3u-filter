@@ -118,9 +118,9 @@ impl Display for M3uFilterError {
 impl Error for M3uFilterError {}
 
 pub fn to_io_error<E>(err: E) -> std::io::Error
-where E: std::error::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, err.to_string())
-}
+where
+    E: std::error::Error,
+{ std::io::Error::new(std::io::ErrorKind::Other, err.to_string()) }
 
 pub fn str_to_io_error(err: &str) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::Other, err.to_string())

@@ -3,7 +3,6 @@ use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::path::Path;
-
 use crate::m3u_filter_error::{str_to_io_error, to_io_error};
 use crate::utils::file::file_utils::{file_reader, file_writer, open_read_write_file, rename_or_copy};
 use log::error;
@@ -11,6 +10,7 @@ use ruzstd::decoding::StreamingDecoder;
 use ruzstd::encoding::{compress_to_vec, CompressionLevel};
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
+use crate::utils::bincode_utils::{bincode_deserialize, bincode_serialize};
 
 const BLOCK_SIZE: usize = 4096;
 const BINCODE_OVERHEAD: usize = 8;
@@ -37,22 +37,6 @@ fn is_file_valid(file: File) -> io::Result<File> {
 #[inline]
 fn u32_from_bytes(bytes: &[u8]) -> io::Result<u32> {
     Ok(u32::from_le_bytes(bytes.try_into().map_err(to_io_error)?))
-}
-
-#[inline]
-fn bincode_serialize<T>(value: &T) -> io::Result<Vec<u8>>
-where
-    T: ?Sized + serde::Serialize,
-{
-    bincode::serialize(value).map_err(to_io_error)
-}
-
-#[inline]
-fn bincode_deserialize<T>(value: &[u8]) -> io::Result<T>
-where
-    T: for<'a> serde::Deserialize<'a>,
-{
-    bincode::deserialize(value).map_err(to_io_error)
 }
 
 

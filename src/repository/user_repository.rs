@@ -1,15 +1,85 @@
-use std::collections::HashSet;
+use crate::model::api_proxy::{ProxyUserCredentials, TargetUser};
 use crate::model::config::Config;
+use crate::model::playlist::XtreamCluster;
 use crate::model::playlist_categories::{PlaylistCategoriesDto, PlaylistCategoryDto};
+use crate::repository::bplustree::BPlusTree;
 use crate::utils::file::file_utils;
 use crate::utils::json_utils::json_write_documents_to_file;
 use log::error;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use crate::model::playlist::XtreamCluster;
 
 const USER_LIVE_BOUQUET: &str = "live_bouquet.json";
 const USER_VOD_BOUQUET: &str = "vod_bouquet.json";
 const USER_SERIES_BOUQUET: &str = "series_bouquet.json";
+
+
+// This is a Helper class to store all user into one Database file.
+// For the Config files we keep the old structure where a user is assigned to a target.
+// But for storing inside one db file it is easier to store the target next to the user.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct StoredProxyUserCredentials {
+    pub target: String,
+    pub user: ProxyUserCredentials,
+}
+
+pub fn get_api_user_db_path(cfg: &Config) -> PathBuf {
+    PathBuf::from(&cfg.t_config_path).join("api_user.db")
+}
+
+
+fn add_target_user_to_user_tree(target_users: &[TargetUser], user_tree: &mut BPlusTree<String, StoredProxyUserCredentials>) {
+    for target_user in target_users {
+        for user in &target_user.credentials {
+            let store_user = StoredProxyUserCredentials {
+                target: target_user.target.clone(),
+                user: user.clone(),
+            };
+            user_tree.insert(user.username.clone(), store_user);
+        }
+    }
+}
+
+pub fn merge_api_user(cfg: &Config, target_users: &[TargetUser]) -> Result<u64, std::io::Error> {
+    let path = get_api_user_db_path(&cfg);
+    let _lock = cfg.file_locks.read_lock(&path);
+    let mut user_tree: BPlusTree<String, StoredProxyUserCredentials> = BPlusTree::load(&path).unwrap_or_else(|_| BPlusTree::new());
+    drop(_lock);
+    add_target_user_to_user_tree(target_users, &mut user_tree);
+    let _lock = cfg.file_locks.write_lock(&path);
+    user_tree.store(&path)
+}
+
+pub fn store_api_user(cfg: &Config, target_users: &[TargetUser]) -> Result<u64, std::io::Error> {
+    let mut user_tree = BPlusTree::<String, StoredProxyUserCredentials>::new();
+    add_target_user_to_user_tree(target_users, &mut user_tree);
+    let path = get_api_user_db_path(&cfg);
+    let _lock = cfg.file_locks.write_lock(&path);
+    user_tree.store(&path)
+}
+
+pub fn load_api_user(cfg: &Config) -> Result<Vec<TargetUser>, std::io::Error> {
+    let path = get_api_user_db_path(&cfg);
+    let _lock = cfg.file_locks.read_lock(&path);
+    let user_tree = BPlusTree::<String, StoredProxyUserCredentials>::load(&path)?;
+    drop(_lock);
+    let mut target_users: HashMap<String, TargetUser> = HashMap::new();
+    for (_uname, user_wrapper) in user_tree.iter() {
+        match target_users.entry(user_wrapper.target.clone()) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                let target = entry.get_mut();
+                target.credentials.push(user_wrapper.user.clone());
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(TargetUser {
+                    target: user_wrapper.target.clone(),
+                    credentials: vec![user_wrapper.user.clone()],
+                });
+            }
+        }
+    }
+    Ok(target_users.into_values().collect())
+}
 
 pub fn get_user_storage_path(cfg: &Config, username: &str) -> Option<PathBuf> {
     cfg.user_config_dir.as_ref().and_then(|ucd| file_utils::get_file_path(ucd, Some(std::path::PathBuf::from(username))))
@@ -68,7 +138,7 @@ pub async fn load_user_bouquet_as_json(cfg: &Config, username: &str) -> Option<S
 pub(crate) async fn user_get_cluster_bouquet(cfg: &Config, username: &str, cluster: XtreamCluster) -> Option<Vec<PlaylistCategoryDto>> {
     if let Some(storage_path) = get_user_storage_path(cfg, username) {
         if storage_path.exists() {
-            let content = load_user_bouquet_from_file(& match cluster {
+            let content = load_user_bouquet_from_file(&match cluster {
                 XtreamCluster::Live => user_get_live_bouquet_path(&storage_path),
                 XtreamCluster::Video => user_get_vod_bouquet_path(&storage_path),
                 XtreamCluster::Series => user_get_series_bouquet_path(&storage_path),

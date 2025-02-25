@@ -10,6 +10,7 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use crate::m3u_filter_error::{str_to_io_error, to_io_error};
+use crate::utils::bincode_utils::{bincode_deserialize, bincode_serialize};
 use crate::utils::file::file_utils::{create_new_file_for_read_write, file_reader, file_writer, open_read_write_file, open_readonly_file, rename_or_copy};
 
 const BLOCK_SIZE: usize = 4096;
@@ -163,7 +164,7 @@ where
     where
         T: ?Sized + serde::Serialize,
     {
-        let encoded_bytes = bincode::serialize(doc).map_err(|_| Error::new(ErrorKind::InvalidData, "Failed to serialize document"))?;
+        let encoded_bytes = bincode_serialize(doc).map_err(|_| Error::new(ErrorKind::InvalidData, "Failed to serialize document"))?;
         let mut new_record_appended = false; // do i need to change the index and set the new offset
         if let Some(&offset) = self.index_tree.query(&doc_id) {
             self.main_file.seek(SeekFrom::Start(u64::from(offset)))?;
@@ -266,7 +267,7 @@ where
             let buf_size = IndexedDocument::read_content_size(&mut self.main_file)?;
             let mut buffer: Vec<u8> = vec![0; buf_size];
             self.main_file.read_exact(&mut buffer)?;
-            if let Ok(item) = bincode::deserialize::<T>(&buffer) {
+            if let Ok(item) = bincode_deserialize::<T>(&buffer) {
                 return Ok(item);
             }
         }
@@ -351,7 +352,7 @@ where
         // read content
         self.main_file.read_exact(&mut self.t_buffer[0..buf_size])?;
         // deserialize buffer
-        match bincode::deserialize::<T>(&self.t_buffer[0..buf_size]) {
+        match bincode_deserialize::<T>(&self.t_buffer[0..buf_size]) {
             Ok(value) => Ok(Some(value)),
             Err(err) => {
                 self.failed = true;
@@ -399,7 +400,7 @@ impl IndexedDocumentDirectAccess {
             let buf_size = IndexedDocument::read_content_size(&mut main_file)?;
             let mut buffer: Vec<u8> = vec![0; buf_size];
             main_file.read_exact(&mut buffer)?;
-            if let Ok(item) = bincode::deserialize::<T>(&buffer) {
+            if let Ok(item) = bincode_deserialize::<T>(&buffer) {
                 return Ok(item);
             }
         }

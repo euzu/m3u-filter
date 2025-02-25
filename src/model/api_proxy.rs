@@ -1,12 +1,15 @@
-use std::collections::HashSet;
-use std::fmt::Display;
-use std::str::FromStr;
-use chrono::{Local};
-use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
-use crate::utils::file::config_reader;
-use enum_iterator::Sequence;
-use log::debug;
 use crate::api::model::app_state::AppState;
+use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
+use crate::model::config::Config;
+use crate::repository::user_repository::{get_api_user_db_path, load_api_user, merge_api_user};
+use crate::utils::file::config_reader;
+use chrono::Local;
+use enum_iterator::Sequence;
+use log::{debug};
+use std::collections::{HashSet};
+use std::fmt::Display;
+use std::fs;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
 pub enum ProxyType {
@@ -282,30 +285,84 @@ impl ApiProxyServerInfo {
 pub struct ApiProxyConfig {
     pub server: Vec<ApiProxyServerInfo>,
     pub user: Vec<TargetUser>,
+    #[serde(default)]
+    pub use_user_db: bool,
+
 }
 
 impl ApiProxyConfig {
-    pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
-        let mut usernames = HashSet::new();
-        let mut tokens = HashSet::new();
-        let mut errors = Vec::new();
-        if self.server.is_empty() {
-            errors.push("No server info defined".to_string());
-        } else {
-            let mut name_set = HashSet::new();
-            for server in &self.server {
-                if server.name.trim().is_empty() {
-                    errors.push("Server info name is empty ".to_owned());
-                } else if name_set.contains(server.name.as_str()) {
-                    errors.push(format!(
-                        "Non unique server info name found {}",
-                        &server.name
-                    ));
+    // we have the option to store user in the config file or in the user_db
+    // When we switch from one to other we need to migrate the existing data.
+    fn migrate_api_user(&mut self, cfg: &Config, errors: &mut Vec<String>) {
+        if self.use_user_db {
+            // we have user defined in config file.
+            // we migrate them to the db and delete them from the config file
+            if !&self.user.is_empty() {
+                if let Err(err) = merge_api_user(cfg, &self.user) {
+                    errors.push(err.to_string());
                 } else {
-                    name_set.insert(server.name.clone());
+                    let api_proxy_file = cfg.t_api_proxy_file_path.as_str();
+                    let backup_dir = cfg.backup_dir.as_ref().unwrap().as_str();
+                    self.user = vec![];
+                    if let Err(err) = config_reader::save_api_proxy(api_proxy_file, backup_dir, &self) {
+                        errors.push(format!("Error saving api proxy file: {err}"));
+                    }
+                }
+            }
+            match load_api_user(cfg) {
+                Ok(users) => {
+                    self.user = users;
+                }
+                Err(err) => {
+                    println!("{err}");
+                    errors.push(err.to_string())
+                },
+            };
+        } else {
+            let user_db_path = get_api_user_db_path(cfg);
+            if user_db_path.exists() {
+                // we cant have user defined in db file.
+                // we need to load them and save them into the config file
+                if let Ok(stored_users) = load_api_user(cfg) {
+                    for stored_user in stored_users {
+                        if let Some(target_user) = self.user.iter_mut().find(|t| t.target == stored_user.target) {
+                            for stored_credential in stored_user.credentials.iter() {
+                                if target_user.credentials.iter().find(|&c| c.username == stored_credential.username).is_none() {
+                                    target_user.credentials.push(stored_credential.clone());
+                                };
+                            }
+                        } else {
+                            self.user.push(stored_user);
+                        }
+                    }
+                }
+                let api_proxy_file = cfg.t_api_proxy_file_path.as_str();
+                let backup_dir = cfg.backup_dir.as_ref().unwrap().as_str();
+                if let Err(err) = config_reader::save_api_proxy(api_proxy_file, backup_dir, &self) {
+                    errors.push(format!("Error saving api proxy file: {err}"));
+                } else {
+                    let _ = fs::remove_file(&user_db_path);
                 }
             }
         }
+    }
+
+    fn prepare_server_config(&mut self, errors: &mut Vec<String>) {
+        let mut name_set = HashSet::new();
+        for server in &self.server {
+            if server.name.trim().is_empty() {
+                errors.push("Server info name is empty ".to_owned());
+            } else if name_set.contains(server.name.as_str()) {
+                errors.push(format!("Non unique server info name found {}", &server.name));
+            } else {
+                name_set.insert(server.name.clone());
+            }
+        }
+    }
+
+    fn prepare_target_user(&mut self, resolve_var: bool, errors: &mut Vec<String>) {
+        let mut usernames = HashSet::new();
+        let mut tokens = HashSet::new();
         for target_user in &mut self.user {
             for user in &mut target_user.credentials {
                 user.prepare(resolve_var);
@@ -325,9 +382,7 @@ impl ApiProxyConfig {
                 }
 
                 if let Some(server_info_name) = &user.server {
-                    if !&self
-                        .server
-                        .iter()
+                    if !&self.server.iter()
                         .any(|server_info| server_info.name.eq(server_info_name))
                     {
                         errors.push(format!(
@@ -338,6 +393,17 @@ impl ApiProxyConfig {
                 }
             }
         }
+    }
+
+    pub fn prepare(&mut self, cfg: &Config, resolve_var: bool) -> Result<(), M3uFilterError> {
+        let mut errors = Vec::new();
+        if self.server.is_empty() {
+            errors.push("No server info defined".to_string());
+        } else {
+            self.prepare_server_config(&mut errors);
+        }
+        self.prepare_target_user(resolve_var, &mut errors);
+        self.migrate_api_user(cfg, &mut errors);
         if errors.is_empty() {
             Ok(())
         } else {

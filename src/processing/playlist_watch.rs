@@ -4,6 +4,7 @@ use log::{error, info};
 use crate::messaging::{MsgKind, send_message};
 use crate::model::config::Config;
 use crate::model::playlist::PlaylistGroup;
+use crate::utils::bincode_utils::{bincode_deserialize, bincode_serialize};
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::sanitize_filename;
 
@@ -76,13 +77,13 @@ fn handle_watch_notification(cfg: &Config, added: &BTreeSet<String>, removed: &B
 
 fn load_watch_tree(path: &Path) -> Option<BTreeSet<String>> {
     std::fs::read(path).map_or(None, |encoded| {
-            let decoded: BTreeSet<String> = bincode::deserialize(&encoded[..]).unwrap();
+            let decoded = bincode_deserialize(&encoded[..]).ok()?;
             Some(decoded)
         })
 }
 
 fn save_watch_tree(path: &Path, tree: &BTreeSet<String>) -> std::io::Result<()> {
-    let encoded: Vec<u8> = bincode::serialize(&tree).unwrap();
+    let encoded: Vec<u8> = bincode_serialize(&tree)?;
     std::fs::write(path, encoded)
 }
 

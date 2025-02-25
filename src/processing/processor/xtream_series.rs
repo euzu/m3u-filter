@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
 use crate::model::xtream::{XtreamSeriesEpisode, XtreamSeriesInfoEpisode};
+use crate::utils::bincode_utils::bincode_serialize;
 use crate::utils::file::file_utils::file_writer;
 
 const TAG_SERIES_INFO_LAST_MODIFIED: &str = "last_modified";
@@ -42,7 +43,7 @@ fn write_series_episode_record_to_wal_file(
     episode: &XtreamSeriesInfoEpisode,
 ) -> std::io::Result<()> {
     let series_episode = XtreamSeriesEpisode::from(episode);
-    if let Ok(content_bytes) = bincode::serialize(&series_episode) {
+    if let Ok(content_bytes) = bincode_serialize(&series_episode) {
         writer.write_all(&provider_id.to_le_bytes())?;
         let len = u32::try_from(content_bytes.len()).unwrap();
         writer.write_all(&len.to_le_bytes())?;

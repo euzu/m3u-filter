@@ -24,6 +24,7 @@ use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::file::file_utils::open_readonly_file;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
+use crate::utils::bincode_utils::{bincode_deserialize};
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -922,7 +923,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
             if reader.read_exact(&mut buffer[0..len]).is_err() {
                 break;
             }
-            match bincode::deserialize(&buffer[0..len]) {
+            match bincode_deserialize(&buffer[0..len]) {
                 Ok(episode) => {
                     tree_record_index.insert(provider_id, episode);
                 }

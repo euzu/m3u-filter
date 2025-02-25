@@ -7,6 +7,7 @@ pub mod hash_utils;
 pub mod compression;
 pub(crate) mod file;
 pub(crate) mod network;
+pub mod bincode_utils;
 
 #[macro_export]
 macro_rules! debug_if_enabled {

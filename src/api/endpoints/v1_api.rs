@@ -12,13 +12,14 @@ use crate::api::endpoints::user_api::user_api_register;
 use crate::api::model::app_state::AppState;
 use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::api::model::request::PlaylistRequest;
-use crate::auth::authenticator::{validator_admin};
+use crate::auth::authenticator::validator_admin;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
 use crate::processing::processor::playlist;
-use crate::utils::network::request::sanitize_sensitive_info;
+use crate::repository::user_repository::store_api_user;
 use crate::utils::file::config_reader;
+use crate::utils::network::request::sanitize_sensitive_info;
 use crate::utils::network::{m3u, xtream};
 
 fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
@@ -56,18 +57,25 @@ async fn save_config_api_proxy_user(
                 return HttpResponse::BadRequest().json(json!({"error": err.to_string()}));
             }
             if usernames.contains(&credential.username) {
-                return HttpResponse::BadRequest().json(json!({"error": format!("Duplicate usewrname {}", &credential.username)}));
+                return HttpResponse::BadRequest().json(json!({"error": format!("Duplicate username {}", &credential.username)}));
             }
             usernames.insert(&credential.username);
         }
     }
+
     if let Some(api_proxy) = app_state.config.t_api_proxy.write().as_mut() {
-        let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         api_proxy.user = users;
-        if let Some(err) = intern_save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
-            return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
-        }
         api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.prepare(true));
+        if api_proxy.use_user_db {
+            if let Err(err) = store_api_user(&app_state.config, &api_proxy.user) {
+                return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+            }
+        } else {
+            let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
+            if let Some(err) = intern_save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
+                return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+            }
+        }
     }
     HttpResponse::Ok().finish()
 }
@@ -227,7 +235,7 @@ async fn config(
         messaging: config.messaging.clone(),
         video: config.video.clone(),
         sources: config.sources.iter().map(map_source).collect(),
-        api_proxy: config_reader::read_api_proxy(app_state.config.t_api_proxy_file_path.as_str(), false),
+        api_proxy: config_reader::read_api_proxy(config, app_state.config.t_api_proxy_file_path.as_str(), false),
     };
 
     let mut result = match config_reader::read_config(app_state.config.t_config_path.as_str(),
@@ -261,7 +269,5 @@ pub fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfi
             .route("/playlist/update", web::post().to(playlist_update))
             .route("/file/download", web::post().to(download_api::queue_download_file))
             .route("/file/download/info", web::get().to(download_api::download_file_info)));
-
-
     }
 }
