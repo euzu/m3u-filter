@@ -8,7 +8,7 @@
 .user {
   & {
     min-height: 400px;
-
+    background-color: inherit;
     @include preferences.prefsRoot();
     @include preferences.prefsToolbar();
   }

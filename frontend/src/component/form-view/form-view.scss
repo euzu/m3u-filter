@@ -16,8 +16,8 @@
   }
 
   &__row {
-    @include common.container_horz_nowrap(flex-start);
-    padding:0;
+    flex-flow: row nowrap;
+    @include common.container_common(flex-start, 0);
   }
 
   &__col {
@@ -48,8 +48,10 @@
     }
 
     input {
-      //flex: 1 0 auto;
       @include preferences.prefsInput();
+      flex: 1 1 0;
+      min-width: 0;
+      width: 100%;
     }
   }
 }

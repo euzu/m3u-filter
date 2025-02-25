@@ -5,7 +5,7 @@ interface LoadingIndicatorProps {
     loading: boolean;
 }
 
-export default function InputField(props: LoadingIndicatorProps): ReactNode {
+export default function LoadingIndicator(props: LoadingIndicatorProps): ReactNode {
     if (!props.loading) {
         return <div className="loading-bar-placeholder"></div>;
     }

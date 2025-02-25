@@ -17,6 +17,7 @@ dialog {
   & {
     min-height: 400px;
     @include preferences.prefsToolbar();
+
   }
 
   &__content {

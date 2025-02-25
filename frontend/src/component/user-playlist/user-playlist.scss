@@ -39,10 +39,16 @@
       background-color: var(--background-color);
       align-items: center;
 
+      @media (max-width: common.$media-size-mobile) {
+        flex-wrap: wrap-reverse;
+        gap: 8px;
+      }
+
       &-filter {
-        flex-grow: 1;
+        display: flex;
+        flex: 1 1 auto;
+        background-color: inherit;
         .playlist-filter {
-            max-width: 400px;
           input {
               font-size: 1em;
           }

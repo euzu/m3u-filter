@@ -7,17 +7,22 @@
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   font-size: inherit;
-  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  width: auto;
   box-sizing: border-box;
+  background-color: inherit;
 
   &__content {
     display: flex;
     flex-flow: row nowrap;
-    flex: 1 1 auto;
+    flex: 1 1 0;
     overflow: hidden;
     border-radius: var(--border-radius);
     font-size: inherit;
     user-select: none;
+    box-sizing: border-box;
+    min-width: 0;
   }
 
   &:focus-within {
@@ -28,7 +33,7 @@
     position: absolute;
     color: var(--label-color);
     transform: translate(6px, -0.8rem);
-    background-color: var(--card-background-color);
+    background-color: inherit;
     border-radius: var(--border-radius);
     padding: 0 6px;
     font-size: 1.1rem !important;
@@ -37,17 +42,21 @@
   input {
     color: var(--text-color);
     border: none !important;
-    flex: 1 1 auto;
+    flex: 1 1 0;
     height: 100%;
+    width: 100%;
+    min-width: 0;
     font-size: 1.1rem !important;
     outline: none !important;
     padding: 0 4px 0 12px;
+    box-sizing: border-box;
   }
 
   button {
     @include common.iconButton();
     border: none !important;
     border-radius: 0 !important;
+    flex-shrink: 0;
     &:last-child {
       border-bottom-right-radius: var(--border-radius);
       border-top-right-radius: var(--border-radius);
