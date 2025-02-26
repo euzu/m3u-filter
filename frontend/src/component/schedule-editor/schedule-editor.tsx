@@ -66,9 +66,9 @@ export default function ScheduleEditor(props: ScheduleEditorProps) {
       <TagSelect options={targets} name={index + ''} defaultValues={schedule.targets || []} multi={true}
                  onSelect={handleTargetChange}></TagSelect>
       <div className={"schedule-editor__schedule-toolbar"}>
-      <button title={'Delete'} data-index={index} onClick={handleScheduleRemove}>{getIconByName('ScheduleRemove')}</button>
+      <button data-tooltip={'Delete'} data-index={index} onClick={handleScheduleRemove}>{getIconByName('ScheduleRemove')}</button>
         {index === lastIndex &&
-            <button title={'Add'} onClick={handleScheduleAdd}>{getIconByName('ScheduleAdd')}</button>}
+            <button data-tooltip={'Add'} onClick={handleScheduleAdd}>{getIconByName('ScheduleAdd')}</button>}
       </div>
     </div>
   }, [targets, handleScheduleChange, handleTargetChange, handleScheduleRemove, handleScheduleAdd, lastIndex]);
@@ -77,7 +77,7 @@ export default function ScheduleEditor(props: ScheduleEditorProps) {
       <div className="schedule-editor">
         {schedules?.map(renderSchedule)}
         {lastIndex < 0 &&
-          <button title={'Add'} onClick={handleScheduleAdd}>{getIconByName('ScheduleAdd')}</button>}
+          <button data-tooltip={'Add'} onClick={handleScheduleAdd}>{getIconByName('ScheduleAdd')}</button>}
       </div>
   );
 }

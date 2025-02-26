@@ -40,8 +40,8 @@ export default function ClipboardViewer(props: ClipboardViewerProps): JSX.Elemen
 
     return <div className={'clipboard-viewer'}>
         <div className={'clipboard-viewer-toolbar'}>
-            <button title="Clear All" className={'toolbar-btn'} onClick={handleClear}>{getIconByName('DeleteSweep')}</button>
-            <button title="Copy" className={'toolbar-btn'} onClick={handleCopyToClipboard}>{getIconByName('ContentCopy')}</button>
+            <button data-title="Clear All" className={'tooltip toolbar-btn'} onClick={handleClear}>{getIconByName('DeleteSweep')}</button>
+            <button data-title="Copy" className={'tooltip toolbar-btn'} onClick={handleCopyToClipboard}>{getIconByName('ContentCopy')}</button>
         </div>
         <div className={'clipboard-viewer-content'}>
             <ul>

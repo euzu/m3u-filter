@@ -7,6 +7,8 @@ import TagInput from "../tag-input/tag-input";
 import ScheduleEditor from "../schedule-editor/schedule-editor";
 import DatePicker from "../date-picker/date-picker";
 import {genUuid} from "../../utils/uuid";
+import {getIconByName} from "../../icons/icons";
+import useTranslator from "../../hook/use-translator";
 // export const isNumber = (value: string): boolean => {
 //     return !isNaN(value as any);
 // }
@@ -27,6 +29,7 @@ export enum FormFieldType {
 export type FormField = {
     name: string,
     label: string,
+    hint?: string,
     validator?: (value: any) => boolean,
     options?: { value: string, label: string }[],
     fieldType: FormFieldType
@@ -40,6 +43,7 @@ interface FormViewProps {
 export default function FormView(props: FormViewProps) {
     const {data, fields} = props;
     const uuid = useMemo(() => genUuid(), []);
+    const translate = useTranslator();
     const inputIds= useRef([]);
     const [formData, setFormData] = useState(data || {});
 
@@ -110,7 +114,8 @@ export default function FormView(props: FormViewProps) {
                 fields.map(field =>
                     <div key={'form-view_field_' + field.name} className={'form-view__row'}>
                         <div className={'form-view__col  form-view__col-label'}>
-                            <label>{field.label}</label>
+                            <label>{translate(field.label)}</label>
+                            {field.hint && <span className={'label-hint'} data-tooltip={translate(field.hint)}>{getIconByName('Help')}</span>}
                         </div>
                         <div className={'form-view__col form-view__col-value'}>
                             {getFieldInput(field)}

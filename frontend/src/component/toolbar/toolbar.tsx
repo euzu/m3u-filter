@@ -9,7 +9,7 @@ interface ToolbarProps {
 export default function Toolbar(props: ToolbarProps) {
     const translate = useTranslator();
     return <div className={'toolbar'}>
-        <button title={translate('LABEL.SAVE')} onClick={props.onDownload}>
+        <button data-tooltip='LABEL.SAVE' onClick={props.onDownload}>
             {translate('LABEL.SAVE')}
         </button>
     </div>

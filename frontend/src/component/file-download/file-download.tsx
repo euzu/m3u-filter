@@ -86,7 +86,7 @@ export default function FileDownload(props: FileDownloadProps) {
             return <div className={'file-download'}>
                 <div className={'download-info'}>
                     <div className={'download-info__toolbar'}>
-                        <button title={'Clear All'} onClick={handleClearAll}>{getIconByName('DeleteSweep')}</button>
+                        <button data-tooltip={'Clear All'} onClick={handleClearAll}>{getIconByName('DeleteSweep')}</button>
                     </div>
                     <div className={'download-info__content'}>
                         <ul>

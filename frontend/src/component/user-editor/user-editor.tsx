@@ -82,8 +82,8 @@ const UserEditor = forwardRef<IUserEditor, UserViewProps>((props: UserViewProps,
                 <FormView data={user} fields={formFields}></FormView>
             </div>
             <div className={'user-editor__toolbar'}>
-                <button title={translate('LABEL.CANCEL')} onClick={() => dialogRef.current?.close()}>{translate('LABEL.CANCEL')}</button>
-                <button title={translate('LABEL.OK')} onClick={handleSubmit}>{translate('LABEL.OK')}</button>
+                <button data-tooltip='LABEL.CANCEL' onClick={() => dialogRef.current?.close()}>{translate('LABEL.CANCEL')}</button>
+                <button data-tooltip='LABEL.OK' onClick={handleSubmit}>{translate('LABEL.OK')}</button>
             </div>
         </div>
     </dialog>;

@@ -4,6 +4,13 @@
 .form-view {
   @include common.container_vert_no_padding();
 
+  .label-hint {
+    svg {
+      fill: var(--text-color);
+      height: 0.7em;
+    }
+  }
+
   &__map-editor {
     @include common.container_horz_nowrap();
     flex: 1 1 auto;
@@ -26,9 +33,10 @@
     padding: 6px;
 
     &-label {
+      display: flex;
       width: 7em;
       justify-content: flex-end;
-      align-items: flex-start;
+      align-items: center;
     }
 
     &-value {

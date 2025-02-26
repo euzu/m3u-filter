@@ -88,7 +88,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
     }, []);
 
     const renderCat = useCallback((cat:PlaylistCategory) => {
-        return <div className={'user-playlist__categories__category'} key={cat.id} title={cat.name}>
+        return <div className={'user-playlist__categories__category'} key={cat.id} data-tooltip={cat.name}>
             <Checkbox label={cat.name}
                       value={cat.id}
                       checked={selections[cat.id]}
@@ -153,7 +153,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
         <div className="user-playlist">
             <div className="user-playlist__toolbar">
                 <label>{translate('TITLE.USER_BOUQUET_EDITOR')}</label>
-                <button title={translate('LABEL.SAVE')} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
+                <button data-tooltip='LABEL.SAVE' onClick={handleSave}>{translate('LABEL.SAVE')}</button>
             </div>
             <TabSet tabs={tabs} active={activeTab} onTabChange={setActiveTab}></TabSet>
             {CATEGORY_TABS.map(tab => <div key={tab.key} className={'user-playlist__categories-panel' + (activeTab !== tab.key ? ' hidden' : '')}>
@@ -161,9 +161,9 @@ export default function UserPlaylist(props: UserPlaylistProps) {
                     <div className={'user-playlist__categories__toolbar-filter'}>
                         <PlaylistFilter onFilter={handleFilter}></PlaylistFilter>
                      </div>
-                    <button title={translate('LABEL.SHOW_SELECTED')} onClick={handleShowSelected} className={showSelected ? 'button-active': ''}>{getIconByName('Checked')}</button>
-                    <button title={translate('LABEL.SELECT_ALL')} onClick={handleSelectAll}>{getIconByName('SelectAll')}</button>
-                    <button title={translate('LABEL.DESELECT_ALL')} onClick={handleDeselectAll}>{getIconByName('DeselectAll')}</button>
+                    <button className={showSelected ? 'button-active': ''} data-tooltip='LABEL.SHOW_SELECTED' onClick={handleShowSelected}>{getIconByName('Checked')}</button>
+                    <button data-tooltip='LABEL.SELECT_ALL' onClick={handleSelectAll}>{getIconByName('SelectAll')}</button>
+                    <button data-tooltip='LABEL.DESELECT_ALL' onClick={handleDeselectAll}>{getIconByName('DeselectAll')}</button>
                 </div>
                 <div className={'user-playlist__categories'}>
                     {getActiveCategories(tab.key)?.map(renderCat)}

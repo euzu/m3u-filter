@@ -28,7 +28,8 @@ export default function i18n_init(languages: string[]): Observable<boolean> {
                     }, {});
                     i18next.init({
                         interpolation: {escapeValue: false},  // React already does escaping
-                        lng: 'en',                            // language to use
+                        lng: savedLanguage,                            // language to use
+                        fallbackLng: {default: ['en']},
                         resources,
                     }).then(() => observer.next(true))
                         .catch(failed);

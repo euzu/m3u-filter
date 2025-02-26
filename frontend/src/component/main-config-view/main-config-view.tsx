@@ -50,11 +50,11 @@ const CONFIG_SCHEDULES_FIELDS = [
 
 const CONFIG_LOG_FIELDS = [
     {name: 'sanitize_sensitive_info', label: 'LABEL.SANITIZE_SENSITIVE_INFO', fieldType: FormFieldType.CHECK},
-    {name: 'active_clients', label: 'LABEL.ACTIVE_CLIENTS', fieldType: FormFieldType.CHECK},
+    {name: 'active_clients', label: 'LABEL.ACTIVE_CLIENTS', hint: 'HINT.CONFIG.LOG.ACTIVE_CLIENTS', fieldType: FormFieldType.CHECK},
 ]
 
 const CONFIG_REVERSE_PROXY_FIELDS = [
-    {name: 'resource_rewrite_disabled', label: 'LABEL.RESOURCE_REWRITE_DISABLE', fieldType: FormFieldType.CHECK},
+    {name: 'resource_rewrite_disabled', label: 'LABEL.RESOURCE_REWRITE_DISABLE', hint: 'HINT.CONFIG.PROXY.RESOURCE_REWRITE_DISABLE', fieldType: FormFieldType.CHECK},
 ];
 
 const CONFIG_REVERSE_PROXY_STREAM_FIELDS = [
@@ -115,10 +115,12 @@ const TABS = [
     {label: 'LABEL.VIDEO', key: 'video'}
 ];
 
-const translateLabels = (config: any, translateFunc: any) => config.map((c: any) => ({
-    ...c,
-    label: translateFunc(c.label)
-}));
+// const translateLabels = (config: any, translateFunc: any) => config.map((c: any) => ({
+//     ...c,
+//     label: translateFunc(c.label)
+// }));
+
+const translateLabels = (config: any, translateFunc: any) => config;
 
 interface MainConfigViewProps {
     config: ServerConfig;
@@ -236,7 +238,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
 
     return <div className={'main-config'}>
         <div className={'main-config__toolbar'}><label>{translate('LABEL.CONFIG')}</label>
-            <button title={translate('LABEL.SAVE')} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
+            <button data-tooltip='LABEL.SAVE' onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
         <TabSet tabs={configs.tabs} active={activeTab} onTabChange={handleTabChange}></TabSet>
         <div className={'main-config__content'}>

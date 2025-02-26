@@ -11,12 +11,14 @@ import i18n_init from "./utils/i18n";
 
 import {catchError, map, switchMap} from 'rxjs/operators';
 import {EMPTY} from 'rxjs';
+import Tooltip from "./component/tooltip/tooltip";
 
 const initUI = () => {
     const container = document.getElementById('root');
     const root = createRoot(container);
     root.render(
         <SnackbarProvider maxSnack={3} autoHideDuration={1500} anchorOrigin={({vertical: 'top', horizontal: 'center'})}>
+            <Tooltip></Tooltip>
             <ServiceProvider>
                 <Authentication/>
             </ServiceProvider>

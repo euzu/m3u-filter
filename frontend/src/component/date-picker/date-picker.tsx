@@ -2,7 +2,6 @@ import React, {useCallback, useEffect} from "react";
 import "./date-picker.scss";
 import ReactDatePicker from "react-datepicker";
 import {getIconByName} from "../../icons/icons";
-import useTranslator from "../../hook/use-translator";
 
 
 interface DatePickerProps {
@@ -13,7 +12,6 @@ interface DatePickerProps {
 
 export default function DatePicker(props: DatePickerProps) {
     const {name, value, onChange} = props;
-    const translate= useTranslator();
     const [selected, setSelected] = React.useState<any>(value);
     const datePickerRef = React.useRef<ReactDatePicker>(null);
 
@@ -60,8 +58,8 @@ export default function DatePicker(props: DatePickerProps) {
                 </ReactDatePicker>
             </div>
             <div className={'date-picker-container__toolbar'}>
-                <button title={translate('LABEL.INFINITE')} onClick={handleInfiniteDate}>{getIconByName('Unlimited')}</button>
-                <button title={translate('LABEL.ONE_YEAR')} onClick={handleNowDate}>{getIconByName('Today')}</button>
+                <button data-tooltip='LABEL.INFINITE' onClick={handleInfiniteDate}>{getIconByName('Unlimited')}</button>
+                <button data-tooltip='LABEL.ONE_YEAR' onClick={handleNowDate}>{getIconByName('Today')}</button>
             </div>
         </div>
     );

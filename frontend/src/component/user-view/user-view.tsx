@@ -336,7 +336,7 @@ export default function UserView(props: UserViewProps) {
 
         <div className={'user__toolbar'}><label>{translate('LABEL.USER')}</label>
             <PlaylistFilter onFilter={handleFilter} options={filteredUser[activeTarget]}></PlaylistFilter>
-            <button title={translate('LABEL.SAVE')} onClick={handleSave}>{translate('LABEL.SAVE')}</button>
+            <button data-tooltip='LABEL.SAVE' onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
         <TabSet tabs={tabs} active={activeTarget} onTabChange={setActiveTarget}></TabSet>
         <div className={'user__content'}>
@@ -347,7 +347,7 @@ export default function UserView(props: UserViewProps) {
                         <div className={'user__target-target'}>
                             <label className={(target as any).src ? '' : 'target-not-exists'}>{target.target}</label>
                             <div className={'user__target-target-toolbar'}>
-                                <button title={'New User'} data-target={target.target}
+                                <button data-tooltip={'New User'} data-target={target.target}
                                         onClick={handleUserAdd}>{getIconByName('PersonAdd')}</button>
                             </div>
                         </div>

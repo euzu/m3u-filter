@@ -37,7 +37,8 @@ export default function TargetUpdateView(props: TargetUpdateViewProps) {
     }, [services, enqueueSnackbar, translate]);
 
     return <div className={'target-update'}>
-        <div className={'target-update__toolbar'}><label>{translate('LABEL.UPDATE')}</label><button title={'Update'} onClick={handleUpdate}>{translate('LABEL.START')}</button></div>
+        <div className={'target-update__toolbar'}><label>{translate('LABEL.UPDATE')}</label>
+            <button data-tooltip={'Update'} onClick={handleUpdate}>{translate('LABEL.START')}</button></div>
         <div className={'target-update__content'}>
             <ul>
                 {targets.map(t => <li key={t}><Checkbox label={t} value={t} checked={false} onSelect={handleSelect}></Checkbox></li>)}

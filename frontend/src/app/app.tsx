@@ -166,8 +166,8 @@ export default function App(props: AppProps) {
             <div className={'app-header'}>
                 <div className={'app-header__caption'}><span className={'app-header__logo'}>{appLogo}</span>{appTitle}</div>
                 <div className={'app-header__toolbar'}><select onChange={handleLanguage} defaultValue={i18next.language}>{services.config().getUiConfig().languages.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
-                <div className={'app-header__toolbar'}><button title={translate('LABEL.CONFIGURATION')} onClick={handlePreferences}>{getIconByName('Config')}</button></div>
-                <div className={'app-header__toolbar'}><button title={translate('LABEL.LOGOUT')} onClick={handleLogout}>{getIconByName('Logout')}</button></div>
+                <div className={'app-header__toolbar'}><button data-tooltip='LABEL.CONFIGURATION' onClick={handlePreferences}>{getIconByName('Config')}</button></div>
+                <div className={'app-header__toolbar'}><button data-tooltip='LABEL.LOGOUT' onClick={handleLogout}>{getIconByName('Logout')}</button></div>
             </div>
             <div className={'app-main' + (preferencesVisible ? '' : '  hidden')}>
                 <div className={'app-content'}>

@@ -2,6 +2,7 @@ import React, {useCallback, useMemo} from "react";
 
 import './tab-set.scss';
 import {genUuid} from "../../utils/uuid";
+import useTranslator from "../../hook/use-translator";
 
 export interface TabSetTab {
     label: string;
@@ -17,6 +18,7 @@ interface TabSetProps {
 export default function TabSet(props: TabSetProps) {
     const {tabs, active, onTabChange} = props;
     const uuid = useMemo(() => genUuid(), []);
+    const translate = useTranslator();
 
     const handleTabClick = useCallback((evt: any) => {
         const key = evt.target.dataset.key;
@@ -55,7 +57,7 @@ export default function TabSet(props: TabSetProps) {
             <li tabIndex={0} className={'tab-set__tab' + (tab.key === active ? ' tab-set__tab-active' : '')}
                 key={'tab_' + tab.key} data-key={tab.key} id={uuid + '-tab-' + idx}
                 onKeyUp={handleTabPress}
-                onClick={handleTabClick}>{tab.label}</li>)}
+                onClick={handleTabClick}>{translate(tab.label)}</li>)}
     </ul>
 
 }

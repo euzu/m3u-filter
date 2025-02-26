@@ -64,10 +64,10 @@ export default function PlaylistFilter(props: PlaylistFilterProps) {
     return <div className={'playlist-filter'}>
         <InputField label={translate('LABEL.SEARCH')}>
             <input type="text" ref={textField} onKeyUp={handleKeyPress}/>
-            <button title={translate('LABEL.REGEXP')} className={useRegexp ? 'playlist-filter__option-active' : ''}
+            <button className={useRegexp ? 'playlist-filter__option-active' : ''} data-tooltip='LABEL.REGEXP'
                     onClick={handleRegexp}>{getIconByName('Regexp')}</button>
-            <button title={translate('LABEL.CLEAR')} onClick={handleClear}>{getIconByName('ClearSearch')}</button>
-            <button title={translate('LABEL.SEARCH')} onClick={handleSearch}>{getIconByName('Search')}</button>
+            <button data-tooltip='LABEL.CLEAR' onClick={handleClear}>{getIconByName('ClearSearch')}</button>
+            <button data-tooltip='LABEL.SEARCH' onClick={handleSearch}>{getIconByName('Search')}</button>
         </InputField>
         {errorMsg && <div className="playlist-filter__error-message">{errorMsg}</div>}
     </div>
