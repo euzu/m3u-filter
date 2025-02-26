@@ -1,79 +1,137 @@
-use crate::model::api_proxy::{ProxyUserCredentials, TargetUser};
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, ProxyUserStatus, TargetUser};
 use crate::model::config::Config;
 use crate::model::playlist::XtreamCluster;
 use crate::model::playlist_categories::{PlaylistCategoriesDto, PlaylistCategoryDto};
 use crate::repository::bplustree::BPlusTree;
 use crate::utils::file::file_utils;
 use crate::utils::json_utils::json_write_documents_to_file;
-use log::error;
+use log::{error};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use chrono::Local;
 
 const USER_LIVE_BOUQUET: &str = "live_bouquet.json";
 const USER_VOD_BOUQUET: &str = "vod_bouquet.json";
 const USER_SERIES_BOUQUET: &str = "series_bouquet.json";
-
+const API_USER_DB_FILE: &str = "api_user.db";
 
 // This is a Helper class to store all user into one Database file.
 // For the Config files we keep the old structure where a user is assigned to a target.
 // But for storing inside one db file it is easier to store the target next to the user.
+// due to known issue with  bincode and skip_serialization_if we have to list all fields and cant use ProxyUserCredentials
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct StoredProxyUserCredentials {
     pub target: String,
-    pub user: ProxyUserCredentials,
+    pub username: String,
+    pub password: String,
+    pub token: Option<String>,
+    pub proxy: ProxyType,
+    pub server: Option<String>,
+    pub epg_timeshift: Option<String>,
+    pub created_at: Option<i64>,
+    pub exp_date: Option<i64>,
+    pub max_connections: Option<u32>,
+    pub status: Option<ProxyUserStatus>,
 }
 
+impl StoredProxyUserCredentials {
+    fn from(proxy: &ProxyUserCredentials, target_name: &str) -> Self {
+        Self {
+            target: String::from(target_name),
+            username: proxy.username.clone(),
+            password: proxy.password.clone(),
+            token: proxy.token.clone(),
+            proxy: proxy.proxy.clone(),
+            server: proxy.server.clone(),
+            epg_timeshift: proxy.epg_timeshift.clone(),
+            created_at: proxy.created_at,
+            exp_date: proxy.exp_date,
+            max_connections: proxy.max_connections,
+            status: proxy.status.clone(),
+        }
+    }
+
+    fn to(stored: &StoredProxyUserCredentials) -> ProxyUserCredentials {
+        ProxyUserCredentials {
+            username: stored.username.clone(),
+            password: stored.password.clone(),
+            token: stored.token.clone(),
+            proxy: stored.proxy.clone(),
+            server: stored.server.clone(),
+            epg_timeshift: stored.epg_timeshift.clone(),
+            created_at: stored.created_at,
+            exp_date: stored.exp_date,
+            max_connections: stored.max_connections,
+            status: stored.status.clone(),
+        }
+    }
+}
+
+
 pub fn get_api_user_db_path(cfg: &Config) -> PathBuf {
-    PathBuf::from(&cfg.t_config_path).join("api_user.db")
+    PathBuf::from(&cfg.t_config_path).join(API_USER_DB_FILE)
 }
 
 
 fn add_target_user_to_user_tree(target_users: &[TargetUser], user_tree: &mut BPlusTree<String, StoredProxyUserCredentials>) {
     for target_user in target_users {
         for user in &target_user.credentials {
-            let store_user = StoredProxyUserCredentials {
-                target: target_user.target.clone(),
-                user: user.clone(),
-            };
+            let store_user: StoredProxyUserCredentials = StoredProxyUserCredentials::from(user, &target_user.target);
             user_tree.insert(user.username.clone(), store_user);
         }
     }
 }
 
 pub fn merge_api_user(cfg: &Config, target_users: &[TargetUser]) -> Result<u64, std::io::Error> {
-    let path = get_api_user_db_path(&cfg);
-    let _lock = cfg.file_locks.read_lock(&path);
+    let path = get_api_user_db_path(cfg);
+    let lock = cfg.file_locks.read_lock(&path);
     let mut user_tree: BPlusTree<String, StoredProxyUserCredentials> = BPlusTree::load(&path).unwrap_or_else(|_| BPlusTree::new());
-    drop(_lock);
+    drop(lock);
     add_target_user_to_user_tree(target_users, &mut user_tree);
     let _lock = cfg.file_locks.write_lock(&path);
     user_tree.store(&path)
+}
+
+/// # Panics
+///
+/// Will panic if `backup_dir` is not given
+pub fn backup_api_user_db_file(cfg: &Config, path: &Path) {
+    let backup_dir = cfg.backup_dir.as_ref().unwrap().as_str();
+    let backup_path = PathBuf::from(backup_dir).join(format!("{API_USER_DB_FILE}_{}", Local::now().format("%Y%m%d_%H%M%S")));
+    let _lock = cfg.file_locks.read_lock(path);
+    match std::fs::copy(path, &backup_path) {
+        Ok(_) => {}
+        Err(err) => { error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err) }
+    }
 }
 
 pub fn store_api_user(cfg: &Config, target_users: &[TargetUser]) -> Result<u64, std::io::Error> {
     let mut user_tree = BPlusTree::<String, StoredProxyUserCredentials>::new();
     add_target_user_to_user_tree(target_users, &mut user_tree);
-    let path = get_api_user_db_path(&cfg);
+    let path = get_api_user_db_path(cfg);
+    backup_api_user_db_file(cfg, &path);
     let _lock = cfg.file_locks.write_lock(&path);
     user_tree.store(&path)
 }
 
 pub fn load_api_user(cfg: &Config) -> Result<Vec<TargetUser>, std::io::Error> {
-    let path = get_api_user_db_path(&cfg);
-    let _lock = cfg.file_locks.read_lock(&path);
+    let path = get_api_user_db_path(cfg);
+    let lock = cfg.file_locks.read_lock(&path);
     let user_tree = BPlusTree::<String, StoredProxyUserCredentials>::load(&path)?;
-    drop(_lock);
+    drop(lock);
     let mut target_users: HashMap<String, TargetUser> = HashMap::new();
-    for (_uname, user_wrapper) in user_tree.iter() {
-        match target_users.entry(user_wrapper.target.clone()) {
+    for (_uname, stored_user) in &user_tree {
+        let proxy_user: ProxyUserCredentials = StoredProxyUserCredentials::to(stored_user);
+        let target_name = stored_user.target.clone();
+        match target_users.entry(target_name) {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 let target = entry.get_mut();
-                target.credentials.push(user_wrapper.user.clone());
+                target.credentials.push(proxy_user);
             }
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(TargetUser {
-                    target: user_wrapper.target.clone(),
-                    credentials: vec![user_wrapper.user.clone()],
+                    target: stored_user.target.clone(),
+                    credentials: vec![proxy_user],
                 });
             }
         }
@@ -188,5 +246,82 @@ pub async fn user_get_bouquet_filter(config: &Config, username: &str, category_i
         None
     } else {
         Some(filter)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::env::temp_dir;
+    use crate::model::api_proxy::{ProxyType, ProxyUserStatus};
+    use super::*;
+
+
+    #[test]
+    pub fn save_target_user() {
+        let user =
+        TargetUser {
+            target: "test".to_string(),
+            credentials: vec![
+                ProxyUserCredentials {
+                    username: "Test".to_string(),
+                    password: "Test".to_string(),
+                    token: Some("Test".to_string()),
+                    proxy: ProxyType::Reverse,
+                    server: Some("default".to_string()),
+                    epg_timeshift: None,
+                    created_at: None,
+                    exp_date: Some(1672705545),
+                    max_connections: Some(1),
+                    status: Some(ProxyUserStatus::Active),
+                },
+                ProxyUserCredentials {
+                    username: "Test2".to_string(),
+                    password: "Test".to_string(),
+                    token: Some("Test".to_string()),
+                    proxy: ProxyType::Reverse,
+                    server: Some("default".to_string()),
+                    epg_timeshift: None,
+                    created_at: None,
+                    exp_date: Some(1672705545),
+                    max_connections: Some(1),
+                    status: Some(ProxyUserStatus::Expired),
+                },
+                ProxyUserCredentials {
+                    username: "Test3".to_string(),
+                    password: "Test".to_string(),
+                    token: Some("Test".to_string()),
+                    proxy: ProxyType::Reverse,
+                    server: Some("default".to_string()),
+                    epg_timeshift: None,
+                    created_at: None,
+                    exp_date: Some(1672705545),
+                    max_connections: Some(1),
+                    status: Some(ProxyUserStatus::Expired),
+                },
+                ProxyUserCredentials {
+                    username: "Test4".to_string(),
+                    password: "Test".to_string(),
+                    token: Some("Test".to_string()),
+                    proxy: ProxyType::Reverse,
+                    server: Some("default".to_string()),
+                    epg_timeshift: None,
+                    created_at: None,
+                    exp_date: Some(1672705545),
+                    max_connections: Some(1),
+                    status: Some(ProxyUserStatus::Expired),
+                }
+            ]
+        };
+
+        let mut cfg = Config::default();
+        let target_user = vec![user];
+        cfg.t_config_path = temp_dir().to_string_lossy().to_string();
+        let _ = store_api_user(&cfg, &target_user);
+
+        let user_list = load_api_user(&cfg);
+        assert!(user_list.is_ok());
+        assert_eq!(user_list.as_ref().unwrap().len(), 1);
+        assert_eq!(user_list.as_ref().unwrap().get(0).unwrap().credentials.len(), 4);
     }
 }

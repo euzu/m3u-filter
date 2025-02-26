@@ -117,7 +117,7 @@ fn write_config_file<T>(file_path: &str, backup_dir: &str, config: &T, default_n
         T: ?Sized + Serialize {
     let path = PathBuf::from(file_path);
     let filename = path.file_name().map_or(default_name.to_string(), |f| f.to_string_lossy().to_string());
-    let backup_path = PathBuf::from(backup_dir).join(format!("{}_{}", filename, Local::now().format("%Y%m%d_%H%M%S")));
+    let backup_path = PathBuf::from(backup_dir).join(format!("{filename}_{}", Local::now().format("%Y%m%d_%H%M%S")));
 
 
     match std::fs::copy(&path, &backup_path) {

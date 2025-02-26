@@ -12,15 +12,43 @@ import PlaylistFilter from "../playlist-filter/playlist-filter";
 import UserEditor from "../user-editor/user-editor";
 import TextGenerator from "../../utils/text-generator";
 
+const renderExpDate = (value: any, hidden?: boolean) => {
+    if (!value) {
+        return getIconByName('Unlimited');
+    }
+    return DateUtils.formatDate(value)
+};
+
+const renderMaxCon = (value: any, hidden?: boolean) => {
+    if (!value) {
+        return getIconByName('Unlimited');
+    }
+    return value;
+};
+
+const renderStatus = (value: any, hidden?: boolean) => {
+    if (value) {
+        return <span className={'status-' + value.toLowerCase()}>{value}</span>
+    }
+    return value;
+};
+
+const renderProxyType = (value: any, hidden?: boolean) => {
+    if (value) {
+        return <span className={'proxy-type-' + value.toLowerCase()}>{value}</span>
+    }
+    return value;
+};
+
 const COLUMNS = [
     {field: 'username', label: 'LABEL.USERNAME'},
     {field: 'password', label: 'LABEL.PASSWORD', hidden: true},
     {field: 'token', label: 'LABEL.TOKEN', hidden: true},
     {field: 'server', label: 'LABEL.SERVER'},
-    {field: 'proxy', label: 'LABEL.PROXY'},
-    {field: 'max_connections', label: 'LABEL.MAX_CON'},
-    {field: 'status', label: 'LABEL.STATUS'},
-    {field: 'exp_date', label: 'LABEL.EXP_DATE', render: (value: any, hidden?: boolean) => DateUtils.formatDate(value)},
+    {field: 'proxy', label: 'LABEL.PROXY', render: renderProxyType},
+    {field: 'max_connections', label: 'LABEL.MAX_CON', render: renderMaxCon},
+    {field: 'status', label: 'LABEL.STATUS', render: renderStatus},
+    {field: 'exp_date', label: 'LABEL.EXP_DATE', render: renderExpDate},
 ]
 
 COLUMNS.forEach(col => {
@@ -33,7 +61,10 @@ const prepareCredentials = (targetUser: TargetUser[]) => {
     targetUser.forEach((user) => {
         user.credentials.forEach((credential) => {
             if (credential.exp_date) {
-                credential.exp_date = new Date(credential.exp_date * 1000) as any;
+                credential.exp_date = DateUtils.unixSecondsToDate(credential.exp_date);
+            }
+            if (credential.created_at) {
+                credential.created_at = DateUtils.unixSecondsToDate(credential.created_at);
             }
         })
     });
@@ -41,13 +72,12 @@ const prepareCredentials = (targetUser: TargetUser[]) => {
 
 const prepareTargetUserForSave = (targetUser: TargetUser[]): TargetUser[] => {
     return targetUser.map((user) => {
-        let newUser = {...user, credentials: user.credentials.map(c => ({...c}))};
-        newUser.credentials.forEach((credential) => {
-            if (credential.exp_date) {
-                credential.exp_date = Math.floor((credential.exp_date as any).getTime() / 1000);
-            }
+        let storeUser = {...user, credentials: user.credentials.map(c => ({...c}))};
+        storeUser.credentials.forEach((credential) => {
+             credential.exp_date = DateUtils.toUnixSeconds(credential.exp_date);
+             credential.created_at = DateUtils.toUnixSeconds(credential.created_at);
         });
-        return newUser;
+        return storeUser;
     });
 }
 
@@ -93,15 +123,17 @@ const createNewUser = (targets: TargetUser[]): Credentials => {
             break;
         }
     }
-    const created_at = Math.floor(Date.now() / 1000);
+    const created_at = Date.now();
+    const exp_date = new Date();
+    exp_date.setFullYear(exp_date.getFullYear()+1);
     return {
             username,
             password: TextGenerator.generatePassword(),
             token: TextGenerator.generatePassword(),
             proxy: 'reverse',
             created_at,
-            exp_date: undefined,
-            max_connections: undefined,
+            exp_date: exp_date.getTime(),
+            max_connections: 1,
             status: "Active",
             // @ts-ignore
             _ref: undefined, // an indicator for new user
@@ -203,6 +235,7 @@ export default function UserView(props: UserViewProps) {
 
     const handleSave = useCallback(() => {
         const usernames: any = {};
+        const tokens: any = {};
         for (const target of targets) {
             for (const user of target.credentials) {
                 const err = checkuser(user);
@@ -210,7 +243,18 @@ export default function UserView(props: UserViewProps) {
                     enqueueSnackbar(translate(err), {variant: 'error'});
                     return;
                 }
+                if (usernames[user.username]) {
+                    enqueueSnackbar(translate("MESSAGES.USER.DUPLICATE_USERNAME") + user.username, {variant: 'error'});
+                    return;
+                }
                 usernames[user.username] = true;
+                if (user.token) {
+                    if (tokens[user.token]) {
+                        enqueueSnackbar(translate("MESSAGES.USER.DUPLICATE_TOKEN") + user.token, {variant: 'error'});
+                        return;
+                    }
+                    tokens[user.token] = true;
+                }
             }
         }
         const targetUser = targets.map(t => {

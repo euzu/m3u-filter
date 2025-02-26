@@ -1,6 +1,26 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
 
+.proxy-type {
+  &-reverse {
+  }
+  &-redirect {
+    color: #fffa00;
+  }
+}
+
+.status {
+  &-active, .status-trial {
+    color: var(--ok-color);
+  }
+  &-banned {
+    color: var(--attention-color);
+  }
+  &-expired, &-disabled, &-pending {
+    color: var(--warn-color);
+  }
+}
+
 .tag-select {
   min-width: 160px;
 }

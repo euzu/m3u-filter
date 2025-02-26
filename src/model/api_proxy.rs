@@ -1,7 +1,7 @@
 use crate::api::model::app_state::AppState;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::Config;
-use crate::repository::user_repository::{get_api_user_db_path, load_api_user, merge_api_user};
+use crate::repository::user_repository::{backup_api_user_db_file, get_api_user_db_path, load_api_user, merge_api_user};
 use crate::utils::file::config_reader;
 use chrono::Local;
 use enum_iterator::Sequence;
@@ -304,7 +304,7 @@ impl ApiProxyConfig {
                     let api_proxy_file = cfg.t_api_proxy_file_path.as_str();
                     let backup_dir = cfg.backup_dir.as_ref().unwrap().as_str();
                     self.user = vec![];
-                    if let Err(err) = config_reader::save_api_proxy(api_proxy_file, backup_dir, &self) {
+                    if let Err(err) = config_reader::save_api_proxy(api_proxy_file, backup_dir, self) {
                         errors.push(format!("Error saving api proxy file: {err}"));
                     }
                 }
@@ -315,7 +315,7 @@ impl ApiProxyConfig {
                 }
                 Err(err) => {
                     println!("{err}");
-                    errors.push(err.to_string())
+                    errors.push(err.to_string());
                 },
             };
         } else {
@@ -326,8 +326,8 @@ impl ApiProxyConfig {
                 if let Ok(stored_users) = load_api_user(cfg) {
                     for stored_user in stored_users {
                         if let Some(target_user) = self.user.iter_mut().find(|t| t.target == stored_user.target) {
-                            for stored_credential in stored_user.credentials.iter() {
-                                if target_user.credentials.iter().find(|&c| c.username == stored_credential.username).is_none() {
+                            for stored_credential in &stored_user.credentials {
+                                if !target_user.credentials.iter().any(|c| c.username == stored_credential.username) {
                                     target_user.credentials.push(stored_credential.clone());
                                 };
                             }
@@ -338,9 +338,10 @@ impl ApiProxyConfig {
                 }
                 let api_proxy_file = cfg.t_api_proxy_file_path.as_str();
                 let backup_dir = cfg.backup_dir.as_ref().unwrap().as_str();
-                if let Err(err) = config_reader::save_api_proxy(api_proxy_file, backup_dir, &self) {
+                if let Err(err) = config_reader::save_api_proxy(api_proxy_file, backup_dir, self) {
                     errors.push(format!("Error saving api proxy file: {err}"));
                 } else {
+                    backup_api_user_db_file(cfg, &user_db_path);
                     let _ = fs::remove_file(&user_db_path);
                 }
             }

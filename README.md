@@ -501,6 +501,11 @@ If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is ad
 - `xtream_skip_video_direct_source`  if true the direct_source property from provider for movies is ignored
 - `xtream_skip_series_direct_source`  if true the direct_source property from provider for series is ignored
 
+Iptv player can act differently and use the direct-source attribute or can compose the url based on the server info.
+The options `xtream_skip_live_direct_source`, `xtream_skip_video_direct_source` and`xtream_skip_series_direct_source`
+are default `true` to avoid this problem.
+You can set them fo `false`to keep the direct-source attribute.
+
 Because xtream api delivers only the metadata to series, we need to fetch the series and resolve them. But be aware,
 each series info entry needs to be fetched one by one and the provider can ban you if you are doing request too frequently.
 - `xtream_resolve_series` if is set to `true` and you have xtream input and m3u output, the series are fetched and resolved.
@@ -521,6 +526,7 @@ Unlike `series info` `movie info` is only fetched once for each movie. If the da
 There is a difference for `xtream_resolve_vod` and `xtream_resolve_series`.
 `xtream_resolve_series` works only when input: `xtream` and output: `m3u`.
 `xtream_resolve_vod` works only when input: `xtream`.
+
 
 ### 2.2.2.5 `filter`
 The filter is a string with a filter statement.
@@ -920,17 +926,48 @@ mappings:
 ```
 
 ## 3. Api-Proxy Config
-If you use the proxy functionality, 
-you need to create a `api-proxy.yml` configuration.
 
-You can specify the path for the file with the  `-a` cli argument. 
+If you use m3u-filter to deliver playlists, we require a configuration to provide the necessary server information, rewrite URLs in reverse proxy mode, and define users who can access the API.
 
-The configuration contains the server info for xtream accounts and user definitions.
-You can define multiple server with unique names, one should be named `default`.
+For this purpose, we use the `api-proxy.yml` configuration.
 
-Iptv player can act differently and use the direct-source attribute or can compose the url based on the server info.
-The options `xtream_skip_live_direct_source`, `xtream_skip_video_direct_source` and `xtream_skip_series_direct_source` are default `true` to avoid this problem. 
-You can set them fo `false`to keep the direct-source attribute.
+You can specify the path to the file using the `-a` CLI argument.
+
+You can define multiple servers with unique names; typically, two are defined—one for the local network and one for external access.
+One server should be named `default`.
+
+```yaml
+server:
+  - name: default
+    protocol: http
+    host: 192.169.1.9
+    port: '8901'
+    timezone: Europe/Paris
+    message: Welcome to m3u-filter
+  - name: external
+    protocol: https
+    host: m3ufilter.mydomain.tv
+    port: '443'
+    timezone: Europe/Paris
+    message: Welcome to m3u-filter
+    path: m3uflt
+```
+
+User definitions are made for the targets. Each target can have multiple users. Usernames and tokens must be unique.
+
+```yaml
+user:
+- target: xc_m3u
+  credentials:
+  - username: test1
+    password: secret1
+    token: 'token1'
+    proxy: reverse
+    server: default
+    exp_date: 1672705545
+    max_connections: 1
+    status: Active
+```
 
 `username` and `password`are mandatory for credentials. `username` is unique.
 The `token` is _optional_. If defined it should be unique. The `token`can be used
@@ -939,6 +976,20 @@ instead of username+password
 `server` is _optional_. It should match one server definition, if not given the server with the name `default` is used or the first one.  
 `epg_timeshift` is _optional_. It is only applied when source has `epg_url` configured. `epg_timeshift: [-+]hh:mm`, example  
 `-2:30`(-2h30m), `1:45` (1h45m), `+0:15` (15m), `2` (2h), `:30` (30m), `:3` (3m), `2:` (3h)
+- `max_connections` is _optional_
+- `status` is _optional_
+- `exp_date` is _optional_
+
+`max_connections`, `status` and `exp_date` are only used when `user_access_control` ist ste to true.
+
+
+If you have a lot of users and dont want to keep them in `api-proxy.yml`, you can set the option 
+- `use_user_db` to true to store the user information inside a db-file.
+
+If the `use_user_db` option is switched to `false` or `true`, the users will automatically 
+be migrated to the corresponding file (`false` → `api_proxy.yml`, `true` → `api_user.db`).
+
+If you set  `use_user_db` to `true` you need to use the `Web-UI` to `edit`/`add`/`remove` users.
 
 To access the api for: 
 - `xtream` use url like `http://192.169.1.2/player_api.php?username={}&password={}`
@@ -966,6 +1017,7 @@ If you use `https` you need a ssl terminator. `m3u-filter` does not support http
 
 If you use a ssl-terminator or proxy in front of m3u-filter you can set a `path` to make the configuration of your proxy simpler.
 For example you use `nginx` as your reverse proxy.
+
 `api-proxy.yml`
 ```yaml
 server:
@@ -982,6 +1034,17 @@ server:
   timezone: Europe/Paris
   message: Welcome to m3u-filter
   path: m3uflt
+user:
+  - target: xc_m3u
+    credentials:
+      - username: test1
+        password: secret1
+        token: 'token1'
+        proxy: reverse
+        server: default
+        exp_date: 1672705545
+        max_connections: 1
+        status: Active
 ```
 
 Now you can do `nginx`  configuration like

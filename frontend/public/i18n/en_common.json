@@ -73,7 +73,9 @@
     "MESSAGE": "Message",
     "PROTOCOL": "Protocol",
     "NAME": "Name",
-    "API_PROXY": "Api-Proxy"
+    "API_PROXY": "Api-Proxy",
+    "INFINITE": "Infinite",
+    "ONE_YEAR": "One year"
   },
   "TITLE": {
     "USER_BOUQUET_EDITOR": "User group editor"
@@ -106,6 +108,7 @@
         "FAIL": "Failed to save user!",
         "USERNAME_REQUIRED": "Username required",
         "DUPLICATE_USERNAME": "Duplicate username!",
+        "DUPLICATE_TOKEN": "Duplicate token!",
         "TARGET_NOT_FOUND": "Target not found!",
         "MAX_CONNECTIONS_INVALID": "MaxConnections invalid"
       },

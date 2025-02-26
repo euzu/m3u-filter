@@ -20,7 +20,7 @@
 - Added `user_config_dir` to `config.yml`. It is the storage path for user configurations (f.e. bouquets).
 - New Filter field `input` can be used along `name`, `group`, `title`, `url` and `type`. Input is a `regexp` filter. `input ~ "provider\-\d+"`
 - New option `use_user_db` in `api-proxy.yml`. The Playlist Users are stored inside the config file `api-proxy.yml`. When you set this option to `true`
-the user are stored in a db file. This is a better choice if you have a lot of users. If you have only a few let it defaultto `false`
+the user are stored in a db file. This is a better choice if you have a lot of users. If you have only a few let it default to `false`
 
 # 2.2.1 (2025-02-14)
 - Added more info to `/status`.

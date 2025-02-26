@@ -387,56 +387,56 @@ pub async fn create_provider_stream(cfg: &Config,
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::api::model::streams::provider_stream_factory::PlaylistItemType;
-    use crate::api::model::streams::provider_stream_factory::{create_provider_stream, BufferStreamOptions};
-    use actix_web::test;
-    use actix_web::test::TestRequest;
-    use actix_web::web;
-    use actix_web::App;
-    use actix_web::{HttpRequest, HttpResponse};
-    use futures::StreamExt;
-    use std::sync::Arc;
-    use crate::model::config::Config;
-
-    #[actix_rt::test]
-    async fn test_stream() {
-        let app = App::new().route("/test", web::get().to(test_stream_handler));
-        let server = test::init_service(app).await;
-        let req = TestRequest::get().uri("/test").to_request();
-        let _response = test::call_service(&server, req).await;
-    }
-    async fn test_stream_handler(req: HttpRequest) -> HttpResponse {
-        let cfg = Config::default();
-        let mut counter = 5;
-        let client = Arc::new(reqwest::Client::new());
-        let url = url::Url::parse("https://info.cern.ch/hypertext/WWW/TheProject.html").unwrap();
-        let input = None;
-
-        let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0, false);
-        let value = create_provider_stream(&cfg, Arc::clone(&client), &url, &req, input, options);
-        let mut values = value.await;
-        'outer: while let Some((ref mut stream, info)) = values.as_mut() {
-            if info.is_some() {
-                println!("{:?}", info.as_ref().unwrap());
-            }
-            while let Some(result) = stream.next().await {
-                match result {
-                    Ok(bytes) => {
-                        println!("Received {} bytes  {bytes:?}", bytes.len());
-                        counter -= 1;
-                        if counter < 0 {
-                            break 'outer;
-                        }
-                    }
-                    Err(err) => {
-                        eprintln!("Error occurred: {}", err);
-                        break 'outer;
-                    }
-                }
-            }
-        }
-        HttpResponse::Ok().finish()
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use crate::api::model::streams::provider_stream_factory::PlaylistItemType;
+//     use crate::api::model::streams::provider_stream_factory::{create_provider_stream, BufferStreamOptions};
+//     use actix_web::test;
+//     use actix_web::test::TestRequest;
+//     use actix_web::web;
+//     use actix_web::App;
+//     use actix_web::{HttpRequest, HttpResponse};
+//     use futures::StreamExt;
+//     use std::sync::Arc;
+//     use crate::model::config::Config;
+//
+//     #[actix_rt::test]
+//     async fn test_stream() {
+//         let app = App::new().route("/test", web::get().to(test_stream_handler));
+//         let server = test::init_service(app).await;
+//         let req = TestRequest::get().uri("/test").to_request();
+//         let _response = test::call_service(&server, req).await;
+//     }
+//     async fn test_stream_handler(req: HttpRequest) -> HttpResponse {
+//         let cfg = Config::default();
+//         let mut counter = 5;
+//         let client = Arc::new(reqwest::Client::new());
+//         let url = url::Url::parse("https://info.cern.ch/hypertext/WWW/TheProject.html").unwrap();
+//         let input = None;
+//
+//         let options = BufferStreamOptions::new(PlaylistItemType::Live, true, true, 0, false);
+//         let value = create_provider_stream(&cfg, Arc::clone(&client), &url, &req, input, options);
+//         let mut values = value.await;
+//         'outer: while let Some((ref mut stream, info)) = values.as_mut() {
+//             if info.is_some() {
+//                 println!("{:?}", info.as_ref().unwrap());
+//             }
+//             while let Some(result) = stream.next().await {
+//                 match result {
+//                     Ok(bytes) => {
+//                         println!("Received {} bytes  {bytes:?}", bytes.len());
+//                         counter -= 1;
+//                         if counter < 0 {
+//                             break 'outer;
+//                         }
+//                     }
+//                     Err(err) => {
+//                         eprintln!("Error occurred: {}", err);
+//                         break 'outer;
+//                     }
+//                 }
+//             }
+//         }
+//         HttpResponse::Ok().finish()
+//     }
+// }

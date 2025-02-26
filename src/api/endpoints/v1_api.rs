@@ -50,6 +50,7 @@ async fn save_config_api_proxy_user(
 ) -> HttpResponse {
     let mut users = req.0;
     let mut usernames = HashSet::new();
+    let mut tokens = HashSet::new();
     for target_user in &mut users {
         for credential in &mut target_user.credentials {
             credential.trim();
@@ -60,6 +61,12 @@ async fn save_config_api_proxy_user(
                 return HttpResponse::BadRequest().json(json!({"error": format!("Duplicate username {}", &credential.username)}));
             }
             usernames.insert(&credential.username);
+            if let Some(token) = &credential.token {
+                if tokens.contains(token) {
+                    return HttpResponse::BadRequest().json(json!({"error": format!("Duplicate token {token}")}));
+                }
+                tokens.insert(token);
+            }
         }
     }
 

@@ -1,4 +1,4 @@
-#![warn(clippy::pedantic)]
+#![warn(clippy::all,clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::return_self_not_must_use)]
