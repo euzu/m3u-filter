@@ -26,6 +26,10 @@ body {
     height: 2rem;
     border-radius: 6px;
   }
+
+  select {
+    border-color: var(--border-color);
+  }
 }
 
 #root {
@@ -35,4 +39,15 @@ body {
   box-sizing: border-box;
   overflow: hidden;
   max-width: 100%;
+  background-color: inherit;
+}
+
+dialog {
+  border: none;
+  border-radius: var(--border-radius);
+  background-color: var(--card-background-color);
+  filter: drop-shadow(6px 6px 6px var(--popup-shadow-color));
+  &::backdrop {
+    background: rgba(0, 0, 0, 0.3); /* Schwarzer, halbtransparenter Hintergrund */
+  }
 }

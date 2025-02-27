@@ -12,34 +12,36 @@ export default function Tooltip() {
             const tooltip = event.target.dataset.tooltip;
             if (tooltip) {
                 ref.current.innerText = translate(tooltip);
-                const el = event.target;
-                const rect = el.getBoundingClientRect();
-                const screenWidth = window.innerWidth;
-                const screenHeight = window.innerHeight;
+                setTimeout(() => {
+                    const el = event.target;
+                    const rect = el.getBoundingClientRect();
+                    const screenWidth = window.innerWidth;
+                    const screenHeight = window.innerHeight;
 
-                let tooltipX = rect.left;
-                let tooltipY = rect.top + rect.height + 10;
+                    let tooltipX = rect.left;
+                    let tooltipY = rect.top + rect.height + 10;
 
-                ref.current.style.left = tooltipX + 'px';
-                ref.current.style.top = tooltipY + 'px';
+                    ref.current.style.left = tooltipX + 'px';
+                    ref.current.style.top = tooltipY + 'px';
 
-                if (tooltipX + ref.current.offsetWidth > screenWidth) {
-                    ref.current.style.left = (screenWidth - ref.current.offsetWidth - 5) + 'px';
-                }
+                    if (tooltipX + ref.current.offsetWidth > screenWidth) {
+                        ref.current.style.left = (screenWidth - ref.current.offsetWidth) + 'px';
+                    }
 
-                if (tooltipX < 5) {
-                    ref.current.style.left = '5px';
-                }
+                    if (tooltipX < 5) {
+                        ref.current.style.left = '5px';
+                    }
 
-                if (tooltipY < 5) {
-                    ref.current.style.top = '5px';
-                }
+                    if (tooltipY < 5) {
+                        ref.current.style.top = '5px';
+                    }
 
-                if (tooltipY + ref.current.offsetHeight > screenHeight) {
-                    ref.current.style.top = (screenHeight - ref.current.offsetHeight - 5) + 'px';
-                }
+                    if (tooltipY + ref.current.offsetHeight > screenHeight) {
+                        ref.current.style.top = (rect.top - ref.current.offsetHeight - 5) + 'px';
+                    }
 
-                ref.current.style.opacity = '1';
+                    ref.current.style.opacity = '1';
+                }, 0);
             }
         };
         const handlerLeave = (event: any) => {

@@ -25,7 +25,7 @@ struct PlaylistXtreamCategory {
     pub name: String,
 }
 
-async fn get_categories_content(action: Result<(Option<PathBuf>, Option<String>), Error>) -> Option<String> {
+pub(crate) async fn get_categories_content(action: Result<(Option<PathBuf>, Option<String>), Error>) -> Option<String> {
     if let Ok((Some(file_path), _content)) = action {
         if let Ok(content) = tokio::fs::read_to_string(&file_path).await {
             // TODO deserialize like sax parser

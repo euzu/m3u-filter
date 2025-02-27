@@ -1,11 +1,30 @@
-import React, {KeyboardEvent, useCallback, useEffect, useRef, useState} from "react";
+import React, {KeyboardEvent, useCallback, useRef} from "react";
 
 import './source-selector.scss';
 import {getIconByName} from "../../icons/icons";
-import ServerConfig, {InputConfig} from "../../model/server-config";
-import PopupMenu from "../popup-menu/popup-menu";
-import {PlaylistRequest} from "../../model/playlist-request";
+import ServerConfig from "../../model/server-config";
+import {PlaylistRequest, PlaylistRequestType} from "../../model/playlist-request";
 import InputField from "../input-field/input-field";
+import SourceSelectorEditor, {ISourceSelectorEditor,} from "../source-selector-editor/source-selector-editor";
+
+const formatSourceSelection = (req: PlaylistRequest): string => {
+    switch (req?.rtype) {
+        case PlaylistRequestType.TARGET: {
+            return `Target: ${req.sourceName}`;
+        }
+        case PlaylistRequestType.INPUT: {
+            return `Provider: ${req.sourceName}`;
+        }
+        case PlaylistRequestType.XTREAM: {
+            return `${req.url}/player_api.php?username=${req.username}&password=${req.password}`;
+        }
+        case PlaylistRequestType.M3U: {
+            return req.url;
+        }
+        default:
+            return '';
+    }
+};
 
 interface SourceSelectorProps {
     serverConfig: ServerConfig;
@@ -13,24 +32,17 @@ interface SourceSelectorProps {
 }
 
 export default function SourceSelector(props: SourceSelectorProps) {
-    const textField = useRef<HTMLInputElement>(undefined);
-    const [popupVisible, setPopupVisible] = useState<{ x: number, y: number }>(undefined);
-    const [sources, setSources] = useState<InputConfig[]>([]);
-    const [selected, setSelected] = useState<InputConfig>(undefined);
+    const editorRef = useRef<ISourceSelectorEditor>(undefined);
+    const textFieldRef = useRef<HTMLInputElement>(undefined);
+    const playlistRequestRef = useRef<PlaylistRequest>(undefined);
 
     const {serverConfig, onDownload} = props;
 
     const handleDownload = useCallback(() => {
-        const value = textField.current.value;
-        if (value && value.trim().length > 0) {
-            // eslint-disable-next-line
-            if (value.trim() == selected?.name) {
-                onDownload({input_id: selected.id});
-            } else {
-                onDownload({url: value.trim()});
-            }
+        if (playlistRequestRef.current) {
+            onDownload(playlistRequestRef.current);
         }
-    }, [onDownload, selected]);
+    }, [onDownload]);
 
     const handleKeyPress = useCallback((event: KeyboardEvent<any>) => {
         if (event.key === 'Enter') {
@@ -38,43 +50,24 @@ export default function SourceSelector(props: SourceSelectorProps) {
         }
     }, [handleDownload]);
 
-    const closePopup = useCallback(() => {
-        setPopupVisible(undefined);
-    }, []);
-
     const openPopup = useCallback((evt: any) => {
-        const rect = evt.target.getBoundingClientRect();
-        const top = rect.y + rect.height;
-        setPopupVisible({x: evt.clientX, y: top});
+        editorRef.current.open();
     }, []);
 
-    const handleMenuClick = useCallback((evt: any) => {
-        const idx = evt.target.dataset.idx;
-        // eslint-disable-next-line eqeqeq
-        if (idx != undefined) {
-            setPopupVisible(undefined);
-            setSelected(sources[idx]);
-            textField.current.value = sources[idx].name || sources[idx].url;
-        }
-    }, [sources]);
 
-    useEffect(()=> {
-        if (serverConfig) {
-            setSources(serverConfig.sources?.flatMap(source => source.inputs))
-        }
-    }, [serverConfig]);
+    const handleEditorSubmit = useCallback((req: PlaylistRequest): boolean => {
+        textFieldRef.current.value = formatSourceSelection(req);
+        playlistRequestRef.current = req;
+        return true;
+    }, []);
 
     return <div className={'source-selector'}>
         <InputField label={'Source'}>
-            <input onKeyUp={handleKeyPress} ref={textField}/>
+            <input readOnly={true} onKeyUp={handleKeyPress} ref={textFieldRef}/>
             <button data-tooltip={'Download'} onClick={handleDownload}>{getIconByName('CloudDownload')}</button>
             <button data-tooltip={'Input List'} onClick={openPopup}>{getIconByName('ArrowDown')}</button>
         </InputField>
-        <PopupMenu position={popupVisible} onHide={closePopup}>
-            <ul>
-                {sources.map((s, idx) =>
-                    <li key={s.id + '_' + idx} data-idx={idx} onClick={handleMenuClick}>{s.name || s.url}</li>)}
-            </ul>
-        </PopupMenu>
+        <SourceSelectorEditor onSubmit={handleEditorSubmit} ref={editorRef}
+                              serverConfig={serverConfig}></SourceSelectorEditor>
     </div>
 }

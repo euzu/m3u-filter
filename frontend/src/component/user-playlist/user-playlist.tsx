@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import './user-playlist.scss';
 import {useServices} from "../../provider/service-provider";
 import {finalize, first, zip} from 'rxjs';
-import {PlaylistCategories, PlaylistCategory} from "../../model/playlist-categories";
+import {PlaylistCategories, PlaylistGroup} from "../../model/playlist";
 import LoadingIndicator from '../loading-indicator/loading-indicator';
 import TabSet from "../tab-set/tab-set";
 import Checkbox from "../checkbox/checkbox";
@@ -25,8 +25,8 @@ function isEmpty(value: any): boolean {
     return false;
 }
 
-const selectEntries = (selected: boolean, list: PlaylistCategory[]): Record<string, boolean> => {
-    return list?.reduce((acc: Record<string, boolean>, category: PlaylistCategory) => {
+const selectEntries = (selected: boolean, list: PlaylistGroup[]): Record<string, boolean> => {
+    return list?.reduce((acc: Record<string, boolean>, category: PlaylistGroup) => {
         acc[category.id] = selected;
         return acc;
     }, {});
@@ -51,7 +51,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
     const getActiveCategories =  useCallback((key: string) => {
             let active = ((filteredCategories as any)?.[key] ?? (categories as any)?.[key]) as any;
             if (showSelected) {
-                return active.filter((c: PlaylistCategory) => selections[c.id])
+                return active.filter((c: PlaylistGroup) => selections[c.id])
             }
             return active;
         },
@@ -68,14 +68,14 @@ export default function UserPlaylist(props: UserPlaylistProps) {
                 if (isEmpty(categories)) {
                     categories = {} as any;
                 }
-                Object.values(categories).forEach((list: PlaylistCategory[]) => {
+                Object.values(categories).forEach((list: PlaylistGroup[]) => {
                     list.sort((a, b) => a.name.localeCompare(b.name, {sensitivity: 'base'} as any))
                 });
                 if (bouquet || categories) {
                     const user_bouquet: any = {}
                     CATEGORY_TABS.map(t => t.key).forEach(key => {
-                        let current_bouquet: PlaylistCategory[] = ((bouquet as any)?.[key]?.length ?  (bouquet as any)[key] : (categories as any)?.[key]) ?? [];
-                        Object.values(current_bouquet).forEach((c: PlaylistCategory) => user_bouquet[c.id] = true);
+                        let current_bouquet: PlaylistGroup[] = ((bouquet as any)?.[key]?.length ?  (bouquet as any)[key] : (categories as any)?.[key]) ?? [];
+                        Object.values(current_bouquet).forEach((c: PlaylistGroup) => user_bouquet[c.id] = true);
                     });
                     setSelections(user_bouquet);
                 }
@@ -87,7 +87,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
         setSelections(selections => ({...selections, [value]: checked}));
     }, []);
 
-    const renderCat = useCallback((cat:PlaylistCategory) => {
+    const renderCat = useCallback((cat:PlaylistGroup) => {
         return <div className={'user-playlist__categories__category'} key={cat.id} data-tooltip={cat.name}>
             <Checkbox label={cat.name}
                       value={cat.id}
@@ -129,7 +129,7 @@ export default function UserPlaylist(props: UserPlaylistProps) {
     const handleFilter = useCallback((filter: string, regexp: boolean): void => {
         let filter_value = regexp ? filter : filter.toLowerCase();
         if (filter_value?.length) {
-            const filtered = (categories as any)?.[activeTab]?.filter((cat: PlaylistCategory) => {
+            const filtered = (categories as any)?.[activeTab]?.filter((cat: PlaylistGroup) => {
                 if (regexp) {
                     // eslint-disable-next-line eqeqeq
                     return cat.name.trim().match(filter_value) != undefined;

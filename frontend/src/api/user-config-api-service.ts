@@ -1,6 +1,6 @@
 import {Observable} from "rxjs";
 import ApiService, {DefaultApiService} from "./api-service";
-import {PlaylistCategories} from "../model/playlist-categories";
+import {PlaylistCategories} from "../model/playlist";
 
 const PLAYLIST_CATEGORIES_PATH = "user/playlist/categories";
 const PLAYLIST_BOUQUET_PATH = "user/playlist/bouquet";

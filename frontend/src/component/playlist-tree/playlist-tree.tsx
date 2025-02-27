@@ -40,7 +40,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         if (data && !isNaN(id)) {
             for (let i = 0, len = data.length; i < len; i++) {
                 const group = data[i];
-                for (let j = 0, clen = group.channels.length; j < clen; j++) {
+                for (let j = 0, clen = group.channels?.length ?? 0; j < clen; j++) {
                     const plitem = group.channels[j];
                     // eslint-disable-next-line eqeqeq
                     if (plitem.id == id) {
@@ -154,13 +154,13 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                     'ExpandMore' : 'ChevronRight')}</div>
                 <div className={'tree-group__header-content'}>
                     <input type={"checkbox"} onChange={handleChange} data-group={group.id}/>
-                    {group.title}
-                    <div className={'tree-group__count'}>({group.channels.length})</div>
+                    {group.name}
+                    <div className={'tree-group__count'}>({group.channels?.length})</div>
                 </div>
             </div>
             {expanded.current[group.id] && (
                 <div className={'tree-group__childs'}>
-                    {group.channels.map(renderEntry)}
+                    {group.channels?.map(renderEntry)}
                 </div>)}
         </div>;
     }, [handleChange, handleExpand, renderEntry]);

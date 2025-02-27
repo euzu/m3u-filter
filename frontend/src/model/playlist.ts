@@ -19,7 +19,21 @@ export interface PlaylistItem {
 }
 
 export interface PlaylistGroup {
-    id: number;
-    title: string;
-    channels: PlaylistItem[];
+    id: number,
+    name: string,
+    channels?: PlaylistItem[];
 }
+
+export interface PlaylistCategories {
+    live: PlaylistGroup[],
+    vod: PlaylistGroup[],
+    series: PlaylistGroup[],
+}
+
+export enum PlaylistCategory {
+    LIVE = 'live',
+    VOD = 'vod',
+    SERIES = 'series'
+}
+
+export const EmptyPlaylistCategories: PlaylistCategories = {live: [], vod: [], series: []}

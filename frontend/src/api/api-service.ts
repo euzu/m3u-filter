@@ -28,7 +28,7 @@ export class DefaultApiService implements ApiService {
     private readonly DEFAULT_ERROR = {'origin': 'server', 'message': 'Server error'};
 
     private static getLanguage(): string {
-        return "de_DE";
+        return "en";
     }
 
     protected getBaseUrl(): string {

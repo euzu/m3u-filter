@@ -44,14 +44,12 @@ const UserEditor = forwardRef<IUserEditor, UserViewProps>((props: UserViewProps,
     const translate = useTranslator();
     const formFields = useMemo(() => COLUMNS
         .map((c) => {
-            let options = undefined;
-            if (c.options) {
-                options = c.options.map(c => ({...c, label: translate(c.label)}));
-            } else if  (c.name === 'server') {
+            let options = c.options;
+            if  (c.name === 'server') {
                 options = serverOptions;
             }
-            return ({...c, label: translate(c.label), options});
-        }), [translate, serverOptions]);
+            return ({...c, options});
+        }), [serverOptions]);
 
     const [user, setUser] = useState(undefined);
     const [target, setTarget] = useState(undefined);

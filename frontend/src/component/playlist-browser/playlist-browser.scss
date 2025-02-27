@@ -1,0 +1,30 @@
+.playlist-browser {
+  &__content {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+    box-sizing: border-box;
+    overflow: hidden;
+    max-width: 100%;
+    background-color: inherit;
+    padding: 10px;
+    
+    .playlist-viewer {
+      background-color: var(--card-background-color);
+    }
+  }
+
+  &__toolbar {
+    display: flex;
+    flex-flow: row;
+    flex: 0 1 auto;
+    box-sizing: border-box;
+    overflow: hidden;
+    max-width: 100%;
+    background-color: inherit;
+
+    .source-selector {
+      flex: 1 1 auto;
+    }
+  }
+}

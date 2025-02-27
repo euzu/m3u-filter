@@ -1,17 +1,46 @@
 $card-width: 180px;
 $card-height: 200px;
+
+$category-size: 96px;
+
 .playlist-gallery {
   display: flex;
   flex-flow: row nowrap;
   overflow: hidden;
+  flex: 1 1 auto;
+
+  &__category {
+    display: flex;
+    flex-flow: row;
+    justify-content: center;
+    align-items: center;
+    min-height: $category-size;
+    min-width: $category-size;
+    height: $category-size;
+    width: $category-size;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 10px;
+    cursor: pointer;
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    &:hover {
+      background-color: var(--icon-button-hover-background-color);
+      color: var(--icon-button-hover-color);
+    }
+  }
 
   &__categories {
     display: flex;
-    flex-flow: column;
-    border: 1px solid var(--border-color);
-    max-width: 250px;
-    min-width: 250px;
+    flex-flow: row;
+    flex: 1 1 auto;
     overflow-y: auto;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
 
     .selected-group {
       color: var(--tool-button-hover-color);

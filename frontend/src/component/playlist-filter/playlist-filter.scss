@@ -11,6 +11,9 @@
   max-width: 400px;
   background-color: inherit;
 
+  .input-field {
+    flex: 1 1 auto;
+  }
 
   &__option-active {
     box-sizing: border-box !important;

@@ -910,7 +910,7 @@ impl WebAuthConfig {
                         username: username.trim().to_string(),
                         password: password.trim().to_string(),
                     });
-                    debug!("Read ui user {}", username);
+                    // debug!("Read ui user {}", username);
                 }
             }
 
@@ -1148,6 +1148,28 @@ impl Config {
             for input in &source.inputs {
                 if input.name == input_name {
                     return Some(input);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn get_input_by_id(&self, input_id: u16) -> Option<&ConfigInput> {
+        for source in &self.sources {
+            for input in &source.inputs {
+                if input.id == input_id {
+                    return Some(input);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn get_target_by_id(&self, target_id: u16) -> Option<&ConfigTarget> {
+        for source in &self.sources {
+            for target in &source.targets {
+                if target.id == target_id {
+                    return Some(target);
                 }
             }
         }

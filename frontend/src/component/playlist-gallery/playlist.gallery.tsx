@@ -1,5 +1,5 @@
 import ServerConfig from "../../model/server-config";
-import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
+import {PlaylistCategories, PlaylistCategory, PlaylistGroup, PlaylistItem} from "../../model/playlist";
 import './playlist-gallery.scss';
 import React, {useCallback, useEffect, useState} from "react";
 import {useSnackbar} from "notistack";
@@ -10,7 +10,7 @@ import {noop} from "rxjs";
 
 interface PlaylistGalleryProps {
     serverConfig: ServerConfig;
-    data: PlaylistGroup[];
+    data: PlaylistCategories;
     onCopy: (playlistItem: PlaylistItem) => void;
     onPlay?: (playlistItem: PlaylistItem) => void;
     onDownload?: (playlistItem: PlaylistItem) => void;
@@ -24,25 +24,28 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
 
     const [showcaseGroup, setShowcaseGroup] = useState<PlaylistGroup>();
+    const [category, setCategory] = useState<PlaylistCategory>();
 
     useEffect(() => {
-        setShowcaseGroup(data.length ? data[0] : undefined)
-    }, [data]);
+        if (category) {
+            setShowcaseGroup((data as any)?.[category])
+        }
+    }, [data, category]);
 
     const getPlaylistItemById = useCallback((itemId: string): PlaylistItem => {
-        const id = parseInt(itemId);
-        if (data && !isNaN(id)) {
-            for (let i = 0, len = data.length; i < len; i++) {
-                const group = data[i];
-                for (let j = 0, clen = group.channels.length; j < clen; j++) {
-                    const plitem = group.channels[j];
-                    // eslint-disable-next-line eqeqeq
-                    if (plitem.id == id) {
-                        return plitem;
-                    }
-                }
-            }
-        }
+        // const id = parseInt(itemId);
+        // if (data && !isNaN(id)) {
+        //     for (let i = 0, len = data.length; i < len; i++) {
+        //         const group = data[i];
+        //         for (let j = 0, clen = group.channels.length; j < clen; j++) {
+        //             const plitem = group.channels[j];
+        //             // eslint-disable-next-line eqeqeq
+        //             if (plitem.id == id) {
+        //                 return plitem;
+        //             }
+        //         }
+        //     }
+        // }
         return undefined;
     }, [data]);
 
@@ -101,15 +104,15 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
     }, [serverConfig]);
 
     const handleGroupClick = useCallback((event: any) => {
-        const key = parseInt(event.target.dataset.group);
-        const group = data.find(plg => plg.id === key);
-        setShowcaseGroup(group);
+        // const key = parseInt(event.target.dataset.group);
+        // const group = data.find(plg => plg.id === key);
+        // setShowcaseGroup(group);
     }, [data]);
 
     const renderGroup = useCallback((group: PlaylistGroup): React.ReactNode => {
         return <div className={'playlist-gallery__categories-group' + (showcaseGroup?.id === group.id ? ' selected-group' : '') } key={group.id} data-group={group.id}
                     onClick={handleGroupClick}>
-            {group.title}
+            {group.name}
         </div>
     }, [handleGroupClick, showcaseGroup]);
 
@@ -149,16 +152,34 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
         if (!showcaseGroup) {
             return <React.Fragment></React.Fragment>
         }
-        return showcaseGroup.channels.map(renderPlaylistItem);
+        return showcaseGroup.channels?.map(renderPlaylistItem);
     }, [showcaseGroup, renderPlaylistItem]);
 
 
+    const handleCategory = useCallback((evt: any) => {
+        let selectedCategory = evt.target.dataset.category;
+        setCategory(selectedCategory);
+    }, []);
+
     const renderCategories = useCallback(() => {
-        if (!data?.length) {
-            return <React.Fragment/>;
+        if (data) {
+            if (!showcaseGroup) {
+                let categories = [];
+                if (data.live?.length) {
+                    categories.push(<div onClick={handleCategory}  data-category="live"  className={'playlist-gallery__category'}>{getIconByName('Live')}</div>)
+                }
+                if (data.vod?.length) {
+                    categories.push(<div onClick={handleCategory} data-category="vod"  className={'playlist-gallery__category'}>{getIconByName('VOD')}</div>)
+                }
+                if (data.series?.length) {
+                    categories.push(<div onClick={handleCategory} data-category="series" className={'playlist-gallery__category'}>{getIconByName('Series')}</div>)
+                }
+                return <div className="playlist-gallery__categories">{categories}</div>
+            }
+            // return <div className="playlist-gallery__categories">{data.map(renderGroup)}</div>
         }
-        return <div className="playlist-gallery__categories">{data.map(renderGroup)}</div>
-    }, [data, renderGroup]);
+        return <React.Fragment/>;
+    }, [data, showcaseGroup, category, renderGroup]);
 
     return <div className="playlist-gallery">
         {renderCategories()}

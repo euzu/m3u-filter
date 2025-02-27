@@ -9,6 +9,7 @@
   box-sizing: border-box;
   max-width: 100%;
   color: var(--text-color);
+  background-color: inherit;
 
   .app-header {
     display: flex;
@@ -60,6 +61,7 @@
     overflow: hidden;
     box-sizing: border-box;
     max-width: 100%;
+    background-color: inherit;
 
     .app-content {
       display: flex;
@@ -68,6 +70,7 @@
       box-sizing: border-box;
       overflow: hidden;
       max-width: 100%;
+      background-color: inherit;
     }
   }
 }

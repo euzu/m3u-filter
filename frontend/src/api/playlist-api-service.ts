@@ -1,22 +1,22 @@
 import ApiService, {DefaultApiService} from "./api-service";
-import {PlaylistGroup} from "../model/playlist";
 import {Observable, throwError} from "rxjs";
 import {PlaylistRequest} from "../model/playlist-request";
+import {PlaylistCategories} from "../model/playlist";
 
 const PLAYLIST_API_PATH = 'playlist';
 const TARGET_UPDATE_API_PATH = 'playlist/update';
 
 export default interface PlaylistApiService extends ApiService {
-    getPlaylist(req: PlaylistRequest): Observable<PlaylistGroup[]>;
+    getPlaylist(req: PlaylistRequest): Observable<PlaylistCategories>;
 
     updateTargets(targets: string[]): Observable<any>;
 }
 
 export class DefaultPlaylistApiService extends DefaultApiService implements PlaylistApiService {
-    getPlaylist(req: PlaylistRequest): Observable<PlaylistGroup[]> {
+    getPlaylist(req: PlaylistRequest): Observable<PlaylistCategories> {
         // eslint-disable-next-line eqeqeq
-        if (req.url || req.input_id != undefined) {
-            return this.post<PlaylistGroup[]>(PLAYLIST_API_PATH, req);
+        if (req != undefined) {
+            return this.post<PlaylistCategories>(PLAYLIST_API_PATH, req);
         }
         return throwError(() => new Error('Invalid arguments'));
     }

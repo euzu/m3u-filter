@@ -1,9 +1,12 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use actix_web::body::BodyStream;
 use actix_web::middleware::Condition;
 use actix_web::{web, HttpResponse};
 use actix_web_httpauth::middleware::HttpAuthentication;
+use bytes::Bytes;
+use futures::stream;
 use log::error;
 use serde_json::json;
 
@@ -11,13 +14,14 @@ use crate::api::endpoints::download_api;
 use crate::api::endpoints::user_api::user_api_register;
 use crate::api::model::app_state::AppState;
 use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
-use crate::api::model::request::PlaylistRequest;
+use crate::api::model::request::{PlaylistRequest, PlaylistRequestType};
 use crate::auth::authenticator::validator_admin;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
-use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
+use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, TargetType};
 use crate::processing::processor::playlist;
 use crate::repository::user_repository::store_api_user;
+use crate::repository::xtream_repository;
 use crate::utils::file::config_reader;
 use crate::utils::network::request::sanitize_sensitive_info;
 use crate::utils::network::{m3u, xtream};
@@ -143,12 +147,32 @@ async fn playlist_update(
     }
 }
 
-fn create_config_input_for_url(name: &str, url: &str) -> ConfigInput {
+fn create_config_input_for_m3u(url: &str) -> ConfigInput {
     ConfigInput {
         id: 0,
-        name: String::from(name),
+        name: String::from("m3u_req"),
         input_type: InputType::M3u,
         url: String::from(url),
+        enabled: true,
+        options: Some(ConfigInputOptions {
+            xtream_skip_live: false,
+            xtream_skip_vod: false,
+            xtream_skip_series: false,
+            xtream_live_stream_without_extension: false,
+            xtream_live_stream_use_prefix: true,
+        }),
+        ..Default::default()
+    }
+}
+
+fn create_config_input_for_xtream(username: &str, password: &str, host: &str) -> ConfigInput {
+    ConfigInput {
+        id: 0,
+        name: String::from("xc_req"),
+        input_type: InputType::Xtream,
+        url: String::from(host),
+        username: Some(String::from(username)),
+        password: Some(String::from(password)),
         enabled: true,
         options: Some(ConfigInputOptions {
             xtream_skip_live: false,
@@ -180,17 +204,66 @@ async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInp
     }
 }
 
+async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Config) -> HttpResponse {
+    if let Some(target) = cfg_target {
+        let target_name = &target.name;
+        if target.has_output(&TargetType::Xtream) {
+            let live_categories = crate::api::endpoints::user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_LIVE)).await;
+            let vod_categories = crate::api::endpoints::user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_VOD)).await;
+            let series_categories = crate::api::endpoints::user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_SERIES)).await;
+            let json_stream =
+                stream::iter(vec![
+                    Ok::<Bytes, String>(Bytes::from(r#"{"live": "#.to_string())),
+                    Ok::<Bytes, String>(Bytes::from(live_categories.unwrap_or("null".to_string()))),
+                    Ok::<Bytes, String>(Bytes::from(r#", "vod": "#.to_string())),
+                    Ok::<Bytes, String>(Bytes::from(vod_categories.unwrap_or("null".to_string()))),
+                    Ok::<Bytes, String>(Bytes::from(r#", "series": "#.to_string())),
+                    Ok::<Bytes, String>(Bytes::from(series_categories.unwrap_or("null".to_string()))),
+                    Ok::<Bytes, String>(Bytes::from(r"}".to_string())),
+                ]);
+            return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(BodyStream::new(json_stream));
+        } else if target.has_output(&TargetType::M3u) {
+            return HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"}));
+        }
+    }
+    HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"}))
+}
+
 async fn playlist(
     req: web::Json<PlaylistRequest>,
     app_state: web::Data<AppState>,
 ) -> HttpResponse {
-    if let Some(input_name) = req.input_name.as_ref() {
-        get_playlist(Arc::clone(&app_state.http_client), app_state.config.get_input_by_name(input_name), &app_state.config).await
-    } else {
-        let url = req.url.as_deref().unwrap_or("");
-        let name = req.input_name.as_deref().unwrap_or("");
-        let input = create_config_input_for_url(name, url);
-        get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await
+    match req.rtype {
+        PlaylistRequestType::Input => {
+            if let Some(source_id) = req.source_id {
+                get_playlist(Arc::clone(&app_state.http_client), app_state.config.get_input_by_id(source_id), &app_state.config).await
+            } else {
+                HttpResponse::BadRequest().json(json!({"error": "Invalid input"}))
+            }
+        }
+        PlaylistRequestType::Target => {
+            if let Some(source_id) = req.source_id {
+                get_playlist_for_target(app_state.config.get_target_by_id(source_id), &app_state.config).await
+            } else {
+                HttpResponse::BadRequest().json(json!({"error": "Invalid target"}))
+            }
+        }
+        PlaylistRequestType::Xtream => {
+            if let (Some(url), Some(username), Some(password)) = (req.url.as_ref(), req.username.as_ref(), req.password.as_ref()) {
+                let input = create_config_input_for_xtream(username, password, url);
+                get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await
+            } else {
+                HttpResponse::BadRequest().json(json!({"error": "Invalid url"}))
+            }
+        }
+        PlaylistRequestType::M3U => {
+            if let Some(url) = req.url.as_ref() {
+                let input = create_config_input_for_m3u(url);
+                get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await
+            } else {
+                HttpResponse::BadRequest().json(json!({"error": "Invalid url"}))
+            }
+        }
     }
 }
 

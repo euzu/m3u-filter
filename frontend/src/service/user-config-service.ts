@@ -1,6 +1,6 @@
 import { Observable } from "rxjs";
 import UserConfigApiService, {DefaultUserConfigApiService} from "../api/user-config-api-service";
-import {PlaylistCategories} from "../model/playlist-categories";
+import {PlaylistCategories} from "../model/playlist";
 
 export default class UserConfigService {
     constructor(private userConfigApiService: UserConfigApiService = new DefaultUserConfigApiService()) {

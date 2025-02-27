@@ -75,7 +75,12 @@
     "NAME": "Name",
     "API_PROXY": "Api-Proxy",
     "INFINITE": "Infinite",
-    "ONE_YEAR": "One year"
+    "ONE_YEAR": "One year",
+    "SELF_HOSTED": "Self Hosted",
+    "PROVIDER": "Provider",
+    "CUSTOM": "Custom",
+    "XTREAM_CODES": "xtream codes",
+    "M3U": "m3u"
   },
   "TITLE": {
     "USER_BOUQUET_EDITOR": "User group editor"
@@ -116,6 +121,9 @@
         "SUCCESS": "Successfully started playlist update!",
         "FAIL": "Playlist update failed!"
       }
+    },
+    "SOURCE_SELECTOR": {
+      "MISSING_SELECTION": "No entry selected"
     }
   },
   "INFO": {

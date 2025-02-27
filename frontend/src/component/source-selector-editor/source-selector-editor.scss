@@ -1,0 +1,36 @@
+@use '../../scss/common';
+@use '../../scss/preferences';
+
+.source-selector-editor {
+  & {
+    display: flex;
+    flex-flow: column;
+    gap: 12px;
+    min-height: 400px;
+    @include preferences.prefsToolbar();
+  }
+
+  &__content {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+    min-width: 340px;
+    .form-view__col-label {
+      justify-content: flex-start;
+      min-width: 80px;
+      width: fit-content;
+    }
+
+    .tab-set {
+      margin-bottom: 8px;
+    }
+
+    &-tags, &-form {
+      display: flex;
+      flex-flow: column;
+      flex: 1 1 auto;
+      gap: 12px;
+    }
+  }
+}
+

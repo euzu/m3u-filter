@@ -1,23 +1,23 @@
 import {Observable} from "rxjs";
 import PlaylistApiService, {DefaultPlaylistApiService} from "../api/playlist-api-service";
-import {PlaylistGroup} from "../model/playlist";
 import {first} from "rxjs/operators";
 import {PlaylistRequest} from "../model/playlist-request";
+import {PlaylistCategories} from "../model/playlist";
 
 export default class PlaylistService {
 
     constructor(private playlistApiService: PlaylistApiService = new DefaultPlaylistApiService()) {
     }
 
-    getPlaylist(req: PlaylistRequest): Observable<PlaylistGroup[]> {
+    getPlaylistCategories(req: PlaylistRequest): Observable<PlaylistCategories> {
         return new Observable((obs) =>
             this.playlistApiService.getPlaylist(req).pipe(first()).subscribe({
-                next: (pl: PlaylistGroup[]) => {
+                next: (pl: PlaylistCategories) => {
                     if (pl) {
                         let cnt = 0;
-                        pl.forEach(g => {
+                        [pl.live, pl.vod, pl.series].flat().forEach(g => {
                             g.id = ++cnt;
-                            g.channels.forEach(c => c.id = ++cnt);
+                            g.channels?.forEach(c => c.id = ++cnt);
                         })
                         obs.next(pl);
                     } else {

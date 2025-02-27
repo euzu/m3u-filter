@@ -2,6 +2,7 @@ import './tag-select.scss';
 import {useCallback, useEffect, useMemo, useState} from "react";
 import {noop} from "rxjs";
 import {genUuid} from "../../utils/uuid";
+import useTranslator from "../../hook/use-translator";
 
 interface TagSelectProps {
     name: string;
@@ -14,6 +15,7 @@ interface TagSelectProps {
 
 export default function TagSelect(props: TagSelectProps) {
     const {name, multi, options, defaultValues, onSelect, radio} = props;
+    const translate = useTranslator();
     const [selected, setSelected] = useState<Record<number, boolean>>({});
     const uuid = useMemo(() => genUuid(), []);
 
@@ -59,7 +61,7 @@ export default function TagSelect(props: TagSelectProps) {
         {options.map((o, idx) =>
             <span key={uuid + '-' + idx}
                   className={'tag-select__tag' + (selected[idx] ? ' tag-select__tag-selected' : '')}
-                  data-idx={idx} onClick={handleTagClick}>{o.label}</span>
+                  data-idx={idx} onClick={handleTagClick}>{translate(o.label)}</span>
         )}
     </div>
 }

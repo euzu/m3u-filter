@@ -1,13 +1,17 @@
-import React, {forwardRef, useImperativeHandle, useMemo, useEffect, useState, useCallback} from "react";
+import React, {forwardRef, useImperativeHandle, useMemo, useEffect, useState, useCallback, useRef} from "react";
 import './playlist-viewer.scss';
-import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
 import PlaylistTree, {PlaylistTreeState} from "../playlist-tree/playlist-tree";
-import {Observable, noop, tap, finalize} from "rxjs";
-import {useSnackbar} from "notistack";
-import {first} from "rxjs/operators";
+import {Observable, noop} from "rxjs";
 import ServerConfig from "../../model/server-config";
 import PlaylistGallery from "../playlist-gallery/playlist.gallery";
 import {getIconByName} from "../../icons/icons";
+import {
+    EmptyPlaylistCategories,
+    PlaylistCategories,
+    PlaylistCategory,
+    PlaylistGroup,
+    PlaylistItem
+} from "../../model/playlist";
 
 function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: boolean }): PlaylistGroup[] {
     if (playlist) {
@@ -35,7 +39,7 @@ function filterMatchingChannels(grp: PlaylistGroup, searchRequest: SearchRequest
     if (channels.length) {
         return {
             id: grp.id,
-            title: grp.title,
+            name: grp.name,
             channels
         } as PlaylistGroup;
     }
@@ -47,7 +51,7 @@ function filterMatchingGroups(gl: PlaylistGroup[], searchRequest: SearchRequest)
         searchRequest.filter = searchRequest.filter.toLowerCase();
         const result: PlaylistGroup[] = [];
         for (const g of gl) {
-            if (textMatch(g.title, searchRequest)) {
+            if (textMatch(g.name, searchRequest)) {
                 result.push(g);
             } else {
                 const matches = filterMatchingChannels(g, searchRequest);
@@ -68,12 +72,12 @@ export interface SearchRequest  {
 
 
 export interface IPlaylistViewer {
-    getFilteredPlaylist: () => PlaylistGroup[];
+    getFilteredPlaylist: () => PlaylistCategories;
 }
 
 interface PlaylistViewerProps {
     serverConfig: ServerConfig;
-    playlist: PlaylistGroup[];
+    playlist: PlaylistCategories;
     searchChannel: Observable<SearchRequest>;
     onProgress: (value: boolean) => void;
     onCopy: (playlistItem: PlaylistItem) => void;
@@ -85,13 +89,14 @@ interface PlaylistViewerProps {
 const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: PlaylistViewerProps, ref: any) => {
     const {serverConfig, playlist, searchChannel,
         onProgress, onCopy, onPlay, onDownload, onWebSearch} = props;
-    const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
-    const [data, setData] = useState<PlaylistGroup[]>([]);
+    // const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
+    const [data, setData] = useState<PlaylistCategories>(EmptyPlaylistCategories);
+    const currentCatgoryRef = useRef<PlaylistCategory>(PlaylistCategory.LIVE);
     const [galleryView, setGalleryView] = useState<boolean>(localStorage.getItem("galleryView") === '1');
     const checked = useMemo((): PlaylistTreeState => ({}), []);
     const reference = useMemo(() => (
         {
-            getFilteredPlaylist: () => filterPlaylist(playlist, checked)
+            getFilteredPlaylist: () => filterPlaylist((playlist as any)[currentCatgoryRef.current], checked)
         }), [playlist, checked]);
 
     useImperativeHandle(ref, () => reference);
@@ -101,34 +106,34 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
         return noop;
     }, [playlist]);
 
-    useEffect(() => {
-        const sub = searchChannel.subscribe((searchRequest: SearchRequest) => {
-            let criteria = searchRequest.filter;
-            // eslint-disable-next-line eqeqeq
-            if (criteria == undefined || !criteria.length || !criteria.trim().length) {
-                setData(playlist);
-            } else {
-                const trimmedCrit = criteria.trim();
-                if (trimmedCrit.length < 2) {
-                    enqueueSnackbar("Minimum search criteria length is 2", {variant: 'info'});
-                } else {
-                    searchRequest.filter = trimmedCrit;
-                    filterMatchingGroups(playlist, searchRequest).pipe(
-                        tap(() => onProgress && onProgress(true)),
-                        finalize(() => onProgress && onProgress(false)),
-                        first())
-                        .subscribe((matches: PlaylistGroup[]) => {
-                            if (matches.length) {
-                                setData(matches);
-                            } else {
-                                enqueueSnackbar("Nothing found!", {variant: 'info'});
-                            }
-                        });
-                }
-            }
-        });
-        return () => sub.unsubscribe();
-    }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
+    // useEffect(() => {
+    //     const sub = searchChannel.subscribe((searchRequest: SearchRequest) => {
+    //         let criteria = searchRequest.filter;
+    //         // eslint-disable-next-line eqeqeq
+    //         if (criteria == undefined || !criteria.length || !criteria.trim().length) {
+    //             setData(playlist);
+    //         } else {
+    //             const trimmedCrit = criteria.trim();
+    //             if (trimmedCrit.length < 2) {
+    //                 enqueueSnackbar("Minimum search criteria length is 2", {variant: 'info'});
+    //             } else {
+    //                 searchRequest.filter = trimmedCrit;
+    //                 filterMatchingGroups(playlist[currentCatgoryRef.current], searchRequest).pipe(
+    //                     tap(() => onProgress && onProgress(true)),
+    //                     finalize(() => onProgress && onProgress(false)),
+    //                     first())
+    //                     .subscribe((matches: PlaylistGroup[]) => {
+    //                         if (matches.length) {
+    //                             setData(matches);
+    //                         } else {
+    //                             enqueueSnackbar("Nothing found!", {variant: 'info'});
+    //                         }
+    //                     });
+    //             }
+    //         }
+    //     });
+    //     return () => sub.unsubscribe();
+    // }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
 
     const renderContent = () => {
         if (galleryView) {
@@ -137,7 +142,7 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
                                     onWebSearch={onWebSearch}
                                     serverConfig={serverConfig}/>
         }
-        return <PlaylistTree data={data} state={checked}
+        return <PlaylistTree data={data[currentCatgoryRef.current]} state={checked}
                              onCopy={onCopy} onPlay={onPlay}
                              onDownload={onDownload}
                              onWebSearch={onWebSearch}

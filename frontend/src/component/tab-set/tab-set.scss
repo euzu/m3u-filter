@@ -5,6 +5,8 @@
   gap: 2px;
   background-color: var(--tabset-background-color);
   border-bottom: 1px solid var(--tabset-border-color);
+  border-top-left-radius: var(--border-radius);
+  border-top-right-radius: var(--border-radius);
 
   list-style-type: none;
   padding: 0;

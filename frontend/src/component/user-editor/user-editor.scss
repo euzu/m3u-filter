@@ -5,14 +5,6 @@
   min-width: 160px;
 }
 
-dialog {
-  border: none;
-  background-color: var(--card-background-color);
-  &::backdrop {
-    background: rgba(0, 0, 0, 0.6); /* Schwarzer, halbtransparenter Hintergrund */
-  }
-}
-
 .user-editor {
   & {
     min-height: 400px;
