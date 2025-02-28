@@ -80,7 +80,8 @@
     "PROVIDER": "Provider",
     "CUSTOM": "Custom",
     "XTREAM_CODES": "xtream codes",
-    "M3U": "m3u"
+    "M3U": "m3u",
+    "PLAYLIST_BROWSER": "Playlist Browser"
   },
   "TITLE": {
     "USER_BOUQUET_EDITOR": "User group editor"

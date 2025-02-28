@@ -104,7 +104,7 @@ impl Iterator for M3uPlaylistIterator {
         }
 
         // TODO hls and unknown reverse proxy
-        self.reader.next().map(|m3u_pli| {
+        self.reader.next().map(|(m3u_pli, _has_next)| {
             let rewrite_urls = match m3u_pli.item_type {
                 PlaylistItemType::LiveHls => None,
                 _ => if match &self.proxy_type {

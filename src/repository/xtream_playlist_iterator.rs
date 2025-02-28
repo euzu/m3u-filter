@@ -68,12 +68,12 @@ impl Iterator for XtreamPlaylistIterator {
         }
         if let Some(set) = &self.filter {
             self.reader
-                .find(|pli| set.contains(&pli.category_id.to_string()))
-                .map(|pli| pli.to_doc(&self.base_url, &self.options, &self.user).to_string())
+                .find(|(pli, _has_next)| set.contains(&pli.category_id.to_string()))
+                .map(|(pli, _has_next)| pli.to_doc(&self.base_url, &self.options, &self.user).to_string())
         } else {
             self.reader
                 .next()
-                .map(|pli| pli.to_doc(&self.base_url, &self.options, &self.user).to_string())
+                .map(|(pli, _has_next)| pli.to_doc(&self.base_url, &self.options, &self.user).to_string())
         }
     }
 }

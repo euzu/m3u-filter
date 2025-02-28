@@ -1,6 +1,4 @@
-use crate::m3u_filter_error::str_to_io_error;
-use crate::repository::storage::hex_encode;
-use crate::utils::file::file_utils::file_reader;
+use crate::utils::file::file_lock_manager::FileReadGuard;
 use log::error;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -8,15 +6,15 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
-
-use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, notify_err};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::repository::storage::hex_encode;
+use crate::utils::file::file_utils::file_reader;
+use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, str_to_io_error, info_err, create_m3u_filter_error, create_m3u_filter_error_result, notify_err};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::{rewrite_doc_urls, XtreamMappingOptions, XtreamSeriesEpisode, INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, SEASON_RESOURCE_PREFIX};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
-use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentWriter};
+use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
 use crate::repository::playlist_repository::get_target_id_mapping;
 use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::repository::target_id_mapping::{VirtualIdRecord};
@@ -941,12 +939,19 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::io;
-
-    #[test]
-    fn test() -> io::Result<()> {
-        Ok(())
+pub fn iter_raw_xtream_playlist(config: &Config, target: &ConfigTarget, cluster: XtreamCluster)  -> Option<(FileReadGuard, impl Iterator<Item = (XtreamPlaylistItem, bool)>)> {
+    if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
+        let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
+        if !xtream_path.exists() || !idx_path.exists() {
+            return None;
+        }
+        let file_lock = config.file_locks.read_lock(&xtream_path);
+        match IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&xtream_path, &idx_path)
+            .map_err(|err| info_err!(format!("Could not deserialize file {xtream_path:?} - {err}"))) {
+            Ok(reader) => Some((file_lock, reader)),
+            Err(_) => None
+        }
+    } else {
+        None
     }
 }

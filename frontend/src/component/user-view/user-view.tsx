@@ -173,7 +173,7 @@ export default function UserView(props: UserViewProps) {
             const result: TargetUser[] = target_names?.map(name => ({
                 src: true,
                 target: name,
-                credentials: config.api_proxy.user.find(t => t.target === name)?.credentials || []
+                credentials: config.api_proxy?.user.find(t => t.target === name)?.credentials || []
             } as any));
             prepareCredentials(result);
             missing?.forEach(target => {

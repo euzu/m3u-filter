@@ -13,9 +13,39 @@ export interface PlaylistItemHeader {
     url: string;
 }
 
+export enum XtreamCluster {
+    Live = 'Live',
+    Video = 'Video',
+    Series = 'Series',
+}
+
+export enum PlaylistItemType {
+    Live = 'Live',
+    Video = 'Video',
+    Series = 'Series', //  xtream series description
+    SeriesInfo = 'SeriesInfo', //  xtream series info fetched for series description
+    Catchup = 'Catchup',
+    LiveUnknown = 'LiveUnknown', // No Provider id
+    LiveHls = 'LiveHls', // m3u8 entry
+}
+
 export interface PlaylistItem {
     id: number;
-    header: PlaylistItemHeader;
+    category_id: number,
+    provider_id: number,
+    virtual_id: number,
+    url: string,
+    name: string,
+    title: string,
+    channel_no: number,
+    epg_channel_id: string,
+    group: string,
+    input_name: string,
+    item_type: PlaylistItemType,
+    logo: string,
+    logo_small: string,
+    xtream_cluster: XtreamCluster,
+    additional_properties: string,
 }
 
 export interface PlaylistGroup {
@@ -30,10 +60,22 @@ export interface PlaylistCategories {
     series: PlaylistGroup[],
 }
 
+
+export interface PlaylistChannels {
+    live: PlaylistItem[],
+    vod: PlaylistItem[],
+    series: PlaylistItem[],
+}
+
 export enum PlaylistCategory {
     LIVE = 'live',
     VOD = 'vod',
     SERIES = 'series'
+}
+
+export interface PlaylistResponse {
+    categories: PlaylistCategories,
+    channels: PlaylistChannels,
 }
 
 export const EmptyPlaylistCategories: PlaylistCategories = {live: [], vod: [], series: []}

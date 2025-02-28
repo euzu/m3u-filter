@@ -80,7 +80,7 @@ pub struct RegexWithCaptures {
 #[derive(Parser)]
 #[grammar_inline = r#"
 WHITESPACE = _{ " " | "\t" | "\r" | "\n"}
-field = { ^"group" | ^"title" | ^"name" | ^"url" }
+field = { ^"group" | ^"title" | ^"name" | ^"url" | ^"input"}
 and = { ^"and" }
 or = { ^"or" }
 not = { ^"not" }
@@ -698,6 +698,7 @@ mod tests {
     fn test_filter_6() {
         let flt = r####"
             Group ~ "^EU \| FRANCE.*"
+            OR  Input ~ "hello"
             OR  Group ~ "^VOD \| FR.*"
             OR  Group ~ "\[FR\].*"
             OR  Group ~ "^SRS \| FR.*"

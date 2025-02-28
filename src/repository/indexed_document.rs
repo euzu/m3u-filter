@@ -336,13 +336,14 @@ where
     pub fn has_next(&self) -> bool {
         !self.failed && self.index < self.offsets.len()
     }
-    pub fn read_next(&mut self) -> Result<Option<T>, Error> {
+    pub fn read_next(&mut self) -> Result<Option<(T, bool)>, Error> {
         if !self.has_next() {
             return Ok(None);
         }
         // read content-size
         self.main_file.seek(SeekFrom::Start(u64::from(self.offsets[self.index])))?;
         self.index += 1;
+        let has_next = self.has_next();
         let buf_size: usize = IndexedDocument::read_content_size(&mut self.main_file)?;
         // resize buffer if necessary
         if self.t_buffer.capacity() < buf_size {
@@ -353,7 +354,7 @@ where
         self.main_file.read_exact(&mut self.t_buffer[0..buf_size])?;
         // deserialize buffer
         match bincode_deserialize::<T>(&self.t_buffer[0..buf_size]) {
-            Ok(value) => Ok(Some(value)),
+            Ok(value) => Ok(Some((value, has_next))),
             Err(err) => {
                 self.failed = true;
                 Err(str_to_io_error(&format!("Failed to deserialize document {err}")))
@@ -366,7 +367,7 @@ impl<K, T: serde::de::DeserializeOwned> Iterator for IndexedDocumentIterator<K, 
 where
     K: Ord + Serialize + for<'de> Deserialize<'de> + Clone + Debug,
 {
-    type Item = T;
+    type Item = (T, bool);
 
     // Implement the next() method
     fn next(&mut self) -> Option<Self::Item> {
@@ -573,7 +574,7 @@ mod tests {
         {
             let reader = IndexedDocumentIterator::<u32, Record>::new(&main_path, &index_path)?;
             let mut i = 0;
-            for doc in reader {
+            for (doc, _) in reader {
                 assert_eq!(doc.id, i, "Wrong id");
                 assert_eq!(doc.data, format!("Entry {}", i + 9000), "Wrong data");
                 i += 1;

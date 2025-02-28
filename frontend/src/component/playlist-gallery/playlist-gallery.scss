@@ -1,3 +1,5 @@
+@use '../../scss/common';
+
 $card-width: 180px;
 $card-height: 200px;
 
@@ -5,9 +7,88 @@ $category-size: 96px;
 
 .playlist-gallery {
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: column;
   overflow: hidden;
   flex: 1 1 auto;
+  gap: 8px;
+
+  &__breadcrumbs {
+    flex-flow: row;
+    align-items: center;
+    //height: 2em;
+    //min-height: 2em;
+    display: flex;
+    //overflow: hidden;
+    gap: 4px;
+    border-radius: 5px;
+    background-color: var(--breadcrumbs-background-color);
+
+    button {
+      @include common.iconButton();
+    }
+
+    span {
+      cursor: pointer;
+      background-color: var(--breadcrumb-background-color);
+      color: var(--breadcrumb-color);
+      line-height: 1.8em;
+      text-align: center;
+      padding: 0 4px 0 20px;
+      position: relative;
+
+      &:after {
+        background: var(--breadcrumb-background-color);
+        bottom: 0;
+        clip-path: polygon(50% 50%, -50% -50%, 0 100%);
+        content: '';
+        left: 100%;
+        position: absolute;
+        top: 0;
+        width: 2em;
+        z-index: 1;
+      }
+
+      &:before {
+        background: var(--breadcrumbs-background-color);
+        bottom: 0;
+        clip-path: polygon(-50% -50%, 50% 50%, 0 100%);
+        content: '';
+        left: 0;
+        position: absolute;
+        top: 0;
+        width: 2em;
+      }
+
+      &:last-child {
+        border-right: none;
+        &:after {
+          background: var(--breadcrumb-active-background-color);
+        }
+        background: var(--breadcrumb-active-background-color);
+        color: var(--breadcrumb-active-color);
+      }
+
+      &:not(:last-child) {
+        &:hover {
+          &:after {
+            background: var(--text-button-hover-background-color);
+          }
+
+          background: var(--text-button-hover-background-color);
+          color: var(--text-button-hover-color);
+        }
+      }
+    }
+  }
+
+  &__categories {
+    display: flex;
+    flex-flow: row;
+    justify-content: center;
+    align-items: center;
+    flex: 1 1 auto;
+    gap: 12px;
+  }
 
   &__category {
     display: flex;
@@ -33,99 +114,62 @@ $category-size: 96px;
     }
   }
 
-  &__categories {
+  &__content {
     display: flex;
-    flex-flow: row;
-    flex: 1 1 auto;
+    flex-flow: column;
+    width: 100%;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+  }
+
+  .channel-Live {
+  }
+  .channel-Video {
+  }
+  .channel-Series {
+  }
+
+
+  &__channels,
+  &__groups {
+    display: grid;
+    grid-gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    overflow-x: hidden;
     overflow-y: auto;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
+    gap: 8px;
+    padding: 4px;
+    background-color: var(--background-color);
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: var(--border-radius);
 
-    .selected-group {
-      color: var(--tool-button-hover-color);
-      background-color: var(--tool-button-hover-background-color);
-    }
-
+    &-channel,
     &-group {
-      padding: 8px 4px;
-      min-height: 2rem;
+      border:1px solid var(--border-color);
+      padding: 12px 8px;
+      border-radius: var(--border-radius);
+      background-color: var(--card-background-color);
+      color: var(--card-color);
       box-sizing: border-box;
-      overflow: hidden;
+      display: flex;
+      flex-flow: row nowrap;
+      gap: 8px;
       white-space: nowrap;
-      text-overflow: ellipsis;
       cursor: pointer;
-
-      &:not(:first-child) {
-        border-top: 1px solid var(--border-color);
-      }
-
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-height: 3em;
       &:hover {
-        background-color: var(--tab-hover-background-color);
-        color: var(--tab-hover-color);
+        color: var(--icon-button-hover-color);
+        background-color: var(--icon-button-hover-background-color);
       }
-
-      &:active {
-        transform: scale(0.95);
-      }
-
     }
   }
 
-  &__showcase {
-    display: flex;
-    flex-flow: row wrap;
-    gap: 8px;
-    padding: 8px;
-    align-content: flex-start;
-    overflow-y: auto;
-    justify-content: flex-start;
-
-    &-card {
-      display: flex;
-      flex-flow: column;
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      height: $card-height;
-      width: $card-width;
-      overflow: hidden;
-      cursor: pointer;
-
-      &:hover {
-        border: 1px solid var(--text-button-hover-color);
-      }
-
-      &-header {
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        padding: 8px 4px;
-        overflow: hidden;
-        flex: 0 0 auto;
-      }
-
-      &-content {
-        display: flex;
-        flex-flow: column;
-        justify-content: center;
-        align-items: center;
-        flex: 1 1 auto;
-        background-color: var(--shocase-card-background);
-
-        img {
-          aspect-ratio: 1 / 1;
-          max-width: $card-width;
-          width: 80%;
-        }
-      }
-
-      &-footer {
-        display: flex;
-        flex-flow: row nowrap;
-        gap: 4px;
-        justify-content: center;
-        align-items: center;
-        flex: 1 1 auto;
-      }
+  &__groups {
+    &-group {
+      height: 48px;
     }
   }
 }

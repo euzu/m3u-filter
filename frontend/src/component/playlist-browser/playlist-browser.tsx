@@ -4,10 +4,9 @@ import SourceSelector from "..//source-selector/source-selector";
 import PlaylistViewer, {IPlaylistViewer, SearchRequest} from "../playlist-viewer/playlist-viewer";
 import {useSnackbar} from 'notistack';
 import {useServices} from "../../provider/service-provider";
-import {first} from "rxjs/operators";
 import Progress from '..//progress/progress';
 import PlaylistFilter from "../playlist-filter/playlist-filter";
-import {noop, Subject} from "rxjs";
+import {finalize, first, noop, Subject} from "rxjs";
 import PlaylistVideo from "../playlist-video/playlist-video";
 import ClipboardViewer from "../clipboard-viewer/clipboard-viewer";
 import Sidebar from "../sidebar/sidebar";
@@ -17,6 +16,7 @@ import FileDownload from "../file-download/file-download";
 import {FileDownloadInfo} from "../../model/file-download";
 import useTranslator from "../../hook/use-translator";
 import {EmptyPlaylistCategories, PlaylistCategories, PlaylistItem} from "../../model/playlist";
+import LoadingIndicator from "../loading-indicator/loading-indicator";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface PlaylistBrowserProps {
@@ -36,16 +36,14 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
     const videoChannel = useMemo(() => new Subject<PlaylistItem>(), []);
     const handleSourceDownload = useCallback((req: PlaylistRequest) => {
         setProgress(true);
-        services.playlist().getPlaylistCategories(req).pipe(first()).subscribe({
+        services.playlist().getPlaylistCategories(req).pipe(first(), finalize(() => setProgress(false))).subscribe({
             next: (pl: PlaylistCategories) => {
                 enqueueSnackbar(translate("MESSAGES.DOWNLOAD.PLAYLIST.SUCCESS"), {variant: 'success'})
                 setPlaylist(pl);
             },
             error: (err) => {
-                setProgress(false);
                 enqueueSnackbar(translate("MESSAGES.DOWNLOAD.PLAYLIST.FAIL"), {variant: 'error'});
             },
-            complete: () => setProgress(false),
         });
     }, [enqueueSnackbar, services, translate]);
 
@@ -62,12 +60,12 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
     }, [videoChannel]);
 
     const handleOnCopy = useCallback((playlistItem: PlaylistItem): void => {
-        clipboardChannel.next(playlistItem.header.url);
+        clipboardChannel.next(playlistItem.url);
     }, [clipboardChannel]);
 
     const handleOnDownload = useCallback((playlistItem: PlaylistItem): void => {
-        let filename = playlistItem.header.title;
-        const parts = playlistItem.header.url.split('.');
+        let filename = playlistItem.title;
+        const parts = playlistItem.url.split('.');
         let ext = undefined;
         if (parts.length > 1) {
             ext = parts[parts.length - 1];
@@ -75,7 +73,7 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
 
         if (config.video?.extensions?.includes(ext)) {
             services.file().download({
-                url: playlistItem.header.url,
+                url: playlistItem.url,
                 filename: filename + '.' + ext
             }).pipe(first()).subscribe({
                 next: (_: FileDownloadInfo) => {
@@ -90,7 +88,7 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
 
     const handleOnWebSearch = useCallback((playlistItem: PlaylistItem): void => {
         if (playlistItem) {
-            let title = playlistItem.header.title;
+            let title = playlistItem.title;
             let pattern = config.video.download?.episode_pattern;
             if (pattern) {
                 pattern = pattern.replace('?P<episode>', '?<episode>');
@@ -120,6 +118,7 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
                 <PlaylistFilter onFilter={handleFilter}/>
                 <SourceSelector onDownload={handleSourceDownload} serverConfig={config}/>
             </div>
+            <LoadingIndicator loading={progress}/>
             <PlaylistViewer ref={viewerRef} playlist={playlist} searchChannel={searchChannel}
                             onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}
                             onDownload={handleOnDownload}

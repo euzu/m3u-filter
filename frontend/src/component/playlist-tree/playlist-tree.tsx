@@ -21,7 +21,7 @@ interface PlaylistTreeProps {
 }
 
 export default function PlaylistTree(props: PlaylistTreeProps) {
-    const {serverConfig, state, data, onCopy, onPlay, onDownload, onWebSearch} = props;
+    const {serverConfig, data, onCopy, onPlay, onDownload, onWebSearch} = props;
 
     const [, setForceUpdate] = useState(undefined);
     const expanded = useRef<PlaylistTreeState>({});
@@ -52,12 +52,6 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         return undefined;
     }, [data]);
 
-    const handleChange = useCallback((event: any) => {
-        const key = event.target.dataset.group;
-        state[key] = !state[key];
-        setForceUpdate({});
-    }, [state]);
-
     const handleExpand = useCallback((event: any) => {
         const key = event.target.dataset.group;
         expanded.current[key] = !expanded.current[key];
@@ -68,7 +62,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         const item = getPlaylistItemById(e.target.dataset.item);
         if (item) {
             onCopy(item);
-            copyToClipboard(item.header.url).pipe(first()).subscribe({
+            copyToClipboard(item.url).pipe(first()).subscribe({
                 next: value => enqueueSnackbar(value ? "URL copied to clipboard" : "Copy to clipboard failed!", {variant: value ? 'success' : 'error'}),
                 error: _ => enqueueSnackbar("Copy to clipboard failed!", {variant: 'error'}),
                 complete: noop,
@@ -108,9 +102,9 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     }, [onPlay, getPlaylistItemById]);
 
     const isVideoFile = useCallback((entry: PlaylistItem): boolean => {
-        if (videoExtensions && entry.header.url) {
+        if (videoExtensions && entry.url) {
             for (const ext of videoExtensions) {
-                if (entry.header.url.endsWith(ext)) {
+                if (entry.url.endsWith(ext)) {
                     return true;
                 }
             }
@@ -142,7 +136,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
             </div>
             <div className={'tree-group__channel-content'}>
                 <div className={'tree-group__channel-nr'}>{index + 1}</div>
-                {entry.header.name}</div>
+                {entry.name}</div>
         </div>
     }, [handleClipboardUrl, handlePlayUrl, handleDownloadUrl, isVideoFile, handleWebSearch, serverConfig]);
 
@@ -153,7 +147,6 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                      onClick={handleExpand}>{getIconByName(expanded.current[group.id] ?
                     'ExpandMore' : 'ChevronRight')}</div>
                 <div className={'tree-group__header-content'}>
-                    <input type={"checkbox"} onChange={handleChange} data-group={group.id}/>
                     {group.name}
                     <div className={'tree-group__count'}>({group.channels?.length})</div>
                 </div>
@@ -163,7 +156,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                     {group.channels?.map(renderEntry)}
                 </div>)}
         </div>;
-    }, [handleChange, handleExpand, renderEntry]);
+    }, [handleExpand, renderEntry]);
 
     const renderPlaylist = useCallback((): React.ReactNode => {
         if (!data) {

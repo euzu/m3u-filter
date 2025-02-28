@@ -17,18 +17,18 @@ export default class FileService {
     private notifyDownload(info: FileDownloadInfo) {
         this.downloadNotification.next(info);
     }
-
-    save(playlist: PlaylistGroup[]) {
-        const lines = ['#EXTM3U'];
-        playlist.forEach(group => {
-            group.channels.forEach((entry: PlaylistItem) => {
-                lines.push(entry.header.source);
-                lines.push(entry.header.url);
-            })
-        });
-        const blob = new Blob([lines.join('\n')], { type: "text/plain;charset=utf-8" });
-        FileSaver.saveAs(blob, "playlist.m3u");
-    }
+    //
+    // save(playlist: PlaylistGroup[]) {
+    //     const lines = ['#EXTM3U'];
+    //     playlist.forEach(group => {
+    //         group.channels.forEach((entry: PlaylistItem) => {
+    //             lines.push(entry.header.source);
+    //             lines.push(entry.header.url);
+    //         })
+    //     });
+    //     const blob = new Blob([lines.join('\n')], { type: "text/plain;charset=utf-8" });
+    //     FileSaver.saveAs(blob, "playlist.m3u");
+    // }
 
     download(req: FileDownloadRequest): Observable<FileDownloadInfo> {
         return this.fileApiService.download(req).pipe(tap((result) => this.notifyDownload(result) ));

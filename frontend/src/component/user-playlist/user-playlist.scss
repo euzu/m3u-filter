@@ -14,7 +14,6 @@
   &__categories-panel {
     @include common.container_vert_no_padding();
     overflow: hidden;
-    gap: 8px;
   }
   &__categories-toolbar {
     @include common.container_horz_no_padding();
@@ -23,7 +22,7 @@
 
   &__categories {
     display: grid;
-    grid-gap: 10px; /* Abstand zwischen den Elementen */
+    grid-gap: 10px;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     overflow-x: hidden;
     overflow-y: auto;

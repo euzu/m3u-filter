@@ -6,12 +6,12 @@ use actix_web::middleware::Condition;
 use actix_web::{web, HttpResponse};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use bytes::Bytes;
-use futures::stream;
+use futures::{stream, Stream, StreamExt};
 use log::error;
 use serde_json::json;
 
-use crate::api::endpoints::download_api;
 use crate::api::endpoints::user_api::user_api_register;
+use crate::api::endpoints::{download_api, user_api};
 use crate::api::model::app_state::AppState;
 use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::api::model::request::{PlaylistRequest, PlaylistRequestType};
@@ -19,10 +19,12 @@ use crate::auth::authenticator::validator_admin;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, TargetType};
+use crate::model::playlist::{XtreamCluster, XtreamPlaylistItem};
 use crate::processing::processor::playlist;
 use crate::repository::user_repository::store_api_user;
 use crate::repository::xtream_repository;
 use crate::utils::file::config_reader;
+use crate::utils::file::file_lock_manager::FileReadGuard;
 use crate::utils::network::request::sanitize_sensitive_info;
 use crate::utils::network::{m3u, xtream};
 
@@ -204,23 +206,65 @@ async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInp
     }
 }
 
+fn to_stream<I>(channels: Option<(FileReadGuard, I)>) -> impl Stream<Item=Result<Bytes, String>>
+where
+    I: Iterator<Item=(XtreamPlaylistItem, bool)> + 'static,
+{
+    match channels {
+        Some((_, chans)) => {
+            // Convert iterator items to Result<Bytes, String>
+            let mapped = chans.map(move |(item, has_next)| {
+                match serde_json::to_string(&item) {
+                    Ok(content) => {
+                        Ok(Bytes::from(if has_next {
+                            format!("{content},")
+                        } else {
+                            content
+                        }))
+                    }
+                    Err(_) => Ok(Bytes::from("")),
+                }
+            });
+            stream::iter(mapped).left_stream()
+        }
+        None => {
+            stream::once(async { Ok(Bytes::from("")) }).right_stream()
+        }
+    }
+}
+
 async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Config) -> HttpResponse {
     if let Some(target) = cfg_target {
         let target_name = &target.name;
         if target.has_output(&TargetType::Xtream) {
-            let live_categories = crate::api::endpoints::user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_LIVE)).await;
-            let vod_categories = crate::api::endpoints::user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_VOD)).await;
-            let series_categories = crate::api::endpoints::user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_SERIES)).await;
+            let live_categories = user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_LIVE)).await;
+            let vod_categories = user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_VOD)).await;
+            let series_categories = user_api::get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_SERIES)).await;
+
+            let live_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Live);
+            let vod_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Video);
+            let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
+
+            let live_stream = to_stream(live_channels);
+            let vod_stream = to_stream(vod_channels);
+            let series_stream = to_stream(series_channels);
+
             let json_stream =
                 stream::iter(vec![
-                    Ok::<Bytes, String>(Bytes::from(r#"{"live": "#.to_string())),
+                    Ok::<Bytes, String>(Bytes::from(r#"{"categories": {"live": "#.to_string())),
                     Ok::<Bytes, String>(Bytes::from(live_categories.unwrap_or("null".to_string()))),
                     Ok::<Bytes, String>(Bytes::from(r#", "vod": "#.to_string())),
                     Ok::<Bytes, String>(Bytes::from(vod_categories.unwrap_or("null".to_string()))),
                     Ok::<Bytes, String>(Bytes::from(r#", "series": "#.to_string())),
                     Ok::<Bytes, String>(Bytes::from(series_categories.unwrap_or("null".to_string()))),
-                    Ok::<Bytes, String>(Bytes::from(r"}".to_string())),
-                ]);
+                    Ok::<Bytes, String>(Bytes::from(r#"},"channels": {"live": ["#.to_string())),
+                ]).chain(live_stream).chain(stream::iter(vec![
+                    Ok::<Bytes, String>(Bytes::from(r#"], "vod": ["#.to_string())),
+                ])).chain(vod_stream).chain(stream::iter(vec![
+                    Ok::<Bytes, String>(Bytes::from(r#"], "series": ["#.to_string())),
+                ])).chain(series_stream).chain(stream::iter(vec![
+                    Ok::<Bytes, String>(Bytes::from(r"]}}".to_string())),
+                ]));
             return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(BodyStream::new(json_stream));
         } else if target.has_output(&TargetType::M3u) {
             return HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"}));

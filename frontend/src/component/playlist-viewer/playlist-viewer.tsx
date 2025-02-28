@@ -3,7 +3,7 @@ import './playlist-viewer.scss';
 import PlaylistTree, {PlaylistTreeState} from "../playlist-tree/playlist-tree";
 import {Observable, noop} from "rxjs";
 import ServerConfig from "../../model/server-config";
-import PlaylistGallery from "../playlist-gallery/playlist.gallery";
+import PlaylistGallery from "../playlist-gallery/playlist-gallery";
 import {getIconByName} from "../../icons/icons";
 import {
     EmptyPlaylistCategories,
@@ -32,7 +32,7 @@ function textMatch(text: string, searchRequest: SearchRequest): boolean {
 function filterMatchingChannels(grp: PlaylistGroup, searchRequest: SearchRequest): PlaylistGroup {
     let channels: PlaylistItem[] = [];
     for (const c of grp.channels) {
-        if (textMatch(c.header.name, searchRequest)) {
+        if (textMatch(c.name, searchRequest)) {
             channels.push(c);
         }
     }
@@ -91,12 +91,12 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
         onProgress, onCopy, onPlay, onDownload, onWebSearch} = props;
     // const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [data, setData] = useState<PlaylistCategories>(EmptyPlaylistCategories);
-    const currentCatgoryRef = useRef<PlaylistCategory>(PlaylistCategory.LIVE);
+    const currentCategoryRef = useRef<PlaylistCategory>(PlaylistCategory.LIVE);
     const [galleryView, setGalleryView] = useState<boolean>(localStorage.getItem("galleryView") === '1');
     const checked = useMemo((): PlaylistTreeState => ({}), []);
     const reference = useMemo(() => (
         {
-            getFilteredPlaylist: () => filterPlaylist((playlist as any)[currentCatgoryRef.current], checked)
+            getFilteredPlaylist: () => filterPlaylist((playlist as any)[currentCategoryRef.current], checked)
         }), [playlist, checked]);
 
     useImperativeHandle(ref, () => reference);
@@ -142,7 +142,7 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
                                     onWebSearch={onWebSearch}
                                     serverConfig={serverConfig}/>
         }
-        return <PlaylistTree data={data[currentCatgoryRef.current]} state={checked}
+        return <PlaylistTree data={data[currentCategoryRef.current]} state={checked}
                              onCopy={onCopy} onPlay={onPlay}
                              onDownload={onDownload}
                              onWebSearch={onWebSearch}
