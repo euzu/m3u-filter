@@ -29,9 +29,8 @@ interface PlaylistGalleryProps {
 export default function PlaylistGallery(props: PlaylistGalleryProps) {
 
     const {data, onCopy, onPlay, onWebSearch, onDownload, serverConfig} = props;
-    const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
+    // const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const translate = useTranslator();
-
     const [selectedItem, setSelectedItem] = useState<PlaylistItem>();
     const [selectedGroup, setSelectedGroup] = useState<PlaylistGroup>();
     const [selectedCategory, setSelectedCategory] = useState<PlaylistCategory>();
@@ -165,12 +164,35 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
     //     return group.channels?.map(renderPlaylistItem);
     // }, [group, renderPlaylistItem]);
 
+    // useEffect(() => {
+    //     if (selectedItem) {
+    //
+    //     }
+    // }, [selectedItem]);
+
     useEffect(() => {
-        if (selectedItem) {
-
+        if (selectedCategory) {
+            let groups = (data as any)[selectedCategory];
+            if (!groups?.length) {
+                setSelectedItem(undefined);
+                setSelectedGroup(undefined);
+                setSelectedCategory(undefined);
+            }
+            if (selectedGroup && groups?.length) {
+                let group = groups.find((g: PlaylistGroup) => g.id === selectedGroup.id);
+                if (!group) {
+                    setSelectedItem(undefined);
+                    setSelectedGroup(undefined);
+                }
+                if (group && selectedItem) {
+                    let channel = group.channels.find((c: PlaylistItem) => c.id === selectedItem.id);
+                    if (!channel) {
+                        setSelectedItem(undefined);
+                    }
+                }
+            }
         }
-    }, [selectedItem]);
-
+    }, [data, selectedCategory, selectedGroup])
 
     const handleCategorySelect = useCallback((evt: any) => {
         let category = evt.target.dataset.category;
@@ -227,7 +249,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
             return <div>
                 {JSON.stringify(item)}
                 <div>{item.title}</div>
-                <img src={item.logo} alt={'logo'} />
+                <img loading='lazy'  src={item.logo} alt={'logo'} />
             </div>;
 
         }
@@ -240,8 +262,13 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                 <div key={channel.id} onClick={handleChannelSelect}
                      data-category={category} data-group={group.id} data-channel={channel.id}
                      className={'playlist-gallery__channels-channel channel-' + channel.xtream_cluster}>
-                    {/*{getLogo(channel) && <img alt={"logo"} src={getLogo(channel)} onError={(e: any) => e.target.style.display='none'}/>}*/}
-                    {channel.title}
+                    <div className="playlist-gallery__channels-channel-logo">
+                        {getLogo(channel) && <img loading='lazy' alt={"logo"} src={getLogo(channel)}
+                                                  onError={(e: any) => (e.target.onerror=null) || (e.target.src="/missing-logo.svg")}/>}
+                    </div>
+                    <div className="playlist-gallery__channels-channel-name">
+                        {channel.title}
+                    </div>
                 </div>
             ))}
         </div>;

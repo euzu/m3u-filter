@@ -61,9 +61,11 @@ $category-size: 96px;
 
       &:last-child {
         border-right: none;
+
         &:after {
           background: var(--breadcrumb-active-background-color);
         }
+
         background: var(--breadcrumb-active-background-color);
         color: var(--breadcrumb-active-color);
       }
@@ -103,6 +105,7 @@ $category-size: 96px;
     border-radius: var(--border-radius);
     padding: 10px;
     cursor: pointer;
+
     svg {
       width: 100%;
       height: 100%;
@@ -124,17 +127,20 @@ $category-size: 96px;
 
   .channel-Live {
   }
+
   .channel-Video {
   }
+
   .channel-Series {
   }
 
+  $grid-cell-width: 300px;
 
   &__channels,
   &__groups {
     display: grid;
     grid-gap: 10px;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax($grid-cell-width, 1fr));
     overflow-x: hidden;
     overflow-y: auto;
     gap: 8px;
@@ -146,20 +152,18 @@ $category-size: 96px;
 
     &-channel,
     &-group {
-      border:1px solid var(--border-color);
+      border: 1px solid var(--border-color);
       padding: 12px 8px;
       border-radius: var(--border-radius);
       background-color: var(--card-background-color);
       color: var(--card-color);
       box-sizing: border-box;
-      display: flex;
-      flex-flow: row nowrap;
       gap: 8px;
-      white-space: nowrap;
       cursor: pointer;
       overflow: hidden;
       text-overflow: ellipsis;
       min-height: 3em;
+
       &:hover {
         color: var(--icon-button-hover-color);
         background-color: var(--icon-button-hover-background-color);
@@ -167,9 +171,48 @@ $category-size: 96px;
     }
   }
 
+  &__channels {
+    &-channel {
+      position: relative;
+      height: 240px;
+      width: $grid-cell-width;
+
+      &-logo {
+        display: flex;
+        justify-content: center;
+        align-content: center;
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        bottom: 12px;
+        right: 12px;
+        img {
+          fill: white;
+          aspect-ratio: 1 / 1;
+        }
+      }
+
+      &-name {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: $grid-cell-width;
+        height: 4em;
+        padding-top: 10px;
+        text-align: center;
+        background-color: #00000099;
+        font-weight: bold;
+        font-size: 1.2em;
+      }
+    }
+  }
+
   &__groups {
     &-group {
+      display: flex;
+      flex-flow: row nowrap;
       height: 48px;
+      white-space: nowrap;
     }
   }
 }

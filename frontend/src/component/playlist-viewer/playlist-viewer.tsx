@@ -1,7 +1,7 @@
 import React, {forwardRef, useImperativeHandle, useMemo, useEffect, useState, useCallback, useRef} from "react";
 import './playlist-viewer.scss';
 import PlaylistTree, {PlaylistTreeState} from "../playlist-tree/playlist-tree";
-import {Observable, noop} from "rxjs";
+import {Observable, noop, tap, finalize} from "rxjs";
 import ServerConfig from "../../model/server-config";
 import PlaylistGallery from "../playlist-gallery/playlist-gallery";
 import {getIconByName} from "../../icons/icons";
@@ -12,18 +12,13 @@ import {
     PlaylistGroup,
     PlaylistItem
 } from "../../model/playlist";
-
-function filterPlaylist(playlist: PlaylistGroup[], filter: { [key: string]: boolean }): PlaylistGroup[] {
-    if (playlist) {
-        return playlist.filter(group => filter[group.id] !== true)
-    }
-    return undefined;
-}
+import {useSnackbar} from "notistack";
+import {first} from "rxjs/operators";
 
 function textMatch(text: string, searchRequest: SearchRequest): boolean {
     if (searchRequest.regexp) {
         // eslint-disable-next-line eqeqeq
-        return text.toLowerCase().match(searchRequest.filter) != undefined;
+        return text.match(searchRequest.filter) != undefined;
     } else {
         return (text.toLowerCase().indexOf(searchRequest.filter) > -1);
     }
@@ -46,21 +41,33 @@ function filterMatchingChannels(grp: PlaylistGroup, searchRequest: SearchRequest
     return undefined;
 }
 
-function filterMatchingGroups(gl: PlaylistGroup[], searchRequest: SearchRequest): Observable<PlaylistGroup[]> {
-    return new Observable<PlaylistGroup[]>((observer) => {
+function filterMatchingGroups(playlistCategories: PlaylistCategories, searchRequest: SearchRequest): Observable<PlaylistCategories> {
+    return new Observable<PlaylistCategories>((observer) => {
         searchRequest.filter = searchRequest.filter.toLowerCase();
-        const result: PlaylistGroup[] = [];
-        for (const g of gl) {
-            if (textMatch(g.name, searchRequest)) {
-                result.push(g);
-            } else {
-                const matches = filterMatchingChannels(g, searchRequest);
-                if (matches) {
-                    result.push(matches);
+        const result: PlaylistCategories = {
+            live:[],
+            vod: [],
+            series: [],
+        };
+        for (const category of ['live', 'vod', 'series']) {
+            const groups = (playlistCategories as any)[category] ?? [];
+            const currentResult = (result as any)[category];
+            for (const g of groups) {
+                if (textMatch(g.name, searchRequest)) {
+                    currentResult.push(g);
+                } else {
+                    const matches = filterMatchingChannels(g, searchRequest);
+                    if (matches) {
+                        currentResult.push(matches);
+                    }
                 }
             }
         }
-        observer.next(result);
+        if (result.live.length || result.vod.length || result.series.length) {
+            observer.next(result);
+        } else {
+            observer.next(undefined);
+        }
         observer.complete();
     })
 }
@@ -86,54 +93,49 @@ interface PlaylistViewerProps {
     onWebSearch?: (playlistItem: PlaylistItem) => void;
 }
 
-const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: PlaylistViewerProps, ref: any) => {
+export default function PlaylistViewer(props:  PlaylistViewerProps) {
     const {serverConfig, playlist, searchChannel,
         onProgress, onCopy, onPlay, onDownload, onWebSearch} = props;
-    // const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
+    const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [data, setData] = useState<PlaylistCategories>(EmptyPlaylistCategories);
-    const currentCategoryRef = useRef<PlaylistCategory>(PlaylistCategory.LIVE);
     const [galleryView, setGalleryView] = useState<boolean>(localStorage.getItem("galleryView") === '1');
     const checked = useMemo((): PlaylistTreeState => ({}), []);
-    const reference = useMemo(() => (
-        {
-            getFilteredPlaylist: () => filterPlaylist((playlist as any)[currentCategoryRef.current], checked)
-        }), [playlist, checked]);
-
-    useImperativeHandle(ref, () => reference);
 
     useEffect(() => {
         setData(playlist);
         return noop;
     }, [playlist]);
 
-    // useEffect(() => {
-    //     const sub = searchChannel.subscribe((searchRequest: SearchRequest) => {
-    //         let criteria = searchRequest.filter;
-    //         // eslint-disable-next-line eqeqeq
-    //         if (criteria == undefined || !criteria.length || !criteria.trim().length) {
-    //             setData(playlist);
-    //         } else {
-    //             const trimmedCrit = criteria.trim();
-    //             if (trimmedCrit.length < 2) {
-    //                 enqueueSnackbar("Minimum search criteria length is 2", {variant: 'info'});
-    //             } else {
-    //                 searchRequest.filter = trimmedCrit;
-    //                 filterMatchingGroups(playlist[currentCatgoryRef.current], searchRequest).pipe(
-    //                     tap(() => onProgress && onProgress(true)),
-    //                     finalize(() => onProgress && onProgress(false)),
-    //                     first())
-    //                     .subscribe((matches: PlaylistGroup[]) => {
-    //                         if (matches.length) {
-    //                             setData(matches);
-    //                         } else {
-    //                             enqueueSnackbar("Nothing found!", {variant: 'info'});
-    //                         }
-    //                     });
-    //             }
-    //         }
-    //     });
-    //     return () => sub.unsubscribe();
-    // }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
+    useEffect(() => {
+        const sub = searchChannel.subscribe((searchRequest: SearchRequest) => {
+            let criteria = searchRequest.filter;
+            // eslint-disable-next-line eqeqeq
+            if (criteria == undefined || !criteria.length || !criteria.trim().length) {
+                setData(playlist);
+            } else {
+                const trimmedCrit = criteria.trim();
+                if (trimmedCrit.length < 2) {
+                    enqueueSnackbar("Minimum search criteria length is 2", {variant: 'info'});
+                } else {
+                    searchRequest.filter = trimmedCrit;
+                    onProgress && onProgress(true)
+                    filterMatchingGroups(playlist, searchRequest).pipe(
+                        finalize(() => onProgress && onProgress(false)),
+                        first())
+                        .subscribe((matches: PlaylistCategories) => {
+                            if (matches) {
+                                const foundCount = matches.live.length +  matches.vod.length +   matches.series.length;
+                                enqueueSnackbar("Found Entries: " + foundCount, {variant: 'success'});
+                                setData(matches);
+                            } else {
+                                enqueueSnackbar("Nothing found!", {variant: 'info'});
+                            }
+                        });
+                }
+            }
+        });
+        return () => sub.unsubscribe();
+    }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
 
     const renderContent = () => {
         if (galleryView) {
@@ -142,7 +144,7 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
                                     onWebSearch={onWebSearch}
                                     serverConfig={serverConfig}/>
         }
-        return <PlaylistTree data={data[currentCategoryRef.current]} state={checked}
+        return <PlaylistTree data={data} state={checked}
                              onCopy={onCopy} onPlay={onPlay}
                              onDownload={onDownload}
                              onWebSearch={onWebSearch}
@@ -166,6 +168,4 @@ const PlaylistViewer = forwardRef<IPlaylistViewer, PlaylistViewerProps>((props: 
             {renderContent()}
         </div>
     </div>
-});
-
-export default PlaylistViewer;
+}

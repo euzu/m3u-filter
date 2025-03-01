@@ -1,6 +1,6 @@
 import React, {useCallback, useState, useRef, useEffect} from 'react';
 import './playlist-tree.scss';
-import {PlaylistGroup, PlaylistItem} from "../../model/playlist";
+import {PlaylistCategories, PlaylistGroup, PlaylistItem} from "../../model/playlist";
 import copyToClipboard from "../../utils/clipboard";
 import {first} from "rxjs/operators";
 import {noop} from "rxjs";
@@ -12,7 +12,7 @@ export type PlaylistTreeState = { [key: number]: boolean };
 
 interface PlaylistTreeProps {
     serverConfig: ServerConfig;
-    data: PlaylistGroup[];
+    data: PlaylistCategories;
     state: PlaylistTreeState;
     onCopy: (playlistItem: PlaylistItem) => void;
     onPlay?: (playlistItem: PlaylistItem) => void;
@@ -38,8 +38,9 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
     const getPlaylistItemById = useCallback((itemId: string): PlaylistItem => {
         const id = parseInt(itemId);
         if (data && !isNaN(id)) {
-            for (let i = 0, len = data.length; i < len; i++) {
-                const group = data[i];
+            const groups = [data.live, data.vod, data.series].flat();
+            for (let i = 0, len = groups.length; i < len; i++) {
+                const group = groups[i];
                 for (let j = 0, clen = group.channels?.length ?? 0; j < clen; j++) {
                     const plitem = group.channels[j];
                     // eslint-disable-next-line eqeqeq
@@ -163,7 +164,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
             return <React.Fragment/>;
         }
         return <React.Fragment>
-            {data.map(renderGroup)}
+            {[data.live, data.vod, data.series].flat().map(renderGroup)}
         </React.Fragment>;
     }, [data, renderGroup]);
 

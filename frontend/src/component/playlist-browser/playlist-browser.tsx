@@ -30,7 +30,6 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
     const [progress, setProgress] = useState<boolean>(false);
     const [playlist, setPlaylist] = useState<PlaylistCategories>(EmptyPlaylistCategories);
     const clipboardChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
-    const viewerRef = useRef<IPlaylistViewer>(undefined);
     const translate = useTranslator();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const videoChannel = useMemo(() => new Subject<PlaylistItem>(), []);
@@ -48,6 +47,9 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
     }, [enqueueSnackbar, services, translate]);
 
     const handleFilter = useCallback((filter: string, regexp: boolean): void => {
+        if (!regexp) {
+            filter = filter.toLowerCase();
+        }
         searchChannel.next({filter, regexp});
     }, [searchChannel]);
 
@@ -119,7 +121,7 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
                 <SourceSelector onDownload={handleSourceDownload} serverConfig={config}/>
             </div>
             <LoadingIndicator loading={progress}/>
-            <PlaylistViewer ref={viewerRef} playlist={playlist} searchChannel={searchChannel}
+            <PlaylistViewer playlist={playlist} searchChannel={searchChannel}
                             onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}
                             onDownload={handleOnDownload}
                             onWebSearch={handleOnWebSearch}
