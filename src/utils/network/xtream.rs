@@ -204,9 +204,7 @@ pub fn create_vod_info_from_item(user: &ProxyUserCredentials, pli: &XtreamPlayli
   "movie_data": {{
     "added": "{added}",
     "category_id": {category_id},
-    "category_ids": [
-      {category_id}
-    ],
+    "category_ids": [{category_id}],
     "container_extension": "{extension}",
     "custom_sid": "",
     "direct_source": "",

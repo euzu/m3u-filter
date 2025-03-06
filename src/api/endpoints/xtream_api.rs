@@ -141,7 +141,7 @@ fn get_user_info(user: &ProxyUserCredentials, app_state: &AppState) -> XtreamAut
 async fn xtream_player_api_stream(
     req: &HttpRequest,
     api_req: &web::Query<UserApiRequest>,
-    app_state: &web::Data<AppState>,
+    app_state: &web::Data<Arc<AppState>>,
     stream_req: XtreamApiStreamRequest<'_>,
 ) -> HttpResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state).await, false, format!("Could not find any user {}", stream_req.username));
@@ -332,7 +332,7 @@ fn xtream_get_season_resource_url(config: &Config, pli: &XtreamPlaylistItem, tar
 async fn xtream_player_api_resource(
     req: &HttpRequest,
     api_req: &web::Query<UserApiRequest>,
-    app_state: &web::Data<AppState>,
+    app_state: &web::Data<Arc<AppState>>,
     resource_req: XtreamApiStreamRequest<'_>,
 ) -> HttpResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(resource_req.username, resource_req.password, api_req, app_state).await, false, format!("Could not find any user {}", resource_req.username));
@@ -375,7 +375,7 @@ macro_rules! create_xtream_player_api_stream {
             req: HttpRequest,
             api_req: web::Query<UserApiRequest>,
             path: web::Path<(String, String, String)>,
-            app_state: web::Data<AppState>,
+            app_state: web::Data<Arc<AppState>>,
         ) -> HttpResponse {
             let (username, password, stream_id) = path.into_inner();
             xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from($context, &username, &password, &stream_id, "")).await
@@ -389,7 +389,7 @@ macro_rules! create_xtream_player_api_resource {
             req: HttpRequest,
             api_req: web::Query<UserApiRequest>,
             path: web::Path<(String, String, String, String)>,
-            app_state: web::Data<AppState>,
+            app_state: web::Data<Arc<AppState>>,
         ) -> HttpResponse {
             let (username, password, stream_id, resource) = path.into_inner();
             xtream_player_api_resource(&req, &api_req, &app_state, XtreamApiStreamRequest::from($context, &username, &password, &stream_id, &resource)).await
@@ -421,7 +421,7 @@ async fn xtream_player_api_timeshift_stream(
     api_query_req: web::Query<UserApiRequest>,
     api_form_req: web::Form<UserApiRequest>,
     path: web::Path<(String, String, String, String, String)>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let (path_username, path_password, path_duration, path_start, path_stream_id) = path.into_inner();
     let username = get_non_empty(&path_username, &api_query_req.username, &api_form_req.username);
@@ -579,7 +579,7 @@ macro_rules! skip_flag_optional {
 async fn xtream_player_api(
     req: &HttpRequest,
     api_req: UserApiRequest,
-    app_state: &web::Data<AppState>,
+    app_state: &web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let user_target = get_user_target(&api_req, app_state).await;
     if let Some((user, target)) = user_target {
@@ -675,30 +675,27 @@ async fn xtream_player_api(
     }
 }
 
-fn xtream_create_content_stream(xtream_iter: impl Iterator<Item=String>) -> impl Stream<Item=Result<Bytes, String>> {
-    let mut first_item = true;
+fn xtream_create_content_stream(xtream_iter: impl Iterator<Item=(String, bool)>) -> impl Stream<Item=Result<Bytes, String>> {
     stream::once(async { Ok::<Bytes, String>(Bytes::from("[")) }).chain(
-        stream::iter(xtream_iter.map(move |line| {
-            let line = if first_item {
-                first_item = false;
-                line
+        stream::iter(xtream_iter.map(move |(line, has_next)| {
+            Ok::<Bytes, String>(Bytes::from(if has_next {
+                format!("{line},")
             } else {
-                format!(",{line}")
-            };
-            Ok::<Bytes, String>(Bytes::from(line))
+                line.to_string()
+            }))
         })).chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
 }
 
 async fn xtream_player_api_get(req: HttpRequest,
                                api_req: web::Query<UserApiRequest>,
-                               app_state: web::Data<AppState>,
+                               app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     xtream_player_api(&req, api_req.into_inner(), &app_state).await
 }
 
 async fn xtream_player_api_post(req: HttpRequest,
                                 api_req: web::Form<UserApiRequest>,
-                                app_state: web::Data<AppState>,
+                                app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     xtream_player_api(&req, api_req.into_inner(), &app_state).await
 }

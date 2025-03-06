@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use mime::APPLICATION_JSON;
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
-use crate::api::model::app_state::AppState;
+use crate::api::model::app_state::{AppState, HdHomerunAppState};
 use crate::api::model::download::DownloadQueue;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
@@ -27,6 +27,7 @@ use crate::tools::lru_cache::{LRUResourceCache};
 use crate::utils::size_utils::human_readable_byte_size;
 use crate::utils::sys_utils;
 use crate::{BUILD_TIMESTAMP, VERSION};
+use crate::api::endpoints::hdhomerun_api::{hdhr_api_register};
 use crate::api::model::active_provider_manager::ActiveProviderManager;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -39,7 +40,7 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
     Ok(web_dir_path)
 }
 
-fn create_healthcheck(app_state: &web::Data<AppState>) -> Healthcheck {
+fn create_healthcheck(app_state: &web::Data<Arc<AppState>>) -> Healthcheck {
     let server_time = chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string();
     let cache = app_state.cache.as_ref().as_ref().map(|c| c.lock().get_size_text());
     let (active_clients, active_connections) =  {
@@ -59,11 +60,11 @@ fn create_healthcheck(app_state: &web::Data<AppState>) -> Healthcheck {
     }
 }
 
-async fn healthcheck(app_state: web::Data<AppState>,) -> HttpResponse {
+async fn healthcheck(app_state: web::Data<Arc<AppState>>,) -> HttpResponse {
     HttpResponse::Ok().json(create_healthcheck(&app_state))
 }
 
-async fn status(app_state: web::Data<AppState>,) -> HttpResponse {
+async fn status(app_state: web::Data<Arc<AppState>>,) -> HttpResponse {
     let status = create_healthcheck(&app_state);
     match serde_json::to_string_pretty(&status) {
         Ok(pretty_json) => HttpResponse::Ok().content_type(APPLICATION_JSON).body(pretty_json),
@@ -71,7 +72,7 @@ async fn status(app_state: web::Data<AppState>,) -> HttpResponse {
     }
 }
 
-fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
+fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let lru_cache = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()).and_then(|c| if c.enabled  {
         Some(PlMutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
     } else { None} );
@@ -86,7 +87,7 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
         }
     });
     let user_access_control = cfg.user_access_control;
-    Data::new(AppState {
+    AppState {
         config: Arc::clone(cfg),
         http_client: Arc::new(reqwest::Client::new()),
         downloads: Arc::from(DownloadQueue::new()),
@@ -94,7 +95,7 @@ fn create_shared_data(cfg: &Arc<Config>) -> Data<AppState> {
         shared_stream_manager: Arc::new(SharedStreamManager::new()),
         active_users: Arc::new(ActiveUserManager::new()),
         active_provider: Arc::new(ActiveProviderManager::new(user_access_control)),
-    })
+    }
 }
 
 fn exec_update_on_boot(client: Arc<reqwest::Client>, cfg: &Arc<Config>, targets: &Arc<ProcessTargets>) {
@@ -159,8 +160,43 @@ fn is_web_auth_enabled(cfg: &Arc<Config>, web_ui_enabled: bool) -> bool {
     false
 }
 
+fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec<String>) {
+    let host = cfg.api.host.to_string();
+    if let Some(hdhomerun) = &cfg.hdhomerun {
+        if hdhomerun.enabled {
+            for device in &hdhomerun.devices {
+                if device.t_enabled {
+                    let app_data = Arc::clone(app_state);
+                    let app_host = host.clone();
+                    let port = device.port;
+                    let device_clone = Arc::new(device.clone());
+                    infos.push(format!("HdHomeRun Server '{}' running: http://{host}:{port}", device.name));
+                    actix_rt::spawn(async move {
+                        HttpServer::new(move || {
+                            App::new()
+                                .wrap(Logger::default())
+                                .wrap(Cors::default()
+                                    .supports_credentials()
+                                    .allow_any_origin()
+                                    .allowed_methods(vec!["GET", "POST", "OPTIONS", "HEAD"])
+                                    .allow_any_header()
+                                    .max_age(3600))
+                                .app_data(Data::new(HdHomerunAppState {
+                                    app_state: Arc::clone(&app_data),
+                                    device: Arc::clone(&device_clone),
+                                }))
+                                .configure(hdhr_api_register)
+                        }).bind(format!("{}:{port}", app_host.clone()))?.run().await
+                    });
+                }
+            }
+        }
+    }
+}
+
 #[actix_web::main]
 pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> futures::io::Result<()> {
+    let mut infos = Vec::new();
     let host = cfg.api.host.to_string();
     let port = cfg.api.port;
     let web_ui_enabled = cfg.web_ui_enabled;
@@ -169,14 +205,23 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         Err(err) => return Err(err)
     };
     if web_ui_enabled {
-        info!("Web root: {:?}", &web_dir_path);
+        infos.push(format!("Web root: {:?}", &web_dir_path));
     }
-    let shared_data = create_shared_data(&cfg);
+    let app_state = Arc::new(create_shared_data(&cfg));
+    let shared_data = Data::new(Arc::clone(&app_state));
 
     exec_scheduler(&Arc::clone(&shared_data.http_client), &cfg, &targets);
     exec_update_on_boot(Arc::clone(&shared_data.http_client), &cfg, &targets);
     let web_auth_enabled = is_web_auth_enabled(&cfg, web_ui_enabled);
 
+    if cfg.t_api_proxy.read().is_some() {
+        start_hdhomerun(&cfg, &app_state, &mut infos);
+    }
+
+    infos.push(format!("Server running: http://{}:{}", &cfg.api.host, &cfg.api.port));
+    for info in &infos {
+        info!("{info}");
+    }
     // Web Server
     HttpServer::new(move || {
         App::new()

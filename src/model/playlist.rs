@@ -284,13 +284,15 @@ pub struct M3uPlaylistItem {
     pub epg_channel_id: Option<Rc<String>>,
     pub input_name: Rc<String>,
     pub item_type: PlaylistItemType,
+    #[serde(skip)]
+    pub t_stream_url: String,
+    #[serde(skip)]
+    pub t_resource_url: Option<String>,
 }
 
 impl M3uPlaylistItem {
-    pub fn to_m3u(&self, target_options: Option<&ConfigTargetOptions>, rewrite_urls: Option<&(String, Option<String>)>) -> String {
-        let (stream_url, resource_url) = rewrite_urls
-            .map_or_else(|| (self.url.as_str(), None), |(su, ru)| (su.as_str(), ru.as_ref().map(String::as_str)));
-
+    #[allow(clippy::missing_panics_doc)]
+    pub fn to_m3u(&self, target_options: Option<&ConfigTargetOptions>, rewrite_urls: bool) -> String {
         let options = target_options.as_ref();
         let ignore_logo = options.is_some_and(|o| o.ignore_logo);
         let mut line = format!("#EXTINF:-1 tvg-id=\"{}\" tvg-name=\"{}\" group-title=\"{}\"",
@@ -298,13 +300,10 @@ impl M3uPlaylistItem {
                                self.name, self.group);
 
         if !ignore_logo {
-            match resource_url {
-                None => {
-                    to_m3u_non_empty_fields!(self, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
-                }
-                Some(res_url) => {
-                    to_m3u_resource_non_empty_fields!(self, res_url, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
-                }
+            if rewrite_urls && self.t_resource_url.is_some(){
+                to_m3u_resource_non_empty_fields!(self, self.t_resource_url.as_ref().unwrap(), line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
+            } else {
+                to_m3u_non_empty_fields!(self, line, (logo, "tvg-logo"), (logo_small, "tvg-logo-small"););
             }
         }
 
@@ -315,7 +314,8 @@ impl M3uPlaylistItem {
             (time_shift, "timeshift"),
             (rec, "tvg-rec"););
 
-        format!("{},{}\n{}", line, self.title, stream_url)
+        let url = if self.t_stream_url.is_empty() { &self.url } else { &self.t_stream_url };
+        format!("{line},{}\n{url}", self.title, )
     }
 }
 
@@ -505,6 +505,8 @@ impl PlaylistItem {
             epg_channel_id: header.epg_channel_id.clone(),
             input_name: Rc::clone(&header.input_name),
             item_type: header.item_type,
+            t_stream_url: header.url.to_string(),
+            t_resource_url: None,
         }
     }
 

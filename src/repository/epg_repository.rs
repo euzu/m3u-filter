@@ -54,8 +54,8 @@ pub fn epg_write(target: &ConfigTarget, cfg: &Config, target_path: &Path, epg: O
                     None => return Err(notify_err!(format!("failed to serialize epg for target: {}, storage path not found", target.name))),
                 }
             }
-            TargetType::Strm => {}
-        }
+            TargetType::Strm | TargetType::HdHomeRun => {}
+            }
     }
     Ok(())
 }

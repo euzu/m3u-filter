@@ -55,6 +55,7 @@ tempfile = "3.16"
 ruzstd = "0"
 filetime = "0.2"
 parking_lot = "0.12"
+socket2 = "0.5"
 #[cfg(target_os = "macos")]
 libc = "0"
 #[cfg(target_os = "windows")]

@@ -1,5 +1,6 @@
 #![allow(clippy::struct_excessive_bools)]
 use enum_iterator::Sequence;
+use parking_lot::RwLock;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -7,7 +8,6 @@ use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
-use parking_lot::RwLock;
 use std::sync::Arc;
 
 use crate::auth::user::UserCredential;
@@ -22,8 +22,8 @@ use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::utils::file::config_reader;
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
+use crate::utils::file::config_reader;
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
@@ -51,6 +51,7 @@ macro_rules! valid_property {
 }
 pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
+use crate::model::hdhomerun_config::HdHomeRunConfig;
 use crate::utils::string_utils::get_trimmed_string;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
@@ -61,12 +62,15 @@ pub enum TargetType {
     Xtream,
     #[serde(rename = "strm")]
     Strm,
+    #[serde(rename = "hdhomerun")]
+    HdHomeRun,
 }
 
 impl TargetType {
     const M3U: &'static str = "M3u";
     const XTREAM: &'static str = "Xtream";
     const STRM: &'static str = "Strm";
+    const HDHOMERUN: &'static str = "HdHomeRun";
 }
 
 impl Display for TargetType {
@@ -75,6 +79,7 @@ impl Display for TargetType {
             Self::M3u => Self::M3U,
             Self::Xtream => Self::XTREAM,
             Self::Strm => Self::STRM,
+            Self::HdHomeRun => Self::HDHOMERUN,
         })
     }
 }
@@ -305,8 +310,8 @@ pub struct ConfigTargetOptions {
 pub struct TargetOutput {
     #[serde(alias = "type")]
     pub target: TargetType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub filename: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "filename")]
+    pub output: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
 }
@@ -354,24 +359,16 @@ impl ConfigTarget {
         let mut strm_cnt = 0;
         let mut xtream_cnt = 0;
         let mut strm_needs_xtream = false;
-        for format in &self.output {
-            let has_username = if let Some(username) = &format.username { !username.trim().is_empty() } else { false };
-            let has_filename = if let Some(fname) = &format.filename { !fname.trim().is_empty() } else { false };
+        let mut hdhr_cnt = 0;
+        for target_output in &self.output {
+            let has_username = if let Some(username) = &target_output.username { !username.trim().is_empty() } else { false };
+            let has_filename = if let Some(fname) = &target_output.output { !fname.trim().is_empty() } else { false };
 
-            match format.target {
+            match target_output.target {
                 TargetType::M3u => {
                     m3u_cnt += 1;
                     if has_username {
                         warn!("Username for target output m3u is ignored: {}", self.name);
-                    }
-                }
-                TargetType::Strm => {
-                    strm_cnt += 1;
-                    if !has_filename {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for strm type: {}", self.name);
-                    }
-                    if has_username {
-                        strm_needs_xtream = true;
                     }
                 }
                 TargetType::Xtream => {
@@ -386,15 +383,38 @@ impl ConfigTarget {
                         warn!("Filename for target output xtream is ignored: {}", self.name);
                     }
                 }
+                TargetType::Strm => {
+                    strm_cnt += 1;
+                    if !has_filename {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for strm type: {}", self.name);
+                    }
+                    if has_username {
+                        strm_needs_xtream = true;
+                    }
+                }
+                TargetType::HdHomeRun => {
+                    hdhr_cnt += 1;
+                    if !has_username {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Username is required for HdHomeRun type: {}", self.name);
+                    }
+                    let hdhr_name = target_output.output.as_ref().map_or("", |s| s.trim());
+                    if hdhr_name.is_empty() {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Output is required for HdHomeRun type: {}", self.name);
+                    }
+                }
             }
         }
 
-        if m3u_cnt > 1 || strm_cnt > 1 || xtream_cnt > 1 {
+        if m3u_cnt > 1 || strm_cnt > 1 || xtream_cnt > 1 || hdhr_cnt > 1 {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Multiple output formats with same type : {}", self.name);
         }
 
         if strm_cnt > 0 && strm_needs_xtream && xtream_cnt == 0 {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "strm output with a username is only permitted when used in combination with xtream output: {}", self.name);
+        }
+
+        if hdhr_cnt > 0 && (xtream_cnt == 0 && m3u_cnt == 0) {
+            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun output is only permitted when used in combination with xtream or m3u output: {}", self.name);
         }
 
         if let Some(watch) = &self.watch {
@@ -434,7 +454,7 @@ impl ConfigTarget {
     pub fn get_m3u_filename(&self) -> Option<&String> {
         for format in &self.output {
             if format.target == TargetType::M3u {
-                return format.filename.as_ref();
+                return format.output.as_ref();
             }
         }
         None
@@ -781,7 +801,6 @@ pub struct VideoConfig {
 }
 
 impl VideoConfig {
-
     /// # Panics
     ///
     /// Will panic if default `RegEx` gets invalid
@@ -1074,6 +1093,8 @@ pub struct Config {
     pub messaging: Option<MessagingConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reverse_proxy: Option<ReverseProxyConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hdhomerun: Option<HdHomeRunConfig>,
     #[serde(skip)]
     pub t_api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
     #[serde(skip)]
@@ -1091,8 +1112,63 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) {
+    pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) -> Result<(), M3uFilterError> {
         self.t_api_proxy = Arc::new(RwLock::new(api_proxy));
+        self.check_target_user()
+    }
+
+    fn check_username(&self, output_username: Option<&str>, target_name: &str) -> Result<(), M3uFilterError> {
+        if let Some(username) = output_username {
+            if let Some((_, config_target)) = self.get_target_for_username(username) {
+                if config_target.name != target_name {
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "User:{username} does not belong to target: {}", target_name);
+                }
+            }
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+    fn check_target_user(&mut self) -> Result<(), M3uFilterError> {
+        let check_homerun = self.hdhomerun.as_ref().is_some_and(|h| h.enabled);
+        for source in &self.sources {
+            for target in &source.targets {
+                for output in &target.output {
+                    match output.target {
+                        TargetType::M3u | TargetType::Xtream => {}
+                        TargetType::Strm => {
+                            self.check_username(output.username.as_deref(), &target.name)?;
+                        }
+                        TargetType::HdHomeRun => {
+                            if check_homerun {
+                                if let Some(hdhr_name) = output.output.as_ref() {
+                                    self.check_username(output.username.as_deref(), &target.name)?;
+                                    if let Some(homerun) = &mut self.hdhomerun {
+                                        for device in &mut homerun.devices {
+                                            if &device.name == hdhr_name {
+                                                if let Some(username) = output.username.as_ref() {
+                                                    device.t_username.clone_from(username);
+                                                    device.t_enabled = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(hdhomerun) = &self.hdhomerun {
+            for device in &hdhomerun.devices {
+                if !device.t_enabled {
+                    debug!("HdHomeRun device '{}' has no username and will be disabled", device.name);
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn is_reverse_proxy_resource_rewrite_enabled(&self) -> bool {
@@ -1125,8 +1201,8 @@ impl Config {
     }
 
     pub fn get_target_for_username(&self, username: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        if let Some(credentials) =  self.get_user_credentials(username) {
-            return self.t_api_proxy.read().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(&credentials.username, &credentials.password)))
+        if let Some(credentials) = self.get_user_credentials(username) {
+            return self.t_api_proxy.read().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(&credentials.username, &credentials.password)));
         }
         None
     }
@@ -1256,7 +1332,7 @@ impl Config {
             match file_utils::read_file_as_bytes(&PathBuf::from(&channel_unavailable)) {
                 Ok(data) => {
                     self.t_channel_unavailable_file = Some(Arc::new(data));
-                },
+                }
                 Err(err) => {
                     error!("Failed to load channel unavailable file: {channel_unavailable} {err}");
                 }
@@ -1289,6 +1365,13 @@ impl Config {
         if let Some(reverse_proxy) = self.reverse_proxy.as_mut() {
             reverse_proxy.prepare(&self.working_dir, resolve_var);
         }
+
+        if let Some(hdhomerun) = self.hdhomerun.as_mut() {
+            if hdhomerun.enabled {
+                hdhomerun.prepare(self.api.port)?;
+            }
+        }
+
         self.api.prepare();
         self.prepare_api_web_root(resolve_var);
         if let Some(templates) = &mut self.templates {

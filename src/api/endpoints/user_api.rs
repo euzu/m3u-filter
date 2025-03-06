@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::api::api_utils::{get_user_target_by_username, get_username_from_auth_header};
 use crate::api::model::app_state::AppState;
 use crate::auth::authenticator::validator_user;
@@ -39,7 +40,7 @@ pub(crate) async fn get_categories_content(action: Result<(Option<PathBuf>, Opti
 
 async fn playlist_categories(
     credentials: Option<BearerAuth>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     if let Some(username) = get_username_from_auth_header(credentials, &app_state) {
         if let Some((user, target)) = get_user_target_by_username(username.as_str(), &app_state).await {
@@ -73,7 +74,7 @@ async fn playlist_categories(
 
 async fn save_playlist_bouquet(
     credentials: Option<BearerAuth>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
     req: web::Json<PlaylistCategoriesDto>,
 ) -> HttpResponse {
     if let Some(username) = get_username_from_auth_header(credentials, &app_state) {
@@ -96,7 +97,7 @@ async fn save_playlist_bouquet(
 
 async fn playlist_bouquet(
     credentials: Option<BearerAuth>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     if let Some(username) = get_username_from_auth_header(credentials, &app_state) {
         if let Some((user, _target)) = get_user_target_by_username(username.as_str(), &app_state).await {

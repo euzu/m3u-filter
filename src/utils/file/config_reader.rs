@@ -33,18 +33,18 @@ pub fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<O
     }
 }
 
-pub fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) -> Option<String> {
+pub fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &mut Config) -> Result<Option<String>, M3uFilterError> {
     let api_proxy_config_file: String = args_api_proxy_config.unwrap_or_else(|| file_utils::get_default_api_proxy_config_path(cfg.t_config_path.as_str()));
     api_proxy_config_file.clone_into(&mut cfg.t_api_proxy_file_path);
     let api_proxy_config = read_api_proxy(cfg, api_proxy_config_file.as_str(), true);
     match api_proxy_config {
         None => {
             warn!("cant read api_proxy_config file: {}", api_proxy_config_file.as_str());
-            None
+            Ok(None)
         }
         Some(config) => {
-            cfg.set_api_proxy(Some(config));
-            Some(api_proxy_config_file)
+            cfg.set_api_proxy(Some(config))?;
+            Ok(Some(api_proxy_config_file))
         }
     }
 }

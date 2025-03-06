@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use actix_web::{web, HttpRequest, HttpResponse};
 use bytes::Bytes;
 use futures::stream;
@@ -27,7 +28,7 @@ async fn m3u_api(
             match m3u_load_rewrite_playlist(&app_state.config, target, &user).await {
                 Ok(m3u_iter) => {
                     // Convert the iterator into a stream of `Bytes`
-                    let content_stream = stream::iter(m3u_iter.map(|line| Ok::<Bytes, String>(Bytes::from([line.as_bytes(), b"\n"].concat()))));
+                    let content_stream = stream::iter(m3u_iter.map(|line| Ok::<Bytes, String>(Bytes::from([line.to_string().as_bytes(), b"\n"].concat()))));
                     let mut builder = HttpResponse::Ok();
                     builder.content_type(mime::TEXT_PLAIN_UTF_8);
                     if api_req.content_type == "m3u_plus" {
@@ -46,13 +47,13 @@ async fn m3u_api(
 }
 
 async fn m3u_api_get(api_req: web::Query<UserApiRequest>,
-                     app_state: web::Data<AppState>,
+                     app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     m3u_api(&api_req.into_inner(), &app_state).await
 }
 async fn m3u_api_post(
     api_req: web::Form<UserApiRequest>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     m3u_api(&api_req.into_inner(), &app_state).await
 }
@@ -61,7 +62,7 @@ async fn m3u_api_stream(
     req: HttpRequest,
     api_req: web::Query<UserApiRequest>,
     path: web::Path<(String, String, String)>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let (username, password, stream_id) = path.into_inner();
     let (action_stream_id, stream_ext) = separate_number_and_remainder(&stream_id);
@@ -107,7 +108,7 @@ async fn m3u_api_resource(
     req: HttpRequest,
     api_req: web::Query<UserApiRequest>,
     path: web::Path<(String, String, String, String)>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let (username, password, stream_id, resource) = path.into_inner();
     let Ok(m3u_stream_id) = stream_id.parse::<u32>() else { return HttpResponse::BadRequest().finish() };

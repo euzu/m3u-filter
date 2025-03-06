@@ -302,7 +302,7 @@ pub fn empty_json_list_response() -> HttpResponse {
     HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("[]")
 }
 
-pub fn get_username_from_auth_header(credentials: Option<BearerAuth>, app_state: &web::Data<AppState>) -> Option<String> {
+pub fn get_username_from_auth_header(credentials: Option<BearerAuth>, app_state: &web::Data<Arc<AppState>>) -> Option<String> {
     if let Some(bearer) = credentials {
         if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
             let secret_key = web_auth_config.secret.as_ref();

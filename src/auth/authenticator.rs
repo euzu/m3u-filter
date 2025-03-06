@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use actix_web::{dev::ServiceRequest, Error, web};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use chrono::{Local, Duration};
@@ -84,7 +85,7 @@ fn validate_request(
     credentials: Option<BearerAuth>,
     verify_fn: fn(Option<BearerAuth>, &[u8]) -> bool, // Funktions-Parameter für Admin/User-Check
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    if let Some(app_state) = req.app_data::<web::Data<AppState>>() {
+    if let Some(app_state) = req.app_data::<web::Data<Arc<AppState>>>() {
         if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
             let secret_key = web_auth_config.secret.as_ref();
             if verify_fn(credentials, secret_key) {

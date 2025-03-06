@@ -9,7 +9,7 @@ use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigTarget};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentWriter};
-use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
+use crate::repository::m3u_playlist_iterator::{M3uPlaylistIteratorText};
 use crate::repository::storage::{get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_writer;
@@ -40,7 +40,7 @@ fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlis
                     let mut buf_writer = file_writer(&file);
                     let _ = buf_writer.write(b"#EXTM3U\n");
                     for m3u in m3u_playlist {
-                        let _ = buf_writer.write(m3u.to_m3u(target.options.as_ref(), None).as_bytes());
+                        let _ = buf_writer.write(m3u.to_m3u(target.options.as_ref(), false).to_string().as_bytes());
                         let _ = buf_writer.write(b"\n");
                     }
                 }
@@ -84,8 +84,8 @@ pub async fn m3u_load_rewrite_playlist(
     cfg: &Config,
     target: &ConfigTarget,
     user: &ProxyUserCredentials,
-) -> Result<Box<dyn Iterator<Item = String>>, M3uFilterError> {
-    Ok(Box::new(M3uPlaylistIterator::new(cfg, target, user)?))
+) -> Result<M3uPlaylistIteratorText, M3uFilterError> {
+    M3uPlaylistIteratorText::new(cfg, target, user)
 }
 
 

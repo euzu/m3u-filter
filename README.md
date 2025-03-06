@@ -324,6 +324,55 @@ and add it to the `config.yml`.
 channel_unavailable_file: /freeze_frame.ts
 ```
 
+### 1.13 `hdhomerun`
+
+It is possible to define `hdhomerun` target for output. To use this outputs we need to define HdHomeRun devices.
+
+The simplest config looks like:
+```yaml
+hdhomerun:
+  enabled: true
+  devices:
+  - name: hdhr1
+  - name: hdhr2
+```
+
+The `name` must be unique and is used in the target configuration in `source.yml` like.
+
+```yaml
+sources:
+- inputs:
+  - name: ...
+    ...
+  targets:
+  - name: xt_m3u
+    output:
+      - type: xtream
+      - type: hdhomerun
+        username: xtr
+        output: hdhr1
+    filter: "!ALL_FILTER!"
+```
+
+The HdHomerun config has the following attribute:
+`enabled`:  default is `false`,  you need to set it to `true`
+`devices`: is a list of HdHomeRun Device configuraitons. 
+For each output you need to define one device with a unique name. Each output gets his own port to connect.
+
+HdHomeRun device config has the following attributes: 
+
+- `name`: _mandatory_ and must be unique
+- `friendly_name`: _optional_
+- `manufacturer`: _optional_
+- `model_name`: _optional_
+- `model_number`: _optional_
+- `firmware_name`: _optional_
+- `firmware_version`: _optional_
+- `device_type`: _optional_
+- `device_udn`: _optional_
+- `port`: _optional_, if not given the m3u-filter-server port is incremented for each device.
+
+
 ## 2. `source.yml`
 
 Has the following top level entries:

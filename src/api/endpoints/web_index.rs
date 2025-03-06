@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use actix_files::NamedFile;
@@ -14,7 +15,7 @@ fn no_web_auth_token() -> HttpResponse {
 
 async fn token(
     mut req: web::Json<UserCredential>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     match &app_state.config.web_auth {
         None => no_web_auth_token(),
@@ -53,7 +54,7 @@ async fn token(
 async fn token_refresh(
     _req: HttpRequest,
     credentials: Option<BearerAuth>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     match &app_state.config.web_auth {
         None => {
@@ -84,7 +85,7 @@ async fn token_refresh(
 
 async fn index(
     _req: HttpRequest,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> std::io::Result<NamedFile> {
     let path: PathBuf = [&app_state.config.api.web_root, "index.html"].iter().collect();
     NamedFile::open(path)

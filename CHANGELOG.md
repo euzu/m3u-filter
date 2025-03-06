@@ -15,13 +15,15 @@
   targets:
   - name: test
 ```
-- The Web UI now includes a login feature for playlist users, allowing them to set their group for filtering and managing their own boutique.
- The playlist user can login with his credentials and can select the desired groups for his playlist. 
+- The Web UI now includes a login feature for playlist users, allowing them to set their group for filtering and managing their own bouquet of groups.
+ The playlist user can login with his credentials and can select the desired groups for his playlist.
+Currently only xtream api is supported, m3u will follow
 - Added `user_config_dir` to `config.yml`. It is the storage path for user configurations (f.e. bouquets).
 - New Filter field `input` can be used along `name`, `group`, `title`, `url` and `type`. Input is a `regexp` filter. `input ~ "provider\-\d+"`
 - New option `use_user_db` in `api-proxy.yml`. The Playlist Users are stored inside the config file `api-proxy.yml`. When you set this option to `true`
 the user are stored in a db file. This is a better choice if you have a lot of users. If you have only a few let it default to `false`
 - WebUI playlist browser with tree and gallery mode. Explore self hosted and provider playlists in browser.
+- Added HdHomeRun tuner target for use with Plex/Emby/Jellyfin
 
 # 2.2.1 (2025-02-14)
 - Added more info to `/status`.

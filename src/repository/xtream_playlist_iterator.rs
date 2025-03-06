@@ -26,7 +26,7 @@ impl XtreamPlaylistIterator {
         config: &Config,
         target: &ConfigTarget,
         category_id: u32,
-        user: &ProxyUserCredentials
+        user: &ProxyUserCredentials,
     ) -> Result<Self, M3uFilterError> {
         if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
             let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
@@ -56,24 +56,51 @@ impl XtreamPlaylistIterator {
             Err(info_err!(format!("Failed to find xtream storage for target {}", &target.name)))
         }
     }
-}
 
-impl Iterator for XtreamPlaylistIterator {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn get_next(&mut self) -> Option<(XtreamPlaylistItem, bool)> {
         if self.reader.has_error() {
             error!("Could not deserialize xtream item: {:?}", self.reader.get_path());
             return None;
         }
         if let Some(set) = &self.filter {
-            self.reader
-                .find(|(pli, _has_next)| set.contains(&pli.category_id.to_string()))
-                .map(|(pli, _has_next)| pli.to_doc(&self.base_url, &self.options, &self.user).to_string())
+            self.reader.find(|(pli, _has_next)| set.contains(&pli.category_id.to_string()))
         } else {
-            self.reader
-                .next()
-                .map(|(pli, _has_next)| pli.to_doc(&self.base_url, &self.options, &self.user).to_string())
+            self.reader.next()
         }
     }
+
 }
+
+impl Iterator for XtreamPlaylistIterator {
+    type Item = (XtreamPlaylistItem, bool);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.get_next()
+    }
+}
+
+
+pub struct XtreamPlaylistIteratorText {
+    inner: XtreamPlaylistIterator,
+}
+
+impl XtreamPlaylistIteratorText {
+pub async fn new(
+    cluster: XtreamCluster,
+    config: &Config,
+    target: &ConfigTarget,
+    category_id: u32,
+    user: &ProxyUserCredentials,
+    ) -> Result<Self, M3uFilterError> {
+        Ok(Self {
+            inner: XtreamPlaylistIterator::new(cluster, config, target, category_id, user).await?
+        })
+    }
+}
+
+impl Iterator for XtreamPlaylistIteratorText {
+    type Item = (String, bool);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.get_next().map(|(pli, has_next)| (pli.to_doc(&self.inner.base_url, &self.inner.options, &self.inner.user).to_string(), has_next))
+    }
+}
+

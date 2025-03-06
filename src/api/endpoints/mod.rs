@@ -6,3 +6,4 @@ pub(in crate::api) mod xmltv_api;
 pub(in crate::api) mod web_index;
 pub(in crate::api) mod hls_api;
 mod user_api;
+pub(in crate::api) mod hdhomerun_api;

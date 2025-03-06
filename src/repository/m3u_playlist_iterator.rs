@@ -20,7 +20,6 @@ pub struct M3uPlaylistIterator {
     target_options: Option<ConfigTargetOptions>,
     mask_redirect_url: bool,
     include_type_in_url: bool,
-    started: bool,
     rewrite_resource: bool,
     proxy_type: ProxyType,
     _file_lock: FileReadGuard,
@@ -45,6 +44,8 @@ impl M3uPlaylistIterator {
         let include_type_in_url = target_options.is_some_and(|opts| opts.m3u_include_type_in_url);
         let mask_redirect_url = target_options.is_some_and(|opts| opts.m3u_mask_redirect_url);
 
+        // TODO m3u bouquet filter
+
         let server_info = cfg.get_user_server_info(user);
         Ok(Self {
             reader,
@@ -56,7 +57,6 @@ impl M3uPlaylistIterator {
             mask_redirect_url,
             proxy_type: user.proxy.clone(),
             _file_lock: file_lock, // Save lock inside struct
-            started: false,
             rewrite_resource: cfg.is_reverse_proxy_resource_rewrite_enabled(),
         })
     }
@@ -92,19 +92,9 @@ impl M3uPlaylistIterator {
         self.get_rewritten_url(m3u_pli, false, M3U_RESOURCE_PATH)
     }
 
-}
-
-impl Iterator for M3uPlaylistIterator {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if !self.started {
-            self.started = true;
-            return Some("#EXTM3U".to_string());
-        }
-
+    fn get_next(&mut self) -> Option<(M3uPlaylistItem, bool)> {
         // TODO hls and unknown reverse proxy
-        self.reader.next().map(|(m3u_pli, _has_next)| {
+        self.reader.next().map(|(mut m3u_pli, _has_next)| {
             let rewrite_urls = match m3u_pli.item_type {
                 PlaylistItemType::LiveHls => None,
                 _ => if match &self.proxy_type {
@@ -116,8 +106,58 @@ impl Iterator for M3uPlaylistIterator {
                     None
                 }
             };
-            let target_options = self.target_options.as_ref();
-            m3u_pli.to_m3u(target_options, rewrite_urls.as_ref())
+            let url = m3u_pli.url.to_string();
+            let (stream_url, resource_url) = rewrite_urls
+                .map_or_else(|| (url, None), |(su, ru)| (su, ru.as_ref().map(String::to_string)));
+
+            m3u_pli.t_stream_url = stream_url.to_string();
+            m3u_pli.t_resource_url = resource_url.map(|s| s.to_string());
+            (m3u_pli, self.reader.has_next())
+        })
+    }
+}
+
+impl Iterator for M3uPlaylistIterator {
+    type Item = (M3uPlaylistItem, bool);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.get_next()
+    }
+}
+
+
+pub struct M3uPlaylistIteratorText {
+    inner: M3uPlaylistIterator,
+    started: bool,
+
+}
+
+impl M3uPlaylistIteratorText {
+    pub fn new(
+        cfg: &Config,
+        target: &ConfigTarget,
+        user: &ProxyUserCredentials,
+    ) -> Result<Self, M3uFilterError> {
+        Ok(Self {
+            inner: M3uPlaylistIterator::new(cfg, target, user)?,
+            started: false,
+        })
+    }
+}
+
+impl Iterator for M3uPlaylistIteratorText {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.started {
+            self.started = true;
+            return Some("#EXTM3U".to_string());
+        }
+
+        // TODO hls and unknown reverse proxy
+        self.inner.get_next().map(|(m3u_pli, _has_next)| {
+            let target_options = self.inner.target_options.as_ref();
+            m3u_pli.to_m3u(target_options, true)
         })
     }
 }

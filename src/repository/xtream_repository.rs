@@ -6,6 +6,9 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use bytes::Bytes;
+use futures::{stream, Stream, StreamExt};
 use crate::repository::storage::hex_encode;
 use crate::utils::file::file_utils::file_reader;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, str_to_io_error, info_err, create_m3u_filter_error, create_m3u_filter_error_result, notify_err};
@@ -18,11 +21,11 @@ use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDo
 use crate::repository::playlist_repository::get_target_id_mapping;
 use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
 use crate::repository::target_id_mapping::{VirtualIdRecord};
-use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
 use crate::utils::file::file_utils::open_readonly_file;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
 use crate::utils::bincode_utils::{bincode_deserialize};
+use crate::repository::xtream_playlist_iterator::XtreamPlaylistIteratorText;
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -429,8 +432,8 @@ pub async fn xtream_load_rewrite_playlist(
     target: &ConfigTarget,
     category_id: u32,
     user: &ProxyUserCredentials,
-) -> Result<Box<dyn Iterator<Item=String>>, M3uFilterError> {
-    Ok(Box::new(XtreamPlaylistIterator::new(cluster, config, target, category_id, user).await?))
+) -> Result<XtreamPlaylistIteratorText, M3uFilterError> {
+    XtreamPlaylistIteratorText::new(cluster, config, target, category_id, user).await
 }
 
 pub fn xtream_write_series_info(
@@ -939,7 +942,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
     }
 }
 
-pub fn iter_raw_xtream_playlist(config: &Config, target: &ConfigTarget, cluster: XtreamCluster)  -> Option<(FileReadGuard, impl Iterator<Item = (XtreamPlaylistItem, bool)>)> {
+pub fn iter_raw_xtream_playlist(config: &Arc<Config>, target: &ConfigTarget, cluster: XtreamCluster)  -> Option<(FileReadGuard, impl Iterator<Item = (XtreamPlaylistItem, bool)>)> {
     if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
         let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
         if !xtream_path.exists() || !idx_path.exists() {
@@ -953,5 +956,32 @@ pub fn iter_raw_xtream_playlist(config: &Config, target: &ConfigTarget, cluster:
         }
     } else {
         None
+    }
+}
+
+pub fn playlist_iter_to_stream<I>(channels: Option<(FileReadGuard, I)>) -> impl Stream<Item=Result<Bytes, String>>
+where
+    I: Iterator<Item=(XtreamPlaylistItem, bool)> + 'static,
+{
+    match channels {
+        Some((_, chans)) => {
+            // Convert iterator items to Result<Bytes, String>
+            let mapped = chans.map(move |(item, has_next)| {
+                match serde_json::to_string(&item) {
+                    Ok(content) => {
+                        Ok(Bytes::from(if has_next {
+                            format!("{content},")
+                        } else {
+                            content
+                        }))
+                    }
+                    Err(_) => Ok(Bytes::from("")),
+                }
+            });
+            stream::iter(mapped).left_stream()
+        }
+        None => {
+            stream::once(async { Ok(Bytes::from("")) }).right_stream()
+        }
     }
 }

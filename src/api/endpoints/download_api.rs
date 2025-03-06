@@ -111,7 +111,7 @@ macro_rules! download_info {
 
 pub async fn queue_download_file(
     req: web::Json<FileDownloadRequest>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     if let Some(download_cfg) = &app_state.config.video.as_ref().unwrap().download {
         if download_cfg.directory.is_none() {
@@ -137,7 +137,7 @@ pub async fn queue_download_file(
 }
 
 pub async fn download_file_info(
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let finished_list: &[Value] = &app_state.downloads.finished.write().await.drain(..)
         .map(|fd| download_info!(fd)).collect::<Vec<Value>>();

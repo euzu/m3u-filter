@@ -2,6 +2,7 @@ use std::sync::Arc;
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web::web::Data;
 use log::{debug, error};
+use serde::Deserialize;
 use crate::api::api_utils::{get_user_target_by_credentials, stream_response};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
@@ -15,7 +16,18 @@ use crate::repository::playlist_repository::HLS_EXT;
 use crate::utils::network::request;
 use crate::utils::network::request::{replace_extension, sanitize_sensitive_info};
 
-pub(in crate::api) async fn handle_hls_stream_request(app_state: &Data<AppState>, user: &ProxyUserCredentials, pli: &dyn PlaylistEntry, input: &ConfigInput, target_type: TargetType) -> HttpResponse {
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct HlsApiPathParams {
+    token: String,
+    username: String,
+    password: String,
+    channel: String,
+    hash: String,
+    chunk: String,
+}
+
+pub(in crate::api) async fn handle_hls_stream_request(app_state: &Data<Arc<AppState>>, user: &ProxyUserCredentials, pli: &dyn PlaylistEntry, input: &ConfigInput, target_type: TargetType) -> HttpResponse {
     let url = replace_extension(&pli.get_provider_url(), HLS_EXT);
     match request::download_text_content(Arc::clone(&app_state.http_client), input, &url, None).await {
         Ok(content) => {
@@ -32,21 +44,21 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Data<AppState>
 async fn hls_api_stream(
     req: &HttpRequest,
     api_req: &web::Query<UserApiRequest>,
-    path: web::Path<(String, String, String, String, String, String)>,
-    app_state: &web::Data<AppState>,
+    path: web::Path<HlsApiPathParams>,
+    app_state: &web::Data<Arc<AppState>>,
     target_type: TargetType
 ) -> HttpResponse {
-    let (_token, username, password, channel, _hash, _chunk) = path.into_inner();
+    let params = path.into_inner();
     let (user, target) = try_option_bad_request!(
-        get_user_target_by_credentials(&username, &password, api_req, app_state).await,
+        get_user_target_by_credentials(&params.username, &params.password, api_req, app_state).await,
         false,
-        format!("Could not find any user {username}"));
+        format!("Could not find any user {}", params.username));
     if !user.has_permissions(app_state) {
         return HttpResponse::Forbidden().finish();
     }
 
     let target_name = &target.name;
-    let virtual_id: u32 = try_result_bad_request!(channel.parse());
+    let virtual_id: u32 = try_result_bad_request!(params.channel.parse());
     let (pli_url, input_name) = if target_type == TargetType::Xtream {
         let (pli, _ ) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
         (pli.url, pli.input_name)
@@ -68,8 +80,8 @@ async fn hls_api_stream(
 async fn hls_api_stream_xtream(
     req: HttpRequest,
     api_req: web::Query<UserApiRequest>,
-    path: web::Path<(String, String, String, String, String, String)>,
-    app_state: web::Data<AppState>,
+    path: web::Path<HlsApiPathParams>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     hls_api_stream(&req, &api_req, path, &app_state, TargetType::Xtream).await
 }
@@ -77,12 +89,11 @@ async fn hls_api_stream_xtream(
 async fn hls_api_stream_m3u(
     req: HttpRequest,
     api_req: web::Query<UserApiRequest>,
-    path: web::Path<(String, String, String, String, String, String)>,
-    app_state: web::Data<AppState>,
+    path: web::Path<HlsApiPathParams>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     hls_api_stream(&req, &api_req, path, &app_state, TargetType::M3u).await
 }
-
 
 pub fn hls_api_register(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/hlsr/{token}/{username}/{password}/{channel}/{hash}/{chunk}").route(web::get().to(hls_api_stream_xtream)));

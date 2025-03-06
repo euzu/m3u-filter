@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -65,8 +66,8 @@ fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<Pat
                     return get_epg_path_for_target_of_type(&target.name, xtream_get_epg_file_path(&storage_path));
                 }
             }
-            TargetType::Strm => {}
-        }
+            TargetType::Strm | TargetType::HdHomeRun => {}
+            }
     }
     None
 }
@@ -166,7 +167,7 @@ fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> HttpResponse
 async fn xmltv_api(
     api_req: web::Query<UserApiRequest>,
     req: HttpRequest,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     if let Some((user, target)) = get_user_target(&api_req, &app_state).await {
         if !user.has_permissions(&app_state) {

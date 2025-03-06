@@ -156,8 +156,12 @@ fn main() {
     }
 
     if args.server {
-        if let Some(api_proxy_file) = config_reader::read_api_proxy_config(args.api_proxy, &mut cfg) {
-            info!("Api Proxy File: {api_proxy_file:?}");
+        match config_reader::read_api_proxy_config(args.api_proxy, &mut cfg) {
+            Ok(Some(api_proxy_file)) => {
+                info!("Api Proxy File: {api_proxy_file:?}");
+            },
+            Ok(None) => {}
+            Err(err) => exit!("{err}"),
         }
         start_in_server_mode(Arc::new(cfg), Arc::new(targets));
     } else {
@@ -200,7 +204,6 @@ fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
 }
 
 fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    info!("Server running: http://{}:{}", &cfg.api.host, &cfg.api.port);
     if let Err(err) = api::main_api::start_server(cfg, targets) {
         exit!("Can't start server: {err}");
     };

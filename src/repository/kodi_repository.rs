@@ -607,7 +607,7 @@ pub async fn kodi_write_strm_playlist(
     if new_playlist.is_empty() {
         return Ok(());
     }
-    if output.filename.is_none() {
+    if output.output.is_none() {
         return Err(notify_err!(
             "Output directory missing. Write strm playlist failed".to_string()
         ));
@@ -615,11 +615,11 @@ pub async fn kodi_write_strm_playlist(
 
     let Some(root_path) = file_utils::get_file_path(
         &cfg.working_dir,
-        Some(std::path::PathBuf::from(&output.filename.as_ref().map_or_else(|| "/tmp", |v| v.as_ref()))),
+        Some(std::path::PathBuf::from(&output.output.as_ref().map_or_else(|| "/tmp", |v| v.as_ref()))),
     ) else {
         return Err(info_err!(format!(
             "Failed to get file path for {}",
-            output.filename.as_deref().unwrap_or("")
+            output.output.as_deref().unwrap_or("")
         )));
     };
 

@@ -78,23 +78,33 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn get_xtream_url(xtream_cluster: XtreamCluster, url: &str,
+                      username: &str, password: &str,
+                      stream_id: u32, container_extension: Option<&String>,
+                      live_stream_use_prefix: bool, live_stream_without_extension: bool) -> String {
+    let stream_base_url = match xtream_cluster {
+        XtreamCluster::Live => {
+            let ctx_path = if live_stream_use_prefix { "live/" } else { "" };
+            let suffix = if live_stream_without_extension { "" } else { ".ts" };
+            format!("{url}/{ctx_path}{username}/{password}/{stream_id}{suffix}")
+        }
+        XtreamCluster::Video => {
+            let ext = container_extension.as_ref().map_or("mp4", |e| e.as_str());
+            format!("{url}/movie/{username}/{password}/{stream_id}.{ext}")
+        }
+        XtreamCluster::Series =>
+            format!("{}&action={ACTION_GET_SERIES_INFO}&series_id={stream_id}", get_xtream_stream_url_base(url, username, password))
+    };
+    stream_base_url
+}
+
 pub fn create_xtream_url(xtream_cluster: XtreamCluster, url: &str, username: &str, password: &str,
-                     stream: &XtreamStream, live_stream_use_prefix: bool, live_stream_without_extension: bool) -> Rc<String> {
+                         stream: &XtreamStream, live_stream_use_prefix: bool, live_stream_without_extension: bool) -> Rc<String> {
     if stream.direct_source.is_empty() {
-        let stream_base_url = match xtream_cluster {
-            XtreamCluster::Live => {
-                let ctx_path = if live_stream_use_prefix {"live/"} else { "" };
-                let suffix = if live_stream_without_extension { "" } else { ".ts" };
-                format!("{url}/{ctx_path}{username}/{password}/{}{suffix}", &stream.get_stream_id())
-            },
-            XtreamCluster::Video => {
-                let ext = stream.container_extension.as_ref().map_or("mp4", |e| e.as_str());
-                format!("{url}/movie/{username}/{password}/{}.{ext}", &stream.get_stream_id())
-            }
-            XtreamCluster::Series =>
-                format!("{}&action={ACTION_GET_SERIES_INFO}&series_id={}", get_xtream_stream_url_base(url, username, password), &stream.get_stream_id())
-        };
-        Rc::new(stream_base_url)
+        Rc::new(get_xtream_url(xtream_cluster, url, username, password, stream.get_stream_id(),
+                               stream.container_extension.as_ref().map(std::string::ToString::to_string).as_ref(),
+                               live_stream_use_prefix, live_stream_without_extension))
     } else {
         Rc::clone(&stream.direct_source)
     }
@@ -135,7 +145,7 @@ pub fn parse_xtream(input: &ConfigInput,
                         let item = PlaylistItem {
                             header: RefCell::new(PlaylistItemHeader {
                                 id: Rc::new(stream.get_stream_id().to_string()),
-                                uuid: Rc::new(generate_playlist_uuid(&input_name,  &stream.get_stream_id().to_string(), item_type, &stream_url)),
+                                uuid: Rc::new(generate_playlist_uuid(&input_name, &stream.get_stream_id().to_string(), item_type, &stream_url)),
                                 name: Rc::clone(&stream.name),
                                 logo: Rc::clone(&stream.stream_icon),
                                 group: Rc::clone(category_name),

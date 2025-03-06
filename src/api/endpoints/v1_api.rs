@@ -6,7 +6,7 @@ use actix_web::middleware::Condition;
 use actix_web::{web, HttpResponse};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use bytes::Bytes;
-use futures::{stream, Stream, StreamExt};
+use futures::{stream, StreamExt};
 use log::error;
 use serde_json::json;
 
@@ -19,12 +19,12 @@ use crate::auth::authenticator::validator_admin;
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, TargetType};
-use crate::model::playlist::{XtreamCluster, XtreamPlaylistItem};
+use crate::model::playlist::{XtreamCluster};
 use crate::processing::processor::playlist;
 use crate::repository::user_repository::store_api_user;
 use crate::repository::xtream_repository;
+use crate::repository::xtream_repository::playlist_iter_to_stream;
 use crate::utils::file::config_reader;
-use crate::utils::file::file_lock_manager::FileReadGuard;
 use crate::utils::network::request::sanitize_sensitive_info;
 use crate::utils::network::{m3u, xtream};
 
@@ -52,7 +52,7 @@ fn intern_save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -
 
 async fn save_config_api_proxy_user(
     req: web::Json<Vec<TargetUser>>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let mut users = req.0;
     let mut usernames = HashSet::new();
@@ -95,7 +95,7 @@ async fn save_config_api_proxy_user(
 
 async fn save_config_main(
     req: web::Json<ConfigDto>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let cfg = req.0;
     if cfg.is_valid() {
@@ -112,7 +112,7 @@ async fn save_config_main(
 
 async fn save_config_api_proxy_config(
     req: web::Json<Vec<ApiProxyServerInfo>>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let mut req_api_proxy = req.0;
     for server_info in &mut req_api_proxy {
@@ -132,7 +132,7 @@ async fn save_config_api_proxy_config(
 
 async fn playlist_update(
     req: web::Json<Vec<String>>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let targets = req.0;
     let user_targets = if targets.is_empty() { None } else { Some(targets) };
@@ -206,34 +206,9 @@ async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInp
     }
 }
 
-fn to_stream<I>(channels: Option<(FileReadGuard, I)>) -> impl Stream<Item=Result<Bytes, String>>
-where
-    I: Iterator<Item=(XtreamPlaylistItem, bool)> + 'static,
-{
-    match channels {
-        Some((_, chans)) => {
-            // Convert iterator items to Result<Bytes, String>
-            let mapped = chans.map(move |(item, has_next)| {
-                match serde_json::to_string(&item) {
-                    Ok(content) => {
-                        Ok(Bytes::from(if has_next {
-                            format!("{content},")
-                        } else {
-                            content
-                        }))
-                    }
-                    Err(_) => Ok(Bytes::from("")),
-                }
-            });
-            stream::iter(mapped).left_stream()
-        }
-        None => {
-            stream::once(async { Ok(Bytes::from("")) }).right_stream()
-        }
-    }
-}
 
-async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Config) -> HttpResponse {
+
+async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Arc<Config>) -> HttpResponse {
     if let Some(target) = cfg_target {
         let target_name = &target.name;
         if target.has_output(&TargetType::Xtream) {
@@ -245,9 +220,9 @@ async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Config
             let vod_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Video);
             let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
 
-            let live_stream = to_stream(live_channels);
-            let vod_stream = to_stream(vod_channels);
-            let series_stream = to_stream(series_channels);
+            let live_stream = playlist_iter_to_stream(live_channels);
+            let vod_stream = playlist_iter_to_stream(vod_channels);
+            let series_stream = playlist_iter_to_stream(series_channels);
 
             let json_stream =
                 stream::iter(vec![
@@ -275,7 +250,7 @@ async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Config
 
 async fn playlist(
     req: web::Json<PlaylistRequest>,
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     match req.rtype {
         PlaylistRequestType::Input => {
@@ -312,7 +287,7 @@ async fn playlist(
 }
 
 async fn config(
-    app_state: web::Data<AppState>,
+    app_state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
     let map_input = |i: &ConfigInput| ServerInputConfig {
         id: i.id,
