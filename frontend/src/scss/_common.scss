@@ -36,6 +36,15 @@ $media-size-mobile: 600px;
   @include container_common($justify-content, $padding: 0);
 }
 
+@mixin activeOptionButton {
+    box-sizing: border-box !important;
+    background-color: var(--option-active-background-color) !important;
+    color: var(--option-active-color) !important;
+    font-weight: bold;
+    svg {
+      color: var(--option-active-color) !important;
+    }
+}
 
 @mixin iconButton {
   display: flex;

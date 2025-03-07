@@ -1,7 +1,7 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import './playlist-browser.scss';
 import SourceSelector from "..//source-selector/source-selector";
-import PlaylistViewer, {IPlaylistViewer, SearchRequest} from "../playlist-viewer/playlist-viewer";
+import PlaylistViewer, { SearchRequest} from "../playlist-viewer/playlist-viewer";
 import {useSnackbar} from 'notistack';
 import {useServices} from "../../provider/service-provider";
 import Progress from '..//progress/progress';

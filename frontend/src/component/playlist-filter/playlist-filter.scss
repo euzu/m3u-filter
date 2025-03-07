@@ -16,13 +16,7 @@
   }
 
   &__option-active {
-    box-sizing: border-box !important;
-    transform: scale(0.9);
-    background-color: var(--option-active-background-color) !important;
-    color: var(--option-active-color) !important;
-    svg {
-      color: var(--option-active-color) !important;
-    }
+    @include common.activeOptionButton();
   }
 
   &__error-message {

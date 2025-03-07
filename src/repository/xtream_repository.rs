@@ -15,7 +15,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, str_to_io_erro
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::{rewrite_doc_urls, XtreamMappingOptions, XtreamSeriesEpisode, INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, SEASON_RESOURCE_PREFIX};
+use crate::model::xtream::{rewrite_doc_urls, PlaylistXtreamCategory, XtreamMappingOptions, XtreamSeriesEpisode, INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, SEASON_RESOURCE_PREFIX};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
 use crate::repository::playlist_repository::get_target_id_mapping;
@@ -25,7 +25,7 @@ use crate::utils::file::file_utils::open_readonly_file;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
 use crate::utils::bincode_utils::{bincode_deserialize};
-use crate::repository::xtream_playlist_iterator::XtreamPlaylistIteratorText;
+use crate::repository::xtream_playlist_iterator::XtreamPlaylistJsonIterator;
 
 pub static COL_CAT_LIVE: &str = "cat_live";
 pub static COL_CAT_SERIES: &str = "cat_series";
@@ -432,8 +432,8 @@ pub async fn xtream_load_rewrite_playlist(
     target: &ConfigTarget,
     category_id: u32,
     user: &ProxyUserCredentials,
-) -> Result<XtreamPlaylistIteratorText, M3uFilterError> {
-    XtreamPlaylistIteratorText::new(cluster, config, target, category_id, user).await
+) -> Result<XtreamPlaylistJsonIterator, M3uFilterError> {
+    XtreamPlaylistJsonIterator::new(cluster, config, target, category_id, user).await
 }
 
 pub fn xtream_write_series_info(
@@ -984,4 +984,18 @@ where
             stream::once(async { Ok(Bytes::from("")) }).right_stream()
         }
     }
+}
+
+pub(crate) async fn xtream_get_playlist_categories(config: &Config, target_name: &str, cluster: XtreamCluster) -> Option<Vec<PlaylistXtreamCategory>> {
+    let path = xtream_get_collection_path(config, target_name, match cluster {
+        XtreamCluster::Live =>  COL_CAT_LIVE,
+        XtreamCluster::Video =>  COL_CAT_VOD,
+        XtreamCluster::Series =>  COL_CAT_SERIES,
+    });
+    if let Ok((Some(file_path), _content)) = path {
+        if let Ok(content) = tokio::fs::read_to_string(&file_path).await {
+            return serde_json::from_str::<Vec<PlaylistXtreamCategory>>(&content).ok();
+        }
+    }
+    None
 }

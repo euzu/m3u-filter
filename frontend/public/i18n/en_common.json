@@ -80,6 +80,7 @@
     "PROVIDER": "Provider",
     "CUSTOM": "Custom",
     "XTREAM_CODES": "xtream codes",
+    "XC": "xc",
     "M3U": "m3u",
     "PLAYLIST_BROWSER": "Playlist Browser"
   },
@@ -87,6 +88,7 @@
     "USER_BOUQUET_EDITOR": "User group editor"
   },
   "MESSAGES": {
+    "NO_CONTENT": "No content",
     "INVALID_REGEXP": "Invalid regexp",
     "INVALID_FILETYPE": "Invalid filetype",
     "DOWNLOAD": {

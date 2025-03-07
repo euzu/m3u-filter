@@ -3,7 +3,7 @@ use log::error;
 use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTarget};
+use crate::model::config::{Config, ConfigTarget, TargetType};
 use crate::model::playlist::{XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::XtreamMappingOptions;
 use crate::repository::indexed_document::{IndexedDocumentIterator};
@@ -41,8 +41,8 @@ impl XtreamPlaylistIterator {
             let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
             let server_info = config.get_user_server_info(user);
 
-            let category_id_str = if category_id == 0 { String::new() }  else { category_id.to_string() };
-            let filter = user_get_bouquet_filter(config, &user.username, &category_id_str, cluster).await;
+            let category_id_filter = if category_id == 0 { "".to_string() }  else { category_id.to_string() };
+            let filter = user_get_bouquet_filter(config, target.name.as_str(), &user.username, &category_id_filter, TargetType::Xtream, cluster).await;
 
             Ok(Self {
                 reader,
@@ -63,7 +63,7 @@ impl XtreamPlaylistIterator {
             return None;
         }
         if let Some(set) = &self.filter {
-            self.reader.find(|(pli, _has_next)| set.contains(&pli.category_id.to_string()))
+            self.reader.find(|(pli, _has_next)| set.contains(&pli.group.to_string()) || set.contains(&pli.category_id.to_string()))
         } else {
             self.reader.next()
         }
@@ -79,11 +79,11 @@ impl Iterator for XtreamPlaylistIterator {
 }
 
 
-pub struct XtreamPlaylistIteratorText {
+pub struct XtreamPlaylistJsonIterator {
     inner: XtreamPlaylistIterator,
 }
 
-impl XtreamPlaylistIteratorText {
+impl XtreamPlaylistJsonIterator {
 pub async fn new(
     cluster: XtreamCluster,
     config: &Config,
@@ -97,7 +97,7 @@ pub async fn new(
     }
 }
 
-impl Iterator for XtreamPlaylistIteratorText {
+impl Iterator for XtreamPlaylistJsonIterator {
     type Item = (String, bool);
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.get_next().map(|(pli, has_next)| (pli.to_doc(&self.inner.base_url, &self.inner.options, &self.inner.user).to_string(), has_next))

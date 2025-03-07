@@ -1,7 +1,7 @@
 import ApiService, {DefaultApiService} from "./api-service";
 import {Observable, throwError} from "rxjs";
 import {PlaylistRequest} from "../model/playlist-request";
-import {PlaylistCategories, PlaylistResponse} from "../model/playlist";
+import {PlaylistResponse} from "../model/playlist";
 
 const PLAYLIST_API_PATH = 'playlist';
 const TARGET_UPDATE_API_PATH = 'playlist/update';

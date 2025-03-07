@@ -7,89 +7,26 @@
 
   @include preferences.prefsToolbar();
 
-  &__header {
-    font-size: 2rem;
-    color: var(--label-color);
-  }
-  &__categories-panel {
-    @include common.container_vert_no_padding();
-    overflow: hidden;
-  }
-  &__categories-toolbar {
+  &__content {
     @include common.container_horz_no_padding();
-    border: 1px solid red;
-  }
+    overflow: hidden;
 
-  &__categories {
-    display: grid;
-    grid-gap: 10px;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    overflow-x: hidden;
-    overflow-y: auto;
-    gap: 8px;
-    padding: 4px;
-
-    &__toolbar {
-      display: flex;
-      flex-flow: row nowrap;
-      gap: 4px;
-      flex: 0 0 auto;
-      padding: 4px;
-      background-color: var(--background-color);
-      align-items: center;
-
-      @media (max-width: common.$media-size-mobile) {
-        flex-wrap: wrap-reverse;
-        gap: 8px;
-      }
-
-      &-filter {
-        display: flex;
-        flex: 1 1 auto;
-        background-color: inherit;
-        .playlist-filter {
-          input {
-              font-size: 1em;
-          }
-        }
-      }
-
+    &-toolbar {
+      @include common.container_vert_no_padding();
       button {
         @include common.iconButton();
         height: 48px;
       }
 
       .button-active {
-        box-sizing: border-box !important;
-        transform: scale(0.9);
-        background-color: var(--option-active-background-color) !important;
-        svg {
-        color: var(--option-active-color) !important;
-        }
+        @include common.activeOptionButton();
       }
     }
 
-    &__category {
-      border:1px solid var(--border-color);
-      padding: 12px 8px;
-      border-radius: var(--border-radius);
-      background-color: var(--card-background-color);
-      box-sizing: border-box;
-      display: flex;
-      flex-flow: row nowrap;
-      gap: 8px;
-      white-space: nowrap;
-
-      .checkbox-container {
-        width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .checkbox-container:hover {
-        cursor: pointer;
-        color: var(--label-color);
-      }
+    &-panels {
+      @include common.container_vert_no_padding();
+      flex: 1 1 auto;
+      overflow: hidden;
     }
   }
 }

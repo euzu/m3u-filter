@@ -1,14 +1,16 @@
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, ProxyUserStatus, TargetUser};
-use crate::model::config::Config;
+use crate::model::config::{Config, TargetType};
 use crate::model::playlist::XtreamCluster;
-use crate::model::playlist_categories::{PlaylistCategoriesDto, PlaylistCategoryDto};
+use crate::model::playlist_categories::{PlaylistBouquetDto, TargetBouquetDto};
 use crate::repository::bplustree::BPlusTree;
 use crate::utils::file::file_utils;
 use crate::utils::json_utils::json_write_documents_to_file;
 use log::{error};
 use std::collections::{HashMap, HashSet};
+use std::io::Error;
 use std::path::{Path, PathBuf};
 use chrono::Local;
+use crate::repository::xtream_repository::xtream_get_playlist_categories;
 
 const USER_LIVE_BOUQUET: &str = "live_bouquet.json";
 const USER_VOD_BOUQUET: &str = "vod_bouquet.json";
@@ -154,56 +156,72 @@ fn ensure_user_storage_path(cfg: &Config, username: &str) -> Option<PathBuf> {
     }
 }
 
-pub fn user_get_live_bouquet_path(user_storage_path: &Path) -> PathBuf {
-    user_storage_path.join(PathBuf::from(USER_LIVE_BOUQUET))
+fn user_get_live_bouquet_path(user_storage_path: &Path, target: &TargetType) -> PathBuf {
+    user_storage_path.join(PathBuf::from(format!("{}_{USER_LIVE_BOUQUET}", target.to_string().to_lowercase())))
 }
 
-pub fn user_get_vod_bouquet_path(user_storage_path: &Path) -> PathBuf {
-    user_storage_path.join(PathBuf::from(USER_VOD_BOUQUET))
+fn user_get_vod_bouquet_path(user_storage_path: &Path, target: &TargetType) -> PathBuf {
+    user_storage_path.join(PathBuf::from(format!("{}_{USER_VOD_BOUQUET}", target.to_string().to_lowercase())))
 }
 
-pub fn user_get_series_bouquet_path(user_storage_path: &Path) -> PathBuf {
-    user_storage_path.join(PathBuf::from(USER_SERIES_BOUQUET))
+fn user_get_series_bouquet_path(user_storage_path: &Path, target: &TargetType) -> PathBuf {
+    user_storage_path.join(PathBuf::from(format!("{}_{USER_SERIES_BOUQUET}", target.to_string().to_lowercase())))
 }
 
-pub async fn save_user_bouquet(cfg: &Config, username: &str, bouquet: &PlaylistCategoriesDto) -> Result<(), std::io::Error> {
+fn save_user_bouquet_for_target(storage_path: &Path, target: TargetType, bouquet: &TargetBouquetDto)-> Result<(), Error> {
+    json_write_documents_to_file(&user_get_live_bouquet_path(storage_path, &target), &bouquet.live)?;
+    json_write_documents_to_file(&user_get_vod_bouquet_path(storage_path, &target), &bouquet.vod)?;
+    json_write_documents_to_file(&user_get_series_bouquet_path(storage_path, &target), &bouquet.series)?;
+    Ok(())
+}
+
+pub fn save_user_bouquet(cfg: &Config, username: &str, bouquet: &PlaylistBouquetDto) -> Result<(), std::io::Error> {
     if let Some(storage_path) = ensure_user_storage_path(cfg, username) {
-        json_write_documents_to_file(&user_get_live_bouquet_path(&storage_path), &bouquet.live)?;
-        json_write_documents_to_file(&user_get_vod_bouquet_path(&storage_path), &bouquet.vod)?;
-        json_write_documents_to_file(&user_get_series_bouquet_path(&storage_path), &bouquet.series)?;
+        if let Some(xb) =  &bouquet.xtream {
+            save_user_bouquet_for_target(&storage_path, TargetType::Xtream, xb)?;
+        }
+        if let Some(mb) =  &bouquet.m3u {
+            save_user_bouquet_for_target(&storage_path, TargetType::M3u, mb)?;
+        }
         Ok(())
     } else {
         Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("User config path not found for user {username}")))
     }
 }
 
-async fn load_user_bouquet_from_file(file: &Path) -> String {
-    tokio::fs::read_to_string(file).await.unwrap_or_else(|_err| "[]".to_string())
+async fn load_user_bouquet_from_file(file: &Path) -> Option<String> {
+    tokio::fs::read_to_string(file).await.ok()
 }
 
-pub async fn load_user_bouquet_as_json(cfg: &Config, username: &str) -> Option<String> {
+pub async fn load_user_bouquet_as_json(cfg: &Config, username: &str, target: TargetType) -> Option<String> {
     if let Some(storage_path) = get_user_storage_path(cfg, username) {
         if storage_path.exists() {
-            let live = load_user_bouquet_from_file(&user_get_live_bouquet_path(&storage_path)).await;
-            let vod = load_user_bouquet_from_file(&user_get_vod_bouquet_path(&storage_path)).await;
-            let series = load_user_bouquet_from_file(&user_get_series_bouquet_path(&storage_path)).await;
-            return Some(format!(r#"{{"live": {live}, "vod": {vod}, "series": {series} }}"#));
+            let live = load_user_bouquet_from_file(&user_get_live_bouquet_path(&storage_path, &target)).await;
+            let vod = load_user_bouquet_from_file(&user_get_vod_bouquet_path(&storage_path, &target)).await;
+            let series = load_user_bouquet_from_file(&user_get_series_bouquet_path(&storage_path, &target)).await;
+            return Some(format!(r#"{{"live": {}, "vod": {}, "series": {} }}"#,
+                                live.unwrap_or("null".to_string()),
+                                vod.unwrap_or("null".to_string()),
+                                series.unwrap_or("null".to_string()),
+            ));
         }
     }
     None
 }
 
-pub(crate) async fn user_get_cluster_bouquet(cfg: &Config, username: &str, cluster: XtreamCluster) -> Option<Vec<PlaylistCategoryDto>> {
+async fn user_get_cluster_bouquet(cfg: &Config, username: &str, target: &TargetType, cluster: XtreamCluster) -> Option<Vec<String>> {
     if let Some(storage_path) = get_user_storage_path(cfg, username) {
         if storage_path.exists() {
             let content = load_user_bouquet_from_file(&match cluster {
-                XtreamCluster::Live => user_get_live_bouquet_path(&storage_path),
-                XtreamCluster::Video => user_get_vod_bouquet_path(&storage_path),
-                XtreamCluster::Series => user_get_series_bouquet_path(&storage_path),
+                XtreamCluster::Live => user_get_live_bouquet_path(&storage_path, target),
+                XtreamCluster::Video => user_get_vod_bouquet_path(&storage_path, target),
+                XtreamCluster::Series => user_get_series_bouquet_path(&storage_path, target),
             }).await;
-            if let Ok(bouquet) = serde_json::from_str::<Vec<PlaylistCategoryDto>>(&content) {
-                if !bouquet.is_empty() {
-                    return Some(bouquet);
+            if let Some(value) = content {
+                if let Ok(bouquet) = serde_json::from_str::<Vec<String>>(&value) {
+                    if !bouquet.is_empty() {
+                        return Some(bouquet);
+                    }
                 }
             }
         }
@@ -212,23 +230,24 @@ pub(crate) async fn user_get_cluster_bouquet(cfg: &Config, username: &str, clust
 }
 
 
-pub(crate) async fn user_get_live_bouquet(cfg: &Config, username: &str) -> Option<Vec<PlaylistCategoryDto>> {
-    user_get_cluster_bouquet(cfg, username, XtreamCluster::Live).await
+pub(crate) async fn user_get_live_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<Vec<String>> {
+    user_get_cluster_bouquet(cfg, username, target, XtreamCluster::Live).await
 }
 
-pub(crate) async fn user_get_vod_bouquet(cfg: &Config, username: &str) -> Option<Vec<PlaylistCategoryDto>> {
-    user_get_cluster_bouquet(cfg, username, XtreamCluster::Video).await
+pub(crate) async fn user_get_vod_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<Vec<String>> {
+    user_get_cluster_bouquet(cfg, username, target, XtreamCluster::Video).await
 }
 
-pub(crate) async fn user_get_series_bouquet(cfg: &Config, username: &str) -> Option<Vec<PlaylistCategoryDto>> {
-    user_get_cluster_bouquet(cfg, username, XtreamCluster::Series).await
+pub(crate) async fn user_get_series_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<Vec<String>> {
+    user_get_cluster_bouquet(cfg, username, target, XtreamCluster::Series).await
 }
 
-pub async fn user_get_bouquet_filter(config: &Config, username: &str, category_id: &str, cluster: XtreamCluster) -> Option<HashSet<String>> {
+// TODO save user bouquet for xtream with category id, and not load it every time when playlist read
+pub async fn user_get_bouquet_filter(config: &Config, target_name: &str, username: &str, category_id: &str, target: TargetType, cluster: XtreamCluster) -> Option<HashSet<String>> {
     let bouquet = match cluster {
-        XtreamCluster::Live => user_get_live_bouquet(config, username).await,
-        XtreamCluster::Video => user_get_vod_bouquet(config, username).await,
-        XtreamCluster::Series => user_get_series_bouquet(config, username).await,
+        XtreamCluster::Live => user_get_live_bouquet(config, username, &target).await,
+        XtreamCluster::Video => user_get_vod_bouquet(config, username, &target).await,
+        XtreamCluster::Series => user_get_series_bouquet(config, username, &target).await,
     };
     let category_id = category_id.trim();
     let mut filter = HashSet::new();
@@ -237,8 +256,22 @@ pub async fn user_get_bouquet_filter(config: &Config, username: &str, category_i
     }
     if let Some(bouquet_categories) = bouquet {
         if !bouquet_categories.is_empty() {
-            for c in bouquet_categories {
-                filter.insert(c.id);
+            if target == TargetType::Xtream {
+                if let Some(xtream_categories) = xtream_get_playlist_categories(config, target_name,cluster).await  {
+                    let map: HashMap<String, String> = xtream_categories
+                        .into_iter()
+                        .map(|item| (item.name, item.id))
+                        .collect();
+                    for c in bouquet_categories {
+                        if let Some(id) = map.get(&c) {
+                            filter.insert(id.to_string());
+                        }
+                    }
+                }
+            } else {
+                for c in bouquet_categories {
+                    filter.insert(c);
+                }
             }
         }
     }

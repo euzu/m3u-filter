@@ -1,18 +1,19 @@
+use crate::m3u_filter_error::{create_m3u_filter_error,info_err};
+use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::model::api_proxy::ProxyUserCredentials;
+use crate::model::config::{Config, ConfigTarget};
+use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
+use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentIterator, IndexedDocumentWriter};
+use crate::repository::m3u_playlist_iterator::{M3uPlaylistM3uTextIterator};
+use crate::repository::storage::{get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
+use crate::utils::file::file_lock_manager::FileReadGuard;
+use crate::utils::file::file_utils;
+use crate::utils::file::file_utils::file_writer;
+use log::error;
 use std::fs::File;
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
-use log::error;
-
-use crate::m3u_filter_error::{create_m3u_filter_error};
-use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTarget};
-use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
-use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentWriter};
-use crate::repository::m3u_playlist_iterator::{M3uPlaylistIteratorText};
-use crate::repository::storage::{get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
-use crate::utils::file::file_utils;
-use crate::utils::file::file_utils::file_writer;
+use std::sync::Arc;
 
 const FILE_M3U: &str = "m3u";
 macro_rules! cant_write_result {
@@ -84,12 +85,11 @@ pub async fn m3u_load_rewrite_playlist(
     cfg: &Config,
     target: &ConfigTarget,
     user: &ProxyUserCredentials,
-) -> Result<M3uPlaylistIteratorText, M3uFilterError> {
-    M3uPlaylistIteratorText::new(cfg, target, user)
+) -> Result<M3uPlaylistM3uTextIterator, M3uFilterError> {
+    M3uPlaylistM3uTextIterator::new(cfg, target, user)
 }
 
-
-pub async  fn m3u_get_item_for_stream_id(stream_id: u32, cfg: &Config, target: &ConfigTarget) -> Result<M3uPlaylistItem, Error> {
+pub async fn m3u_get_item_for_stream_id(stream_id: u32, cfg: &Config, target: &ConfigTarget) -> Result<M3uPlaylistItem, Error> {
     if stream_id < 1 {
         return Err(str_to_io_error("id should start with 1"));
     }
@@ -98,5 +98,19 @@ pub async  fn m3u_get_item_for_stream_id(stream_id: u32, cfg: &Config, target: &
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
         let _file_lock = cfg.file_locks.read_lock(&m3u_path);
         IndexedDocumentDirectAccess::read_indexed_item::<u32, M3uPlaylistItem>(&m3u_path, &idx_path, &stream_id)
+    }
+}
+
+pub fn iter_raw_m3u_playlist(config: &Arc<Config>, target: &ConfigTarget) -> Option<(FileReadGuard, impl Iterator<Item=(M3uPlaylistItem, bool)>)> {
+    let target_path = get_target_storage_path(config, target.name.as_str())?;
+    let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
+    if !m3u_path.exists() || !idx_path.exists() {
+        return None;
+    }
+    let file_lock = config.file_locks.read_lock(&m3u_path);
+    match IndexedDocumentIterator::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path)
+        .map_err(|err| info_err!(format!("Could not deserialize file {m3u_path:?} - {err}"))) {
+        Ok(reader) => Some((file_lock, reader)),
+        Err(_) => None
     }
 }

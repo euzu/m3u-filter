@@ -1,20 +1,16 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import './user-playlist.scss';
 import {useServices} from "../../provider/service-provider";
 import {finalize, first, zip} from 'rxjs';
-import {PlaylistCategories, PlaylistGroup} from "../../model/playlist";
+import {UserPlaylistCategories, UserPlaylistTargetCategories} from "../../model/playlist";
 import LoadingIndicator from '../loading-indicator/loading-indicator';
-import TabSet from "../tab-set/tab-set";
-import Checkbox from "../checkbox/checkbox";
-import {enqueueSnackbar} from "notistack";
-import {getIconByName} from "../../icons/icons";
-import PlaylistFilter from "../playlist-filter/playlist-filter";
 import useTranslator from "../../hook/use-translator";
+import UserTargetPlaylist, {BouquetSelection} from "../user-target-playlist/user-target-playlist";
+import {useSnackbar} from "notistack";
 
-const CATEGORY_TABS = [
-    {label: "LABEL.LIVE", key: "live"},
-    {label: "LABEL.VOD", key: "vod"},
-    {label: "LABEL.SERIES", key: "series"}
+const TARGET_TABS = [
+    {label: "LABEL.XC", key: "xtream"},
+    {label: "LABEL.M3U", key: "m3u"},
 ];
 
 function isEmpty(value: any): boolean {
@@ -23,13 +19,6 @@ function isEmpty(value: any): boolean {
     if (Array.isArray(value)) return value.length === 0;
     if (typeof value === "object") return Object.keys(value).length === 0;
     return false;
-}
-
-const selectEntries = (selected: boolean, list: PlaylistGroup[]): Record<string, boolean> => {
-    return list?.reduce((acc: Record<string, boolean>, category: PlaylistGroup) => {
-        acc[category.id] = selected;
-        return acc;
-    }, {});
 }
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
@@ -41,67 +30,76 @@ export default function UserPlaylist(props: UserPlaylistProps) {
     const services = useServices();
     const translate = useTranslator();
     const [loading, setLoading] = useState(false);
-    const [categories, setCategories] = useState<PlaylistCategories>(undefined);
-    const [filteredCategories, setFilteredCategories] = useState<PlaylistCategories>({} as any);
-    const [selections, setSelections] = useState<Record<string, boolean>>({});
-    const [activeTab, setActiveTab] = useState<string>(CATEGORY_TABS[0].key);
-    const [showSelected, setShowSelected] = useState<boolean>(false);
-    const tabs = useMemo(() => CATEGORY_TABS.map(d => ({key: d.key, label: translate(d.label) })), [translate])
-
-    const getActiveCategories =  useCallback((key: string) => {
-            let active = ((filteredCategories as any)?.[key] ?? (categories as any)?.[key]) as any;
-            if (showSelected) {
-                return active.filter((c: PlaylistGroup) => selections[c.id])
-            }
-            return active;
-        },
-        [categories, filteredCategories, showSelected, selections]);
+    const [categories, setCategories] = useState<UserPlaylistCategories>(undefined);
+    const [bouquets, setBouquets] = useState<UserPlaylistCategories>(undefined);
+    const [activeTab, setActiveTab] = useState<string>(TARGET_TABS[0].key);
+    const selectionRef = useRef<{ xtream: BouquetSelection, m3u: BouquetSelection }>({} as any);
+    const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
 
     useEffect(() => {
         setLoading(true);
-        zip(services.userConfig().getPlaylistBouquet().pipe(first()) ,
+        zip(services.userConfig().getPlaylistBouquet().pipe(first()),
             services.userConfig().getPlaylistCategories().pipe(first())).pipe(finalize(() => setLoading(false)))
-            .subscribe(([bouquet, categories]: [PlaylistCategories, PlaylistCategories]) => {
+            .subscribe(([bouquet, categories]: [UserPlaylistCategories, UserPlaylistCategories]) => {
                 if (isEmpty(bouquet)) {
                     bouquet = undefined;
                 }
                 if (isEmpty(categories)) {
-                    categories = {} as any;
+                    categories = undefined;
                 }
-                Object.values(categories).forEach((list: PlaylistGroup[]) => {
-                    list.sort((a, b) => a.name.localeCompare(b.name, {sensitivity: 'base'} as any))
-                });
-                if (bouquet || categories) {
-                    const user_bouquet: any = {}
-                    CATEGORY_TABS.map(t => t.key).forEach(key => {
-                        let current_bouquet: PlaylistGroup[] = ((bouquet as any)?.[key]?.length ?  (bouquet as any)[key] : (categories as any)?.[key]) ?? [];
-                        Object.values(current_bouquet).forEach((c: PlaylistGroup) => user_bouquet[c.id] = true);
-                    });
-                    setSelections(user_bouquet);
+                setCategories(categories);
+                setBouquets(bouquet);
+
+                const mapToSelection = (userBouquet: string[]) => {
+                    if (userBouquet) {
+                        return userBouquet.reduce((acc: any, e: string) => {
+                            acc[e] = true;
+                            return acc;
+                        }, {})
+                    }
+                    return undefined;
                 }
-                setCategories(categories ?? undefined);
+                const mapTargetToSelection = (targetBouquet: UserPlaylistTargetCategories) => {
+                    return {
+                        live: mapToSelection(targetBouquet?.live),
+                        vod: mapToSelection(targetBouquet?.vod),
+                        series: mapToSelection(targetBouquet?.series),
+                    }
+                }
+
+                selectionRef.current = {
+                    xtream: mapTargetToSelection(bouquet?.xtream),
+                    m3u: mapTargetToSelection(bouquet?.m3u),
+                };
             });
     }, [services]);
 
-    const handleCheckboxChange = useCallback((value: string, checked:boolean) => {
-        setSelections(selections => ({...selections, [value]: checked}));
+    const handleActiveTabChange = useCallback((event: any) => {
+        const tab = event.target.dataset.tab;
+        setActiveTab(tab);
     }, []);
-
-    const renderCat = useCallback((cat:PlaylistGroup) => {
-        return <div className={'user-playlist__categories__category'} key={cat.id} data-tooltip={cat.name}>
-            <Checkbox label={cat.name}
-                      value={cat.id}
-                      checked={selections[cat.id]}
-                      onSelect={handleCheckboxChange}></Checkbox>
-        </div>;
-    }, [handleCheckboxChange, selections]);
 
     const handleSave = useCallback(() => {
         setLoading(true);
-        const live = categories?.live?.filter(c => selections[c.id]);
-        const vod = categories?.vod?.filter(c => selections[c.id]);
-        const series = categories?.series?.filter(c => selections[c.id]);
-        const bouquet: PlaylistCategories = {live, series, vod};
+
+        const toClusterCategories = (clusterBouquet: any, clusterCategories: any): string[] => {
+            const result = clusterBouquet ? Object.keys(clusterBouquet).filter(key => clusterBouquet[key]) : undefined;
+            if (result?.length === clusterCategories?.length) {
+                return undefined;
+            }
+            return result;
+        }
+        const toTargetCategories = (bs: BouquetSelection, targetCategories: UserPlaylistTargetCategories): UserPlaylistTargetCategories => ({
+            live: toClusterCategories(bs?.live, targetCategories?.live),
+            vod: toClusterCategories(bs?.vod, targetCategories?.vod),
+            series: toClusterCategories(bs?.series, targetCategories?.series)
+        });
+
+        const bouquet: UserPlaylistCategories = {
+            xtream: toTargetCategories(selectionRef.current.xtream, categories.xtream),
+            m3u: toTargetCategories(selectionRef.current.m3u, categories.m3u)
+        }
+
         services.userConfig().savePlaylistBouquet(bouquet).pipe(first(), finalize(() => setLoading(false))).subscribe({
             next: () => {
                 enqueueSnackbar(translate('MESSAGES.SAVE.BOUQUET.SUCCESS'), {variant: 'success'})
@@ -110,43 +108,11 @@ export default function UserPlaylist(props: UserPlaylistProps) {
                 enqueueSnackbar(translate('MESSAGES.SAVE.BOUQUET.FAIL'), {variant: 'error'})
             }
         })
-    }, [services, categories, selections, translate]);
+    }, [services, translate, enqueueSnackbar, categories?.m3u, categories?.xtream]);
 
-    const handleSelectAll = useCallback(() => {
-        let activeCategories = getActiveCategories(activeTab);
-        if (activeCategories?.length) {
-            setSelections(selections => ({...selections, ...selectEntries(true, activeCategories)}));
-        }
-    }, [activeTab, getActiveCategories]);
-
-    const handleDeselectAll = useCallback(() => {
-        let activeCategories = getActiveCategories(activeTab);
-        if (activeCategories?.length) {
-            setSelections(selections => ({...selections, ...selectEntries(false, activeCategories)}));
-        }
-    }, [activeTab, getActiveCategories]);
-
-    const handleFilter = useCallback((filter: string, regexp: boolean): void => {
-        let filter_value = regexp ? filter : filter.toLowerCase();
-        if (filter_value?.length) {
-            const filtered = (categories as any)?.[activeTab]?.filter((cat: PlaylistGroup) => {
-                if (regexp) {
-                    // eslint-disable-next-line eqeqeq
-                    return cat.name.trim().match(filter_value) != undefined;
-                } else {
-                    return (cat.name.trim().toLowerCase().indexOf(filter_value) > -1);
-                }
-            }) ?? [];
-            setFilteredCategories(filteredCategories => ({...filteredCategories, [activeTab]: filtered}));
-        } else {
-            setFilteredCategories(filteredCategories => ({...filteredCategories, [activeTab]: (categories as any)?.[activeTab]}));
-        }
-    }, [activeTab, categories]);
-
-    const handleShowSelected = useCallback((event: any) => {
-        event.target.blur();
-        setShowSelected(!showSelected);
-    }, [showSelected]);
+    const handleSelectionChange = (selections: BouquetSelection) => {
+        (selectionRef.current as any)[activeTab] = selections;
+    }
 
     return <>
         <LoadingIndicator loading={loading}></LoadingIndicator>
@@ -155,21 +121,20 @@ export default function UserPlaylist(props: UserPlaylistProps) {
                 <label>{translate('TITLE.USER_BOUQUET_EDITOR')}</label>
                 <button data-tooltip='LABEL.SAVE' onClick={handleSave}>{translate('LABEL.SAVE')}</button>
             </div>
-            <TabSet tabs={tabs} active={activeTab} onTabChange={setActiveTab}></TabSet>
-            {CATEGORY_TABS.map(tab => <div key={tab.key} className={'user-playlist__categories-panel' + (activeTab !== tab.key ? ' hidden' : '')}>
-                <div className={'user-playlist__categories__toolbar'}>
-                    <div className={'user-playlist__categories__toolbar-filter'}>
-                        <PlaylistFilter onFilter={handleFilter}></PlaylistFilter>
-                     </div>
-                    <button className={showSelected ? 'button-active': ''} data-tooltip='LABEL.SHOW_SELECTED' onClick={handleShowSelected}>{getIconByName('Checked')}</button>
-                    <button data-tooltip='LABEL.SELECT_ALL' onClick={handleSelectAll}>{getIconByName('SelectAll')}</button>
-                    <button data-tooltip='LABEL.DESELECT_ALL' onClick={handleDeselectAll}>{getIconByName('DeselectAll')}</button>
+            <div className="user-playlist__content">
+                <div className="user-playlist__content-toolbar">
+                    {TARGET_TABS.map((t) =>
+                        <button key={t.key} className={activeTab === t.key ? 'button-active' : ''} data-tab={t.key}
+                                onClick={handleActiveTabChange}>{translate(t.label)}</button>)}
                 </div>
-                <div className={'user-playlist__categories'}>
-                    {getActiveCategories(tab.key)?.map(renderCat)}
-                    </div>
-                </div>)
-            }
+                <div className="user-playlist__content-panels">
+                    {TARGET_TABS.map((t) =>
+                        <UserTargetPlaylist onSelectionChange={handleSelectionChange}
+                                            key={t.key} visible={activeTab === t.key}
+                                            bouquet={(bouquets as any)?.[t.key]}
+                                            categories={(categories as any)?.[t.key]}></UserTargetPlaylist>)}
+                </div>
+            </div>
         </div>
     </>;
 }

@@ -192,7 +192,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                 }
             }
         }
-    }, [data, selectedCategory, selectedGroup])
+    }, [data, selectedCategory, selectedGroup, selectedItem])
 
     const handleCategorySelect = useCallback((evt: any) => {
         let category = evt.target.dataset.category;
@@ -303,7 +303,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
         if (nodes.length) {
             return <div className="playlist-gallery__categories">{nodes}</div>
         }
-        return <div>No Content</div>
+        return <div>{translate("MESSAGES.NO_CONTENT")}</div>
     }, [translate, handleCategorySelect]);
 
     const renderSelectionContent = useCallback((): ReactNode => {
@@ -316,9 +316,9 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
         if (selectedCategory) {
             return renderGroups(selectedCategory, data[selectedCategory]);
         }
-        return <div>No Content</div>
+        return <div>{translate("MESSAGES.NO_CONTENT")}</div>
     }, [data, selectedCategory, selectedGroup, selectedItem,
-        renderGroups, renderItems, renderItem])
+        renderGroups, renderItems, renderItem, translate])
 
     const renderContent = useCallback((): ReactNode => {
         if (data) {
@@ -331,8 +331,8 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                 return renderCategories(data);
             }
         }
-        return <div>No Content</div>;
-    }, [data, selectedCategory, selectedGroup, selectedItem, renderCategories, renderSelectionContent]);
+        return <div>{translate("MESSAGES.NO_CONTENT")}</div>;
+    }, [data, selectedCategory, selectedGroup, selectedItem, renderCategories, renderSelectionContent, translate]);
 
     const handleBreadcrumb = useCallback((evt: any) => {
         const index = evt.target.dataset.index;

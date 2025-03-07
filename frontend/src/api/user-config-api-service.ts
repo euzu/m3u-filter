@@ -1,26 +1,26 @@
 import {Observable} from "rxjs";
 import ApiService, {DefaultApiService} from "./api-service";
-import {PlaylistCategories} from "../model/playlist";
+import {UserPlaylistCategories} from "../model/playlist";
 
 const PLAYLIST_CATEGORIES_PATH = "user/playlist/categories";
 const PLAYLIST_BOUQUET_PATH = "user/playlist/bouquet";
 
 export default interface UserConfigApiService extends ApiService {
-    getPlaylistBouquet(): Observable<PlaylistCategories>;
-    getPlaylistCategories(): Observable<PlaylistCategories>;
-    savePlaylistBouquet(bouquet: PlaylistCategories): Observable<void>;
+    getPlaylistBouquet(): Observable<UserPlaylistCategories>;
+    getPlaylistCategories(): Observable<UserPlaylistCategories>;
+    savePlaylistBouquet(bouquet: UserPlaylistCategories): Observable<void>;
 }
 
 export class DefaultUserConfigApiService extends DefaultApiService implements UserConfigApiService {
 
-    getPlaylistBouquet(): Observable<PlaylistCategories> {
-        return this.get<PlaylistCategories>(PLAYLIST_BOUQUET_PATH);
+    getPlaylistBouquet(): Observable<UserPlaylistCategories> {
+        return this.get<UserPlaylistCategories>(PLAYLIST_BOUQUET_PATH);
     }
-    getPlaylistCategories(): Observable<PlaylistCategories> {
-        return this.get<PlaylistCategories>(PLAYLIST_CATEGORIES_PATH);
+    getPlaylistCategories(): Observable<UserPlaylistCategories> {
+        return this.get<UserPlaylistCategories>(PLAYLIST_CATEGORIES_PATH);
     }
 
-    savePlaylistBouquet(bouquet: PlaylistCategories): Observable<void> {
+    savePlaylistBouquet(bouquet: UserPlaylistCategories): Observable<void> {
         return this.post<void>(PLAYLIST_BOUQUET_PATH, bouquet);
     }
 }

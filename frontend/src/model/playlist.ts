@@ -79,3 +79,15 @@ export interface PlaylistResponse {
 }
 
 export const EmptyPlaylistCategories: PlaylistCategories = {live: [], vod: [], series: []}
+
+
+export interface UserPlaylistTargetCategories {
+    live: string[],
+    vod: string[],
+    series: string[],
+}
+
+export interface UserPlaylistCategories {
+    xtream: UserPlaylistTargetCategories,
+    m3u: UserPlaylistTargetCategories,
+}

@@ -125,14 +125,13 @@ impl Iterator for M3uPlaylistIterator {
     }
 }
 
-
-pub struct M3uPlaylistIteratorText {
+pub struct M3uPlaylistM3uTextIterator {
     inner: M3uPlaylistIterator,
     started: bool,
 
 }
 
-impl M3uPlaylistIteratorText {
+impl M3uPlaylistM3uTextIterator {
     pub fn new(
         cfg: &Config,
         target: &ConfigTarget,
@@ -145,7 +144,7 @@ impl M3uPlaylistIteratorText {
     }
 }
 
-impl Iterator for M3uPlaylistIteratorText {
+impl Iterator for M3uPlaylistM3uTextIterator {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
