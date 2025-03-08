@@ -25,7 +25,7 @@ impl XtreamPlaylistIterator {
         cluster: XtreamCluster,
         config: &Config,
         target: &ConfigTarget,
-        category_id: u32,
+        category_id: Option<u32>,
         user: &ProxyUserCredentials,
     ) -> Result<Self, M3uFilterError> {
         if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
@@ -41,8 +41,7 @@ impl XtreamPlaylistIterator {
             let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
             let server_info = config.get_user_server_info(user);
 
-            let category_id_filter = if category_id == 0 { String::new() }  else { category_id.to_string() };
-            let filter = user_get_bouquet_filter(config, &user.username, &category_id_filter, TargetType::Xtream, cluster).await;
+            let filter = user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, cluster).await;
 
             Ok(Self {
                 reader,
@@ -88,7 +87,7 @@ pub async fn new(
     cluster: XtreamCluster,
     config: &Config,
     target: &ConfigTarget,
-    category_id: u32,
+    category_id: Option<u32>,
     user: &ProxyUserCredentials,
     ) -> Result<Self, M3uFilterError> {
         Ok(Self {

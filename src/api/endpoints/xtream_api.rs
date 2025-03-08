@@ -504,7 +504,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
     get_empty_epg_response()
 }
 
-async fn xtream_player_api_handle_content_action(config: &Config, target_name: &str, action: &str, category_id: &str, user: &ProxyUserCredentials,  req: &HttpRequest) -> Option<HttpResponse> {
+async fn xtream_player_api_handle_content_action(config: &Config, target_name: &str, action: &str, category_id: Option<u32>, user: &ProxyUserCredentials,  req: &HttpRequest) -> Option<HttpResponse> {
     if let Ok((path, content)) = match action {
         ACTION_GET_LIVE_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_LIVE),
         ACTION_GET_VOD_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_VOD),
@@ -624,14 +624,14 @@ async fn xtream_player_api(
             _ => {}
         }
 
+        let category_id =  api_req.category_id.trim().parse::<u32>().ok();
         // Handle general content actions
         if let Some(response) = xtream_player_api_handle_content_action(
-            &app_state.config, &target.name, action, api_req.category_id.trim(), &user, req,
+            &app_state.config, &target.name, action, category_id, &user, req,
         ).await {
             return response;
         }
 
-        let category_id = api_req.category_id.trim().parse::<u32>().unwrap_or(0);
         let result = match action {
             ACTION_GET_LIVE_STREAMS =>
                 skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id, &user).await),

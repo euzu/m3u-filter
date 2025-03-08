@@ -430,7 +430,7 @@ pub async fn xtream_load_rewrite_playlist(
     cluster: XtreamCluster,
     config: &Config,
     target: &ConfigTarget,
-    category_id: u32,
+    category_id: Option<u32>,
     user: &ProxyUserCredentials,
 ) -> Result<XtreamPlaylistJsonIterator, M3uFilterError> {
     XtreamPlaylistJsonIterator::new(cluster, config, target, category_id, user).await

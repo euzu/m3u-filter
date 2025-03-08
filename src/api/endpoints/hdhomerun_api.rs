@@ -228,8 +228,8 @@ async fn lineup_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder 
                 None
             };
 
-            let live_channels = XtreamPlaylistIterator::new(XtreamCluster::Live, &cfg, target, 0, &credentials).await.ok();
-            let vod_channels = XtreamPlaylistIterator::new(XtreamCluster::Video, &cfg, target, 0, &credentials).await.ok();
+            let live_channels = XtreamPlaylistIterator::new(XtreamCluster::Live, &cfg, target, None, &credentials).await.ok();
+            let vod_channels = XtreamPlaylistIterator::new(XtreamCluster::Video, &cfg, target, None, &credentials).await.ok();
             // TODO include when resolved
             //let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
             let user_credentials = Arc::new(credentials);
