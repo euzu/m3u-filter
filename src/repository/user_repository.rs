@@ -284,31 +284,36 @@ pub async fn user_get_bouquet_filter(config: &Config, username: &str, category_i
         XtreamCluster::Video => user_get_vod_bouquet(config, username, &target).await,
         XtreamCluster::Series => user_get_series_bouquet(config, username, &target).await,
     };
-    let category_id = category_id.trim();
+
+    if bouquet.is_none() && category_id.trim().is_empty() {
+        return None
+    }
+
     let mut filter = HashSet::new();
+
+    let category_id = category_id.trim();
     if !category_id.is_empty() {
         filter.insert(category_id.to_string());
     }
-    if let Some(bouquet_categories) = bouquet {
-        if !bouquet_categories.is_empty() {
-            if target == TargetType::Xtream {
-                if let Ok(bouquet_entries) = serde_json::from_str::<Vec<PlaylistXtreamCategory>>(&bouquet_categories) {
-                    for c in bouquet_entries {
-                        filter.insert(c.id);
-                    }
-                }
-            } else if let Ok(bouquet_entries) = serde_json::from_str::<Vec<String>>(&bouquet_categories) {
-                for c in bouquet_entries {
-                    filter.insert(c);
-                }
-            }
-        }
+
+    let bouquet_categories = bouquet.unwrap_or_default();
+    if bouquet_categories.is_empty() || bouquet_categories == "null" {
+        return Some(filter).filter(|f| !f.is_empty());
     }
-    if filter.is_empty() {
-        None
+
+    let entries: Option<Vec<String>> = if target == TargetType::Xtream {
+        serde_json::from_str::<Vec<PlaylistXtreamCategory>>(&bouquet_categories)
+            .ok()
+            .map(|v| v.into_iter().map(|c| c.id).collect())
     } else {
-        Some(filter)
+        serde_json::from_str::<Vec<String>>(&bouquet_categories).ok()
+    };
+
+    if let Some(entries) = entries {
+        filter.extend(entries);
     }
+
+    Some(filter)
 }
 
 
