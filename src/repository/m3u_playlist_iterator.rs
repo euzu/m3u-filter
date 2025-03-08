@@ -1,11 +1,13 @@
+use std::collections::HashSet;
 use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTarget, ConfigTargetOptions};
-use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType};
+use crate::model::config::{Config, ConfigTarget, ConfigTargetOptions, TargetType};
+use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::indexed_document::IndexedDocumentIterator;
 use crate::repository::m3u_repository::m3u_get_file_paths;
 use crate::repository::storage::ensure_target_storage_path;
+use crate::repository::user_repository::user_get_bouquet_filter;
 use crate::utils::file::file_lock_manager::FileReadGuard;
 
 pub const M3U_STREAM_PATH: &str = "m3u-stream";
@@ -22,11 +24,12 @@ pub struct M3uPlaylistIterator {
     include_type_in_url: bool,
     rewrite_resource: bool,
     proxy_type: ProxyType,
+    filter: Option<HashSet<String>>,
     _file_lock: FileReadGuard,
 }
 
 impl M3uPlaylistIterator {
-    pub fn new(
+    pub async fn new(
         cfg: &Config,
         target: &ConfigTarget,
         user: &ProxyUserCredentials,
@@ -43,7 +46,7 @@ impl M3uPlaylistIterator {
         let target_options = target.options.as_ref();
         let include_type_in_url = target_options.is_some_and(|opts| opts.m3u_include_type_in_url);
         let mask_redirect_url = target_options.is_some_and(|opts| opts.m3u_mask_redirect_url);
-
+        let filter = user_get_bouquet_filter(cfg, &user.username, "", TargetType::M3u, XtreamCluster::Live).await;
         // TODO m3u bouquet filter
 
         let server_info = cfg.get_user_server_info(user);
@@ -55,6 +58,7 @@ impl M3uPlaylistIterator {
             target_options: target.options.clone(),
             include_type_in_url,
             mask_redirect_url,
+            filter,
             proxy_type: user.proxy.clone(),
             _file_lock: file_lock, // Save lock inside struct
             rewrite_resource: cfg.is_reverse_proxy_resource_rewrite_enabled(),
@@ -93,8 +97,14 @@ impl M3uPlaylistIterator {
     }
 
     fn get_next(&mut self) -> Option<(M3uPlaylistItem, bool)> {
+        let entry =  if let Some(set) = &self.filter {
+            self.reader.find(|(pli, _has_next)| set.contains(&pli.group.to_string()))
+        } else {
+            self.reader.next()
+        };
+
         // TODO hls and unknown reverse proxy
-        self.reader.next().map(|(mut m3u_pli, _has_next)| {
+        entry.map(|(mut m3u_pli, _has_next)| {
             let rewrite_urls = match m3u_pli.item_type {
                 PlaylistItemType::LiveHls => None,
                 _ => if match &self.proxy_type {
@@ -132,13 +142,13 @@ pub struct M3uPlaylistM3uTextIterator {
 }
 
 impl M3uPlaylistM3uTextIterator {
-    pub fn new(
+    pub async fn new(
         cfg: &Config,
         target: &ConfigTarget,
         user: &ProxyUserCredentials,
     ) -> Result<Self, M3uFilterError> {
         Ok(Self {
-            inner: M3uPlaylistIterator::new(cfg, target, user)?,
+            inner: M3uPlaylistIterator::new(cfg, target, user).await?,
             started: false,
         })
     }

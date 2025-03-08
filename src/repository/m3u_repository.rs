@@ -86,7 +86,7 @@ pub async fn m3u_load_rewrite_playlist(
     target: &ConfigTarget,
     user: &ProxyUserCredentials,
 ) -> Result<M3uPlaylistM3uTextIterator, M3uFilterError> {
-    M3uPlaylistM3uTextIterator::new(cfg, target, user)
+    M3uPlaylistM3uTextIterator::new(cfg, target, user).await
 }
 
 pub async fn m3u_get_item_for_stream_id(stream_id: u32, cfg: &Config, target: &ConfigTarget) -> Result<M3uPlaylistItem, Error> {

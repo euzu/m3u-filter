@@ -63,7 +63,7 @@ impl XtreamPlaylistIterator {
             return None;
         }
         if let Some(set) = &self.filter {
-            self.reader.find(|(pli, _has_next)| set.contains(&pli.group.to_string()) || set.contains(&pli.category_id.to_string()))
+            self.reader.find(|(pli, _has_next)| set.contains(&pli.category_id.to_string()))
         } else {
             self.reader.next()
         }

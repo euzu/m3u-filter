@@ -244,7 +244,7 @@ async fn lineup_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder 
                 .content_type("application/json")
                 .streaming(body_stream);
         } else if target.has_output(&TargetType::M3u) {
-            let iterator = M3uPlaylistIterator::new(&cfg,target,&credentials).ok();
+            let iterator = M3uPlaylistIterator::new(&cfg,target,&credentials).await.ok();
             let stream = m3u_item_to_lineup_stream(iterator);
             let body_stream = stream::once(async { Ok(Bytes::from("[")) })
                 .chain(stream)
