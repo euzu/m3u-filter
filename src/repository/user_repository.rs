@@ -2,15 +2,16 @@ use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, ProxyUserStatus, 
 use crate::model::config::{Config, TargetType};
 use crate::model::playlist::XtreamCluster;
 use crate::model::playlist_categories::{PlaylistBouquetDto, TargetBouquetDto};
+use crate::model::xtream::PlaylistXtreamCategory;
 use crate::repository::bplustree::BPlusTree;
+use crate::repository::xtream_repository::xtream_get_playlist_categories;
 use crate::utils::file::file_utils;
 use crate::utils::json_utils::json_write_documents_to_file;
-use log::{error};
+use chrono::Local;
+use log::error;
 use std::collections::{HashMap, HashSet};
 use std::io::Error;
 use std::path::{Path, PathBuf};
-use chrono::Local;
-use crate::repository::xtream_repository::xtream_get_playlist_categories;
 
 const USER_LIVE_BOUQUET: &str = "live_bouquet.json";
 const USER_VOD_BOUQUET: &str = "vod_bouquet.json";
@@ -168,20 +169,49 @@ fn user_get_series_bouquet_path(user_storage_path: &Path, target: &TargetType) -
     user_storage_path.join(PathBuf::from(format!("{}_{USER_SERIES_BOUQUET}", target.to_string().to_lowercase())))
 }
 
-fn save_user_bouquet_for_target(storage_path: &Path, target: TargetType, bouquet: &TargetBouquetDto)-> Result<(), Error> {
-    json_write_documents_to_file(&user_get_live_bouquet_path(storage_path, &target), &bouquet.live)?;
-    json_write_documents_to_file(&user_get_vod_bouquet_path(storage_path, &target), &bouquet.vod)?;
-    json_write_documents_to_file(&user_get_series_bouquet_path(storage_path, &target), &bouquet.series)?;
+async fn save_xtream_user_bouquet_for_target(config: &Config, target_name: &str, storage_path: &Path, cluster: XtreamCluster, bouquet: Option<&Vec<String>>) -> Result<(), Error> {
+    let bouquet_path = match cluster {
+        XtreamCluster::Live => user_get_live_bouquet_path(storage_path, &TargetType::Xtream),
+        XtreamCluster::Video => user_get_vod_bouquet_path(storage_path, &TargetType::Xtream),
+        XtreamCluster::Series => user_get_series_bouquet_path(storage_path, &TargetType::Xtream),
+    };
+    match bouquet {
+        Some(bouquet) => {
+            if let Some(xtream_categories) = xtream_get_playlist_categories(config, target_name, cluster).await {
+                let filtered: Vec<&PlaylistXtreamCategory> = xtream_categories.iter().filter(|p| bouquet.contains(&p.name)).collect();
+                json_write_documents_to_file(&bouquet_path, &filtered)?;
+            } else {
+                json_write_documents_to_file(&bouquet_path, &None::<String>)?;
+            }
+        }
+        None => {
+            json_write_documents_to_file(&bouquet_path, &bouquet)?;
+        }
+    }
+
     Ok(())
 }
 
-pub fn save_user_bouquet(cfg: &Config, username: &str, bouquet: &PlaylistBouquetDto) -> Result<(), std::io::Error> {
+async fn save_user_bouquet_for_target(config: &Config, target_name: &str, storage_path: &Path, target: TargetType, bouquet: &TargetBouquetDto) -> Result<(), Error> {
+    if target == TargetType::Xtream {
+        save_xtream_user_bouquet_for_target(config, target_name, storage_path, XtreamCluster::Live, bouquet.live.as_ref()).await?;
+        save_xtream_user_bouquet_for_target(config, target_name, storage_path, XtreamCluster::Video, bouquet.vod.as_ref()).await?;
+        save_xtream_user_bouquet_for_target(config, target_name, storage_path, XtreamCluster::Series, bouquet.series.as_ref()).await?;
+    } else {
+        json_write_documents_to_file(&user_get_live_bouquet_path(storage_path, &target), &bouquet.live)?;
+        json_write_documents_to_file(&user_get_vod_bouquet_path(storage_path, &target), &bouquet.vod)?;
+        json_write_documents_to_file(&user_get_series_bouquet_path(storage_path, &target), &bouquet.series)?;
+    }
+    Ok(())
+}
+
+pub async fn save_user_bouquet(cfg: &Config, target_name: &str, username: &str, bouquet: &PlaylistBouquetDto) -> Result<(), std::io::Error> {
     if let Some(storage_path) = ensure_user_storage_path(cfg, username) {
-        if let Some(xb) =  &bouquet.xtream {
-            save_user_bouquet_for_target(&storage_path, TargetType::Xtream, xb)?;
+        if let Some(xb) = &bouquet.xtream {
+            save_user_bouquet_for_target(cfg, target_name, &storage_path, TargetType::Xtream, xb).await?;
         }
-        if let Some(mb) =  &bouquet.m3u {
-            save_user_bouquet_for_target(&storage_path, TargetType::M3u, mb)?;
+        if let Some(mb) = &bouquet.m3u {
+            save_user_bouquet_for_target(cfg, target_name, &storage_path, TargetType::M3u, mb).await?;
         }
         Ok(())
     } else {
@@ -193,12 +223,26 @@ async fn load_user_bouquet_from_file(file: &Path) -> Option<String> {
     tokio::fs::read_to_string(file).await.ok()
 }
 
+fn convert_xtream_user_bouquet(bouquet_cluster: Option<String>) -> Option<String> {
+    bouquet_cluster
+        .and_then(|c| serde_json::from_str::<Vec<PlaylistXtreamCategory>>(&c).ok())
+        .map(|v| v.into_iter().map(|c| c.name).collect::<Vec<_>>())
+        .and_then(|v| serde_json::to_string(&v).ok())
+}
+
 pub async fn load_user_bouquet_as_json(cfg: &Config, username: &str, target: TargetType) -> Option<String> {
     if let Some(storage_path) = get_user_storage_path(cfg, username) {
         if storage_path.exists() {
-            let live = load_user_bouquet_from_file(&user_get_live_bouquet_path(&storage_path, &target)).await;
-            let vod = load_user_bouquet_from_file(&user_get_vod_bouquet_path(&storage_path, &target)).await;
-            let series = load_user_bouquet_from_file(&user_get_series_bouquet_path(&storage_path, &target)).await;
+            let live_content = load_user_bouquet_from_file(&user_get_live_bouquet_path(&storage_path, &target)).await;
+            let vod_content = load_user_bouquet_from_file(&user_get_vod_bouquet_path(&storage_path, &target)).await;
+            let series_content = load_user_bouquet_from_file(&user_get_series_bouquet_path(&storage_path, &target)).await;
+            let (live, vod, series) = if target == TargetType::Xtream {
+                (convert_xtream_user_bouquet(live_content),
+                 convert_xtream_user_bouquet(vod_content),
+                 convert_xtream_user_bouquet(series_content))
+            } else {
+                (live_content, vod_content, series_content)
+            };
             return Some(format!(r#"{{"live": {}, "vod": {}, "series": {} }}"#,
                                 live.unwrap_or("null".to_string()),
                                 vod.unwrap_or("null".to_string()),
@@ -209,41 +253,32 @@ pub async fn load_user_bouquet_as_json(cfg: &Config, username: &str, target: Tar
     None
 }
 
-async fn user_get_cluster_bouquet(cfg: &Config, username: &str, target: &TargetType, cluster: XtreamCluster) -> Option<Vec<String>> {
+async fn user_get_cluster_bouquet(cfg: &Config, username: &str, target: &TargetType, cluster: XtreamCluster) -> Option<String> {
     if let Some(storage_path) = get_user_storage_path(cfg, username) {
         if storage_path.exists() {
-            let content = load_user_bouquet_from_file(&match cluster {
+            return load_user_bouquet_from_file(&match cluster {
                 XtreamCluster::Live => user_get_live_bouquet_path(&storage_path, target),
                 XtreamCluster::Video => user_get_vod_bouquet_path(&storage_path, target),
                 XtreamCluster::Series => user_get_series_bouquet_path(&storage_path, target),
             }).await;
-            if let Some(value) = content {
-                if let Ok(bouquet) = serde_json::from_str::<Vec<String>>(&value) {
-                    if !bouquet.is_empty() {
-                        return Some(bouquet);
-                    }
-                }
-            }
         }
     }
     None
 }
 
-
-pub(crate) async fn user_get_live_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<Vec<String>> {
+pub(crate) async fn user_get_live_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<String> {
     user_get_cluster_bouquet(cfg, username, target, XtreamCluster::Live).await
 }
 
-pub(crate) async fn user_get_vod_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<Vec<String>> {
+pub(crate) async fn user_get_vod_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<String> {
     user_get_cluster_bouquet(cfg, username, target, XtreamCluster::Video).await
 }
 
-pub(crate) async fn user_get_series_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<Vec<String>> {
+pub(crate) async fn user_get_series_bouquet(cfg: &Config, username: &str, target: &TargetType) -> Option<String> {
     user_get_cluster_bouquet(cfg, username, target, XtreamCluster::Series).await
 }
 
-// TODO save user bouquet for xtream with category id, and not load it every time when playlist read
-pub async fn user_get_bouquet_filter(config: &Config, target_name: &str, username: &str, category_id: &str, target: TargetType, cluster: XtreamCluster) -> Option<HashSet<String>> {
+pub async fn user_get_bouquet_filter(config: &Config, username: &str, category_id: &str, target: TargetType, cluster: XtreamCluster) -> Option<HashSet<String>> {
     let bouquet = match cluster {
         XtreamCluster::Live => user_get_live_bouquet(config, username, &target).await,
         XtreamCluster::Video => user_get_vod_bouquet(config, username, &target).await,
@@ -257,19 +292,13 @@ pub async fn user_get_bouquet_filter(config: &Config, target_name: &str, usernam
     if let Some(bouquet_categories) = bouquet {
         if !bouquet_categories.is_empty() {
             if target == TargetType::Xtream {
-                if let Some(xtream_categories) = xtream_get_playlist_categories(config, target_name,cluster).await  {
-                    let map: HashMap<String, String> = xtream_categories
-                        .into_iter()
-                        .map(|item| (item.name, item.id))
-                        .collect();
-                    for c in bouquet_categories {
-                        if let Some(id) = map.get(&c) {
-                            filter.insert(id.to_string());
-                        }
+                if let Ok(bouquet_entries) = serde_json::from_str::<Vec<PlaylistXtreamCategory>>(&bouquet_categories) {
+                    for c in bouquet_entries {
+                        filter.insert(c.id);
                     }
                 }
-            } else {
-                for c in bouquet_categories {
+            } else if let Ok(bouquet_entries) = serde_json::from_str::<Vec<String>>(&bouquet_categories) {
+                for c in bouquet_entries {
                     filter.insert(c);
                 }
             }
@@ -285,67 +314,67 @@ pub async fn user_get_bouquet_filter(config: &Config, target_name: &str, usernam
 
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
-    use crate::model::api_proxy::{ProxyType, ProxyUserStatus};
     use super::*;
+    use crate::model::api_proxy::{ProxyType, ProxyUserStatus};
+    use std::env::temp_dir;
 
 
     #[test]
     pub fn save_target_user() {
         let user =
-        TargetUser {
-            target: "test".to_string(),
-            credentials: vec![
-                ProxyUserCredentials {
-                    username: "Test".to_string(),
-                    password: "Test".to_string(),
-                    token: Some("Test".to_string()),
-                    proxy: ProxyType::Reverse,
-                    server: Some("default".to_string()),
-                    epg_timeshift: None,
-                    created_at: None,
-                    exp_date: Some(1672705545),
-                    max_connections: Some(1),
-                    status: Some(ProxyUserStatus::Active),
-                },
-                ProxyUserCredentials {
-                    username: "Test2".to_string(),
-                    password: "Test".to_string(),
-                    token: Some("Test".to_string()),
-                    proxy: ProxyType::Reverse,
-                    server: Some("default".to_string()),
-                    epg_timeshift: None,
-                    created_at: None,
-                    exp_date: Some(1672705545),
-                    max_connections: Some(1),
-                    status: Some(ProxyUserStatus::Expired),
-                },
-                ProxyUserCredentials {
-                    username: "Test3".to_string(),
-                    password: "Test".to_string(),
-                    token: Some("Test".to_string()),
-                    proxy: ProxyType::Reverse,
-                    server: Some("default".to_string()),
-                    epg_timeshift: None,
-                    created_at: None,
-                    exp_date: Some(1672705545),
-                    max_connections: Some(1),
-                    status: Some(ProxyUserStatus::Expired),
-                },
-                ProxyUserCredentials {
-                    username: "Test4".to_string(),
-                    password: "Test".to_string(),
-                    token: Some("Test".to_string()),
-                    proxy: ProxyType::Reverse,
-                    server: Some("default".to_string()),
-                    epg_timeshift: None,
-                    created_at: None,
-                    exp_date: Some(1672705545),
-                    max_connections: Some(1),
-                    status: Some(ProxyUserStatus::Expired),
-                }
-            ]
-        };
+            TargetUser {
+                target: "test".to_string(),
+                credentials: vec![
+                    ProxyUserCredentials {
+                        username: "Test".to_string(),
+                        password: "Test".to_string(),
+                        token: Some("Test".to_string()),
+                        proxy: ProxyType::Reverse,
+                        server: Some("default".to_string()),
+                        epg_timeshift: None,
+                        created_at: None,
+                        exp_date: Some(1672705545),
+                        max_connections: Some(1),
+                        status: Some(ProxyUserStatus::Active),
+                    },
+                    ProxyUserCredentials {
+                        username: "Test2".to_string(),
+                        password: "Test".to_string(),
+                        token: Some("Test".to_string()),
+                        proxy: ProxyType::Reverse,
+                        server: Some("default".to_string()),
+                        epg_timeshift: None,
+                        created_at: None,
+                        exp_date: Some(1672705545),
+                        max_connections: Some(1),
+                        status: Some(ProxyUserStatus::Expired),
+                    },
+                    ProxyUserCredentials {
+                        username: "Test3".to_string(),
+                        password: "Test".to_string(),
+                        token: Some("Test".to_string()),
+                        proxy: ProxyType::Reverse,
+                        server: Some("default".to_string()),
+                        epg_timeshift: None,
+                        created_at: None,
+                        exp_date: Some(1672705545),
+                        max_connections: Some(1),
+                        status: Some(ProxyUserStatus::Expired),
+                    },
+                    ProxyUserCredentials {
+                        username: "Test4".to_string(),
+                        password: "Test".to_string(),
+                        token: Some("Test".to_string()),
+                        proxy: ProxyType::Reverse,
+                        server: Some("default".to_string()),
+                        epg_timeshift: None,
+                        created_at: None,
+                        exp_date: Some(1672705545),
+                        max_connections: Some(1),
+                        status: Some(ProxyUserStatus::Expired),
+                    }
+                ],
+            };
 
         let mut cfg = Config::default();
         let target_user = vec![user];

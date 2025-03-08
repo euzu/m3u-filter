@@ -514,9 +514,9 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
         if let Some(file_path) = path {
             // load user bouquet
             let filter = match action {
-                ACTION_GET_LIVE_CATEGORIES => user_repository::user_get_bouquet_filter(config, target_name,&user.username, category_id, TargetType::Xtream, XtreamCluster::Live).await,
-                ACTION_GET_VOD_CATEGORIES => user_repository::user_get_bouquet_filter(config, target_name, &user.username, category_id, TargetType::Xtream, XtreamCluster::Video).await,
-                ACTION_GET_SERIES_CATEGORIES => user_repository::user_get_bouquet_filter(config, target_name, &user.username, category_id, TargetType::Xtream, XtreamCluster::Series).await,
+                ACTION_GET_LIVE_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Live).await,
+                ACTION_GET_VOD_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Video).await,
+                ACTION_GET_SERIES_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Series).await,
                 _ => None
             };
             if let Some(flt) = filter {

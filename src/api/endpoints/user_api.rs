@@ -104,11 +104,11 @@ async fn save_playlist_bouquet(
     req: web::Json<PlaylistBouquetDto>,
 ) -> HttpResponse {
     if let Some(username) = get_username_from_auth_header(credentials, &app_state) {
-        if let Some((user, _target)) = get_user_target_by_username(username.as_str(), &app_state).await {
+        if let Some((user, target)) = get_user_target_by_username(username.as_str(), &app_state).await {
             if !user.has_permissions(&app_state) {
                 return HttpResponse::Forbidden().finish();
             }
-            match save_user_bouquet(&app_state.config, &username, &req.0) {
+            match save_user_bouquet(&app_state.config, &target.name, &username, &req.0).await {
                 Ok(()) => {
                     return HttpResponse::Ok().finish();
                 }

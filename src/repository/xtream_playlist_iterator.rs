@@ -41,8 +41,8 @@ impl XtreamPlaylistIterator {
             let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
             let server_info = config.get_user_server_info(user);
 
-            let category_id_filter = if category_id == 0 { "".to_string() }  else { category_id.to_string() };
-            let filter = user_get_bouquet_filter(config, target.name.as_str(), &user.username, &category_id_filter, TargetType::Xtream, cluster).await;
+            let category_id_filter = if category_id == 0 { String::new() }  else { category_id.to_string() };
+            let filter = user_get_bouquet_filter(config, &user.username, &category_id_filter, TargetType::Xtream, cluster).await;
 
             Ok(Self {
                 reader,
