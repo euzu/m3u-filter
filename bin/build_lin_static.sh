@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target x86_64-unknown-linux-musl
+DEFAULT_TARGET="x86_64-unknown-linux-musl"
+TARGET="${1:-$DEFAULT_TARGET}"
+env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$TARGET"
