@@ -1,7 +1,7 @@
 use crate::m3u_filter_error::{create_m3u_filter_error,info_err};
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::ProxyUserCredentials;
-use crate::model::config::{Config, ConfigTarget};
+use crate::model::config::{Config, ConfigTarget, M3uTargetOutput};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentIterator, IndexedDocumentWriter};
 use crate::repository::m3u_playlist_iterator::{M3uPlaylistM3uTextIterator};
@@ -33,8 +33,8 @@ pub fn m3u_get_epg_file_path(target_path: &Path) -> PathBuf {
     file_utils::add_prefix_to_filename(&path, "epg_", Some("xml"))
 }
 
-fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlist: &Vec<M3uPlaylistItem>) {
-    if let Some(filename) = target.get_m3u_filename() {
+fn persist_m3u_playlist_as_text(cfg: &Config, target: &ConfigTarget, target_output: &M3uTargetOutput, m3u_playlist: &Vec<M3uPlaylistItem>) {
+    if let Some(filename) = target_output.filename.as_ref() {
         if let Some(m3u_filename) = file_utils::get_file_path(&cfg.working_dir, Some(PathBuf::from(filename))) {
             match File::create(&m3u_filename) {
                 Ok(file) => {
@@ -53,7 +53,7 @@ fn persist_m3u_playlist_as_text(target: &ConfigTarget, cfg: &Config, m3u_playlis
     }
 }
 
-pub async fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path: &Path, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub async fn m3u_write_playlist( cfg: &Config, target: &ConfigTarget, target_output: &M3uTargetOutput, target_path: &Path, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
     if !new_playlist.is_empty() {
         let (m3u_path, idx_path) = m3u_get_file_paths(target_path);
         let m3u_playlist = new_playlist.iter()
@@ -61,7 +61,7 @@ pub async fn m3u_write_playlist(target: &ConfigTarget, cfg: &Config, target_path
             .filter(|&pli| pli.header.borrow().item_type != PlaylistItemType::SeriesInfo)
             .map(PlaylistItem::to_m3u).collect::<Vec<M3uPlaylistItem>>();
 
-        persist_m3u_playlist_as_text(target, cfg, &m3u_playlist);
+        persist_m3u_playlist_as_text(cfg, target, target_output, &m3u_playlist);
         {
             let _file_lock = cfg.file_locks.write_lock(&m3u_path);
             match IndexedDocumentWriter::new(m3u_path.clone(), idx_path) {

@@ -119,11 +119,11 @@
         "DUPLICATE_TOKEN": "Duplicate token!",
         "TARGET_NOT_FOUND": "Target not found!",
         "MAX_CONNECTIONS_INVALID": "MaxConnections invalid"
-      },
-      "PLAYLIST_UPDATE": {
-        "SUCCESS": "Successfully started playlist update!",
-        "FAIL": "Playlist update failed!"
       }
+    },
+    "PLAYLIST_UPDATE": {
+      "SUCCESS": "Successfully started playlist update!",
+      "FAIL": "Playlist update failed!"
     },
     "SOURCE_SELECTOR": {
       "MISSING_SELECTION": "No entry selected"

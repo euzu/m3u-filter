@@ -103,6 +103,13 @@
       "USER": {
         "SUCCESS": "Benutzer erfolgreich gespeichert",
         "FAIL": "Fehler beim Speichern des Benutzers!"
+      },
+      "PLAYLIST_UPDATE": {
+        "SUCCESS": "Playlist Aktualisierung erfolgreich gestartet!",
+        "FAIL": "Playlist Aktualisierung fehlgeschlagen!"
+      },
+      "SOURCE_SELECTOR": {
+        "MISSING_SELECTION": "Kein Eintrag ausgewählt"
       }
     }
   },

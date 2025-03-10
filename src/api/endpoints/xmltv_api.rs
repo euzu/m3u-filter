@@ -14,8 +14,7 @@ use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::model::api_proxy::ProxyUserCredentials;
-use crate::model::config::{Config, ConfigTarget};
-use crate::model::config::TargetType;
+use crate::model::config::{Config, ConfigTarget, TargetOutput};
 use crate::repository::m3u_repository::m3u_get_epg_file_path;
 use crate::repository::storage::get_target_storage_path;
 use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
@@ -53,21 +52,24 @@ fn get_epg_path_for_target_of_type(target_name: &str, epg_path: PathBuf) -> Opti
 }
 
 fn get_epg_path_for_target(config: &Config, target: &ConfigTarget) -> Option<PathBuf> {
+    // TODO if we have multiple targets, first one serves, this can be problematic when
+    // we use m3u playlist but serve xtream target epg
+
     // TODO if we share the same virtual_id for epg, can we store an epg file for the target ?
     for output in &target.output {
-        match output.target {
-            TargetType::M3u => {
-                if let Some(target_path) = get_target_storage_path(config, &target.name) {
-                    return get_epg_path_for_target_of_type(&target.name, m3u_get_epg_file_path(&target_path));
-                }
-            }
-            TargetType::Xtream => {
+        match output {
+            TargetOutput::Xtream(_) => {
                 if let Some(storage_path) = xtream_get_storage_path(config, &target.name) {
                     return get_epg_path_for_target_of_type(&target.name, xtream_get_epg_file_path(&storage_path));
                 }
             }
-            TargetType::Strm | TargetType::HdHomeRun => {}
+            TargetOutput::M3u(_) => {
+                if let Some(target_path) = get_target_storage_path(config, &target.name) {
+                    return get_epg_path_for_target_of_type(&target.name, m3u_get_epg_file_path(&target_path));
+                }
             }
+            TargetOutput::Strm(_) | TargetOutput::HdHomeRun(_) => {}
+        }
     }
     None
 }

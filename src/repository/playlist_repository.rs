@@ -1,7 +1,7 @@
 use std::path::{Path};
 use crate::m3u_filter_error::{info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigTarget, TargetType};
+use crate::model::config::{Config, ConfigTarget, TargetOutput};
 use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
 use crate::model::xmltv::Epg;
 use crate::repository::epg_repository::epg_write;
@@ -43,12 +43,13 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     }
 
     for output in &target.output {
-        let result = match output.target {
-            TargetType::M3u => m3u_write_playlist(target, cfg, &target_path, playlist).await,
-            TargetType::Xtream => xtream_write_playlist(target, cfg, playlist).await,
-            TargetType::Strm => kodi_write_strm_playlist(target, cfg, playlist, output).await,
-            TargetType::HdHomeRun => Ok(()),
+        let result = match output {
+            TargetOutput::Xtream(_xtream_output) => xtream_write_playlist(target, cfg, playlist).await,
+            TargetOutput::M3u(m3u_output) => m3u_write_playlist(cfg, target, m3u_output, &target_path, playlist).await,
+            TargetOutput::Strm(strm_output) => kodi_write_strm_playlist(target, strm_output, cfg, playlist).await,
+            TargetOutput::HdHomeRun(_hdhomerun_output) => Ok(()),
         };
+
         if let Err(err) = result {
             errors.push(err);
         } else if !playlist.is_empty() {

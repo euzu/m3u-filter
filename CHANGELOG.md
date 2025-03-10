@@ -1,5 +1,57 @@
 # Changelog
 # 2.2.2 (2025-02-xx)
+- !BREAKING CHANGE! Target options moved to specific target output definitions.
+
+target options:
+- ignore_logo: true|false,
+- share_live_streams: true|false,
+- remove_duplicates: true|false,
+
+target output type xtream:
+- skip_live_direct_source: true|false,
+- skip_video_direct_source: true|false,
+- skip_series_direct_source: true|false,
+- resolve_series: true|false,
+- resolve_series_delay: seconds,
+- resolve_vod: true|false,
+- resolve_vod_delay: true|false,
+
+target output type m3u:
+- filename: _optional_
+- include_type_in_url: true|false,
+- mask_redirect_url: true|false,
+
+target output type strm:
+- directory: _mandatory_,
+- username: _optional_,
+- underscore_whitespace: true|false,
+- cleanup: true|false,
+- kodi_style: true|false,
+- strm_props: _optional_,  list of strings,
+
+target output type hdhomerun:
+- device: _mandatory_,
+- username: _mandatory_,
+- use_output: _optional_, m3u|xtream
+
+Example:
+```yaml
+targets:
+  - name: xc_m3u
+    output:
+      - type: xtream
+        skip_live_direct_source: true,
+        skip_video_direct_source: true,
+      - type: m3u
+      - type: strm
+        directory: /tmp/kodi
+      - type: hdhomerun
+        username: hdhruser
+        device: hdhr1
+        use_output: xtream 
+    options: {ignore_logo: false, share_live_streams: true, remove_duplicates: false}
+```
+
 - input alias definition for same provider with same content but different credentials
 ```yaml
 - sources:
@@ -15,7 +67,7 @@
   targets:
   - name: test
 ```
-- The Web UI now includes a login feature for playlist users, allowing them to set their group for filtering and managing their own bouquet of groups.
+- The Web UI now includes a login feature for playlist users, allowing them to set their groups for filtering and managing their own bouquet of groups.
  The playlist user can login with his credentials and can select the desired groups for his playlist.
 - Added `user_config_dir` to `config.yml`. It is the storage path for user configurations (f.e. bouquets).
 - New Filter field `input` can be used along `name`, `group`, `title`, `url` and `type`. Input is a `regexp` filter. `input ~ "provider\-\d+"`

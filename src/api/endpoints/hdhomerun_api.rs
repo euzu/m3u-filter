@@ -220,7 +220,20 @@ async fn lineup_status() -> impl Responder {
 async fn lineup_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder {
     let cfg = Arc::clone(&app_state.app_state.config);
     if let Some((credentials, target)) = cfg.get_target_for_username(&app_state.device.t_username) {
-        if target.has_output(&TargetType::Xtream) {
+        let use_output = target.get_hdhomerun_output().as_ref().and_then(|o| o.use_output.clone());
+        let use_all = use_output.is_none();
+        let use_m3u = use_output.as_ref() == Some(&TargetType::M3u);
+        let use_xtream = use_output.as_ref() == Some(&TargetType::Xtream);
+        if (use_all || use_m3u) && target.has_output(&TargetType::M3u) {
+            let iterator = M3uPlaylistIterator::new(&cfg,target,&credentials).await.ok();
+            let stream = m3u_item_to_lineup_stream(iterator);
+            let body_stream = stream::once(async { Ok(Bytes::from("[")) })
+                .chain(stream)
+                .chain(stream::once(async { Ok(Bytes::from("]")) }));
+            return HttpResponse::Ok()
+                .content_type("application/json")
+                .streaming(body_stream);
+        } else if (use_all || use_xtream) && target.has_output(&TargetType::Xtream) {
             let server_info = app_state.app_state.config.get_user_server_info(&credentials);
             let base_url = if credentials.proxy == ProxyType::Reverse {
                 Some(server_info.get_base_url())
@@ -230,7 +243,7 @@ async fn lineup_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder 
 
             let live_channels = XtreamPlaylistIterator::new(XtreamCluster::Live, &cfg, target, None, &credentials).await.ok();
             let vod_channels = XtreamPlaylistIterator::new(XtreamCluster::Video, &cfg, target, None, &credentials).await.ok();
-            // TODO include when resolved
+            // TODO include series when resolved
             //let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
             let user_credentials = Arc::new(credentials);
             let live_stream = xtream_item_to_lineup_stream(Arc::clone(&cfg), XtreamCluster::Live, Arc::clone(&user_credentials), base_url.clone(), live_channels);
@@ -239,15 +252,6 @@ async fn lineup_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder 
                 .chain(live_stream)
                 .chain(stream::once(async { Ok(Bytes::from(",")) }))
                 .chain(vod_stream)
-                .chain(stream::once(async { Ok(Bytes::from("]")) }));
-            return HttpResponse::Ok()
-                .content_type("application/json")
-                .streaming(body_stream);
-        } else if target.has_output(&TargetType::M3u) {
-            let iterator = M3uPlaylistIterator::new(&cfg,target,&credentials).await.ok();
-            let stream = m3u_item_to_lineup_stream(iterator);
-            let body_stream = stream::once(async { Ok(Bytes::from("[")) })
-                .chain(stream)
                 .chain(stream::once(async { Ok(Bytes::from("]")) }));
             return HttpResponse::Ok()
                 .content_type("application/json")
