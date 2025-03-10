@@ -28,6 +28,7 @@ impl XtreamPlaylistIterator {
         category_id: Option<u32>,
         user: &ProxyUserCredentials,
     ) -> Result<Self, M3uFilterError> {
+        let xtream_output = target.get_xtream_output().ok_or_else(|| info_err!(format!("Unexpected: xtream output required for target {}", target.name)))?;
         if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
             let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
             if !xtream_path.exists() || !idx_path.exists() {
@@ -38,7 +39,7 @@ impl XtreamPlaylistIterator {
             let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&xtream_path, &idx_path)
                 .map_err(|err| info_err!(format!("Could not deserialize file {xtream_path:?} - {err}")))?;
 
-            let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
+            let options = XtreamMappingOptions::from_target_options(xtream_output, config);
             let server_info = config.get_user_server_info(user);
 
             let filter = user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, cluster).await;

@@ -31,14 +31,14 @@ macro_rules! create_resolve_options_function_for_xtream_target {
     ($cluster:ident) => {
         paste::paste! {
             fn [<get_resolve_ $cluster _options>](target: &ConfigTarget, fpl: &FetchedPlaylist) -> (bool, u16) {
-                let (resolve, resolve_delay) =
-                    target.options.as_ref().map_or((false, 0), |opt| {
-                        (opt.[<xtream_resolve_ $cluster>] && fpl.input.input_type == InputType::Xtream,
-                         opt.[<xtream_resolve_ $cluster _delay>])
-                    });
-                (resolve, resolve_delay)
+                match target.get_xtream_output() {
+                    Some(xtream_output) => (xtream_output.[<resolve_ $cluster>] && fpl.input.input_type == InputType::Xtream,
+                                           xtream_output.[<resolve_ $cluster _delay>]),
+                    None => (false, 0)
+                }
             }
         }
     };
 }
 use create_resolve_options_function_for_xtream_target;
+

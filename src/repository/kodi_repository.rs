@@ -1,7 +1,7 @@
-use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, notify_err};
+use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTarget, TargetOutput};
+use crate::model::config::{Config, ConfigTarget, StrmTargetOutput};
 use crate::model::playlist::{
     FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType, UUIDType,
 };
@@ -508,13 +508,6 @@ fn filter_strm_item(pli: &PlaylistItem) -> bool {
         || item_type == PlaylistItemType::Video
 }
 
-fn get_strm_output_options(target: &ConfigTarget) -> (bool, bool, bool) {
-    target.options.as_ref().map_or_else(
-        || (false, false, false),
-        |o| (o.underscore_whitespace, o.cleanup, o.kodi_style),
-    )
-}
-
 fn get_relative_path_str(full_path: &Path, root_path: &Path) -> String {
     full_path
         .strip_prefix(root_path)
@@ -600,31 +593,25 @@ fn prepare_strm_files(
 
 pub async fn kodi_write_strm_playlist(
     target: &ConfigTarget,
+    target_output: &StrmTargetOutput,
     cfg: &Config,
     new_playlist: &[PlaylistGroup],
-    output: &TargetOutput,
 ) -> Result<(), M3uFilterError> {
     if new_playlist.is_empty() {
         return Ok(());
     }
-    if output.output.is_none() {
-        return Err(notify_err!(
-            "Output directory missing. Write strm playlist failed".to_string()
-        ));
-    }
 
     let Some(root_path) = file_utils::get_file_path(
         &cfg.working_dir,
-        Some(std::path::PathBuf::from(&output.output.as_ref().map_or_else(|| "/tmp", |v| v.as_ref()))),
+        Some(std::path::PathBuf::from(&target_output.directory))
     ) else {
         return Err(info_err!(format!(
             "Failed to get file path for {}",
-            output.output.as_deref().unwrap_or("")
+            target_output.directory
         )));
     };
 
-    let credentials_and_server_info = get_credentials_and_server_info(cfg, output);
-    let (underscore_whitespace, cleanup, kodi_style) = get_strm_output_options(target);
+    let credentials_and_server_info = get_credentials_and_server_info(cfg, target_output.username.as_ref());
     let strm_index_path =
         strm_get_file_paths(&ensure_target_storage_path(cfg, target.name.as_str())?);
     let existing_strm = {
@@ -638,7 +625,6 @@ pub async fn kodi_write_strm_playlist(
     let mut processed_strm: HashSet<String> = HashSet::with_capacity(existing_strm.len());
 
     let mut failed = vec![];
-    let strm_props = target.options.as_ref().and_then(|o| o.strm_props.as_ref());
 
     prepare_strm_output_directory(&root_path).await?;
 
@@ -652,8 +638,8 @@ pub async fn kodi_write_strm_playlist(
         cfg,
         new_playlist,
         &root_path,
-        underscore_whitespace,
-        kodi_style,
+        target_output.underscore_whitespace,
+        target_output.kodi_style,
     );
     for strm_file in strm_files {
         // file paths
@@ -664,7 +650,7 @@ pub async fn kodi_write_strm_playlist(
 
         // create content
         let url = get_strm_url(credentials_and_server_info.as_ref(), &strm_file.strm_info);
-        let mut content = strm_props.map_or_else(Vec::new, std::clone::Clone::clone);
+        let mut content = target_output.strm_props.as_ref().map_or_else(Vec::new, std::clone::Clone::clone);
         content.push(url);
         let content_text = content.join("\r\n");
         let content_as_bytes = content_text.as_bytes();
@@ -701,7 +687,7 @@ pub async fn kodi_write_strm_playlist(
     };
 
     if let Err(err) =
-        cleanup_strm_output_directory(cleanup, &root_path, &existing_strm, &processed_strm).await
+        cleanup_strm_output_directory(target_output.cleanup, &root_path, &existing_strm, &processed_strm).await
     {
         failed.push(err);
     }
@@ -799,9 +785,9 @@ async fn has_strm_file_same_hash(file_path: &PathBuf, content_hash: UUIDType) ->
 
 fn get_credentials_and_server_info(
     cfg: &Config,
-    output: &TargetOutput,
+    username: Option<&String>,
 ) -> Option<(ProxyUserCredentials, ApiProxyServerInfo)> {
-    let username = output.username.as_ref()?;
+    let username = username?;
     let credentials = cfg.get_user_credentials(username)?;
     if credentials.proxy != ProxyType::Reverse {
         return None;

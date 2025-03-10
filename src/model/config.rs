@@ -84,6 +84,27 @@ impl Display for TargetType {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
+enum HdHomeRunUseTargetType {
+    #[serde(rename = "m3u")]
+    M3u,
+    #[serde(rename = "xtream")]
+    Xtream,
+}
+
+impl TryFrom<TargetType> for HdHomeRunUseTargetType {
+    type Error = &'static str;
+
+    fn try_from(value: TargetType) -> Result<Self, Self::Error> {
+        match value {
+            TargetType::Xtream => Ok(Self::Xtream),
+            TargetType::M3u => Ok(Self::M3u),
+            _ => Err("Not allowed!"),
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
 pub enum ProcessingOrder {
     #[serde(rename = "frm")]
@@ -274,32 +295,6 @@ pub struct ConfigTargetOptions {
     #[serde(default)]
     pub ignore_logo: bool,
     #[serde(default)]
-    pub underscore_whitespace: bool,
-    #[serde(default)]
-    pub cleanup: bool,
-    #[serde(default)]
-    pub kodi_style: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub strm_props: Option<Vec<String>>,
-    #[serde(default = "default_as_true")]
-    pub xtream_skip_live_direct_source: bool,
-    #[serde(default = "default_as_true")]
-    pub xtream_skip_video_direct_source: bool,
-    #[serde(default = "default_as_true")]
-    pub xtream_skip_series_direct_source: bool,
-    #[serde(default)]
-    pub xtream_resolve_series: bool,
-    #[serde(default = "default_as_two_u16")]
-    pub xtream_resolve_series_delay: u16,
-    #[serde(default)]
-    pub xtream_resolve_vod: bool,
-    #[serde(default = "default_as_two_u16")]
-    pub xtream_resolve_vod_delay: u16,
-    #[serde(default)]
-    pub m3u_include_type_in_url: bool,
-    #[serde(default)]
-    pub m3u_mask_redirect_url: bool,
-    #[serde(default)]
     pub share_live_streams: bool,
     #[serde(default)]
     pub remove_duplicates: bool,
@@ -307,13 +302,67 @@ pub struct ConfigTargetOptions {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct TargetOutput {
-    #[serde(alias = "type")]
-    pub target: TargetType,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "filename")]
-    pub output: Option<String>,
+pub struct XtreamTargetOutput {
+    #[serde(default = "default_as_true")]
+    pub skip_live_direct_source: bool,
+    #[serde(default = "default_as_true")]
+    pub skip_video_direct_source: bool,
+    #[serde(default = "default_as_true")]
+    pub skip_series_direct_source: bool,
+    #[serde(default)]
+    pub resolve_series: bool,
+    #[serde(default = "default_as_two_u16")]
+    pub resolve_series_delay: u16,
+    #[serde(default)]
+    pub resolve_vod: bool,
+    #[serde(default = "default_as_two_u16")]
+    pub resolve_vod_delay: u16,
+}
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct M3uTargetOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+    #[serde(default)]
+    pub include_type_in_url: bool,
+    #[serde(default)]
+    pub mask_redirect_url: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StrmTargetOutput {
+    pub directory: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
+    #[serde(default)]
+    pub underscore_whitespace: bool,
+    #[serde(default)]
+    pub cleanup: bool,
+    #[serde(default)]
+    pub kodi_style: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strm_props: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HdHomeRunTargetOutput {
+    pub device: String,
+    pub username: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_output: Option<TargetType>
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields, tag = "type", rename_all = "lowercase")]
+pub enum TargetOutput {
+    Xtream(XtreamTargetOutput),
+    M3u(M3uTargetOutput),
+    Strm(StrmTargetOutput),
+    HdHomeRun(HdHomeRunTargetOutput),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -348,7 +397,6 @@ pub struct ConfigTarget {
     pub t_mapping: Option<Vec<Mapping>>,
 }
 
-
 impl ConfigTarget {
     pub fn prepare(&mut self, id: u16, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
         self.id = id;
@@ -360,46 +408,49 @@ impl ConfigTarget {
         let mut xtream_cnt = 0;
         let mut strm_needs_xtream = false;
         let mut hdhr_cnt = 0;
-        for target_output in &self.output {
-            let has_username = if let Some(username) = &target_output.username { !username.trim().is_empty() } else { false };
-            let has_filename = if let Some(fname) = &target_output.output { !fname.trim().is_empty() } else { false };
+        let mut hdhomerun_needs_m3u=false;
+        let mut hdhomerun_needs_xtream = false;
 
-            match target_output.target {
-                TargetType::M3u => {
-                    m3u_cnt += 1;
-                    if has_username {
-                        warn!("Username for target output m3u is ignored: {}", self.name);
-                    }
-                }
-                TargetType::Xtream => {
+        for target_output in &mut self.output {
+            match target_output {
+                TargetOutput::Xtream(_) => {
                     xtream_cnt += 1;
                     if default_as_default().eq_ignore_ascii_case(&self.name) {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unique target name is required for xtream type: {}", self.name);
-                    }
-                    if has_username {
-                        warn!("Username for target output xtream is ignored: {}", self.name);
-                    }
-                    if has_filename {
-                        warn!("Filename for target output xtream is ignored: {}", self.name);
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unique target name is required for xtream type output: {}", self.name);
                     }
                 }
-                TargetType::Strm => {
+                TargetOutput::M3u(_) => {
+                    m3u_cnt += 1;
+                }
+                TargetOutput::Strm(strm_output) => {
                     strm_cnt += 1;
-                    if !has_filename {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "filename is required for strm type: {}", self.name);
+                    strm_output.directory =  strm_output.directory.trim().to_string();
+                    if strm_output.directory.trim().is_empty() {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "directory is required for strm type: {}", self.name);
                     }
+                    let has_username = if let Some(username) = &strm_output.username { !username.trim().is_empty() } else { false };
                     if has_username {
                         strm_needs_xtream = true;
                     }
                 }
-                TargetType::HdHomeRun => {
+                TargetOutput::HdHomeRun(hdhomerun_output) => {
                     hdhr_cnt += 1;
-                    if !has_username {
+                    hdhomerun_output.username = hdhomerun_output.username.trim().to_string();
+                    if hdhomerun_output.username.is_empty() {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Username is required for HdHomeRun type: {}", self.name);
                     }
-                    let hdhr_name = target_output.output.as_ref().map_or("", |s| s.trim());
-                    if hdhr_name.is_empty() {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Output is required for HdHomeRun type: {}", self.name);
+
+                    hdhomerun_output.device = hdhomerun_output.device.trim().to_string();
+                    if hdhomerun_output.device.is_empty() {
+                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Device is required for HdHomeRun type: {}", self.name);
+                    }
+
+                    if let Some(use_output) = hdhomerun_output.use_output.as_ref() {
+                        match  &use_output {
+                            TargetType::M3u => { hdhomerun_needs_m3u=true;},
+                            TargetType::Xtream => {hdhomerun_needs_xtream=true;},
+                            _ => return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun output option `use_output` only accepts `m3u` or `xtream` for target: {}", self.name),
+                        };
                     }
                 }
             }
@@ -413,8 +464,16 @@ impl ConfigTarget {
             return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "strm output with a username is only permitted when used in combination with xtream output: {}", self.name);
         }
 
-        if hdhr_cnt > 0 && (xtream_cnt == 0 && m3u_cnt == 0) {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun output is only permitted when used in combination with xtream or m3u output: {}", self.name);
+        if hdhr_cnt > 0 {
+            if xtream_cnt == 0 && m3u_cnt == 0 {
+                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun output is only permitted when used in combination with xtream or m3u output: {}", self.name);
+            }
+            if hdhomerun_needs_m3u && m3u_cnt == 0 {
+                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun output has `use_output=m3u` but no `m3u` output defined: {}", self.name);
+            }
+            if hdhomerun_needs_xtream && xtream_cnt == 0 {
+                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun output has `use_output=xtream` but no `xtream` output defined: {}", self.name);
+            }
         }
 
         if let Some(watch) = &self.watch {
@@ -451,19 +510,45 @@ impl ConfigTarget {
         true
     }
 
-    pub fn get_m3u_filename(&self) -> Option<&String> {
-        for format in &self.output {
-            if format.target == TargetType::M3u {
-                return format.output.as_ref();
-            }
+    pub(crate) fn get_xtream_output(&self) -> Option<&XtreamTargetOutput> {
+        if let Some(TargetOutput::Xtream(output)) = self.output.iter().find(|o| matches!(o, TargetOutput::Xtream(_))) {
+            Some(output)
+        } else {
+            None
         }
-        None
+    }
+
+    pub(crate) fn get_m3u_output(&self) -> Option<&M3uTargetOutput> {
+        if let Some(TargetOutput::M3u(output)) = self.output.iter().find(|o| matches!(o, TargetOutput::M3u(_))) {
+            Some(output)
+        } else {
+            None
+        }
+    }
+
+    // pub(crate) fn get_strm_output(&self) -> Option<&StrmTargetOutput> {
+    //     if let Some(TargetOutput::Strm(output)) = self.output.iter().find(|o| matches!(o, TargetOutput::Strm(_))) {
+    //         Some(output)
+    //     } else {
+    //         None
+    //     }
+    // }
+
+    pub(crate) fn get_hdhomerun_output(&self) -> Option<&HdHomeRunTargetOutput> {
+        if let Some(TargetOutput::HdHomeRun(output)) = self.output.iter().find(|o| matches!(o, TargetOutput::HdHomeRun(_))) {
+            Some(output)
+        } else {
+            None
+        }
     }
 
     pub fn has_output(&self, tt: &TargetType) -> bool {
-        for format in &self.output {
-            if tt.eq(&format.target) {
-                return true;
+        for target_output in &self.output {
+            match target_output {
+                TargetOutput::Xtream(_) => { if tt == &TargetType::Xtream { return true } }
+                TargetOutput::M3u(_) => { if tt == &TargetType::M3u { return true } }
+                TargetOutput::Strm(_) => { if tt == &TargetType::Strm { return true } }
+                TargetOutput::HdHomeRun(_) => { if tt == &TargetType::HdHomeRun { return true } }
             }
         }
         false
@@ -1134,23 +1219,20 @@ impl Config {
         for source in &self.sources {
             for target in &source.targets {
                 for output in &target.output {
-                    match output.target {
-                        TargetType::M3u | TargetType::Xtream => {}
-                        TargetType::Strm => {
-                            self.check_username(output.username.as_deref(), &target.name)?;
+                    match output {
+                        TargetOutput::Xtream(_) | TargetOutput::M3u(_) => {}
+                        TargetOutput::Strm(strm_output) => {
+                            self.check_username(strm_output.username.as_deref(), &target.name)?;
                         }
-                        TargetType::HdHomeRun => {
+                        TargetOutput::HdHomeRun(hdhomerun_output) => {
                             if check_homerun {
-                                if let Some(hdhr_name) = output.output.as_ref() {
-                                    self.check_username(output.username.as_deref(), &target.name)?;
-                                    if let Some(homerun) = &mut self.hdhomerun {
-                                        for device in &mut homerun.devices {
-                                            if &device.name == hdhr_name {
-                                                if let Some(username) = output.username.as_ref() {
-                                                    device.t_username.clone_from(username);
-                                                    device.t_enabled = true;
-                                                }
-                                            }
+                                let hdhr_name = &hdhomerun_output.device;
+                                self.check_username(Some(&hdhomerun_output.username), &target.name)?;
+                                if let Some(homerun) = &mut self.hdhomerun {
+                                    for device in &mut homerun.devices {
+                                        if &device.name == hdhr_name {
+                                            device.t_username.clone_from(&hdhomerun_output.username);
+                                            device.t_enabled = true;
                                         }
                                     }
                                 }

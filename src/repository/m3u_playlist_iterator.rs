@@ -34,6 +34,7 @@ impl M3uPlaylistIterator {
         target: &ConfigTarget,
         user: &ProxyUserCredentials,
     ) -> Result<Self, M3uFilterError> {
+        let m3u_output = target.get_m3u_output().ok_or_else(|| info_err!(format!("Unexpected failure, missing m3u target output for target {}",  target.name)))?;
         let target_path = ensure_target_storage_path(cfg, target.name.as_str())?;
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
 
@@ -43,9 +44,6 @@ impl M3uPlaylistIterator {
             IndexedDocumentIterator::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path)
                 .map_err(|err| info_err!(format!("Could not deserialize file {m3u_path:?} - {err}")))?;
 
-        let target_options = target.options.as_ref();
-        let include_type_in_url = target_options.is_some_and(|opts| opts.m3u_include_type_in_url);
-        let mask_redirect_url = target_options.is_some_and(|opts| opts.m3u_mask_redirect_url);
         let filter = user_get_bouquet_filter(cfg, &user.username, None, TargetType::M3u, XtreamCluster::Live).await;
         // TODO m3u bouquet filter
 
@@ -56,8 +54,8 @@ impl M3uPlaylistIterator {
             username: user.username.to_string(),
             password: user.password.to_string(),
             target_options: target.options.clone(),
-            include_type_in_url,
-            mask_redirect_url,
+            include_type_in_url: m3u_output.include_type_in_url,
+            mask_redirect_url: m3u_output.mask_redirect_url,
             filter,
             proxy_type: user.proxy.clone(),
             _file_lock: file_lock, // Save lock inside struct

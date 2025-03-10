@@ -13,7 +13,7 @@ use crate::repository::storage::hex_encode;
 use crate::utils::file::file_utils::file_reader;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, str_to_io_error, info_err, create_m3u_filter_error, create_m3u_filter_error_result, notify_err};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigInput, ConfigTarget};
+use crate::model::config::{Config, ConfigInput, ConfigTarget, XtreamTargetOutput};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::{rewrite_doc_urls, PlaylistXtreamCategory, XtreamMappingOptions, XtreamSeriesEpisode, INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, SEASON_RESOURCE_PREFIX};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
@@ -265,27 +265,6 @@ pub async fn xtream_write_playlist(
                     XtreamCluster::Video => &mut vod_col,
                 };
 
-                // let col = match header.item_type {
-                // PlaylistItemType::LiveUnknown | PlaylistItemType::LiveHls => {
-                //     header.category_id = *cat_id;
-                //     Some(&mut live_col)
-                // }
-                // _ => {
-                // if header.get_provider_id().is_some() {
-                // header.category_id = *cat_id;
-                // Some(match header.xtream_cluster {
-                //     XtreamCluster::Live => &mut live_col,
-                //     XtreamCluster::Series => &mut series_col,
-                //     XtreamCluster::Video => &mut vod_col,
-                // })
-                // // } else {
-                //     let title = header.title.as_str();
-                //     errors.push(format!("Channel does not have an id: {title}"));
-                //     errors.push(format!("Channel does not have an id: {title}"));
-                //     None
-                // }
-                // }
-                // };
                 drop(header);
                 col.push(pli);
             }
@@ -572,7 +551,7 @@ pub fn xtream_load_vod_info(
 
 fn rewrite_xtream_vod_info<P>(
     config: &Config,
-    target: &ConfigTarget,
+    xtream_output: &XtreamTargetOutput,
     pli: &P,
     user: &ProxyUserCredentials,
     doc: &mut Map<String, Value>,
@@ -602,7 +581,7 @@ fn rewrite_xtream_vod_info<P>(
         movie_data.insert(TAG_STREAM_ID.to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
         movie_data.insert(TAG_CATEGORY_ID.to_string(), Value::Number(serde_json::value::Number::from(category_id)));
         movie_data.insert(TAG_CATEGORY_IDS.to_string(), Value::Array(vec![Value::Number(serde_json::value::Number::from(category_id))]));
-        let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
+        let options = XtreamMappingOptions::from_target_options(xtream_output, config);
         if options.skip_video_direct_source {
             movie_data.insert(TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
         } else {
@@ -619,7 +598,7 @@ fn rewrite_xtream_vod_info<P>(
 
 pub fn rewrite_xtream_vod_info_content<P>(
     config: &Config,
-    target: &ConfigTarget,
+    xtream_output: &XtreamTargetOutput,
     pli: &P,
     user: &ProxyUserCredentials,
     content: &str,
@@ -627,12 +606,13 @@ pub fn rewrite_xtream_vod_info_content<P>(
     P: PlaylistEntry,
 {
     let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
-    rewrite_xtream_vod_info(config, target, pli, user, &mut doc)
+    rewrite_xtream_vod_info(config, xtream_output, pli, user, &mut doc)
 }
 
 pub fn write_and_get_xtream_vod_info<P>(
     config: &Config,
     target: &ConfigTarget,
+    xtream_output: &XtreamTargetOutput,
     pli: &P,
     user: &ProxyUserCredentials,
     content: &str,
@@ -641,12 +621,13 @@ pub fn write_and_get_xtream_vod_info<P>(
 {
     let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
     xtream_write_vod_info(config, target.name.as_str(), pli.get_virtual_id(), content).ok();
-    rewrite_xtream_vod_info(config, target, pli, user, &mut doc)
+    rewrite_xtream_vod_info(config, xtream_output, pli, user, &mut doc)
 }
 
 fn rewrite_xtream_series_info<P>(
     config: &Config,
     target: &ConfigTarget,
+    xtream_output: &XtreamTargetOutput,
     pli: &P,
     user: &ProxyUserCredentials,
     doc: &mut Map<String, Value>,
@@ -689,7 +670,7 @@ fn rewrite_xtream_series_info<P>(
     let virtual_id = pli.get_virtual_id();
     {
         let (mut target_id_mapping, file_lock) = get_target_id_mapping(config, &target_path);
-        let options = XtreamMappingOptions::from_target_options(target.options.as_ref(), config);
+        let options = XtreamMappingOptions::from_target_options(xtream_output, config);
 
         let provider_url = pli.get_provider_url();
         for episode_list in episodes.values_mut().filter_map(Value::as_array_mut) {
@@ -732,6 +713,7 @@ fn rewrite_xtream_series_info<P>(
 pub fn rewrite_xtream_series_info_content<P>(
     config: &Config,
     target: &ConfigTarget,
+    xtream_output: &XtreamTargetOutput,
     pli_series_info: &P,
     user: &ProxyUserCredentials,
     content: &str,
@@ -739,12 +721,13 @@ pub fn rewrite_xtream_series_info_content<P>(
     P: PlaylistEntry,
 {
     let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
-    rewrite_xtream_series_info(config, target, pli_series_info, user, &mut doc)
+    rewrite_xtream_series_info(config, target, xtream_output, pli_series_info, user, &mut doc)
 }
 
 pub fn write_and_get_xtream_series_info<P>(
     config: &Config,
     target: &ConfigTarget,
+    xtream_output: &XtreamTargetOutput,
     pli_series_info: &P,
     user: &ProxyUserCredentials,
     content: &str,
@@ -754,7 +737,7 @@ pub fn write_and_get_xtream_series_info<P>(
     let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
     let virtual_id = pli_series_info.get_virtual_id();
     xtream_write_series_info(config, target.name.as_str(), virtual_id, content).ok();
-    rewrite_xtream_series_info(config, target, pli_series_info, user, &mut doc)
+    rewrite_xtream_series_info(config, target, xtream_output, pli_series_info, user, &mut doc)
 }
 
 pub fn xtream_get_input_info(

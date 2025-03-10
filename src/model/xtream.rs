@@ -3,7 +3,7 @@ use std::iter::FromIterator;
 use std::rc::Rc;
 
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTargetOptions};
+use crate::model::config::{Config, XtreamTargetOutput};
 use crate::model::playlist::{PlaylistEntry, PlaylistItem, XtreamCluster, XtreamPlaylistItem};
 use crate::utils::json_utils::{opt_string_or_number_u32, string_default_on_null, string_or_number_f64, string_or_number_u32};
 use serde::de::DeserializeOwned;
@@ -493,16 +493,11 @@ pub struct XtreamMappingOptions {
 }
 
 impl XtreamMappingOptions {
-    pub fn from_target_options(options: Option<&ConfigTargetOptions>, cfg: &Config) -> Self {
-        let (skip_live_direct_source, skip_video_direct_source, skip_series_direct_source) = options
-            .map_or((false, false, false), |o| (
-                o.xtream_skip_live_direct_source,
-                o.xtream_skip_video_direct_source,
-                o.xtream_skip_series_direct_source));
+    pub fn from_target_options(target_output: &XtreamTargetOutput, cfg: &Config) -> Self {
         Self {
-            skip_live_direct_source,
-            skip_video_direct_source,
-            skip_series_direct_source,
+            skip_live_direct_source: target_output.skip_live_direct_source,
+            skip_video_direct_source: target_output.skip_video_direct_source,
+            skip_series_direct_source: target_output.skip_series_direct_source,
             rewrite_resource_url: cfg.is_reverse_proxy_resource_rewrite_enabled(),
         }
     }
