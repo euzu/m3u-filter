@@ -3,7 +3,6 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tokio::sync::{RwLock, Mutex};
 use std::sync::Arc;
-use actix_web::web;
 use serde::{Deserialize, Serialize};
 use unidecode::unidecode;
 
@@ -140,10 +139,4 @@ impl DownloadQueue {
 pub struct FileDownloadRequest {
     pub url: String,
     pub filename: String,
-}
-
-impl From<web::Json<Self>> for FileDownloadRequest {
-    fn from(req: web::Json<Self>) -> Self {
-        req.clone()
-    }
 }

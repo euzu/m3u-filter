@@ -11,7 +11,7 @@ use crate::utils::file::file_utils::sanitize_filename;
 pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) {
     let mut new_tree = BTreeSet::new();
     pl.channels.iter().for_each(|chan| {
-        let header = chan.header.borrow();
+        let header = &chan.header;
         let title = if header.title.is_empty() { header.title.to_string() } else { header.name.to_string() };
         new_tree.insert(title);
     });

@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Healthcheck {
     pub status: String,
     pub version: String,

@@ -31,7 +31,7 @@ pub async fn start_scheduler(client: Arc<reqwest::Client>, expression: &str, con
             loop {
                 let mut upcoming = schedule.upcoming(offset).take(1);
                 if let Some(datetime) = upcoming.next() {
-                    actix_web::rt::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
+                    tokio::time::sleep_until(tokio::time::Instant::from(datetime_to_instant(datetime))).await;
                     exec_processing(Arc::clone(&client), Arc::clone(&config), Arc::clone(&targets)).await;
                  }
             }
@@ -63,7 +63,7 @@ mod tests {
                 loop {
                     let mut upcoming = schedule.upcoming(offset).take(1);
                     if let Some(datetime) = upcoming.next() {
-                        actix_web::rt::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
+                        tokio::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
                         run_me();
                     }
                     if runs.load(Ordering::SeqCst) == 6 {

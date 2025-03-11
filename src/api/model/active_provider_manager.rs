@@ -1,7 +1,7 @@
 use crate::model::config::{ConfigInput, ConfigInputAlias, InputType};
-use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use tokio::sync::RwLock;
 
 /// This struct represents an individual provider configuration with fields like:
 ///
@@ -53,8 +53,8 @@ impl ProviderConfig {
     }
 
     #[inline]
-    pub fn is_exhausted(&self) -> bool {
-        self.max_connections > 0 && *self.current_connections.read() >= self.max_connections
+    pub async fn is_exhausted(&self) -> bool {
+        self.max_connections > 0 && *self.current_connections.read().await >= self.max_connections
     }
     //
     // #[inline]
@@ -62,8 +62,8 @@ impl ProviderConfig {
     //     !self.is_exhausted()
     // }
 
-    pub fn try_allocate(&self, force: bool) -> bool {
-        let mut connections = self.current_connections.write();
+    pub async fn try_allocate(&self, force: bool) -> bool {
+        let mut connections = self.current_connections.write().await;
         if force || *connections < self.max_connections {
             *connections += 1;
             return true;
@@ -71,8 +71,8 @@ impl ProviderConfig {
         false
     }
 
-    pub fn release(&self) {
-        let mut connections = self.current_connections.write();
+    pub async fn release(&self) {
+        let mut connections = self.current_connections.write().await;
         if *connections > 0 {
             *connections -= 1;
         }
@@ -90,17 +90,17 @@ enum ProviderLineup {
 }
 
 impl ProviderLineup {
-    fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
+    async fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
         match self {
-            ProviderLineup::Single(lineup) => lineup.acquire(force),
-            ProviderLineup::Multi(lineup) => lineup.acquire(force),
+            ProviderLineup::Single(lineup) => lineup.acquire(force).await,
+            ProviderLineup::Multi(lineup) => lineup.acquire(force).await,
         }
     }
 
-    fn release(&self, provider_id: u16) {
+    async fn release(&self, provider_id: u16) {
         match self {
-            ProviderLineup::Single(lineup) => lineup.release(provider_id),
-            ProviderLineup::Multi(lineup) => lineup.release(provider_id),
+            ProviderLineup::Single(lineup) => lineup.release(provider_id).await,
+            ProviderLineup::Multi(lineup) => lineup.release(provider_id).await,
         }
     }
 }
@@ -118,17 +118,17 @@ impl SingleProviderLineup {
         }
     }
 
-    fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
-        if self.provider.try_allocate(force) {
+    async fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
+        if self.provider.try_allocate(force).await {
             Some(&self.provider)
         } else {
             None
         }
     }
 
-    fn release(&self, provider_id: u16) {
+    async fn release(&self, provider_id: u16) {
         if self.provider.id == provider_id {
-            self.provider.release();
+            self.provider.release().await;
         }
     }
 }
@@ -145,10 +145,17 @@ enum ProviderPriorityGroup {
 }
 
 impl ProviderPriorityGroup {
-    fn is_exhausted(&self) -> bool {
+    async fn is_exhausted(&self) -> bool {
         match self {
-            ProviderPriorityGroup::SingleProviderGroup(g) => g.is_exhausted(),
-            ProviderPriorityGroup::MultiProviderGroup(_, groups) => groups.iter().all(ProviderConfig::is_exhausted)
+            ProviderPriorityGroup::SingleProviderGroup(g) => g.is_exhausted().await,
+            ProviderPriorityGroup::MultiProviderGroup(_, groups) => {
+                for g in groups {
+                    if !g.is_exhausted().await {
+                        return false;
+                    }
+                }
+                true
+            }
         }
     }
 }
@@ -221,10 +228,10 @@ impl MultiProviderLineup {
     ///     println!("No available providers in group 0.");
     /// }
     /// ```
-    fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup) -> Option<&ProviderConfig> {
+    async fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup) -> Option<&ProviderConfig> {
         match priority_group {
             ProviderPriorityGroup::SingleProviderGroup(p) => {
-                if p.try_allocate(false) {
+                if p.try_allocate(false).await {
                     return Some(p);
                 }
             }
@@ -234,7 +241,7 @@ impl MultiProviderLineup {
                 for _ in 0..provider_count {
                     let p = pg.get(idx).unwrap();
                     idx = (idx + 1) % provider_count;
-                    if p.try_allocate(false) {
+                    if p.try_allocate(false).await {
                         index.store(idx, Ordering::SeqCst);
                         return Some(p);
                     }
@@ -275,15 +282,15 @@ impl MultiProviderLineup {
     ///     println!("No available providers.");
     /// }
     /// ```
-    fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
+    async fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
         let mut main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
 
         for _ in 0..provider_count {
             let priority_group = &self.providers[main_idx];
             main_idx = (main_idx + 1) % provider_count;
-            if let Some(provider) = Self::acquire_next_provider_from_group(priority_group) {
-                if priority_group.is_exhausted() {
+            if let Some(provider) = Self::acquire_next_provider_from_group(priority_group).await {
+                if priority_group.is_exhausted().await {
                     self.index.store(main_idx, Ordering::SeqCst);
                 }
                 return Some(provider);
@@ -308,19 +315,19 @@ impl MultiProviderLineup {
     }
 
 
-    fn release(&self, provider_id: u16) {
+    async fn release(&self, provider_id: u16) {
         for g in &self.providers {
             match g {
                 ProviderPriorityGroup::SingleProviderGroup(pc) => {
                     if pc.id == provider_id {
-                        pc.release();
+                        pc.release().await;
                         break;
                     }
                 }
                 ProviderPriorityGroup::MultiProviderGroup(_, group) => {
                     for pc in group {
                         if pc.id == provider_id {
-                            pc.release();
+                            pc.release().await;
                             return;
                         }
                     }
@@ -328,6 +335,7 @@ impl MultiProviderLineup {
             }
         }
     }
+
 }
 
 pub struct ActiveProviderManager {
@@ -352,13 +360,16 @@ impl ActiveProviderManager {
         self.providers.insert(name.to_string(), lineup);
     }
 
-    pub fn acquire_connection(&self, lineup_name: &str) -> Option<&ProviderConfig> {
-        self.providers.get(lineup_name).and_then(|lineup| lineup.acquire(self.user_access_control))
+    pub async fn acquire_connection(&self, lineup_name: &str) -> Option<&ProviderConfig> {
+        match self.providers.get(lineup_name) {
+            None => None,
+            Some(lineup) => lineup.acquire(self.user_access_control).await
+        }
     }
 
-    pub fn release_connection(&self, lineup_name: &str, provider_id: u16) {
+    pub async fn release_connection(&self, lineup_name: &str, provider_id: u16) {
         if let Some(lineup) = self.providers.get(lineup_name) {
-            lineup.release(provider_id);
+            lineup.release(provider_id).await;
         }
     }
 }

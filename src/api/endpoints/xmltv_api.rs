@@ -1,14 +1,14 @@
-use std::sync::Arc;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-
-use actix_web::{http::header, web, HttpRequest, HttpResponse};
-use log::{error, trace};
-use quick_xml::{Reader, Writer};
+use std::sync::Arc;
+use axum::response::IntoResponse;
+use chrono::{Duration, NaiveDateTime, TimeDelta};
 use flate2::write::GzEncoder;
 use flate2::Compression;
+// use actix_web::{http::header, web, HttpRequest, HttpResponse};
+use log::{error, trace};
 use quick_xml::events::{BytesStart, Event};
-use chrono::{Duration, NaiveDateTime, TimeDelta};
+use quick_xml::{Reader, Writer};
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::model::app_state::AppState;
@@ -21,9 +21,12 @@ use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
 
-pub fn get_empty_epg_response() -> HttpResponse {
-    HttpResponse::Ok().content_type(mime::TEXT_XML).body(
-        r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)
+pub fn get_empty_epg_response() -> impl axum::response::IntoResponse + Send {
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::OK) // Entspricht `HttpResponse::Ok()`
+        .header(axum::http::header::CONTENT_TYPE, axum::http::HeaderValue::from_static("text/xml"))
+        .body(axum::body::Body::from(r#"<?xml version="1.0" encoding="utf-8" ?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="Xtream Codes" generator-info-url=""></tv>"#)) // Setzt den Body der Antwort
+        .unwrap()
 }
 
 fn time_correct(date_time: &str, correction: &TimeDelta) -> String {
@@ -35,12 +38,12 @@ fn time_correct(date_time: &str, correction: &TimeDelta) -> String {
 
     // Parse the datetime string
     NaiveDateTime::parse_from_str(date_time_split[0], "%Y%m%d%H%M%S").map_or_else(|_| date_time.to_string(), |native_dt| {
-            let corrected_dt = native_dt + *correction;
-            // Format the corrected datetime back to string
-            let formatted_dt = corrected_dt.format("%Y%m%d%H%M%S").to_string();
-            let result = format!("{} {}", formatted_dt, date_time_split[1]);
-            result
-        })
+        let corrected_dt = native_dt + *correction;
+        // Format the corrected datetime back to string
+        let formatted_dt = corrected_dt.format("%Y%m%d%H%M%S").to_string();
+        let result = format!("{} {}", formatted_dt, date_time_split[1]);
+        result
+    })
 }
 
 fn get_epg_path_for_target_of_type(target_name: &str, epg_path: PathBuf) -> Option<PathBuf> {
@@ -89,23 +92,23 @@ fn parse_timeshift(time_shift: Option<&String>) -> Option<i32> {
     })
 }
 
-async fn serve_epg(epg_path: &Path, req: &HttpRequest, user: &ProxyUserCredentials) -> HttpResponse {
+async fn serve_epg(epg_path: &Path, user: &ProxyUserCredentials) -> impl axum::response::IntoResponse + Send {
     match File::open(epg_path) {
         Ok(epg_file) => {
             match parse_timeshift(user.epg_timeshift.as_ref()) {
-                None => serve_file(epg_path, req, mime::TEXT_XML).await,
+                None => serve_file(epg_path, mime::TEXT_XML).await.into_response(),
                 Some(duration) => {
-                    serve_epg_with_timeshift(epg_file, duration)
+                    serve_epg_with_timeshift(epg_file, duration).into_response()
                 }
             }
         }
         Err(_) => {
-            get_empty_epg_response()
+            get_empty_epg_response().into_response()
         }
     }
 }
 
-fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> HttpResponse {
+fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> impl axum::response::IntoResponse + Send {
     let reader = file_reader(epg_file);
     let encoder = GzEncoder::new(Vec::with_capacity(4096), Compression::default());
     let mut xml_reader = Reader::from_reader(reader);
@@ -160,36 +163,38 @@ fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> HttpResponse
     }
 
     let compressed_data = xml_writer.into_inner().finish().unwrap();
-    HttpResponse::Ok()
-        .content_type("application/octet-stream")
-        .insert_header((header::CONTENT_ENCODING, "gzip")) // Set Content-Encoding header
-        .body(compressed_data)
+    axum::response::Response::builder()
+        .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_OCTET_STREAM.to_string())
+        .header(axum::http::header::CONTENT_ENCODING, "gzip") // Set Content-Encoding header
+        .body(axum::body::Body::from(compressed_data))
+        .unwrap()
+        .into_response()
 }
 
 async fn xmltv_api(
-    api_req: web::Query<UserApiRequest>,
-    req: HttpRequest,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
+    axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+) -> impl axum::response::IntoResponse + Send {
     if let Some((user, target)) = get_user_target(&api_req, &app_state).await {
-        if !user.has_permissions(&app_state) {
-            return HttpResponse::Forbidden().finish();
+        if !user.has_permissions(&app_state).await {
+            return axum::http::StatusCode::FORBIDDEN.into_response();
         }
         match get_epg_path_for_target(&app_state.config, target) {
             None => {
                 // No epg configured,  No processing or timeshift, epg can't be mapped to the channels.
                 // we do not deliver epg
             }
-            Some(epg_path) => return serve_epg(&epg_path, &req, &user).await
+            Some(epg_path) => return serve_epg(&epg_path, &user).await.into_response()
         }
     }
-    get_empty_epg_response()
+    get_empty_epg_response().into_response()
 }
 
-pub fn xmltv_api_register(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/xmltv.php").route(web::get().to(xmltv_api)))
-        .service(web::resource("/update/epg.php").route(web::get().to(xmltv_api)))
-        .service(web::resource("/epg").route(web::get().to(xmltv_api)));
+pub fn xmltv_api_register() -> axum::Router<Arc<AppState>> {
+    axum::Router::new()
+        .route("/xmltv.php", axum::routing::get(xmltv_api))
+        .route("/update/epg.php", axum::routing::get(xmltv_api))
+        .route("/epg", axum::routing::get(xmltv_api))
 }
 
 #[cfg(test)]

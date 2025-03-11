@@ -22,7 +22,7 @@ fn send_http_post_request(msg: &str, messaging: &MessagingConfig) {
     if let Some(rest) = &messaging.rest {
         let url = rest.url.clone();
         let data = msg.to_owned();
-        actix_rt::spawn(async move {
+        tokio::spawn(async move {
             let client = reqwest::Client::new();
             match client
                 .post(&url)
@@ -59,7 +59,7 @@ fn send_pushover_message(msg: &str, messaging: &MessagingConfig) {
             .append_pair("message", msg)
             .finish();
 
-        actix_rt::spawn(async move {
+        tokio::spawn(async move {
             let client = reqwest::Client::new();
             match client
                 .post(url)

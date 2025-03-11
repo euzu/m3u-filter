@@ -1,7 +1,4 @@
 use std::borrow::BorrowMut;
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::utils::hash_utils::extract_id_from_url;
@@ -76,9 +73,9 @@ fn skip_digit(it: &mut std::str::Chars) -> Option<char> {
 
 fn create_empty_playlistitem_header(input_name: &str, url: &str) -> PlaylistItemHeader {
     PlaylistItemHeader {
-        url: Rc::new(url.to_owned()),
+        url: url.to_owned(),
         category_id: 0,
-        input_name: Rc::new(input_name.to_string()),
+        input_name: input_name.to_string(),
         ..Default::default()
     }
 }
@@ -87,7 +84,7 @@ macro_rules! process_header_fields {
     ($header:expr, $token:expr, $(($prop:ident, $field:expr)),*; $val:expr) => {
         match $token {
             $(
-               $field => $header.$prop = Rc::new($val),
+               $field => $header.$prop = $val,
              )*
             _ => {}
         }
@@ -105,7 +102,7 @@ fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, u
                 break;
             }
             if c.unwrap() == ',' {
-                plih.title = Rc::new(get_value(&mut it));
+                plih.title = get_value(&mut it);
             } else {
                 let token = token_till(&mut it, '=', true);
                 if let Some(t) = token {
@@ -127,11 +124,11 @@ fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, u
         }
         if plih.id.is_empty() {
             if let Some(chanid) = extract_id_from_url(url) {
-                plih.id = Rc::new(chanid);
+                plih.id = chanid;
             }
         }
         // plih.virtual_id = plih.id;
-        plih.epg_channel_id = Some(Rc::clone(&plih.id));
+        plih.epg_channel_id = Some(plih.id.to_string());
     }
 
     if video_suffixes.iter().any(|suffix| url.ends_with(suffix)) {
@@ -177,17 +174,16 @@ where
             continue;
         }
         if let Some(header_value) = header {
-            let item = PlaylistItem { header: RefCell::new(process_header(input, &video_suffixes, &header_value, line)) };
-            let mut header = item.header.borrow_mut();
+            let mut item = PlaylistItem { header: process_header(input, &video_suffixes, &header_value, line) };
+            let header = &mut item.header;
             if header.group.is_empty() {
                 if let Some(group_value) = group {
-                    header.group = Rc::new(group_value);
+                    header.group = group_value;
                 } else {
                     let current_title = header.title.clone();
-                    header.group = Rc::new(string_utils::get_title_group(current_title.as_str()));
+                    header.group = string_utils::get_title_group(current_title.as_str());
                 }
             }
-            drop(header);
             visit(item);
         }
         header = None;
@@ -205,7 +201,7 @@ where
     consume_m3u(cfg, input, lines, |item| {
         // keep the original sort order for groups and group the playlist items
         let key = {
-            let header = item.header.borrow();
+            let header = &item.header;
             format!("{}{}", &header.xtream_cluster, &header.group)
         };
         match group_map.entry(key) {
@@ -224,9 +220,9 @@ where
         // create a group based on the first playlist item
         let channel = channels.first();
         let (cluster, group_title) = channel.map(|pli|
-                                                 (pli.header.borrow().xtream_cluster, Rc::clone(&pli.header.borrow().group))).unwrap();
+                                                 (pli.header.xtream_cluster, &pli.header.group)).unwrap();
         grp_id += 1;
-        PlaylistGroup { id: grp_id, xtream_cluster: cluster, title: Rc::clone(&group_title), channels }
+        PlaylistGroup { id: grp_id, xtream_cluster: cluster, title: group_title.to_string(), channels }
     }).collect();
     result
 }

@@ -9,7 +9,6 @@ mod modules;
 
 include_modules!();
 
-use actix_rt::System;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -155,18 +154,21 @@ fn main() {
         info!("Freeze frame video loaded from {:?}", cfg.channel_unavailable_file.as_ref().map_or("?", |v| v.as_str()));
     }
 
-    if args.server {
-        match config_reader::read_api_proxy_config(args.api_proxy, &mut cfg) {
-            Ok(Some(api_proxy_file)) => {
-                info!("Api Proxy File: {api_proxy_file:?}");
-            },
-            Ok(None) => {}
-            Err(err) => exit!("{err}"),
+    let rt  = tokio::runtime::Runtime::new().unwrap();
+    let () = rt.block_on(async {
+        if args.server {
+            match config_reader::read_api_proxy_config(args.api_proxy, &mut cfg).await {
+                Ok(Some(api_proxy_file)) => {
+                    info!("Api Proxy File: {api_proxy_file:?}");
+                },
+                Ok(None) => {}
+                Err(err) => exit!("{err}"),
+            }
+            start_in_server_mode(Arc::new(cfg), Arc::new(targets)).await;
+        } else {
+            start_in_cli_mode(Arc::new(cfg), Arc::new(targets)).await;
         }
-        start_in_server_mode(Arc::new(cfg), Arc::new(targets));
-    } else {
-        start_in_cli_mode(Arc::new(cfg), Arc::new(targets));
-    }
+    });
 }
 
 fn create_directories(cfg: &Config, temp_path: &Path) {
@@ -198,13 +200,13 @@ fn create_directories(cfg: &Config, temp_path: &Path) {
     }
 }
 
-fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+async fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let client = Arc::new(reqwest::Client::new());
-    System::new().block_on(async { playlist::exec_processing(client, cfg, targets).await });
+    playlist::exec_processing(client, cfg, targets).await;
 }
 
-fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    if let Err(err) = api::main_api::start_server(cfg, targets) {
+async fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
+    if let Err(err) = api::main_api::start_server(cfg, targets).await {
         exit!("Can't start server: {err}");
     };
 }

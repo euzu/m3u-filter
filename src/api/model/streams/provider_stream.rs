@@ -7,13 +7,13 @@ use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::PlaylistItemType;
 use crate::utils::debug_if_enabled;
 use crate::utils::network::request::{get_request_headers, sanitize_sensitive_info};
-use actix_web::HttpRequest;
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use log::{debug, error};
 use reqwest::StatusCode;
 use std::sync::Arc;
+use axum::http::HeaderMap;
 use url::Url;
 
 type BoxedProviderStream = BoxStream<'static, Result<Bytes, StreamError>>;
@@ -45,11 +45,11 @@ pub fn get_header_filter_for_item_type(item_type: PlaylistItemType) -> HeaderFil
 pub async fn get_provider_pipe_stream(cfg: &Config,
                                       http_client: &Arc<reqwest::Client>,
                                       stream_url: &Url,
-                                      req: &HttpRequest,
+                                      req_headers: &HeaderMap,
                                       input: Option<&ConfigInput>,
                                       item_type: PlaylistItemType) -> ProviderStreamResponse {
     let filter_header = get_header_filter_for_item_type(item_type);
-    let req_headers = get_headers_from_request(req, &filter_header);
+    let req_headers = get_headers_from_request(req_headers, &filter_header);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
     // These are the configured headers for this input.
     let input_headers = input.map(|i| i.headers.clone());
@@ -84,10 +84,10 @@ pub async fn get_provider_pipe_stream(cfg: &Config,
 pub async fn get_provider_reconnect_buffered_stream(cfg: &Config,
                                                     http_client: &Arc<reqwest::Client>,
                                                     stream_url: &Url,
-                                                    req: &HttpRequest,
+                                                    req_headers: &HeaderMap,
                                                     input: Option<&ConfigInput>,
                                                     options: BufferStreamOptions) -> ProviderStreamResponse {
-    match create_provider_stream(cfg, Arc::clone(http_client), stream_url, req, input, options).await {
+    match create_provider_stream(cfg, Arc::clone(http_client), stream_url, req_headers, input, options).await {
         None => (None, None),
         Some((stream, info)) => {
             (Some(stream), info)

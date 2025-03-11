@@ -1,12 +1,11 @@
 use std::sync::Arc;
-use crate::api::model::app_state::HdHomerunAppState;
+use axum::response::IntoResponse;
+use crate::api::model::app_state::{HdHomerunAppState};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, TargetType};
 use crate::model::playlist::{M3uPlaylistItem, XtreamCluster, XtreamPlaylistItem};
 use crate::processing::parser::xtream::get_xtream_url;
 use crate::utils::json_utils::get_string_from_serde_value;
-// https://info.hdhomerun.com/info/http_api
-use actix_web::{web, HttpResponse, Responder};
 use bytes::Bytes;
 use futures::{stream, Stream, StreamExt};
 use log::{error, warn};
@@ -14,6 +13,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json};
 use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
 use crate::repository::xtream_playlist_iterator::{XtreamPlaylistIterator};
+
+// https://info.hdhomerun.com/info/http_api
+
 // const DISCOVERY_BYTES: &[u8] =  &[0, 2, 0, 12, 1, 4, 255, 255, 255, 255, 2, 4, 255, 255, 255, 255, 115, 204, 125, 143];
 // const RESPONSE_BYTES: &[u8] =  &[0, 3, 0, 12, 1, 4, 255, 255, 255, 255, 2, 4, 255, 255, 255, 255, 115, 204, 125, 143];
 
@@ -154,9 +156,9 @@ where
     }
 }
 
-fn create_device(app_state: &web::Data<HdHomerunAppState>) -> Option<Device> {
-    if let Some(credentials) = app_state.app_state.config.get_user_credentials(&app_state.device.t_username) {
-        let server_info = app_state.app_state.config.get_user_server_info(&credentials);
+async fn create_device(app_state: &Arc<HdHomerunAppState>) -> Option<Device> {
+    if let Some(credentials) = app_state.app_state.config.get_user_credentials(&app_state.device.t_username).await {
+        let server_info = app_state.app_state.config.get_user_server_info(&credentials).await;
         let device = &app_state.device;
         let device_url = format!("{}://{}:{}", server_info.protocol, server_info.host, device.port);
         Some(Device {
@@ -180,36 +182,37 @@ fn create_device(app_state: &web::Data<HdHomerunAppState>) -> Option<Device> {
     }
 }
 
-async fn device_xml(app_state: web::Data<HdHomerunAppState>) -> impl Responder {
-    if let Some(device) = create_device(&app_state) {
-        HttpResponse::Ok().content_type("application/xml").body(device.as_xml())
+async fn device_xml(axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {
+    if let Some(device) = create_device(&app_state).await {
+        axum::response::Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "application/xml")
+            .body(axum::body::Body::from(device.as_xml()))
+            .unwrap()
+            .into_response()
     } else {
-        HttpResponse::InternalServerError().finish()
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
     }
 }
 
-async fn device_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder {
-    if let Some(device) = create_device(&app_state) {
-        HttpResponse::Ok().json(device)
+async fn device_json(axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {
+    if let Some(device) = create_device(&app_state).await {
+        axum::Json(device).into_response()
     } else {
-        HttpResponse::InternalServerError().finish()
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
     }
 }
 
-async fn discover_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder {
-    if let Some(device) = create_device(&app_state) {
-        HttpResponse::Ok()
-            .content_type("application/json")
-            .json(device)
+async fn discover_json(axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {
+    if let Some(device) = create_device(&app_state).await {
+            axum::Json(device).into_response()
     } else {
-        HttpResponse::InternalServerError().finish()
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
     }
 }
 
-async fn lineup_status() -> impl Responder {
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .json(json!({
+async fn lineup_status() -> impl IntoResponse {
+        axum::Json(json!({
                 "ScanInProgress": 0,
                 "ScanPossible": 0,
                 "Source": "Cable",
@@ -217,9 +220,10 @@ async fn lineup_status() -> impl Responder {
             }))
 }
 
-async fn lineup_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder {
+#[axum::debug_handler]
+async fn lineup_json(axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {
     let cfg = Arc::clone(&app_state.app_state.config);
-    if let Some((credentials, target)) = cfg.get_target_for_username(&app_state.device.t_username) {
+    if let Some((credentials, target)) = cfg.get_target_for_username(&app_state.device.t_username).await {
         let use_output = target.get_hdhomerun_output().as_ref().and_then(|o| o.use_output.clone());
         let use_all = use_output.is_none();
         let use_m3u = use_output.as_ref() == Some(&TargetType::M3u);
@@ -230,11 +234,13 @@ async fn lineup_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder 
             let body_stream = stream::once(async { Ok(Bytes::from("[")) })
                 .chain(stream)
                 .chain(stream::once(async { Ok(Bytes::from("]")) }));
-            return HttpResponse::Ok()
-                .content_type("application/json")
-                .streaming(body_stream);
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                .body(axum::body::Body::from_stream(body_stream))
+                .unwrap().into_response();
         } else if (use_all || use_xtream) && target.has_output(&TargetType::Xtream) {
-            let server_info = app_state.app_state.config.get_user_server_info(&credentials);
+            let server_info = app_state.app_state.config.get_user_server_info(&credentials).await;
             let base_url = if credentials.proxy == ProxyType::Reverse {
                 Some(server_info.get_base_url())
             } else {
@@ -253,30 +259,34 @@ async fn lineup_json(app_state: web::Data<HdHomerunAppState>) -> impl Responder 
                 .chain(stream::once(async { Ok(Bytes::from(",")) }))
                 .chain(vod_stream)
                 .chain(stream::once(async { Ok(Bytes::from("]")) }));
-            return HttpResponse::Ok()
-                .content_type("application/json")
-                .streaming(body_stream);
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                .body(axum::body::Body::from_stream(body_stream))
+                .unwrap()
+                .into_response();
         }
     }
-    HttpResponse::NotFound().finish()
+    axum::http::StatusCode::NOT_FOUND.into_response()
 }
 
-async fn auto_channel(_app_state: web::Data<HdHomerunAppState>, path: web::Path<String>) -> impl Responder {
-    let channel = path.into_inner();
+async fn auto_channel(axum::extract::State(_app_state): axum::extract::State<Arc<HdHomerunAppState>>,
+                      axum::extract::Path(channel): axum::extract::Path<String>) -> impl IntoResponse {
     warn!("HdHomerun api not implemented for auto_channel {channel}");
-    HttpResponse::NotFound().finish()
+    axum::http::StatusCode::NOT_FOUND.into_response()
 }
 
-pub fn hdhr_api_register(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/device.xml").route(web::get().to(device_xml)));
-    cfg.service(web::resource("/device.json").route(web::get().to(device_json)));
-    cfg.service(web::resource("/discover.json").route(web::get().to(discover_json)));
-    cfg.service(web::resource("/lineup_status.json").route(web::get().to(lineup_status)));
-    cfg.service(web::resource("/lineup.json").route(web::get().to(lineup_json)));
+pub fn hdhr_api_register() -> axum::Router<Arc<HdHomerunAppState>> {
+    axum::Router::new()
+     .route("/device.xml", axum::routing::get(device_xml))
+     .route("/device.json", axum::routing::get(device_json))
+     .route("/discover.json", axum::routing::get(discover_json))
+     .route("/lineup_status.json", axum::routing::get(lineup_status))
+     .route("/lineup.json", axum::routing::get(lineup_json))
     // cfg.service(web::resource("/lineup.xml").route(web::get().to(lineup_xml)));
     // cfg.service(web::resource("/lineup.m3u").route(web::get().to(lineup_m3u)));
-    cfg.service(web::resource("/auto/{channel}").route(web::get().to(auto_channel)));
-    cfg.service(web::resource("/tuner{tuner_num}/{channel}").route(web::get().to(auto_channel)));
+        .route("/auto/{channel}", axum::routing::get(auto_channel))
+    .route("/tuner{tuner_num}/{channel}", axum::routing::get(auto_channel))
 }
 
 // fn start_hdhomerum_discovery_handler(ssdp_socket: Arc<UdpSocket>, server: String, location: String, cache_control: String, usn: String) {

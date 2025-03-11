@@ -1,6 +1,5 @@
 #![allow(clippy::struct_excessive_bools)]
 use enum_iterator::Sequence;
-use parking_lot::RwLock;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -8,7 +7,8 @@ use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc};
+use tokio::sync::RwLock;
 
 use crate::auth::user::UserCredential;
 use log::{debug, error, warn};
@@ -1197,14 +1197,14 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) -> Result<(), M3uFilterError> {
+    pub async fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) -> Result<(), M3uFilterError> {
         self.t_api_proxy = Arc::new(RwLock::new(api_proxy));
-        self.check_target_user()
+        self.check_target_user().await
     }
 
-    fn check_username(&self, output_username: Option<&str>, target_name: &str) -> Result<(), M3uFilterError> {
+    async fn check_username(&self, output_username: Option<&str>, target_name: &str) -> Result<(), M3uFilterError> {
         if let Some(username) = output_username {
-            if let Some((_, config_target)) = self.get_target_for_username(username) {
+            if let Some((_, config_target)) = self.get_target_for_username(username).await {
                 if config_target.name != target_name {
                     return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "User:{username} does not belong to target: {}", target_name);
                 }
@@ -1214,7 +1214,7 @@ impl Config {
             Ok(())
         }
     }
-    fn check_target_user(&mut self) -> Result<(), M3uFilterError> {
+    async fn check_target_user(&mut self) -> Result<(), M3uFilterError> {
         let check_homerun = self.hdhomerun.as_ref().is_some_and(|h| h.enabled);
         for source in &self.sources {
             for target in &source.targets {
@@ -1222,12 +1222,12 @@ impl Config {
                     match output {
                         TargetOutput::Xtream(_) | TargetOutput::M3u(_) => {}
                         TargetOutput::Strm(strm_output) => {
-                            self.check_username(strm_output.username.as_deref(), &target.name)?;
+                            self.check_username(strm_output.username.as_deref(), &target.name).await?;
                         }
                         TargetOutput::HdHomeRun(hdhomerun_output) => {
                             if check_homerun {
                                 let hdhr_name = &hdhomerun_output.device;
-                                self.check_username(Some(&hdhomerun_output.username), &target.name)?;
+                                self.check_username(Some(&hdhomerun_output.username), &target.name).await?;
                                 if let Some(homerun) = &mut self.hdhomerun {
                                     for device in &mut homerun.devices {
                                         if &device.name == hdhr_name {
@@ -1282,23 +1282,24 @@ impl Config {
         None
     }
 
-    pub fn get_target_for_username(&self, username: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        if let Some(credentials) = self.get_user_credentials(username) {
-            return self.t_api_proxy.read().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(&credentials.username, &credentials.password)));
+    pub async fn get_target_for_username(&self, username: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
+        if let Some(credentials) = self.get_user_credentials(username).await {
+           return self.t_api_proxy.read().await.as_ref()
+               .and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(&credentials.username, &credentials.password)));
         }
         None
     }
 
-    pub fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        self.t_api_proxy.read().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(username, password)))
+    pub async fn get_target_for_user(&self, username: &str, password: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
+        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(username, password)))
     }
 
-    pub fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
-        self.t_api_proxy.read().as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name_by_token(token)))
+    pub async fn get_target_for_user_by_token(&self, token: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
+        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name_by_token(token)))
     }
 
-    pub fn get_user_credentials(&self, username: &str) -> Option<ProxyUserCredentials> {
-        self.t_api_proxy.read().as_ref().and_then(|api_proxy| api_proxy.get_user_credentials(username))
+    pub async fn get_user_credentials(&self, username: &str) -> Option<ProxyUserCredentials> {
+        self.t_api_proxy.read().await.as_ref().and_then(|api_proxy| api_proxy.get_user_credentials(username))
     }
 
     pub fn get_input_by_name(&self, input_name: &str) -> Option<&ConfigInput> {
@@ -1526,8 +1527,8 @@ impl Config {
     /// # Panics
     ///
     /// Will panic if default server invalid
-    pub fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
-        let server_info_list = self.t_api_proxy.read().as_ref().unwrap().server.clone();
+    pub async fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
+        let server_info_list = self.t_api_proxy.read().await.as_ref().unwrap().server.clone();
         let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
         server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), Clone::clone)
     }

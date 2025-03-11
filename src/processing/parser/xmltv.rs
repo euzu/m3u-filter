@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-
+use std::sync::Arc;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
@@ -8,14 +7,14 @@ use crate::model::xmltv::{Epg, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_TV, EP
 use crate::utils::compression::compressed_file_reader::CompressedFileReader;
 
 impl TVGuide {
-    pub fn filter(&self, channel_ids: &HashSet<Rc<String>>) -> Option<Epg> {
+    pub fn filter(&self, channel_ids: &HashSet<String>) -> Option<Epg> {
         if channel_ids.is_empty() {
             return None;
         }
         match CompressedFileReader::new(&self.file) {
             Ok(mut reader) => {
                 let mut children: Vec<XmlTag> = vec![];
-                let mut tv_attributes: Option<Rc<HashMap<String, String>>> = None;
+                let mut tv_attributes: Option<Arc<HashMap<String, String>>> = None;
                 let mut filter_tags = |tag: XmlTag| {
                     if match tag.name.as_str() {
                         EPG_TAG_CHANNEL => {
@@ -76,7 +75,7 @@ where
                 let tag = XmlTag {
                     name,
                     value: None,
-                    attributes: if attributes.is_empty() { None } else { Some(Rc::new(attributes)) },
+                    attributes: if attributes.is_empty() { None } else { Some(Arc::new(attributes)) },
                     children: None,
                 };
 
@@ -103,7 +102,7 @@ where
                             }
                         } else if !stack.is_empty() {
                             if let Some(old_tag) = stack.pop().map(|mut r| {
-                                let rc_tag = Rc::new(tag);
+                                let rc_tag = Arc::new(tag);
                                 r.children = Some(
                                     r.children.map_or_else(|| vec![rc_tag.clone()], |mut c| {
                                                           c.push(rc_tag.clone());
@@ -182,7 +181,7 @@ mod tests {
         let tv_guide = TVGuide { file: PathBuf::from(file_path) };
 
         let channel_ids = vec!["channel.1", "channel.2", "channel.3"];
-        let channel_ids : HashSet<Rc<String>> =  channel_ids.into_iter().map(|s| Rc::new(s.to_string())).collect();
+        let channel_ids : HashSet<Arc<String>> =  channel_ids.into_iter().map(|s| Arc::new(s.to_string())).collect();
 
         match tv_guide.filter(&channel_ids) {
             None => assert!(false, "No epg filtered"),

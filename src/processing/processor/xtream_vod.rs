@@ -62,11 +62,11 @@ fn write_vod_info_record_to_wal_file(
     Ok(())
 }
 
-fn should_update_vod_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
+fn should_update_vod_info(pli: &mut PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
     should_update_info(pli, processed_provider_ids, TAG_VOD_INFO_ADDED)
 }
 
-pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) {
+pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget, errors: &mut Vec<M3uFilterError>, fpl: &mut FetchedPlaylist<'_>) {
     let (resolve_movies, resolve_delay) = get_resolve_vod_options(target, fpl);
     if !resolve_movies { return; }
 
@@ -81,11 +81,14 @@ pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, ta
     let mut record_writer = file_writer(&wal_record_file);
     let mut content_updated = false;
 
-    let vod_info_iter = fpl.playlistgroups.iter()
+    // TODO merge both filters to one
+    let vod_info_count = fpl.playlistgroups.iter()
         .flat_map(|plg| &plg.channels)
-        .filter(|&pli| pli.header.borrow().xtream_cluster == XtreamCluster::Video);
+        .filter(|&pli| pli.header.xtream_cluster == XtreamCluster::Video).count();
 
-    let vod_info_count = vod_info_iter.clone().count();
+    let vod_info_iter = fpl.playlistgroups.iter_mut()
+        .flat_map(|plg| plg.channels.iter_mut())
+        .filter(|pli| pli.header.xtream_cluster == XtreamCluster::Video);
 
     info!("Found {vod_info_count} vod info to resolve");
     let start_time = Instant::now();

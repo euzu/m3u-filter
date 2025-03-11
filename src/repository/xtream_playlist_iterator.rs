@@ -34,13 +34,13 @@ impl XtreamPlaylistIterator {
             if !xtream_path.exists() || !idx_path.exists() {
                 return Err(info_err!(format!("No {cluster} entries found for target {}", &target.name)));
             }
-            let file_lock = config.file_locks.read_lock(&xtream_path);
+            let file_lock = config.file_locks.read_lock(&xtream_path).await;
 
             let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&xtream_path, &idx_path)
                 .map_err(|err| info_err!(format!("Could not deserialize file {xtream_path:?} - {err}")))?;
 
             let options = XtreamMappingOptions::from_target_options(xtream_output, config);
-            let server_info = config.get_user_server_info(user);
+            let server_info = config.get_user_server_info(user).await;
 
             let filter = user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, cluster).await;
 

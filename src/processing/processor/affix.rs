@@ -6,7 +6,7 @@ type AffixProcessor<'a> = Box<dyn Fn(&mut PlaylistItem) + 'a>;
 
 fn create_affix_processor(affix: &InputAffix, is_prefix: bool) -> AffixProcessor {
     Box::new(move |channel: &mut PlaylistItem| {
-        let header = &mut channel.header.borrow_mut();
+        let header = &mut channel.header;
         let value = header.get_field(affix.field.as_str()).map_or_else(|| String::from(&affix.value), |field_value| if is_prefix {
             format!("{}{}", &affix.value, field_value.as_str())
         } else {

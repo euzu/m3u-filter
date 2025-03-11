@@ -1,6 +1,4 @@
 use crate::utils::debug_if_enabled;
-use actix_web::http::header::{HeaderName, HeaderValue};
-use actix_web::{HttpResponseBuilder};
 use reqwest::{StatusCode};
 use std::collections::{HashSet};
 use std::str::FromStr;
@@ -16,35 +14,45 @@ pub fn get_response_headers(headers: &HeaderMap) -> Vec<(String, String)> {
     response_headers
 }
 
-pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, StatusCode)>, stream_url: &str) -> HttpResponseBuilder {
-    let mut headers = Vec::<(HeaderName, HeaderValue)>::with_capacity(12);
+pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, StatusCode)>, stream_url: &str) ->  (axum::http::StatusCode, axum::http::HeaderMap) {
+    let mut headers = HeaderMap::new();
     let mut added_headers: HashSet<String> = HashSet::new();
-    let mut status = 200_u16;
+    let mut status = StatusCode::OK;
+
     if let Some((custom_headers, status_code)) = custom {
-        status = status_code.as_u16();
-        for header in custom_headers {
-            headers.push((HeaderName::from_str(&header.0).unwrap(), HeaderValue::from_str(header.1.as_str()).unwrap()));
-            added_headers.insert(header.0.to_string());
+        status = status_code;
+        for (key, value) in custom_headers {
+            if let (Ok(name), Ok(val)) = (axum::http::HeaderName::from_str(&key), axum::http::HeaderValue::from_str(&value)) {
+                headers.insert(name.clone(), val);
+                added_headers.insert(key);
+            }
         }
     }
 
     let default_headers = vec![
-        (actix_web::http::header::CONTENT_TYPE, HeaderValue::from_str("application/octet-stream").unwrap()),
-        (actix_web::http::header::CONNECTION, HeaderValue::from_str("keep-alive").unwrap()),
+        ("content-type", "application/octet-stream"),
+        ("connection", "keep-alive"),
     ];
 
-    for header in default_headers {
-        if !added_headers.contains(header.0.as_str()) {
-            headers.push(header);
+    for (key, value) in default_headers {
+        if !added_headers.contains(key) {
+            if let (Ok(name), Ok(val)) = (axum::http::HeaderName::from_str(key), axum::http::HeaderValue::from_str(value)) {
+                headers.insert(name, val);
+            }
         }
     }
 
-    headers.push((actix_web::http::header::DATE, HeaderValue::from_str(&chrono::Utc::now().to_rfc2822()).unwrap()));
-
-    let mut response_builder = actix_web::HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap());
-    debug_if_enabled!("Responding stream request {} with status {status}, headers {headers:?}", sanitize_sensitive_info(stream_url));
-    for header in headers {
-        response_builder.insert_header(header);
+    // Füge das aktuelle Datum hinzu
+    if let Ok(date_header) = axum::http::HeaderValue::from_str(&chrono::Utc::now().to_rfc2822()) {
+        headers.insert(axum::http::HeaderName::from_static("date"), date_header);
     }
-    response_builder
+
+    debug_if_enabled!(
+        "Responding stream request {} with status {}, headers {:?}",
+        sanitize_sensitive_info(stream_url),
+        status,
+        headers
+    );
+
+    (status, headers)
 }

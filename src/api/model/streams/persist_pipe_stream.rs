@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
 use bytes::Bytes;
@@ -26,7 +27,7 @@ pub struct PersistPipeStream<S, W> {
     completed: bool,
     writer: W,
     size: AtomicUsize,
-    callback: Box<dyn Fn(usize)>,
+    callback: Arc<dyn Fn(usize) + Send + Sync>,
 }
 
 impl<S, W> PersistPipeStream<S, W>
@@ -39,7 +40,7 @@ where
     ///     - `inner`: The input stream providing the data.
     ///     - `writer`: The writer to which the data is written.
     ///     - `callback`: A callback function to be called with the total size upon stream completion.
-    pub fn new(inner: S, writer: W, callback: Box<dyn Fn(usize)>) -> Self {
+    pub fn new(inner: S, writer: W, callback: Arc<dyn Fn(usize) + Send + Sync>) -> Self {
         Self {
             inner,
             completed: false,

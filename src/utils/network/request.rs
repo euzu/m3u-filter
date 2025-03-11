@@ -413,7 +413,7 @@ pub enum MimeCategory {
 pub fn classify_content_type(headers: &[(String, String)]) -> MimeCategory {
     headers.iter()
         .find_map(|(k, v)| {
-            (k == actix_web::http::header::CONTENT_TYPE.as_str()).then_some(v)
+            (k == axum::http::header::CONTENT_TYPE.as_str()).then_some(v)
         })
         .map_or(MimeCategory::Unknown, |v| match v.to_lowercase().as_str() {
             v if v.starts_with("video/") || v == "application/octet-stream" => MimeCategory::Video,

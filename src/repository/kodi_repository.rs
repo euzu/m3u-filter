@@ -21,8 +21,7 @@ use regex::Regex;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use tokio::fs::{create_dir_all, remove_dir, remove_file, File};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 
@@ -155,7 +154,7 @@ fn trim_whitespace(pattern: &Regex, input: &str) -> String {
     pattern.replace_all(input, " ").to_string()
 }
 
-fn kodi_style_rename(
+async fn kodi_style_rename(
     cfg: &Config,
     strm_item_info: &StrmItemInfo,
     style: &KodiStyle,
@@ -189,7 +188,7 @@ fn kodi_style_rename(
                 strm_item_info.input_name.as_str(),
                 input_tmdb_indexes,
                 strm_item_info.item_type,
-            )
+            ).await
         }
         _ => None,
     } {
@@ -280,7 +279,7 @@ enum InputTmdbIndexValue {
 }
 
 type InputTmdbIndexMap = HashMap<String, Option<(FileReadGuard, InputTmdbIndexTree)>>;
-fn get_tmdb_value(
+async fn get_tmdb_value(
     cfg: &Config,
     provider_id: Option<u32>,
     input_name: &str,
@@ -311,7 +310,7 @@ fn get_tmdb_value(
                     .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type))
                 {
                     {
-                        let file_lock = cfg.file_locks.read_lock(&tmdb_path);
+                        let file_lock = cfg.file_locks.read_lock(&tmdb_path).await;
                         match item_type {
                             PlaylistItemType::Series => {
                                 if let Ok(tree) =
@@ -358,13 +357,13 @@ pub fn strm_get_file_paths(target_path: &Path) -> PathBuf {
 
 #[derive(Serialize)]
 struct StrmItemInfo {
-    group: Rc<String>,
-    title: Rc<String>,
+    group: String,
+    title: String,
     item_type: PlaylistItemType,
     provider_id: Option<u32>,
     virtual_id: u32,
-    input_name: Rc<String>,
-    url: Rc<String>,
+    input_name: String,
+    url: String,
     series_name: Option<String>,
     release_date: Option<String>,
     season: Option<String>,
@@ -378,15 +377,15 @@ impl StrmItemInfo {
     }
 }
 
-fn extract_item_info(pli: &PlaylistItem) -> StrmItemInfo {
-    let mut header = pli.header.borrow_mut();
-    let group = Rc::clone(&header.group);
-    let title = Rc::clone(&header.title);
+fn extract_item_info(pli: &mut PlaylistItem) -> StrmItemInfo {
+    let header = &mut pli.header;
+    let group = header.group.to_string();
+    let title = header.title.to_string();
     let item_type = header.item_type;
     let provider_id = header.get_provider_id();
     let virtual_id = header.virtual_id;
-    let input_name = Rc::clone(&header.input_name);
-    let url = Rc::clone(&header.url);
+    let input_name = header.input_name.to_string();
+    let url = header.url.to_string();
     let (series_name, release_date, added, season, episode) = match header.item_type {
         PlaylistItemType::Series => {
             let series_name = match header.get_field("name") {
@@ -502,7 +501,7 @@ async fn cleanup_strm_output_directory(
 }
 
 fn filter_strm_item(pli: &PlaylistItem) -> bool {
-    let item_type = pli.header.borrow().item_type;
+    let item_type = pli.header.item_type;
     item_type == PlaylistItemType::Series
         || item_type == PlaylistItemType::Live
         || item_type == PlaylistItemType::Video
@@ -519,14 +518,14 @@ fn get_relative_path_str(full_path: &Path, root_path: &Path) -> String {
 }
 
 struct StrmFile {
-    file_name: Rc<String>,
+    file_name: Arc<String>,
     dir_path: PathBuf,
     strm_info: StrmItemInfo,
 }
 
-fn prepare_strm_files(
+async fn prepare_strm_files(
     cfg: &Config,
-    new_playlist: &[PlaylistGroup],
+    new_playlist: &mut [PlaylistGroup],
     root_path: &Path,
     underscore_whitespace: bool,
     kodi_style: bool,
@@ -538,13 +537,13 @@ fn prepare_strm_files(
     // contains all filenames to detect collisions
     let mut all_filenames = HashSet::with_capacity(channel_count);
     // contains only collision filenames
-    let mut collisions: HashSet<Rc<String>> = HashSet::new();
+    let mut collisions: HashSet<Arc<String>> = HashSet::new();
     let mut input_tmdb_indexes: InputTmdbIndexMap = HashMap::with_capacity(channel_count);
     let mut result = Vec::with_capacity(channel_count);
 
     // first we create the names to identify name collisions
-    for pg in new_playlist {
-        for pli in pg.channels.iter().filter(|&c| filter_strm_item(c)) {
+    for pg in new_playlist.iter_mut() {
+        for pli in pg.channels.iter_mut().filter(|c| filter_strm_item(c)) {
             let strm_item_info = extract_item_info(pli);
             let (dir_path, strm_file_name) = if kodi_style {
                 kodi_style_rename(
@@ -553,7 +552,7 @@ fn prepare_strm_files(
                     &KODI_STYLE,
                     &mut input_tmdb_indexes,
                     underscore_whitespace,
-                )
+                ).await
             } else {
                 let dir_path = root_path.join(sanitize_for_filename(
                     &strm_item_info.group,
@@ -563,13 +562,13 @@ fn prepare_strm_files(
                     sanitize_for_filename(&strm_item_info.title, underscore_whitespace);
                 (dir_path, strm_file_name)
             };
-            let filename = Rc::new(strm_file_name);
+            let filename = Arc::new(strm_file_name);
             if all_filenames.contains(&filename) {
-                collisions.insert(Rc::clone(&filename));
+                collisions.insert(Arc::clone(&filename));
             };
-            all_filenames.insert(Rc::clone(&filename));
+            all_filenames.insert(Arc::clone(&filename));
             result.push(StrmFile {
-                file_name: Rc::clone(&filename),
+                file_name: Arc::clone(&filename),
                 dir_path,
                 strm_info: strm_item_info,
             });
@@ -582,7 +581,7 @@ fn prepare_strm_files(
             .iter_mut()
             .filter(|s| collisions.contains(&s.file_name))
             .for_each(|s| {
-                s.file_name = Rc::new(format!(
+                s.file_name = Arc::new(format!(
                     "{}{separator}-{separator}[{}]",
                     s.file_name, s.strm_info.virtual_id
                 ));
@@ -595,7 +594,7 @@ pub async fn kodi_write_strm_playlist(
     target: &ConfigTarget,
     target_output: &StrmTargetOutput,
     cfg: &Config,
-    new_playlist: &[PlaylistGroup],
+    new_playlist: &mut [PlaylistGroup],
 ) -> Result<(), M3uFilterError> {
     if new_playlist.is_empty() {
         return Ok(());
@@ -611,7 +610,7 @@ pub async fn kodi_write_strm_playlist(
         )));
     };
 
-    let credentials_and_server_info = get_credentials_and_server_info(cfg, target_output.username.as_ref());
+    let credentials_and_server_info = get_credentials_and_server_info(cfg, target_output.username.as_ref()).await;
     let strm_index_path =
         strm_get_file_paths(&ensure_target_storage_path(cfg, target.name.as_str())?);
     let existing_strm = {
@@ -640,7 +639,7 @@ pub async fn kodi_write_strm_playlist(
         &root_path,
         target_output.underscore_whitespace,
         target_output.kodi_style,
-    );
+    ).await;
     for strm_file in strm_files {
         // file paths
         let output_path = root_path.join(&strm_file.dir_path);
@@ -783,16 +782,16 @@ async fn has_strm_file_same_hash(file_path: &PathBuf, content_hash: UUIDType) ->
     false
 }
 
-fn get_credentials_and_server_info(
+async fn get_credentials_and_server_info(
     cfg: &Config,
     username: Option<&String>,
 ) -> Option<(ProxyUserCredentials, ApiProxyServerInfo)> {
     let username = username?;
-    let credentials = cfg.get_user_credentials(username)?;
+    let credentials = cfg.get_user_credentials(username).await?;
     if credentials.proxy != ProxyType::Reverse {
         return None;
     }
-    let server_info = cfg.get_user_server_info(&credentials);
+    let server_info = cfg.get_user_server_info(&credentials).await;
     Some((credentials, server_info))
 }
 

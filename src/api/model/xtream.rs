@@ -1,8 +1,8 @@
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials, ProxyUserStatus};
 use chrono::{Duration, Local};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct XtreamUserInfoResponse {
     pub password: String,
     pub username: String,
@@ -17,7 +17,7 @@ pub struct XtreamUserInfoResponse {
     pub status: String, // "Active"
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct XtreamServerInfoResponse {
     pub url: String,
     pub port: String,
@@ -29,7 +29,7 @@ pub struct XtreamServerInfoResponse {
     pub time_now: String, //"2021-06-28 17:07:37"
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct XtreamAuthorizationResponse {
     pub user_info: XtreamUserInfoResponse,
     pub server_info: XtreamServerInfoResponse,

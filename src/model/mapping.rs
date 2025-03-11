@@ -2,10 +2,8 @@ use enum_iterator::Sequence;
 use log::{debug, error, trace};
 use regex::{Regex};
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
@@ -270,23 +268,23 @@ impl Mapper {
 }
 
 pub struct MappingValueProcessor<'a> {
-    pub pli: RefCell<&'a PlaylistItem>,
+    pub pli: &'a mut PlaylistItem,
     pub mapper: &'a Mapper,
 }
 
 impl MappingValueProcessor<'_> {
-    fn get_property(&self, key: &str) -> Option<Rc<String>> {
-        self.pli.borrow().header.borrow().get_field(key)
+    fn get_property(&self, key: &str) -> Option<String> {
+        self.pli.header.get_field(key)
     }
 
-    fn set_property(&self, key: &str, value: &str) {
-        if !self.pli.borrow().header.borrow_mut().set_field(key, value) {
+    fn set_property(&mut self, key: &str, value: &str) {
+        if !self.pli.header.set_field(key, value) {
             error!("Cant set unknown field {} to {}", key, value);
         }
         trace!("Property {} set to {}", key, value);
     }
 
-    fn apply_attributes(&self, captured_names: &HashMap<&str, &str>) {
+    fn apply_attributes(&mut self, captured_names: &HashMap<&str, &str>) {
         let mapper = self.mapper;
         let attr_re = &mapper.t_attre.as_ref().unwrap();
         let attributes = &mapper.attributes;
@@ -303,7 +301,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_tags(&self, value: &str, captures: &HashMap<&str, &str>) -> Option<String> {
+    fn apply_tags(&mut self, value: &str, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
         let tag_captures = self.mapper.t_tagre.as_ref().unwrap().captures_iter(value)
             .filter(|caps| caps.len() > 1)
@@ -342,7 +340,7 @@ impl MappingValueProcessor<'_> {
         Some(new_value)
     }
 
-    fn apply_suffix(&self, captures: &HashMap<&str, &str>) {
+    fn apply_suffix(&mut self, captures: &HashMap<&str, &str>) {
         let mapper = self.mapper;
         let suffix = &mapper.suffix;
 
@@ -356,7 +354,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_prefix(&self, captures: &HashMap<&str, &str>) {
+    fn apply_prefix(&mut self, captures: &HashMap<&str, &str>) {
         let mapper = self.mapper;
         let prefix = &mapper.prefix;
         for (key, value) in prefix {
@@ -369,7 +367,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_assignments(&self) {
+    fn apply_assignments(&mut self) {
         let mapper = self.mapper;
         let assignments = &mapper.assignments;
         for (key, value) in assignments {
@@ -387,7 +385,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_transform(&self) {
+    fn apply_transform(&mut self) {
         let mapper = self.mapper;
         match &mapper.transform {
             None => {}

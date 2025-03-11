@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{fmt, io};
 use std::path::{Path, PathBuf};
-use parking_lot::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::m3u_filter_error::str_to_io_error;
 
 #[derive(Clone)]
@@ -18,36 +18,36 @@ impl FileLockManager {
     }
 
     // Acquires a read lock for the specified file and returns a FileReadGuard.
-    pub fn read_lock(&self, path: &Path) -> FileReadGuard {
-        let file_lock = self.get_or_create_lock(path);
-        let guard = file_lock.read();
+    pub async fn read_lock(&self, path: &Path) -> FileReadGuard {
+        let file_lock = self.get_or_create_lock(path).await;
+        let guard = file_lock.read().await;
         // Clone the Arc to avoid moving `file_lock` out, as it is still borrowed by `guard`
         FileReadGuard::new(Arc::clone(&file_lock), guard)
     }
 
     // Acquires a write lock for the specified file and returns a FileWriteGuard.
-    pub fn write_lock(&self, path: &Path) -> FileWriteGuard {
-        let file_lock = self.get_or_create_lock(path);
-        let guard = file_lock.write();
+    pub async fn write_lock(&self, path: &Path) -> FileWriteGuard {
+        let file_lock = self.get_or_create_lock(path).await;
+        let guard = file_lock.write().await;
         // Clone the Arc to avoid moving `file_lock` out, as it is still borrowed by `guard`
         FileWriteGuard::new(Arc::clone(&file_lock), guard)
     }
 
     // Tries to acquire a write lock for the specified file and returns a FileWriteGuard.
-    pub fn try_write_lock(&self, path: &Path) -> io::Result<FileWriteGuard> {
-        let file_lock = self.get_or_create_lock(path);
+    pub async fn try_write_lock(&self, path: &Path) -> io::Result<FileWriteGuard> {
+        let file_lock = self.get_or_create_lock(path).await;
         let guard = file_lock.try_write();
         match guard {
             // Clone the Arc to avoid moving `file_lock` out, as it is still borrowed by `guard`
-            Some(lock_guard) => Ok(FileWriteGuard::new(Arc::clone(&file_lock), lock_guard)),
-            None => Err(str_to_io_error("Failed to acquire write lock"))
+            Ok(lock_guard) => Ok(FileWriteGuard::new(Arc::clone(&file_lock), lock_guard)),
+            Err(_) => Err(str_to_io_error("Failed to acquire write lock"))
         }
     }
 
 
     // Helper function: retrieves or creates a lock for a file.
-   fn get_or_create_lock(&self, path: &Path) -> Arc<RwLock<()>> {
-        let mut locks = self.locks.lock();
+    async fn get_or_create_lock(&self, path: &Path) -> Arc<RwLock<()>> {
+        let mut locks = self.locks.lock().await;
 
         if let Some(lock) = locks.get(path) {
             return lock.clone();
@@ -75,10 +75,11 @@ impl fmt::Debug for FileLockManager {
 }
 
 // Define FileReadGuard to hold both the lock reference and the actual read guard.
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct FileReadGuard {
     lock: Arc<RwLock<()>>,
-    guard: RwLockReadGuard<'static, ()>,
+    guard: Arc<RwLockReadGuard<'static, ()>>,
 }
 
 impl FileReadGuard {
@@ -87,16 +88,17 @@ impl FileReadGuard {
         let static_guard: RwLockReadGuard<'static, ()> = unsafe { std::mem::transmute(guard) };
         Self {
             lock,
-            guard: static_guard,
+            guard: Arc::new(static_guard),
         }
     }
 }
 
 // Define FileWriteGuard to hold both the lock reference and the actual write guard.
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct FileWriteGuard {
     lock: Arc<RwLock<()>>,
-    guard: RwLockWriteGuard<'static, ()>,
+    guard: Arc<RwLockWriteGuard<'static, ()>>,
 }
 
 impl FileWriteGuard {
@@ -105,7 +107,7 @@ impl FileWriteGuard {
         let static_guard: RwLockWriteGuard<'static, ()> = unsafe { std::mem::transmute(guard) };
         Self {
             lock,
-            guard: static_guard,
+            guard: Arc::new(static_guard),
         }
     }
 }

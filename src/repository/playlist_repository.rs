@@ -22,12 +22,12 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
         Err(err) => return Err(vec![err]),
     };
 
-    let (mut target_id_mapping, file_lock) = get_target_id_mapping(cfg, &target_path);
+    let (mut target_id_mapping, file_lock) = get_target_id_mapping(cfg, &target_path).await;
 
     // Virtual IDs assignment
     for group in playlist.iter_mut() {
-        for channel in &group.channels {
-            let mut header = channel.header.borrow_mut();
+        for channel in &mut group.channels {
+            let header = &mut channel.header;
             let provider_id = header.get_provider_id().unwrap_or_default();
             if provider_id == 0 {
                 header.item_type = match (header.url.ends_with(HLS_EXT), header.item_type) {
@@ -38,7 +38,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
             }
             let uuid = header.get_uuid();
             let item_type = header.item_type;
-            header.virtual_id = target_id_mapping.get_and_update_virtual_id(**uuid, provider_id, item_type, 0);
+            header.virtual_id = target_id_mapping.get_and_update_virtual_id(uuid, provider_id, item_type, 0);
         }
     }
 
@@ -67,8 +67,8 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
     if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 
-pub fn get_target_id_mapping(cfg: &Config, target_path: &Path) -> (TargetIdMapping, FileWriteGuard) {
+pub async fn get_target_id_mapping(cfg: &Config, target_path: &Path) -> (TargetIdMapping, FileWriteGuard) {
     let target_id_mapping_file = get_target_id_mapping_file(target_path);
-    let file_lock = cfg.file_locks.write_lock(&target_id_mapping_file);
+    let file_lock = cfg.file_locks.write_lock(&target_id_mapping_file).await;
     (TargetIdMapping::new(&target_id_mapping_file), file_lock)
 }

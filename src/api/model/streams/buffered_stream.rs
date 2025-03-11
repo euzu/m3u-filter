@@ -17,7 +17,7 @@ pub(in crate::api::model) struct BufferedStream {
 impl BufferedStream {
     pub fn new(stream: ResponseStream, buffer_size: usize, client_close_signal: Arc<AtomicOnceFlag>, _url: &str) -> Self {
         let (tx, rx) = channel(buffer_size);
-        actix_rt::spawn(Self::buffer_stream(tx, stream, client_close_signal));
+        tokio::spawn(Self::buffer_stream(tx, stream, client_close_signal));
         Self {
             stream: ReceiverStream::new(rx)
         }
@@ -45,7 +45,7 @@ impl BufferedStream {
                 }
                 Some(Err(err)) => {
                     trace!("Buffered Stream Error: {err:?}");
-                    // actix_web::rt::time::sleep(sleep_duration).await;
+                    // tokio::time::sleep(sleep_duration).await;
                     // Attempt to send error to client
                     if tx.send(Err(err)).await.is_err() {
                         client_close_signal.notify();

@@ -1,6 +1,5 @@
 use std::sync::Arc;
-use actix_web::{dev::ServiceRequest, Error, web};
-use actix_web_httpauth::extractors::bearer::BearerAuth;
+use axum::debug_middleware;
 use chrono::{Local, Duration};
 use jsonwebtoken::{Algorithm, DecodingKey, encode, decode, EncodingKey, Header, Validation, TokenData};
 use crate::model::config::WebAuthConfig;
@@ -46,12 +45,9 @@ fn create_jwt(web_auth_config: &WebAuthConfig, username: &str, roles: Vec<String
     }
 }
 
-pub(crate) fn verify_token(bearer: Option<BearerAuth>, secret_key: &[u8]) -> Option<TokenData<Claims>> {
-    if let Some(auth) = bearer {
-        let token = auth.token();
-        if let Ok(token_data) = decode::<Claims>(token, &DecodingKey::from_secret(secret_key), &Validation::new(Algorithm::HS256)) {
-            return Some(token_data);
-        }
+pub(crate) fn verify_token(token: &str, secret_key: &[u8]) -> Option<TokenData<Claims>> {
+    if let Ok(token_data) = decode::<Claims>(token, &DecodingKey::from_secret(secret_key), &Validation::new(Algorithm::HS256)) {
+        return Some(token_data);
     }
     None
 }
@@ -72,49 +68,51 @@ pub fn is_user(token_data: Option<TokenData<Claims>>) -> bool {
     has_role(token_data, ROLE_USER)
 }
 
-pub fn verify_token_admin(bearer: Option<BearerAuth>, secret_key: &[u8]) -> bool {
+pub fn verify_token_admin(bearer: &str, secret_key: &[u8]) -> bool {
     has_role(verify_token(bearer, secret_key), ROLE_ADMIN)
 }
 
-pub fn verify_token_user(bearer: Option<BearerAuth>, secret_key: &[u8]) -> bool {
+pub fn verify_token_user(bearer: &str, secret_key: &[u8]) -> bool {
     has_role(verify_token(bearer, secret_key), ROLE_USER)
 }
 
 fn validate_request(
-    req: ServiceRequest,
-    credentials: Option<BearerAuth>,
-    verify_fn: fn(Option<BearerAuth>, &[u8]) -> bool, // Funktions-Parameter für Admin/User-Check
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    if let Some(app_state) = req.app_data::<web::Data<Arc<AppState>>>() {
-        if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
-            let secret_key = web_auth_config.secret.as_ref();
-            if verify_fn(credentials, secret_key) {
-                return Ok(req);
-            }
+    app_state: &Arc<AppState>,
+    token: &str,
+    verify_fn: fn(&str, &[u8]) -> bool,
+) -> Result<(), ()> {
+    if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
+        let secret_key = web_auth_config.secret.as_ref();
+        if verify_fn(token, secret_key) {
+            return Ok(());
         }
     }
-    Err((actix_web::error::ErrorUnauthorized("Unauthorized"), req))
+    Err(())
 }
 
+#[debug_middleware]
 pub async fn validator_admin(
-    req: ServiceRequest,
-    credentials: Option<BearerAuth>,
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    validate_request(req, credentials, verify_token_admin)
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    match validate_request(&app_state, &token, verify_token_admin) {
+        Ok(()) => Ok(next.run(request).await),
+        Err(()) => Err(axum::http::StatusCode::UNAUTHORIZED)
+
+    }
 }
 
+#[debug_middleware]
 pub async fn validator_user(
-    req: ServiceRequest,
-    credentials: Option<BearerAuth>,
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    validate_request(req, credentials, verify_token_user)
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    match validate_request(&app_state, &token, verify_token_user) {
+        Ok(()) => Ok(next.run(request).await),
+        Err(()) => Err(axum::http::StatusCode::UNAUTHORIZED)
+    }
 }
-
-// pub fn handle_unauthorized<B>(srvres: ServiceResponse<B>) -> actix_web::Result<ErrorHandlerResponse<B>> {
-//     let (req, _) = srvres.into_parts();
-//     let resp = HttpResponse::TemporaryRedirect().insert_header(("Location", "/auth/login")).finish();
-//     let result = ServiceResponse::new(req, resp)
-//         .map_into_boxed_body()
-//         .map_into_right_body();
-//     Ok(ErrorHandlerResponse::Response(result))
-// }

@@ -1,9 +1,6 @@
 #![allow(clippy::empty_docs)]
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
-
 use enum_iterator::all;
 use log::{debug, error, log_enabled, trace, Level};
 use pest::iterators::Pair;
@@ -16,21 +13,21 @@ use crate::tools::directed_graph::DirectedGraph;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err};
 use crate::utils::sys_utils::exit;
 
-pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> Rc<String> {
-    let header = pli.header.borrow();
+pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
+    let header = &pli.header;
     let value = match field {
-        ItemField::Group => &header.group,
-        ItemField::Name => &header.name,
-        ItemField::Title => &header.title,
-        ItemField::Url => &header.url,
-        ItemField::Input => &header.input_name,
-        ItemField::Type => &Rc::new(header.item_type.to_string()),
+        ItemField::Group => header.group.to_string(),
+        ItemField::Name => header.name.to_string(),
+        ItemField::Title => header.title.to_string(),
+        ItemField::Url => header.url.to_string(),
+        ItemField::Input => header.input_name.to_string(),
+        ItemField::Type => header.item_type.to_string(),
     };
-    Rc::clone(value)
+    value.to_string()
 }
 
-pub fn set_field_value(pli: &PlaylistItem, field: &ItemField, value: Rc<String>) {
-    let header = &mut pli.header.borrow_mut();
+pub fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String) {
+    let header = &mut pli.header;
     match field {
         ItemField::Group => header.group = value,
         ItemField::Name => header.name = value,
@@ -42,13 +39,12 @@ pub fn set_field_value(pli: &PlaylistItem, field: &ItemField, value: Rc<String>)
 }
 
 pub struct ValueProvider<'a> {
-    pub pli: RefCell<&'a PlaylistItem>,
+    pub pli: &'a PlaylistItem,
 }
 
 impl ValueProvider<'_> {
-    fn call(&self, field: &ItemField) -> Rc<String> {
-        let pli = *self.pli.borrow();
-        get_field_value(pli, field)
+    fn call(&self, field: &ItemField) -> String {
+        get_field_value(self.pli, field)
     }
 }
 
@@ -552,9 +548,6 @@ pub fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternTemplate
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
     use regex::Regex;
 
     use crate::foundation::filter::{get_filter, MockValueProcessor, ValueProvider};
@@ -562,11 +555,11 @@ mod tests {
 
     fn create_mock_pli(name: &str, group: &str) -> PlaylistItem {
         PlaylistItem {
-            header: RefCell::new(PlaylistItemHeader {
-                name: Rc::new(name.to_string()),
-                group: Rc::new(group.to_string()),
+            header: PlaylistItemHeader {
+                name: name.to_string(),
+                group: group.to_string(),
                 ..Default::default()
-            }),
+            },
         }
     }
 
@@ -625,7 +618,7 @@ mod tests {
                     .iter()
                     .filter(|&chan| {
                         let provider = ValueProvider {
-                            pli: RefCell::new(chan),
+                            pli: chan,
                         };
                         filter.filter(&provider, &mut processor)
                     })
@@ -681,7 +674,7 @@ mod tests {
                     .iter()
                     .filter(|&chan| {
                         let provider = ValueProvider {
-                            pli: RefCell::new(chan),
+                            pli: chan,
                         };
                         filter.filter(&provider, &mut processor)
                     })

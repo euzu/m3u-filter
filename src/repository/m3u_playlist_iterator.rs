@@ -38,7 +38,7 @@ impl M3uPlaylistIterator {
         let target_path = ensure_target_storage_path(cfg, target.name.as_str())?;
         let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
 
-        let file_lock = cfg.file_locks.read_lock(&m3u_path);
+        let file_lock = cfg.file_locks.read_lock(&m3u_path).await;
 
         let reader =
             IndexedDocumentIterator::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path)
@@ -47,7 +47,7 @@ impl M3uPlaylistIterator {
         let filter = user_get_bouquet_filter(cfg, &user.username, None, TargetType::M3u, XtreamCluster::Live).await;
         // TODO m3u bouquet filter
 
-        let server_info = cfg.get_user_server_info(user);
+        let server_info = cfg.get_user_server_info(user).await;
         Ok(Self {
             reader,
             base_url: server_info.get_base_url(),

@@ -1,11 +1,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
-
-use actix_web::body::BodyStream;
-use actix_web::middleware::Condition;
-use actix_web::{web, HttpResponse};
-use actix_web_httpauth::middleware::HttpAuthentication;
+use axum::response::IntoResponse;
 use bytes::Bytes;
 use futures::{stream, StreamExt};
 use log::error;
@@ -16,7 +12,7 @@ use crate::api::endpoints::{download_api};
 use crate::api::model::app_state::AppState;
 use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::api::model::request::{PlaylistRequest, PlaylistRequestType};
-use crate::auth::authenticator::validator_admin;
+use crate::auth::authenticator::{validator_admin};
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, TargetType};
@@ -53,100 +49,99 @@ fn intern_save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -
 }
 
 async fn save_config_api_proxy_user(
-    req: web::Json<Vec<TargetUser>>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    let mut users = req.0;
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Json(mut users): axum::extract::Json<Vec<TargetUser>>,
+) ->  impl axum::response::IntoResponse + Send {
     let mut usernames = HashSet::new();
     let mut tokens = HashSet::new();
     for target_user in &mut users {
         for credential in &mut target_user.credentials {
             credential.trim();
             if let Err(err) = credential.validate() {
-                return HttpResponse::BadRequest().json(json!({"error": err.to_string()}));
+                return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": err.to_string()}))).into_response();
             }
             if usernames.contains(&credential.username) {
-                return HttpResponse::BadRequest().json(json!({"error": format!("Duplicate username {}", &credential.username)}));
+                return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": format!("Duplicate username {}", &credential.username)}))).into_response();
             }
             usernames.insert(&credential.username);
             if let Some(token) = &credential.token {
                 if tokens.contains(token) {
-                    return HttpResponse::BadRequest().json(json!({"error": format!("Duplicate token {token}")}));
+                    return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": format!("Duplicate token {token}")}))).into_response();
                 }
                 tokens.insert(token);
             }
         }
     }
 
-    if let Some(api_proxy) = app_state.config.t_api_proxy.write().as_mut() {
+    let mut lock = app_state.config.t_api_proxy.write().await;
+    if let Some(api_proxy) =  lock.as_mut() {
         api_proxy.user = users;
         api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.prepare(true));
         if api_proxy.use_user_db {
             if let Err(err) = store_api_user(&app_state.config, &api_proxy.user) {
-                return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+                return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": err.to_string()}))).into_response();
             }
         } else {
             let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
             if let Some(err) = intern_save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
-                return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+                return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": err.to_string()}))).into_response();
             }
         }
     }
-    HttpResponse::Ok().finish()
+    axum::http::StatusCode::OK.into_response()
 }
 
 async fn save_config_main(
-    req: web::Json<ConfigDto>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    let cfg = req.0;
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Json(cfg): axum::extract::Json<ConfigDto>,
+) ->  impl axum::response::IntoResponse + Send {
     if cfg.is_valid() {
         let file_path = app_state.config.t_config_file_path.as_str();
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         if let Some(err) = intern_save_config_main(file_path, backup_dir, &cfg) {
-            return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": err.to_string()}))).into_response();
         }
-        HttpResponse::Ok().finish()
+        axum::http::StatusCode::OK.into_response()
     } else {
-        HttpResponse::BadRequest().json(json!({"error": "Invalid content"}))
+        (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid content"}))).into_response()
     }
 }
 
 async fn save_config_api_proxy_config(
-    req: web::Json<Vec<ApiProxyServerInfo>>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    let mut req_api_proxy = req.0;
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Json(mut req_api_proxy): axum::extract::Json<Vec<ApiProxyServerInfo>>,
+) ->  impl axum::response::IntoResponse + Send {
     for server_info in &mut req_api_proxy {
         if !server_info.is_valid() {
-            return HttpResponse::BadRequest().json(json!({"error": "Invalid content"}));
+            return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid content"}))).into_response();
         }
     }
-    if let Some(api_proxy) = app_state.config.t_api_proxy.write().as_mut() {
+    let mut lock = app_state.config.t_api_proxy.write().await;
+    if let Some(api_proxy) = lock.as_mut() {
         api_proxy.server = req_api_proxy;
         let backup_dir = app_state.config.backup_dir.as_ref().unwrap().as_str();
         if let Some(err) = intern_save_config_api_proxy(backup_dir, api_proxy, app_state.config.t_api_proxy_file_path.as_str()) {
-            return HttpResponse::InternalServerError().json(json!({"error": err.to_string()}));
+            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": err.to_string()}))).into_response();
         }
     }
-    HttpResponse::Ok().finish()
+    axum::http::StatusCode::OK.into_response()
 }
 
+#[axum::debug_handler]
 async fn playlist_update(
-    req: web::Json<Vec<String>>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    let targets = req.0;
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Json(targets): axum::extract::Json<Vec<String>>,
+) ->  impl axum::response::IntoResponse + Send {
     let user_targets = if targets.is_empty() { None } else { Some(targets) };
     let process_targets = validate_targets(user_targets.as_ref(), &app_state.config.sources);
     match process_targets {
         Ok(valid_targets) => {
-            actix_rt::spawn(playlist::exec_processing(Arc::clone(&app_state.http_client), Arc::clone(&app_state.config), Arc::new(valid_targets)));
-            HttpResponse::Ok().finish()
+            tokio::spawn(playlist::exec_processing(Arc::clone(&app_state.http_client), Arc::clone(&app_state.config), Arc::new(valid_targets)));
+            axum::http::StatusCode::OK.into_response()
         }
         Err(err) => {
             error!("Failed playlist update {}", sanitize_sensitive_info(err.to_string().as_str()));
-            HttpResponse::BadRequest().json(json!({"error": err.to_string()}))
+            (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": err.to_string()}))).into_response()
         }
     }
 }
@@ -189,7 +184,7 @@ fn create_config_input_for_xtream(username: &str, password: &str, host: &str) ->
     }
 }
 
-async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInput>, cfg: &Config) -> HttpResponse {
+async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInput>, cfg: &Config) ->  impl axum::response::IntoResponse + Send {
     match cfg_input {
         Some(input) => {
             let (result, errors) =
@@ -199,12 +194,12 @@ async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInp
                 };
             if result.is_empty() {
                 let error_strings: Vec<String> = errors.iter().map(std::string::ToString::to_string).collect();
-                HttpResponse::BadRequest().json(json!({"error": error_strings.join(", ")}))
+                (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": error_strings.join(", ")}))).into_response()
             } else {
-                HttpResponse::Ok().json(result)
+                (axum::http::StatusCode::OK, axum::Json(result)).into_response()
             }
         }
-        None => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
+        None => (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid Arguments"}))).into_response(),
     }
 }
 
@@ -222,7 +217,7 @@ async fn get_categories_content(action: Result<(Option<PathBuf>, Option<String>)
     None
 }
 
-async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Arc<Config>) -> HttpResponse {
+async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Arc<Config>) ->  impl axum::response::IntoResponse + Send {
     if let Some(target) = cfg_target {
         let target_name = &target.name;
         if target.has_output(&TargetType::Xtream) {
@@ -230,9 +225,9 @@ async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Arc<Co
             let vod_categories = get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_VOD)).await;
             let series_categories = get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_SERIES)).await;
 
-            let live_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Live);
-            let vod_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Video);
-            let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
+            let live_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Live).await;
+            let vod_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Video).await;
+            let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series).await;
 
             let live_stream = playlist_iter_to_stream(live_channels);
             let vod_stream = playlist_iter_to_stream(vod_channels);
@@ -254,55 +249,56 @@ async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Arc<Co
                 ])).chain(series_stream).chain(stream::iter(vec![
                     Ok::<Bytes, String>(Bytes::from(r"]}}")),
                 ]));
-            return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(BodyStream::new(json_stream));
+            return (axum::http::StatusCode::OK, axum::body::Body::from_stream(json_stream)).into_response();
         } else if target.has_output(&TargetType::M3u) {
-            return HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"}));
+            return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid Arguments"}))).into_response();
         }
     }
-    HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"}))
+    (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid Arguments"}))).into_response()
 }
 
-async fn playlist(
-    req: web::Json<PlaylistRequest>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    match req.rtype {
+#[axum::debug_handler]
+async fn playlist_content(
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Json(playlist_req): axum::extract::Json<PlaylistRequest>,
+) ->  impl axum::response::IntoResponse + Send {
+    match playlist_req.rtype {
         PlaylistRequestType::Input => {
-            if let Some(source_id) = req.source_id {
-                get_playlist(Arc::clone(&app_state.http_client), app_state.config.get_input_by_id(source_id), &app_state.config).await
+            if let Some(source_id) = playlist_req.source_id {
+                get_playlist(Arc::clone(&app_state.http_client), app_state.config.get_input_by_id(source_id), &app_state.config).await.into_response()
             } else {
-                HttpResponse::BadRequest().json(json!({"error": "Invalid input"}))
+                (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid input"}))).into_response()
             }
         }
         PlaylistRequestType::Target => {
-            if let Some(source_id) = req.source_id {
-                get_playlist_for_target(app_state.config.get_target_by_id(source_id), &app_state.config).await
+            if let Some(source_id) = playlist_req.source_id {
+                get_playlist_for_target(app_state.config.get_target_by_id(source_id), &app_state.config).await.into_response()
             } else {
-                HttpResponse::BadRequest().json(json!({"error": "Invalid target"}))
+                (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid target"}))).into_response()
             }
         }
         PlaylistRequestType::Xtream => {
-            if let (Some(url), Some(username), Some(password)) = (req.url.as_ref(), req.username.as_ref(), req.password.as_ref()) {
+            if let (Some(url), Some(username), Some(password)) = (playlist_req.url.as_ref(), playlist_req.username.as_ref(), playlist_req.password.as_ref()) {
                 let input = create_config_input_for_xtream(username, password, url);
-                get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await
+                get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await.into_response()
             } else {
-                HttpResponse::BadRequest().json(json!({"error": "Invalid url"}))
+                (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid url"}))).into_response()
             }
         }
         PlaylistRequestType::M3U => {
-            if let Some(url) = req.url.as_ref() {
+            if let Some(url) = playlist_req.url.as_ref() {
                 let input = create_config_input_for_m3u(url);
-                get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await
+                get_playlist(Arc::clone(&app_state.http_client), Some(&input), &app_state.config).await.into_response()
             } else {
-                HttpResponse::BadRequest().json(json!({"error": "Invalid url"}))
+                (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid url"}))).into_response()
             }
         }
     }
 }
 
 async fn config(
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+) ->  impl axum::response::IntoResponse + Send {
     let map_input = |i: &ConfigInput| ServerInputConfig {
         id: i.id,
         name: i.name.clone(),
@@ -363,24 +359,27 @@ async fn config(
 
     // if we didn't read it from file then we should use it from app_state
     if result.api_proxy.is_none() {
-        result.api_proxy.clone_from(&*app_state.config.t_api_proxy.read());
+        result.api_proxy.clone_from(&*app_state.config.t_api_proxy.read().await);
     }
 
-    HttpResponse::Ok().json(result)
+    axum::response::Json(result).into_response()
 }
 
-pub fn v1_api_register(web_auth_enabled: bool) -> impl Fn(&mut web::ServiceConfig) {
-    move |cfg: &mut web::ServiceConfig| {
-        user_api_register(cfg);
-        cfg.service(web::scope("/api/v1")
-            .wrap(Condition::new(web_auth_enabled, HttpAuthentication::with_fn(validator_admin)))
-            .route("/config", web::get().to(config))
-            .route("/config/main", web::post().to(save_config_main))
-            .route("/config/user", web::post().to(save_config_api_proxy_user))
-            .route("/config/apiproxy", web::post().to(save_config_api_proxy_config))
-            .route("/playlist", web::post().to(playlist))
-            .route("/playlist/update", web::post().to(playlist_update))
-            .route("/file/download", web::post().to(download_api::queue_download_file))
-            .route("/file/download/info", web::get().to(download_api::download_file_info)));
+pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>) -> axum::Router<Arc<AppState>> {
+    let mut router = axum::Router::new();
+    router = router.route("/config", axum::routing::get(config))
+        .route("/config/main", axum::routing::post(save_config_main))
+        .route("/config/user", axum::routing::post(save_config_api_proxy_user))
+        .route("/config/apiproxy", axum::routing::post(save_config_api_proxy_config))
+        .route("/playlist", axum::routing::post(playlist_content))
+        .route("/playlist/update", axum::routing::post(playlist_update))
+        .route("/file/download", axum::routing::post(download_api::queue_download_file))
+        .route("/file/download/info", axum::routing::get(download_api::download_file_info));
+    if web_auth_enabled {
+        router = router.route_layer(axum::middleware::from_fn_with_state(Arc::clone(&app_state), validator_admin));
     }
+
+    axum::Router::new()
+        .merge(user_api_register(app_state))
+        .nest("/api/v1", router)
 }

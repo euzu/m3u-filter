@@ -84,20 +84,20 @@ impl TargetIdMapping {
     //     }
     // }
 
-    pub fn get_and_update_virtual_id(&mut self, uuid: UUIDType, provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
-        match self.by_uuid.get(&uuid) {
+    pub fn get_and_update_virtual_id(&mut self, uuid: &UUIDType, provider_id: u32, item_type: PlaylistItemType, parent_virtual_id: u32) -> u32 {
+        match self.by_uuid.get(uuid) {
             None => {
                 self.dirty = true;
                 self.virtual_id_counter += 1;
                 let virtual_id = self.virtual_id_counter;
-                let record = VirtualIdRecord::new(provider_id, virtual_id, item_type, parent_virtual_id, uuid);
+                let record = VirtualIdRecord::new(provider_id, virtual_id, item_type, parent_virtual_id, *uuid);
                 self.by_virtual_id.insert(virtual_id, record);
                 self.virtual_id_counter
             }
             Some(virtual_id) => {
                 if let Some(record) = self.by_virtual_id.query(virtual_id) {
                     if record.provider_id == provider_id && (record.item_type != item_type || record.parent_virtual_id != parent_virtual_id) {
-                        let new_record = VirtualIdRecord::new(provider_id, *virtual_id, item_type, parent_virtual_id, uuid);
+                        let new_record = VirtualIdRecord::new(provider_id, *virtual_id, item_type, parent_virtual_id, *uuid);
                         self.by_virtual_id.insert(*virtual_id, new_record);
                         self.dirty = true;
                     }

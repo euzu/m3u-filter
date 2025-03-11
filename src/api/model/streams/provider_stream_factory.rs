@@ -9,7 +9,6 @@ use crate::model::playlist::PlaylistItemType;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::debug_if_enabled;
 use crate::utils::network::request::{classify_content_type, get_request_headers, sanitize_sensitive_info, MimeCategory};
-use actix_web::HttpRequest;
 use bytes::Bytes;
 use futures::stream::{self, BoxStream};
 use futures::{StreamExt, TryStreamExt};
@@ -153,7 +152,7 @@ impl ProviderStreamOptions {
 
 fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Option<usize> {
     // range header looks like  bytes=1234-5566/2345345 or bytes=0-
-    if let Some(req_range) = req_headers.get(actix_web::http::header::RANGE.as_str()) {
+    if let Some(req_range) = req_headers.get(axum::http::header::RANGE.as_str()) {
         if let Some(bytes_range) = req_range.strip_prefix(b"bytes=") {
             if let Some(index) = bytes_range.iter().position(|&x| x == b'-') {
                 let start_bytes = &bytes_range[..index];
@@ -169,13 +168,13 @@ fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Opti
 }
 
 fn get_client_stream_request_params(
-    req: &HttpRequest,
+    req_headers: &HeaderMap,
     input: Option<&ConfigInput>,
     options: &BufferStreamOptions) -> (usize, Option<usize>, bool, HeaderMap)
 {
     let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 1 };
     let filter_header = get_header_filter_for_item_type(options.item_type);
-    let mut req_headers = get_headers_from_request(req, &filter_header);
+    let mut req_headers = get_headers_from_request(req_headers, &filter_header);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
     // we need the range bytes from client request for seek ing to the right position
     let req_range_start_bytes = get_request_range_start_bytes(&req_headers);
@@ -277,7 +276,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
         if !stream_options.should_continue() {
             return None;
         }
-        actix_web::rt::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
     debug_if_enabled!("Stopped reconnecting stream {}", sanitize_sensitive_info(url.as_str()));
     None
@@ -310,17 +309,17 @@ async fn get_initial_stream(cfg: &Config, client: Arc<reqwest::Client>, stream_o
             break;
         }
         connect_err += 1;
-        actix_web::rt::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
     stream_options.cancel_reconnect();
     None
 }
 
 fn create_provider_stream_options(stream_url: &Url,
-                                  req: &HttpRequest,
+                                  req_headers: &HeaderMap,
                                   input: Option<&ConfigInput>,
                                   options: &BufferStreamOptions) -> ProviderStreamOptions {
-    let (buffer_size, req_range_start_bytes, reconnect, headers) = get_client_stream_request_params(req, input, options);
+    let (buffer_size, req_range_start_bytes, reconnect, headers) = get_client_stream_request_params(req_headers, input, options);
     let url = stream_url.clone();
     let range_bytes = Arc::new(req_range_start_bytes.map(AtomicUsize::new));
     let continue_flag = Arc::new(AtomicOnceFlag::new());
@@ -338,10 +337,10 @@ fn create_provider_stream_options(stream_url: &Url,
 pub async fn create_provider_stream(cfg: &Config,
                                     client: Arc<reqwest::Client>,
                                     stream_url: &Url,
-                                    req: &HttpRequest,
+                                    req_headers: &HeaderMap,
                                     input: Option<&ConfigInput>,
                                     options: BufferStreamOptions) -> Option<ProviderStreamFactoryResponse> {
-    let stream_options = create_provider_stream_options(stream_url, req, input, &options);
+    let stream_options = create_provider_stream_options(stream_url, req_headers, input, &options);
 
     let client_stream_factory = |stream, reconnect_flag, range_cnt| {
         let stream = if stream_options.is_buffered() && !options.is_shared_stream() {
@@ -407,7 +406,7 @@ pub async fn create_provider_stream(cfg: &Config,
 //         let req = TestRequest::get().uri("/test").to_request();
 //         let _response = test::call_service(&server, req).await;
 //     }
-//     async fn test_stream_handler(req: HttpRequest) -> HttpResponse {
+//     async fn test_stream_handler(req: axum::http::Request<axum::body::Body>) ->  impl axum::response::IntoResponse + Send {
 //         let cfg = Config::default();
 //         let mut counter = 5;
 //         let client = Arc::new(reqwest::Client::new());

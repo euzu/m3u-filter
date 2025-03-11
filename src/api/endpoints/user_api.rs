@@ -6,18 +6,14 @@ use crate::model::playlist::XtreamCluster;
 use crate::model::playlist_categories::PlaylistBouquetDto;
 use crate::model::xtream::PlaylistXtreamCategory;
 use crate::repository::user_repository::{load_user_bouquet_as_json, save_user_bouquet};
-use crate::repository::{m3u_repository};
-use actix_web::body::BodyStream;
-use actix_web::middleware::Compress;
-use actix_web::{web, HttpResponse};
-use actix_web_httpauth::extractors::bearer::BearerAuth;
-use actix_web_httpauth::middleware::HttpAuthentication;
+use crate::repository::xtream_repository::xtream_get_playlist_categories;
+use crate::repository::m3u_repository;
 use bytes::Bytes;
 use futures::{stream, StreamExt};
 use log::error;
 use std::collections::HashSet;
 use std::sync::Arc;
-use crate::repository::xtream_repository::xtream_get_playlist_categories;
+use axum::response::IntoResponse;
 
 fn get_categories_from_xtream(categories: Option<Vec<PlaylistXtreamCategory>>) -> Vec<String> {
     let mut groups: Vec<String> = Vec::new();
@@ -30,9 +26,9 @@ fn get_categories_from_xtream(categories: Option<Vec<PlaylistXtreamCategory>>) -
 }
 
 
-fn get_categories_from_m3u_playlist(target: &ConfigTarget, config: &Arc<Config>) -> Vec<String> {
+async fn get_categories_from_m3u_playlist(target: &ConfigTarget, config: &Arc<Config>) -> Vec<String> {
     let mut groups = Vec::new();
-    if let Some((_guard, iter)) = m3u_repository::iter_raw_m3u_playlist(config, target) {
+    if let Some((_guard, iter)) = m3u_repository::iter_raw_m3u_playlist(config, target).await {
         let mut unique_groups = HashSet::new();
         for (item, _has_next) in iter {
             if !unique_groups.contains(item.group.as_str()) {
@@ -44,14 +40,15 @@ fn get_categories_from_m3u_playlist(target: &ConfigTarget, config: &Arc<Config>)
     groups
 }
 
+#[axum::debug_handler]
 async fn playlist_categories(
-    credentials: Option<BearerAuth>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    if let Some(username) = get_username_from_auth_header(credentials, &app_state) {
+    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+) -> impl axum::response::IntoResponse + Send {
+    if let Some(username) = get_username_from_auth_header(&token, &app_state) {
         if let Some((user, target)) = get_user_target_by_username(username.as_str(), &app_state).await {
-            if !user.has_permissions(&app_state) {
-                return HttpResponse::Forbidden().finish();
+            if !user.has_permissions(&app_state).await {
+                return axum::http::StatusCode::FORBIDDEN.into_response();
             }
             let config = &app_state.config;
             let target_name = &target.name;
@@ -73,7 +70,7 @@ async fn playlist_categories(
             };
 
             let m3u_stream = if target.has_output(&TargetType::M3u) {
-                let live_categories = get_categories_from_m3u_playlist(target, config);
+                let live_categories = get_categories_from_m3u_playlist(target, config).await;
                 stream::iter(vec![
                     Ok::<Bytes, String>(Bytes::from(r#"{"live": "#)),
                     Ok::<Bytes, String>(Bytes::from(serde_json::to_string(&live_categories).unwrap_or("[]".to_string()))),
@@ -90,27 +87,31 @@ async fn playlist_categories(
                 .chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("}")) }));
 
 
-            return HttpResponse::Ok()
-                .content_type(mime::APPLICATION_JSON)
-                .body(BodyStream::new(json_stream));
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .header("Content-Type", mime::APPLICATION_JSON.to_string())
+                .body(axum::body::Body::from_stream(json_stream))
+                .unwrap()
+                .into_response();
         }
     }
-    HttpResponse::BadRequest().finish()
+    axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
+#[axum::debug_handler]
 async fn save_playlist_bouquet(
-    credentials: Option<BearerAuth>,
-    app_state: web::Data<Arc<AppState>>,
-    req: web::Json<PlaylistBouquetDto>,
-) -> HttpResponse {
-    if let Some(username) = get_username_from_auth_header(credentials, &app_state) {
+    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Json(bouquet): axum::extract::Json<PlaylistBouquetDto>,
+) -> impl axum::response::IntoResponse + Send {
+    if let Some(username) = get_username_from_auth_header(&token, &app_state) {
         if let Some((user, target)) = get_user_target_by_username(username.as_str(), &app_state).await {
-            if !user.has_permissions(&app_state) {
-                return HttpResponse::Forbidden().finish();
+            if !user.has_permissions(&app_state).await {
+                return axum::http::StatusCode::FORBIDDEN.into_response();
             }
-            match save_user_bouquet(&app_state.config, &target.name, &username, &req.0).await {
+            match save_user_bouquet(&app_state.config, &target.name, &username, &bouquet).await {
                 Ok(()) => {
-                    return HttpResponse::Ok().finish();
+                    return axum::http::StatusCode::OK.into_response();
                 }
                 Err(err) => {
                     error!("Saving bouquet for {username} failed: {err}");
@@ -118,33 +119,53 @@ async fn save_playlist_bouquet(
             }
         }
     }
-    HttpResponse::BadRequest().finish()
+    axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
+#[axum::debug_handler]
 async fn playlist_bouquet(
-    credentials: Option<BearerAuth>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    if let Some(username) = get_username_from_auth_header(credentials, &app_state) {
+    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+) -> impl axum::response::IntoResponse + Send {
+    if let Some(username) = get_username_from_auth_header(&token, &app_state) {
         if let Some((user, _target)) = get_user_target_by_username(username.as_str(), &app_state).await {
-            if !user.has_permissions(&app_state) {
-                return HttpResponse::Forbidden().finish();
+            if !user.has_permissions(&app_state).await {
+                return axum::http::StatusCode::FORBIDDEN.into_response();
             }
             let xtream = load_user_bouquet_as_json(&app_state.config, &username, TargetType::Xtream).await;
             let m3u = load_user_bouquet_as_json(&app_state.config, &username, TargetType::M3u).await;
-            return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(
-                format!(r#"{{"xtream": {}, "m3u": {} }}"#, xtream.unwrap_or("null".to_string()), m3u.unwrap_or("null".to_string())));
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .header("Content-Type", mime::APPLICATION_JSON.to_string())
+                .body(axum::body::Body::from(format!(r#"{{"xtream": {}, "m3u": {} }}"#, xtream.unwrap_or("null".to_string()), m3u.unwrap_or("null".to_string()))))
+                .unwrap()
+                .into_response();
         }
     }
-    HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("{}")
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header("Content-Type", mime::APPLICATION_JSON.to_string())
+        .body(axum::body::Body::from("{}"))
+        .unwrap()
+        .into_response()
 }
 
+pub fn user_api_register(app_state: Arc<AppState>) -> axum::Router<Arc<AppState>> {
+    axum::Router::new()
+        .nest(
+            "/api/v1/user",
+            axum::Router::new()
+                .route("/playlist/categories", axum::routing::get(playlist_categories))
+                .route("/playlist/bouquet", axum::routing::get(playlist_bouquet))
+                .route("/playlist/bouquet", axum::routing::post(save_playlist_bouquet))
+                .route_layer(axum::middleware::from_fn_with_state(app_state, validator_user))
+        )
 
-pub fn user_api_register(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/api/v1/user")
-        .wrap(HttpAuthentication::with_fn(validator_user))
-        .wrap(Compress::default())
-        .route("/playlist/categories", web::get().to(playlist_categories))
-        .route("/playlist/bouquet", web::get().to(playlist_bouquet))
-        .route("/playlist/bouquet", web::post().to(save_playlist_bouquet)));
+
+    // cfg.service(web::scope("/api/v1/user")
+    //     .wrap(HttpAuthentication::with_fn(validator_user))
+    //     .wrap(Compress::default())
+    //     .route("/playlist/categories", web::get().to(playlist_categories))
+    //     .route("/playlist/bouquet", web::get().to(playlist_bouquet))
+    //     .route("/playlist/bouquet", web::post().to(save_playlist_bouquet)));
 }

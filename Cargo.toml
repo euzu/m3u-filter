@@ -24,11 +24,10 @@ url = "2.5"
 reqwest = { version = "0", features = ["blocking", "json", "stream", "rustls-tls"] }
 chrono = "0.4"
 cron = "0.15"
-actix-web = "4.9"
-actix-files = "0"
-actix-cors = "0"
-actix-rt = "2.10"
-actix-web-httpauth = "0.8"
+axum = { version = "0" , features = ["macros", "default"]}
+axum-auth = "0"
+tower = "0"
+tower-http = { version = "0", features = ["cors", "auth", "fs"]}
 jsonwebtoken = "9.3"
 rust-argon2 = "2.1"
 futures = "0.3"
@@ -49,13 +48,12 @@ flate2 = "1"
 blake3 = "1.5"
 bytes = "1.10"
 tokio-stream = { version = "0.1", features = ["sync"] }
-tokio = "1.43"
+tokio = { version = "1.43", features = ["rt-multi-thread", "parking_lot", "fs"] }
+tokio-util = "0.7"
 paste = "1.0"
 tempfile = "3.16"
 ruzstd = "0"
 filetime = "0.2"
-parking_lot = "0.12"
-socket2 = "0.5"
 #[cfg(target_os = "macos")]
 libc = "0"
 #[cfg(target_os = "windows")]

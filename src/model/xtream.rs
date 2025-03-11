@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::rc::Rc;
-
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
 use crate::model::config::{Config, XtreamTargetOutput};
 use crate::model::playlist::{PlaylistEntry, PlaylistItem, XtreamCluster, XtreamPlaylistItem};
@@ -79,29 +77,29 @@ fn value_to_string(v: &Value) -> Option<String> {
     }
 }
 
-fn deserialize_as_option_rc_string<'de, D>(deserializer: D) -> Result<Option<Rc<String>>, D::Error>
+fn deserialize_as_option_rc_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let value: Value = Deserialize::deserialize(deserializer)?;
 
     match &value {
-        Value::String(s) => Ok(Some(Rc::new(s.to_owned()))),
-        Value::Number(s) => Ok(Some(Rc::new(s.to_string()))),
+        Value::String(s) => Ok(Some(s.to_owned())),
+        Value::Number(s) => Ok(Some(s.to_string())),
         _ => Ok(None),
     }
 }
 
-fn deserialize_as_rc_string<'de, D>(deserializer: D) -> Result<Rc<String>, D::Error>
+fn deserialize_as_rc_string<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
     let value: Value = Deserialize::deserialize(deserializer)?;
 
     match &value {
-        Value::String(s) => Ok(Rc::new(s.to_owned())),
-        Value::Null => Ok(Rc::new(String::new())),
-        _ => Ok(Rc::new(value.to_string())),
+        Value::String(s) => Ok(s.to_string()),
+        Value::Null => Ok(String::new()),
+        _ => Ok(value.to_string()),
     }
 }
 
@@ -119,9 +117,9 @@ where
 #[derive(Deserialize, Default)]
 pub struct XtreamCategory {
     #[serde(deserialize_with = "deserialize_as_rc_string")]
-    pub category_id: Rc<String>,
+    pub category_id: String,
     #[serde(deserialize_with = "deserialize_as_rc_string")]
-    pub category_name: Rc<String>,
+    pub category_name: String,
     //pub parent_id: i32,
     #[serde(default)]
     pub channels: Vec<PlaylistItem>,
@@ -136,65 +134,65 @@ impl XtreamCategory {
 #[derive(Serialize, Deserialize)]
 pub struct XtreamStream {
     #[serde(default, deserialize_with = "deserialize_as_rc_string")]
-    pub name: Rc<String>,
+    pub name: String,
     #[serde(default, deserialize_with = "deserialize_as_rc_string")]
-    pub category_id: Rc<String>,
+    pub category_id: String,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub stream_id: Option<u32>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub series_id: Option<u32>,
     #[serde(default, deserialize_with = "deserialize_as_rc_string")]
-    pub stream_icon: Rc<String>,
+    pub stream_icon: String,
     #[serde(default, deserialize_with = "deserialize_as_rc_string")]
-    pub direct_source: Rc<String>,
+    pub direct_source: String,
 
     // optional attributes
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub custom_sid: Option<Rc<String>>,
+    pub custom_sid: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_string_array")]
     pub backdrop_path: Option<Vec<String>>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub added: Option<Rc<String>>,
+    pub added: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub cast: Option<Rc<String>>,
+    pub cast: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub container_extension: Option<Rc<String>>,
+    pub container_extension: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub cover: Option<Rc<String>>,
+    pub cover: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub director: Option<Rc<String>>,
+    pub director: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub episode_run_time: Option<Rc<String>>,
+    pub episode_run_time: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub genre: Option<Rc<String>>,
+    pub genre: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub last_modified: Option<Rc<String>>,
+    pub last_modified: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub plot: Option<Rc<String>>,
+    pub plot: Option<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub rating: Option<f64>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub rating_5based: Option<f64>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub release_date: Option<Rc<String>>,
+    pub release_date: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub stream_type: Option<Rc<String>>,
+    pub stream_type: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub title: Option<Rc<String>>,
+    pub title: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub year: Option<Rc<String>>,
+    pub year: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub trailer: Option<Rc<String>>,
+    pub trailer: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub youtube_trailer: Option<Rc<String>>,
+    pub youtube_trailer: Option<String>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub epg_channel_id: Option<Rc<String>>,
+    pub epg_channel_id: Option<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub tv_archive: Option<i32>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub tv_archive_duration: Option<i32>,
     #[serde(default, deserialize_with = "deserialize_as_option_rc_string")]
-    pub tmdb: Option<Rc<String>>,
+    pub tmdb: Option<String>,
     #[serde(default, deserialize_with = "deserialize_number_from_string")]
     pub is_adult: Option<i32>,
 
@@ -561,19 +559,19 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
                 let logo_small_url = if pli.logo_small.is_empty() { String::new() } else { format!("{resource_url}/logo_small") };
                 (Some(resource_url), logo_url, logo_small_url)
             } else {
-                (None, pli.logo.as_ref().clone(), pli.logo_small.as_ref().clone())
+                (None, pli.logo.clone(), pli.logo_small.clone())
             }
         }
         ProxyType::Redirect => {
-            (None, pli.logo.as_ref().clone(), pli.logo_small.as_ref().clone())
+            (None, pli.logo.clone(), pli.logo_small.clone())
         }
     };
     let mut document = serde_json::Map::from_iter([
         ("category_id".to_string(), Value::String(format!("{}", &pli.category_id))),
         ("category_ids".to_string(), Value::Array(Vec::from([Value::Number(serde_json::Number::from(pli.category_id))]))),
-        ("name".to_string(), Value::String(pli.name.as_ref().clone())),
+        ("name".to_string(), Value::String(pli.name.clone())),
         ("num".to_string(), Value::Number(serde_json::Number::from(pli.channel_no))),
-        ("title".to_string(), Value::String(pli.title.as_ref().clone())),
+        ("title".to_string(), Value::String(pli.title.clone())),
         ("stream_icon".to_string(), Value::String(logo)),
     ]);
 
@@ -583,18 +581,18 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
             if options.skip_live_direct_source {
                 document.insert("direct_source".to_string(), Value::String(String::new()));
             } else {
-                document.insert("direct_source".to_string(), Value::String(pli.url.as_ref().clone()));
+                document.insert("direct_source".to_string(), Value::String(pli.url.clone()));
             }
             document.insert("thumbnail".to_string(), Value::String(logo_small));
             document.insert("custom_sid".to_string(), Value::String(String::new()));
-            document.insert("epg_channel_id".to_string(), pli.epg_channel_id.as_ref().map_or(Value::Null, |epg_id| Value::String(epg_id.as_ref().clone())));
+            document.insert("epg_channel_id".to_string(), pli.epg_channel_id.as_ref().map_or(Value::Null, |epg_id| Value::String(epg_id.clone())));
         }
         XtreamCluster::Video => {
             document.insert("stream_id".to_string(), stream_id_value);
             if options.skip_video_direct_source {
                 document.insert("direct_source".to_string(), Value::String(String::new()));
             } else {
-                document.insert("direct_source".to_string(), Value::String(pli.url.as_ref().clone()));
+                document.insert("direct_source".to_string(), Value::String(pli.url.clone()));
             }
             document.insert("custom_sid".to_string(), Value::String(String::new()));
         }

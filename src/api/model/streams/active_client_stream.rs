@@ -17,8 +17,8 @@ pub(in crate::api) struct ActiveClientStream {
 }
 
 impl ActiveClientStream {
-    pub(crate) fn new(inner: ResponseStream, active_clients: Arc<ActiveUserManager>, user: &ProxyUserCredentials, log_active_clients: bool) -> Self {
-        let (client_count, connection_count) = active_clients.add_connection(&user.username);
+    pub(crate) async fn new(inner: ResponseStream, active_clients: Arc<ActiveUserManager>, user: &ProxyUserCredentials, log_active_clients: bool) -> Self {
+        let (client_count, connection_count) = active_clients.add_connection(&user.username).await;
         if log_active_clients {
             info!("Active clients: {client_count}, active connections {connection_count}");
         }
@@ -36,9 +36,16 @@ impl Stream for ActiveClientStream {
 
 impl Drop for ActiveClientStream {
     fn drop(&mut self) {
-        let (client_count, connection_count) = self.active_clients.remove_connection(&self.username);
-        if self.log_active_clients {
-           info!("Active clients: {client_count}, active connections {connection_count}");
-        }
+        let username = self.username.clone();
+        let log_active_clients = self.log_active_clients;
+        let active_clients = Arc::clone(&self.active_clients);
+
+        tokio::spawn(async move {
+            let username = username.clone();
+            let (client_count, connection_count) = active_clients.remove_connection(&username).await;
+            if log_active_clients {
+                info!("Active clients: {client_count}, active connections {connection_count}");
+            }
+        });
     }
 }

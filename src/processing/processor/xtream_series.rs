@@ -52,7 +52,7 @@ fn write_series_episode_record_to_wal_file(
     Ok(())
 }
 
-fn should_update_series_info(pli: &PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
+fn should_update_series_info(pli: &mut PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
     should_update_info(pli, processed_provider_ids, TAG_SERIES_INFO_LAST_MODIFIED)
 }
 
@@ -69,12 +69,18 @@ async fn playlist_resolve_series_info(client: Arc<reqwest::Client>, cfg: &Config
     let mut record_writer = file_writer(&wal_record_file);
     let mut content_updated = false;
 
-    let series_info_iter = fpl.playlistgroups.iter()
+    // TODO merge both filters to one
+    let series_info_count = fpl.playlistgroups.iter()
         .filter(|&plg| plg.xtream_cluster == XtreamCluster::Series)
         .flat_map(|plg| &plg.channels)
-        .filter(|&pli| pli.header.borrow().item_type == PlaylistItemType::SeriesInfo);
+        .filter(|&pli| pli.header.item_type == PlaylistItemType::SeriesInfo).count();
 
-    let series_info_count = series_info_iter.clone().count();
+    let series_info_iter = fpl.playlistgroups.iter_mut()
+        .filter(|plg| plg.xtream_cluster == XtreamCluster::Series)
+        .flat_map(|plg| &mut plg.channels)
+        .filter(|pli| pli.header.item_type == PlaylistItemType::SeriesInfo);
+
+
     info!("Found {series_info_count} series info to resolve");
     let start_time = Instant::now();
     let mut processed_series_info_count = 0;
@@ -160,21 +166,21 @@ async fn process_series_info(
 
         for pli in plg
             .channels
-            .iter()
-            .filter(|pli| pli.header.borrow().item_type == PlaylistItemType::SeriesInfo)
+            .iter_mut()
+            .filter(|pli| pli.header.item_type == PlaylistItemType::SeriesInfo)
         {
-            let Some(provider_id) = pli.header.borrow_mut().get_provider_id() else { continue; };
+            let Some(provider_id) = pli.header.get_provider_id() else { continue; };
             let Ok(content) = info_reader.get(&provider_id)  else { continue; };
             match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(series_content) => {
                     let (group, series_name) = {
-                        let header = pli.header.borrow();
+                        let header = &pli.header;
                         (header.group.clone(), if header.name.is_empty() {header.title.clone()} else { header.name.clone()})
                     };
                     match parse_xtream_series_info(&series_content, &group, &series_name, input) {
-                        Ok(Some(series)) => {
-                            for (episode, pli_episode) in &series {
-                                let Some(provider_id) = &pli_episode.header.borrow_mut().get_provider_id() else { continue; };
+                        Ok(Some(mut series)) => {
+                            for (episode, pli_episode) in &mut series {
+                                let Some(provider_id) = &pli_episode.header.get_provider_id() else { continue; };
                                 handle_error!(write_series_episode_record_to_wal_file(&mut wal_writer, *provider_id, episode),
                                 |err| errors.push(info_err!(format!("Failed to write to series episode wal file: {err}"))));
                             }

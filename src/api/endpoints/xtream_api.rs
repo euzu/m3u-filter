@@ -1,18 +1,19 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
-use crate::api::api_utils::{try_option_bad_request, try_result_bad_request};
+use crate::api::api_utils::{redirect, try_option_bad_request, try_result_bad_request};
 use crate::utils::trace_if_enabled;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::path::Path;
-use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
-use actix_web::{web, HttpRequest, HttpResponse};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::IntoResponse;
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use futures::Stream;
 use log::{debug, error, warn};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use crate::api::api_utils;
 use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, resource_response, separate_number_and_remainder, serve_file, stream_response};
@@ -48,7 +49,7 @@ const TAG_CATEGORY_ID: &str = "category_id";
 const TAG_STREAM_ID: &str = "stream_id";
 const TAG_EPG_LISTINGS: &str = "epg_listings";
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 enum XtreamApiStreamContext {
     LiveAlt,
     Live,
@@ -75,7 +76,7 @@ impl Display for XtreamApiStreamContext {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct XtreamApiStreamRequest<'a> {
     context: XtreamApiStreamContext,
     username: &'a str,
@@ -100,9 +101,9 @@ impl<'a> XtreamApiStreamRequest<'a> {
     }
 }
 
-pub fn serve_query(file_path: &Path, filter: &HashMap<&str, HashSet<String>>) -> HttpResponse {
+pub fn serve_query(file_path: &Path, filter: &HashMap<&str, HashSet<String>>) ->  impl axum::response::IntoResponse + Send {
     let filtered = json_utils::json_filter_file(file_path, filter);
-    HttpResponse::Ok().json(filtered)
+    axum::Json(filtered)
 }
 
 fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStreamContext, action_path: &str, fallback_url: &str) -> Option<String> {
@@ -132,26 +133,26 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStre
     }
 }
 
-fn get_user_info(user: &ProxyUserCredentials, app_state: &AppState) -> XtreamAuthorizationResponse {
-    let server_info = app_state.config.get_user_server_info(user);
-    let active_connections = app_state.get_active_connections_for_user(&user.username);
+async fn get_user_info(user: &ProxyUserCredentials, app_state: &AppState) -> XtreamAuthorizationResponse {
+    let server_info = app_state.config.get_user_server_info(user).await;
+    let active_connections = app_state.get_active_connections_for_user(&user.username).await;
     XtreamAuthorizationResponse::new(&server_info, user, active_connections, app_state.config.user_access_control)
 }
 
 async fn xtream_player_api_stream(
-    req: &HttpRequest,
-    api_req: &web::Query<UserApiRequest>,
-    app_state: &web::Data<Arc<AppState>>,
+    req_headers: &HeaderMap,
+    api_req: &UserApiRequest,
+    app_state: &Arc<AppState>,
     stream_req: XtreamApiStreamRequest<'_>,
-) -> HttpResponse {
+) -> impl axum::response::IntoResponse + Send {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state).await, false, format!("Could not find any user {}", stream_req.username));
-    if !user.has_permissions(app_state) {
-        return HttpResponse::Forbidden().finish();
+    if !user.has_permissions(app_state).await {
+        return axum::http::StatusCode::FORBIDDEN.into_response();
     }
     let target_name = &target.name;
     if !target.has_output(&TargetType::Xtream) {
         debug!("Target has no xtream output {}", target_name);
-        return HttpResponse::BadRequest().finish();
+        return axum::http::StatusCode::BAD_REQUEST.into_response();
     }
     let (action_stream_id, stream_ext) = separate_number_and_remainder(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
@@ -160,7 +161,7 @@ async fn xtream_player_api_stream(
 
     if pli.item_type == PlaylistItemType::LiveHls {
         debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
-        return HttpResponse::Found().insert_header(("Location", pli.url.to_string())).finish();
+        return redirect(&pli.url).into_response();
     }
 
     let is_hls_request = stream_ext.as_deref() == Some(HLS_EXT);
@@ -172,17 +173,17 @@ async fn xtream_player_api_stream(
             let username = input.username.as_ref().map_or("", |v| v);
             let password = input.password.as_ref().map_or("", |v| v);
             let stream_url = format!("{url}/series/{username}/{password}/{}{ext}", mapping.provider_id);
-            return HttpResponse::Found().insert_header(("Location", stream_url)).finish();
+            return redirect(&stream_url).into_response();
         }
 
         let redirect_url = if is_hls_request { &replace_extension(&pli.url, "m3u8") } else { &pli.url };
         debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
-        return HttpResponse::Found().insert_header(("Location", redirect_url.as_str())).finish();
+        return redirect(redirect_url.as_str()).into_response();
     }
 
     // Reverse proxy mode
     if is_hls_request {
-        return handle_hls_stream_request(app_state, &user, &pli, input, TargetType::Xtream).await;
+        return handle_hls_stream_request(app_state, &user, &pli, input, TargetType::Xtream).await.into_response();
     }
 
     let extension = stream_ext.unwrap_or_else(
@@ -200,7 +201,7 @@ async fn xtream_player_api_stream(
         stream_req.context));
 
     trace_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
-    stream_response(app_state, &stream_url, req, Some(input), pli.item_type, target, &user).await
+    stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user).await.into_response()
 }
 
 
@@ -215,18 +216,18 @@ fn get_doc_id_and_field_name(input: &str) -> Option<(u32, &str)> {
     None
 }
 
-fn get_doc_resource_field_value(field: &str, doc: Option<&Value>) -> Option<Rc<String>> {
+fn get_doc_resource_field_value(field: &str, doc: Option<&Value>) -> Option<String> {
     if let Some(Value::Object(info_data)) = doc {
         if field.starts_with(PROP_BACKDROP_PATH) {
             return get_backdrop_path_value(field, info_data.get(PROP_BACKDROP_PATH));
         } else if let Some(Value::String(url)) = info_data.get(field) {
-            return Some(Rc::new(url.to_string()));
+            return Some(url.to_string());
         }
     }
     None
 }
 
-fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<Rc<String>>, serde_json::Error> {
+fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<String>, serde_json::Error> {
     let info_content = match pli.xtream_cluster {
         XtreamCluster::Video => {
             xtream_repository::xtream_load_vod_info(config, target.name.as_str(), pli.get_virtual_id())
@@ -301,7 +302,7 @@ fn get_season_info_doc(doc: &Vec<Value>, season_id: u32) -> Option<&Value> {
 }
 
 
-fn xtream_get_season_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<Rc<String>>, serde_json::Error> {
+fn xtream_get_season_resource_url(config: &Config, pli: &XtreamPlaylistItem, target: &ConfigTarget, resource: &str) -> Result<Option<String>, serde_json::Error> {
     let info_content = match pli.xtream_cluster {
         XtreamCluster::Series => {
             xtream_repository::xtream_load_series_info(config, target.name.as_str(), pli.get_virtual_id())
@@ -330,19 +331,19 @@ fn xtream_get_season_resource_url(config: &Config, pli: &XtreamPlaylistItem, tar
 }
 
 async fn xtream_player_api_resource(
-    req: &HttpRequest,
-    api_req: &web::Query<UserApiRequest>,
-    app_state: &web::Data<Arc<AppState>>,
+    req_headers: &HeaderMap,
+    api_req: &UserApiRequest,
+    app_state: &Arc<AppState>,
     resource_req: XtreamApiStreamRequest<'_>,
-) -> HttpResponse {
+) ->  impl axum::response::IntoResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(resource_req.username, resource_req.password, api_req, app_state).await, false, format!("Could not find any user {}", resource_req.username));
-    if !user.has_permissions(app_state) {
-        return HttpResponse::Forbidden().finish();
+    if !user.has_permissions(app_state).await {
+        return axum::http::StatusCode::FORBIDDEN.into_response();
     }
     let target_name = &target.name;
     if !target.has_output(&TargetType::Xtream) {
         debug!("Target has no xtream output {}", target_name);
-        return HttpResponse::BadRequest().finish();
+        return axum::http::StatusCode::BAD_REQUEST.into_response();
     }
     let virtual_id: u32 = try_result_bad_request!(resource_req.stream_id.trim().parse());
     let resource = resource_req.action_path.trim();
@@ -356,29 +357,15 @@ async fn xtream_player_api_resource(
     };
 
     match stream_url {
-        None => HttpResponse::NotFound().finish(),
+        None => axum::http::StatusCode::NOT_FOUND.into_response(),
         Some(url) => {
             if user.proxy == ProxyType::Redirect {
                 trace_if_enabled!("Redirecting resource request to {}", sanitize_sensitive_info(&url));
-                HttpResponse::Found().insert_header(("Location", url.as_str())).finish()
+                redirect(url.as_str()).into_response()
             } else {
                 trace_if_enabled!("Resource request to {}", sanitize_sensitive_info(&url));
-                resource_response(app_state, url.as_str(), req, None).await
+                resource_response(app_state, url.as_str(), req_headers, None).await.into_response()
             }
-        }
-    }
-}
-
-macro_rules! create_xtream_player_api_stream {
-    ($fn_name:ident, $context:expr) => {
-        async fn $fn_name(
-            req: HttpRequest,
-            api_req: web::Query<UserApiRequest>,
-            path: web::Path<(String, String, String)>,
-            app_state: web::Data<Arc<AppState>>,
-        ) -> HttpResponse {
-            let (username, password, stream_id) = path.into_inner();
-            xtream_player_api_stream(&req, &api_req, &app_state, XtreamApiStreamRequest::from($context, &username, &password, &stream_id, "")).await
         }
     }
 }
@@ -386,13 +373,25 @@ macro_rules! create_xtream_player_api_stream {
 macro_rules! create_xtream_player_api_resource {
     ($fn_name:ident, $context:expr) => {
         async fn $fn_name(
-            req: HttpRequest,
-            api_req: web::Query<UserApiRequest>,
-            path: web::Path<(String, String, String, String)>,
-            app_state: web::Data<Arc<AppState>>,
-        ) -> HttpResponse {
-            let (username, password, stream_id, resource) = path.into_inner();
-            xtream_player_api_resource(&req, &api_req, &app_state, XtreamApiStreamRequest::from($context, &username, &password, &stream_id, &resource)).await
+            axum::extract::Path((username, password, stream_id, resource)): axum::extract::Path<(String, String, String, String)>,
+            axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+            axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
+            req_headers: HeaderMap,
+        ) ->  impl axum::response::IntoResponse {
+            xtream_player_api_resource(&req_headers, &api_req, &app_state, XtreamApiStreamRequest::from($context, &username, &password, &stream_id, &resource)).await.into_response()
+        }
+    }
+}
+
+macro_rules! create_xtream_player_api_stream {
+    ($fn_name:ident, $context:expr) => {
+        async fn $fn_name(
+            axum::extract::Path((username, password, stream_id)): axum::extract::Path<(String, String, String)>,
+            axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+            axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
+            req_headers: HeaderMap,
+        ) ->  impl axum::response::IntoResponse + Send {
+            xtream_player_api_stream(&req_headers, &api_req, &app_state, XtreamApiStreamRequest::from($context, &username, &password, &stream_id, "")).await.into_response()
         }
     }
 }
@@ -416,41 +415,46 @@ fn get_non_empty<'a>(first: &'a str, second: &'a str, third: &'a str) -> &'a str
     }
 }
 
+#[axum::debug_handler]
 async fn xtream_player_api_timeshift_stream(
-    req: HttpRequest,
-    api_query_req: web::Query<UserApiRequest>,
-    api_form_req: web::Form<UserApiRequest>,
-    path: web::Path<(String, String, String, String, String)>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    let (path_username, path_password, path_duration, path_start, path_stream_id) = path.into_inner();
+    req_headers: HeaderMap,
+    axum::extract::Query(api_query_req): axum::extract::Query<UserApiRequest>,
+    axum::extract::Path((path_username, path_password, path_duration, path_start, path_stream_id)): axum::extract::Path<(String, String, String, String, String)>,
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Form(api_form_req): axum::extract::Form<UserApiRequest>,
+) ->  impl axum::response::IntoResponse + Send {
     let username = get_non_empty(&path_username, &api_query_req.username, &api_form_req.username);
     let password = get_non_empty(&path_password, &api_query_req.password, &api_form_req.password);
     let stream_id = get_non_empty(&path_stream_id, &api_query_req.stream, &api_form_req.stream);
     let duration = get_non_empty(&path_duration, &api_query_req.duration, &api_form_req.duration);
     let start = get_non_empty(&path_start, &api_query_req.start, &api_form_req.start);
     let action_path = format!("{duration}/{start}");
-    xtream_player_api_stream(&req, &api_query_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, username, password, stream_id, &action_path)).await
+    xtream_player_api_stream(&req_headers, &api_query_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, username, password, stream_id, &action_path)).await
 }
 
 async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserCredentials,
                                          target: &ConfigTarget, stream_id: &str,
-                                         cluster: XtreamCluster) -> HttpResponse {
+                                         cluster: XtreamCluster) ->  impl axum::response::IntoResponse + Send {
     let virtual_id: u32 = match FromStr::from_str(stream_id) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::BadRequest().finish()
+        Err(_) => return axum::http::StatusCode::BAD_REQUEST.into_response()
     };
 
     if let Ok((pli, virtual_record)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(cluster)) {
         if pli.provider_id > 0 {
-            let input_name = Rc::clone(&pli.input_name);
+            let input_name = &pli.input_name;
             if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
                 if let Some(info_url) = xtream::get_xtream_player_api_info_url(input, cluster, pli.provider_id) {
                     // Redirect is only possible for live streams, vod and series info needs to be modified
                     if user.proxy == ProxyType::Redirect && cluster == XtreamCluster::Live {
-                        return HttpResponse::Found().insert_header(("Location", info_url)).finish();
+                        return redirect(&info_url).into_response();
                     } else if let Ok(content) = xtream::get_xtream_stream_info(Arc::clone(&app_state.http_client), &app_state.config, user, input, target, &pli, info_url.as_str(), cluster).await {
-                        return HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content);
+                        return axum::response::Response::builder()
+                            .status(StatusCode::OK)
+                            .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                            .body(axum::body::Body::from(content))
+                            .unwrap()
+                            .into_response()
                     }
                 }
             }
@@ -459,25 +463,40 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
         return match cluster {
             XtreamCluster::Video => {
                 let content = create_vod_info_from_item(user, &pli, virtual_record.last_updated);
-                HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content)
+                axum::response::Response::builder()
+                    .status(StatusCode::OK)
+                    .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                    .body(axum::body::Body::from(content))
+                    .unwrap()
+                    .into_response()
             }
-            XtreamCluster::Live | XtreamCluster::Series => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("{}"),
+            XtreamCluster::Live | XtreamCluster::Series => axum::response::Response::builder()
+                .status(StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                .body(axum::body::Body::from("{}".as_bytes()))
+                .unwrap()
+                .into_response(),
         };
     }
-    HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("{}")
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+        .body(axum::body::Body::from("{}".as_bytes()))
+        .unwrap()
+        .into_response()
 }
 
-async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials, target: &ConfigTarget, stream_id: &str, limit: &str) -> HttpResponse {
+async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials, target: &ConfigTarget, stream_id: &str, limit: &str) ->  impl axum::response::IntoResponse + Send {
     let target_name = &target.name;
     if target.has_output(&TargetType::Xtream) {
         let virtual_id: u32 = match FromStr::from_str(stream_id.trim()) {
             Ok(id) => id,
-            Err(_) => return HttpResponse::BadRequest().finish()
+            Err(_) => return axum::http::StatusCode::BAD_REQUEST.into_response()
         };
 
         if let Ok((pli, _)) = xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None) {
             if pli.provider_id > 0 {
-                let input_name = Rc::clone(&pli.input_name);
+                let input_name = &pli.input_name;
                 if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
                     if let Some(action_url) = xtream::get_xtream_player_api_action_url(input, ACTION_GET_SHORT_EPG) {
                         let mut info_url = format!("{action_url}&{TAG_STREAM_ID}={}", pli.provider_id);
@@ -485,14 +504,14 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                             info_url = format!("{info_url}&limit={limit}");
                         }
                         if user.proxy == ProxyType::Redirect {
-                            return HttpResponse::Found().insert_header(("Location", info_url)).finish();
+                            return redirect(&info_url).into_response();
                         }
 
                         return match request::download_text_content(Arc::clone(&app_state.http_client), input, info_url.as_str(), None).await {
-                            Ok(content) => HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(content),
+                            Ok(content) => (axum::http::StatusCode::OK, axum::Json(content)).into_response(),
                             Err(err) => {
                                 error!("Failed to download epg {}", sanitize_sensitive_info(err.to_string().as_str()));
-                                get_empty_epg_response()
+                                get_empty_epg_response().into_response()
                             }
                         };
                     }
@@ -501,10 +520,10 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
         }
     }
     warn!("Cant find short epg with id: {target_name}/{stream_id}");
-    get_empty_epg_response()
+    get_empty_epg_response().into_response()
 }
 
-async fn xtream_player_api_handle_content_action(config: &Config, target_name: &str, action: &str, category_id: Option<u32>, user: &ProxyUserCredentials,  req: &HttpRequest) -> Option<HttpResponse> {
+async fn xtream_player_api_handle_content_action(config: &Config, target_name: &str, action: &str, category_id: Option<u32>, user: &ProxyUserCredentials) -> Option<impl IntoResponse> {
     if let Ok((path, content)) = match action {
         ACTION_GET_LIVE_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_LIVE),
         ACTION_GET_VOD_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_VOD),
@@ -520,18 +539,20 @@ async fn xtream_player_api_handle_content_action(config: &Config, target_name: &
                 _ => None
             };
             if let Some(flt) = filter {
-                return Some(serve_query(&file_path, &HashMap::from([(TAG_CATEGORY_ID, flt)])));
+                return Some(serve_query(&file_path, &HashMap::from([(TAG_CATEGORY_ID, flt)])).into_response());
             }
-            return Some(serve_file(&file_path, req, mime::APPLICATION_JSON).await);
+            return Some(serve_file(&file_path, mime::APPLICATION_JSON).await.into_response());
         } else if let Some(payload) = content {
-            return Some(HttpResponse::Ok().body(payload));
+            return Some(axum::response::Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .body(payload).unwrap().into_response());
         }
-        return Some(api_utils::empty_json_list_response());
+        return Some(api_utils::empty_json_list_response().into_response());
     }
     None
 }
 
-async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget, stream_id: &str, start: &str, end: &str) -> HttpResponse {
+async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget, stream_id: &str, start: &str, end: &str) ->  impl axum::response::IntoResponse + Send {
     let virtual_id: u32 = try_result_bad_request!(FromStr::from_str(stream_id));
     let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)));
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()));
@@ -540,29 +561,35 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     let mut doc: Map<String, Value> = try_result_bad_request!(serde_json::from_str(&content));
     let epg_listings = try_option_bad_request!(doc.get_mut(TAG_EPG_LISTINGS).and_then(Value::as_array_mut));
     let target_path = try_option_bad_request!(get_target_storage_path(&app_state.config, target.name.as_str()));
-    let (mut target_id_mapping, file_lock) =  get_target_id_mapping(&app_state.config, &target_path);
+    let (mut target_id_mapping, file_lock) =  get_target_id_mapping(&app_state.config, &target_path).await;
     for epg_list_item in epg_listings.iter_mut().filter_map(Value::as_object_mut) {
         // TODO epg_id
         if let Some(catchup_provider_id) = epg_list_item.get(TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok()) {
             let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &catchup_provider_id.to_string(), pli.item_type, &pli.url);
-            let virtual_id = target_id_mapping.get_and_update_virtual_id(uuid, catchup_provider_id, PlaylistItemType::Catchup, pli.provider_id);
+            let virtual_id = target_id_mapping.get_and_update_virtual_id(&uuid, catchup_provider_id, PlaylistItemType::Catchup, pli.provider_id);
             epg_list_item.insert(TAG_ID.to_string(), Value::String(virtual_id.to_string()));
         }
     }
     if let Err(err) = target_id_mapping.persist() {
         error!("Failed to write catchup id mapping {err}");
-        return HttpResponse::BadRequest().finish();
+        return axum::http::StatusCode::BAD_REQUEST.into_response();
     }
     drop(file_lock);
-    serde_json::to_string(&doc).map_or_else(|_| HttpResponse::BadRequest().finish(), |result| HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body(result))
+    serde_json::to_string(&doc)
+        .map_or_else(
+            |_| axum::http::StatusCode::BAD_REQUEST.into_response(),
+            |result| axum::response::Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                .body(result).unwrap().into_response())
 }
 
 macro_rules! skip_json_response_if_flag_set {
     ($flag:expr, $stmt:expr) => {
         if $flag {
-            return api_utils::empty_json_list_response();
+            return api_utils::empty_json_list_response().into_response();
         }
-        return $stmt;
+        return $stmt.into_response();
     };
 }
 
@@ -577,23 +604,22 @@ macro_rules! skip_flag_optional {
 }
 
 async fn xtream_player_api(
-    req: &HttpRequest,
     api_req: UserApiRequest,
-    app_state: &web::Data<Arc<AppState>>,
-) -> HttpResponse {
+    app_state: &Arc<AppState>,
+) -> impl axum::response::IntoResponse + Send {
     let user_target = get_user_target(&api_req, app_state).await;
     if let Some((user, target)) = user_target {
         if !target.has_output(&TargetType::Xtream) {
-            return HttpResponse::Ok().json(get_user_info(&user, app_state));
+            return axum::response::Json(get_user_info(&user, app_state).await).into_response();
         }
 
         let action = api_req.action.trim();
         if action.is_empty() {
-            return HttpResponse::Ok().json(get_user_info(&user, app_state));
+            return axum::response::Json(get_user_info(&user, app_state).await).into_response();
         }
 
-        if !user.has_permissions(app_state) {
-            return HttpResponse::Forbidden().finish();
+        if !user.has_permissions(app_state).await {
+            return axum::http::StatusCode::FORBIDDEN.into_response();
         }
 
         // Process specific playlist actions
@@ -616,7 +642,7 @@ async fn xtream_player_api(
             ACTION_GET_EPG | ACTION_GET_SHORT_EPG => {
                 return xtream_get_short_epg(
                     app_state, &user, target, api_req.stream_id.trim(), api_req.limit.trim(),
-                ).await;
+                ).await.into_response();
             }
             ACTION_GET_CATCHUP_TABLE => {
                 skip_json_response_if_flag_set!(skip_live, xtream_get_catchup_response(app_state, target, api_req.stream_id.trim(), api_req.start.trim(), api_req.end.trim()).await);
@@ -627,9 +653,9 @@ async fn xtream_player_api(
         let category_id =  api_req.category_id.trim().parse::<u32>().ok();
         // Handle general content actions
         if let Some(response) = xtream_player_api_handle_content_action(
-            &app_state.config, &target.name, action, category_id, &user, req,
+            &app_state.config, &target.name, action, category_id, &user,
         ).await {
-            return response;
+            return response.into_response();
         }
 
         let result = match action {
@@ -649,20 +675,21 @@ async fn xtream_player_api(
                     Ok(xtream_iter) => {
                         // Convert the iterator into a stream of `Bytes`
                         let content_stream = xtream_create_content_stream(xtream_iter);
-                        HttpResponse::Ok()
-                            .content_type(mime::APPLICATION_JSON)
-                            .streaming(content_stream)
+                        axum::response::Response::builder()
+                            .status(axum::http::StatusCode::OK)
+                            .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+                            .body(axum::body::Body::from_stream(content_stream)).unwrap().into_response()
                     }
                     Err(err) => {
                         error!("Failed response for xtream target: {} action: {} error: {}", &target.name, action, err);
                         // Some players fail on NoContent, so we return an empty array
-                        api_utils::empty_json_list_response()
+                        api_utils::empty_json_list_response().into_response()
                     }
                 }
             }
             None => {
                 // Some players fail on NoContent, so we return an empty array
-                api_utils::empty_json_list_response()
+                api_utils::empty_json_list_response().into_response()
             }
         }
     } else {
@@ -671,7 +698,7 @@ async fn xtream_player_api(
             (_, true) => debug!("Parameter action is empty!"),
             _ => debug!("Bad request!"),
         }
-        HttpResponse::BadRequest().finish()
+        axum::http::StatusCode::BAD_REQUEST.into_response()
     }
 }
 
@@ -686,65 +713,90 @@ fn xtream_create_content_stream(xtream_iter: impl Iterator<Item=(String, bool)>)
         })).chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
 }
 
-async fn xtream_player_api_get(req: HttpRequest,
-                               api_req: web::Query<UserApiRequest>,
-                               app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    xtream_player_api(&req, api_req.into_inner(), &app_state).await
+#[axum::debug_handler]
+async fn xtream_player_api_get(
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
+) -> impl axum::response::IntoResponse + Send {
+    xtream_player_api(api_req, &app_state).await
 }
 
-async fn xtream_player_api_post(req: HttpRequest,
-                                api_req: web::Form<UserApiRequest>,
-                                app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    xtream_player_api(&req, api_req.into_inner(), &app_state).await
+// async fn xtream_player_api_get(req: axum::http::Request<axum::body::Body>,
+//                                axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
+//                                axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+// ) ->  impl axum::response::IntoResponse + Send {
+//     xtream_player_api(&req, api_req.into_inner(), &app_state).await
+// }
+#[axum::debug_handler]
+async fn xtream_player_api_post(
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Form(api_req): axum::extract::Form<UserApiRequest>,
+) -> impl axum::response::IntoResponse + Send {
+    xtream_player_api(api_req, &app_state).await
 }
+// async fn xtream_player_api_post(req: axum::http::Request<axum::body::Body>,
+//                                 api_req: web::Form<UserApiRequest>,
+//                                 axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+// ) ->  impl axum::response::IntoResponse + Send {
+//     xtream_player_api(&req, api_req.into_inner(), &app_state).await
+// }
 
 macro_rules! register_xtream_api {
-    ($cfg:expr, [$($path:expr),*]) => {{
+    ($router:expr, [$($path:expr),*]) => {{
+        $router
        $(
-            $cfg.service(web::resource($path).route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)));
+          .route($path, axum::routing::get(xtream_player_api_get))
+          .route($path, axum::routing::post(xtream_player_api_post))
+            // $router.service(web::resource($path).route(web::get().to(xtream_player_api_get)).route(web::post().to(xtream_player_api_post)))
         )*
     }};
 }
 
 macro_rules! register_xtream_api_stream {
-     ($cfg:expr, [$(($path:expr, $fn_name:ident)),*]) => {{
+     ($router:expr, [$(($path:expr, $fn_name:ident)),*]) => {{
+         $router
        $(
-            $cfg.service(web::resource(format!("{}/{{username}}/{{password}}/{{stream_id}}", $path)).route(web::get().to($fn_name)));
+          .route(format!("{}/{{username}}/{{password}}/{{stream_id}}", $path).as_str(), axum::routing::get($fn_name))
+            // $cfg.service(web::resource(format!("{}/{{username}}/{{password}}/{{stream_id}}", $path)).route(web::get().to($fn_name)));
         )*
     }};
 }
 
 macro_rules! register_xtream_api_resource {
-     ($cfg:expr, [$(($path:expr, $fn_name:ident)),*]) => {{
+     ($router:expr, [$(($path:expr, $fn_name:ident)),*]) => {{
+         $router
        $(
-            $cfg.service(web::resource(format!("/resource/{}/{{username}}/{{password}}/{{stream_id}}/{{resource}}", $path)).route(web::get().to($fn_name)));
+           .route(format!("/resource/{}/{{username}}/{{password}}/{{stream_id}}/{{resource}}", $path).as_str(), axum::routing::get($fn_name))
+            // $cfg.service(web::resource(format!("/resource/{}/{{username}}/{{password}}/{{stream_id}}/{{resource}}", $path)).route(web::get().to($fn_name)));
         )*
     }};
 }
 
 macro_rules! register_xtream_api_timeshift {
-     ($cfg:expr, [$($path:expr),*]) => {{
+     ($router:expr, [$($path:expr),*]) => {{
+         $router
        $(
-            $cfg.service(web::resource($path).route(web::get().to(xtream_player_api_timeshift_stream)).route(web::post().to(xtream_player_api_timeshift_stream)));
+          .route($path, axum::routing::get(xtream_player_api_timeshift_stream))
+          .route($path, axum::routing::post(xtream_player_api_timeshift_stream))
+            //$cfg.service(web::resource($path).route(web::get().to(xtream_player_api_timeshift_stream)).route(web::post().to(xtream_player_api_timeshift_stream)));
         )*
     }};
 }
 
-pub fn xtream_api_register(cfg: &mut web::ServiceConfig) {
-    register_xtream_api!(cfg, ["/player_api.php", "/panel_api.php", "/xtream"]);
-    register_xtream_api_stream!(cfg, [
+pub fn xtream_api_register() -> axum::Router<Arc<AppState>> {
+    let router = axum::Router::new();
+    let mut router = register_xtream_api!(router, ["/player_api.php", "/panel_api.php", "/xtream"]);
+    router = register_xtream_api_stream!(router, [
         ("", xtream_player_api_live_stream_alt),
         ("/live", xtream_player_api_live_stream),
         ("/movie", xtream_player_api_movie_stream),
         ("/series", xtream_player_api_series_stream)]);
-    register_xtream_api_timeshift!(cfg, [
+    router = register_xtream_api_timeshift!(router, [
         "/timeshift/{username}/{password}/{duration}/{start}/{stream_id}",
         "/timeshift.php",
         "/streaming/timeshift.php"]);
-    register_xtream_api_resource!(cfg, [
+    register_xtream_api_resource!(router, [
         ("live", xtream_player_api_live_resource),
         ("movie", xtream_player_api_movie_resource),
-        ("series", xtream_player_api_series_resource)]);
+        ("series", xtream_player_api_series_resource)])
 }

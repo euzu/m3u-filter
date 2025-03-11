@@ -1,4 +1,3 @@
-use actix_web::web;
 use serde::de::{self, Deserializer, Unexpected};
 use serde::{Deserialize, Serialize};
 
@@ -41,12 +40,6 @@ pub struct PlaylistRequest {
     pub source_id: Option<u16>,
     #[serde(alias="sourceName")]
     pub source_name: Option<String>,
-}
-
-impl From<web::Json<Self>> for PlaylistRequest {
-    fn from(req: web::Json<Self>) -> Self {
-        req.clone()
-    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]

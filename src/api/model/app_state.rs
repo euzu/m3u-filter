@@ -1,5 +1,5 @@
-use std::sync::{Arc};
-use parking_lot::{Mutex};
+use tokio::sync::{Mutex};
+use std::sync::Arc;
 use crate::api::model::active_provider_manager::ActiveProviderManager;
 use crate::api::model::active_user_manager::ActiveUserManager;
 use crate::api::model::download::DownloadQueue;
@@ -8,6 +8,8 @@ use crate::model::config::{Config};
 use crate::model::hdhomerun_config::HdHomeRunDeviceConfig;
 use crate::tools::lru_cache::LRUResourceCache;
 
+
+#[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
     pub http_client: Arc<reqwest::Client>,
@@ -19,11 +21,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn get_active_connections_for_user(&self, username: &str) -> u32 {
-        self.active_users.user_connections(username)
+    pub async fn get_active_connections_for_user(&self, username: &str) -> u32 {
+        self.active_users.user_connections(username).await
     }
 }
 
+#[derive(Clone)]
 pub struct HdHomerunAppState {
     pub app_state: Arc<AppState>,
     pub device: Arc<HdHomeRunDeviceConfig>,

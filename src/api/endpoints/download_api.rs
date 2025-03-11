@@ -2,7 +2,6 @@ use crate::api::model::app_state::AppState;
 use crate::api::model::download::{DownloadQueue, FileDownload, FileDownloadRequest};
 use crate::model::config::VideoDownloadConfig;
 use crate::utils::network::request;
-use actix_web::{web, HttpResponse};
 use tokio::sync::RwLock;
 use futures::stream::TryStreamExt;
 use log::info;
@@ -12,6 +11,7 @@ use std::io::{Write};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{fs};
+use axum::response::IntoResponse;
 use crate::m3u_filter_error::to_io_error;
 
 async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwest::Client) -> Result<(), String> {
@@ -69,7 +69,7 @@ async fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: 
         let dq = Arc::clone(download_queue);
         match reqwest::Client::builder().default_headers(headers).build() {
             Ok(client) => {
-                actix_rt::spawn(async move {
+                tokio::spawn(async move {
                     loop {
                         if dq.active.read().await.deref().is_some() {
                             match download_file(Arc::clone(&dq.active), &client).await {
@@ -110,41 +110,40 @@ macro_rules! download_info {
 }
 
 pub async fn queue_download_file(
-    req: web::Json<FileDownloadRequest>,
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Json(req): axum::extract::Json<FileDownloadRequest>,
+) ->  impl axum::response::IntoResponse + Send {
     if let Some(download_cfg) = &app_state.config.video.as_ref().unwrap().download {
         if download_cfg.directory.is_none() {
-            return HttpResponse::BadRequest().json(json!({"error": "Server config missing video.download.directory configuration"}));
+            return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Server config missing video.download.directory configuration"}))).into_response();
         }
         match FileDownload::new(req.url.as_str(), req.filename.as_str(), download_cfg) {
             Some(file_download) => {
-                let response = HttpResponse::Ok().json(download_info!(file_download));
-                app_state.downloads.queue.lock().await.push_back(file_download);
+                app_state.downloads.queue.lock().await.push_back(file_download.clone());
                 if app_state.downloads.active.read().await.is_none() {
                     match run_download_queue(download_cfg, &app_state.downloads).await {
                         Ok(()) => {}
-                        Err(err) => return HttpResponse::InternalServerError().json(json!({"error": err})),
+                        Err(err) => return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": err}))).into_response(),
                     }
                 }
-                response
+                axum::Json(download_info!(&file_download)).into_response()
             }
-            None => HttpResponse::BadRequest().json(json!({"error": "Invalid Arguments"})),
+            None => (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid Arguments"}))).into_response(),
         }
     } else {
-        HttpResponse::BadRequest().json(json!({"error": "Server config missing video.download configuration"}))
+        (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Server config missing video.download configuration"}))).into_response()
     }
 }
 
 pub async fn download_file_info(
-    app_state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+) ->  impl axum::response::IntoResponse + Send {
     let finished_list: &[Value] = &app_state.downloads.finished.write().await.drain(..)
         .map(|fd| download_info!(fd)).collect::<Vec<Value>>();
 
-    (*app_state.downloads.active.read().await).as_ref().map_or_else(|| HttpResponse::Ok().json(json!({
+    (*app_state.downloads.active.read().await).as_ref().map_or_else(|| axum::Json(json!({
             "completed": true, "downloads": finished_list
-        })), |file_download| HttpResponse::Ok().json(json!({
+        })), |file_download| axum::Json(json!({
             "completed": false, "downloads": finished_list, "active": download_info!(file_download)
         })))
 }

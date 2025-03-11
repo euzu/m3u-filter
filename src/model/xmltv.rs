@@ -1,7 +1,6 @@
 use std::collections::{HashMap};
 use std::path::PathBuf;
-use std::rc::Rc;
-
+use std::sync::Arc;
 use quick_xml::{Error, Writer};
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 
@@ -17,8 +16,8 @@ pub const EPG_ATTRIB_CHANNEL: &str = "channel";
 pub struct XmlTag {
     pub name: String,
     pub value: Option<String>,
-    pub attributes: Option<Rc<HashMap<String, String>>>,
-    pub children: Option<Vec<Rc<XmlTag>>>,
+    pub attributes: Option<Arc<HashMap<String, String>>>,
+    pub children: Option<Vec<Arc<XmlTag>>>,
 }
 
 impl XmlTag {
@@ -45,7 +44,7 @@ impl XmlTag {
 
 #[derive(Debug, Clone)]
 pub struct Epg {
-    pub attributes: Option<Rc<HashMap<String, String>>>,
+    pub attributes: Option<Arc<HashMap<String, String>>>,
     pub children: Vec<XmlTag>,
 }
 

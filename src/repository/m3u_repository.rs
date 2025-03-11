@@ -58,7 +58,7 @@ pub async fn m3u_write_playlist( cfg: &Config, target: &ConfigTarget, target_out
         let (m3u_path, idx_path) = m3u_get_file_paths(target_path);
         let m3u_playlist = new_playlist.iter()
             .flat_map(|pg| &pg.channels)
-            .filter(|&pli| pli.header.borrow().item_type != PlaylistItemType::SeriesInfo)
+            .filter(|&pli| pli.header.item_type != PlaylistItemType::SeriesInfo)
             .map(PlaylistItem::to_m3u).collect::<Vec<M3uPlaylistItem>>();
 
         persist_m3u_playlist_as_text(cfg, target, target_output, &m3u_playlist);
@@ -101,13 +101,13 @@ pub async fn m3u_get_item_for_stream_id(stream_id: u32, cfg: &Config, target: &C
     }
 }
 
-pub fn iter_raw_m3u_playlist(config: &Arc<Config>, target: &ConfigTarget) -> Option<(FileReadGuard, impl Iterator<Item=(M3uPlaylistItem, bool)>)> {
+pub async fn iter_raw_m3u_playlist(config: &Arc<Config>, target: &ConfigTarget) -> Option<(FileReadGuard, impl Iterator<Item=(M3uPlaylistItem, bool)>)> {
     let target_path = get_target_storage_path(config, target.name.as_str())?;
     let (m3u_path, idx_path) = m3u_get_file_paths(&target_path);
     if !m3u_path.exists() || !idx_path.exists() {
         return None;
     }
-    let file_lock = config.file_locks.read_lock(&m3u_path);
+    let file_lock = config.file_locks.read_lock(&m3u_path).await;
     match IndexedDocumentIterator::<u32, M3uPlaylistItem>::new(&m3u_path, &idx_path)
         .map_err(|err| info_err!(format!("Could not deserialize file {m3u_path:?} - {err}"))) {
         Ok(reader) => Some((file_lock, reader)),

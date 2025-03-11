@@ -172,7 +172,7 @@ impl ProxyUserCredentials {
         Ok(())
     }
 
-    pub fn has_permissions(&self, app_state: &AppState) -> bool {
+    pub async fn has_permissions(&self, app_state: &AppState) -> bool {
         if app_state.config.user_access_control {
             if let Some(exp_date) = self.exp_date.as_ref() {
                 let now = Local::now();
@@ -182,7 +182,7 @@ impl ProxyUserCredentials {
                 }
             }
             if let Some(max_connections) = self.max_connections.as_ref() {
-                if *max_connections < app_state.get_active_connections_for_user(&self.username) {
+                if *max_connections < app_state.get_active_connections_for_user(&self.username).await {
                     debug!("User access denied, too many connections: {}", self.username);
                     return false;
                 }

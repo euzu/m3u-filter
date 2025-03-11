@@ -5,16 +5,13 @@ use crate::model::config::{ConfigInput, ConfigRename};
 use crate::utils::network::epg;
 use crate::utils::network::m3u;
 use crate::utils::network::xtream;
-use parking_lot::Mutex;
 use core::cmp::Ordering;
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc};
+use tokio::sync::Mutex;
 use std::thread;
 
-use actix_rt::System;
 use log::{debug, error, info, log_enabled, trace, warn, Level};
 use std::time::Instant;
 use unidecode::unidecode;
@@ -37,7 +34,7 @@ use crate::utils::default_utils::default_as_default;
 use crate::utils::{debug_if_enabled};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
-    let provider = ValueProvider { pli: RefCell::new(pli) };
+    let provider = ValueProvider { pli };
     target.filter(&provider)
 }
 
@@ -62,8 +59,8 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
 }
 
 fn playlistgroup_comparator(a: &PlaylistGroup, b: &PlaylistGroup, group_sort: &ConfigSortGroup, match_as_ascii: bool) -> Ordering {
-    let value_a = if match_as_ascii { Rc::new(unidecode(&a.title)) } else { Rc::clone(&a.title) };
-    let value_b = if match_as_ascii { Rc::new(unidecode(&b.title)) } else { Rc::clone(&b.title) };
+    let value_a = if match_as_ascii { unidecode(&a.title) } else { a.title.to_string() };
+    let value_b = if match_as_ascii { unidecode(&b.title) } else { b.title.to_string() };
     let ordering = value_a.partial_cmp(&value_b).unwrap();
     match group_sort.order {
         Asc => ordering,
@@ -74,8 +71,8 @@ fn playlistgroup_comparator(a: &PlaylistGroup, b: &PlaylistGroup, group_sort: &C
 fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &ConfigSortChannel, match_as_ascii: bool) -> Ordering {
     let raw_value_a = get_field_value(a, &channel_sort.field);
     let raw_value_b = get_field_value(b, &channel_sort.field);
-    let value_a = if match_as_ascii { Rc::new(unidecode(&raw_value_a)) } else { raw_value_a };
-    let value_b = if match_as_ascii { Rc::new(unidecode(&raw_value_b)) } else { raw_value_b };
+    let value_a = if match_as_ascii { unidecode(&raw_value_a) } else { raw_value_a };
+    let value_b = if match_as_ascii { unidecode(&raw_value_b) } else { raw_value_b };
     channel_sort.sequence.as_ref().map_or_else(|| {
         let ordering = value_a.partial_cmp(&value_b).unwrap();
         match channel_sort.order {
@@ -84,8 +81,8 @@ fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &Co
         }
     }, |custom_order| {
         // Check indices in the custom order vector
-        let index_a = custom_order.iter().position(|s| s == value_a.as_ref());
-        let index_b = custom_order.iter().position(|s| s == value_b.as_ref());
+        let index_a = custom_order.iter().position(|s| s == &value_a);
+        let index_b = custom_order.iter().position(|s| s == &value_b);
 
         match (index_a, index_b) {
             (Some(idx_a), Some(idx_b)) => {
@@ -122,7 +119,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
             for channel_sort in channel_sorts {
                 let regexp = channel_sort.re.as_ref().unwrap();
                 for group in new_playlist.iter_mut() {
-                    let group_title = if match_as_ascii { Rc::new(unidecode(&group.title)) } else { Rc::clone(&group.title) };
+                    let group_title = if match_as_ascii { unidecode(&group.title) } else { group.title.to_string() };
                     if regexp.is_match(group_title.as_str()) {
                         group.channels.sort_by(|chan1, chan2| playlistitem_comparator(chan1, chan2, channel_sort, match_as_ascii));
                     }
@@ -132,17 +129,17 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
     }
 }
 
-fn channel_no_playlist(new_playlist: &[PlaylistGroup]) {
+fn channel_no_playlist(new_playlist: &mut [PlaylistGroup]) {
     let mut chno = 1;
     for group in new_playlist {
-        for chan in &group.channels {
-            chan.header.borrow_mut().chno = Rc::new(chno.to_string());
+        for chan in &mut group.channels {
+            chan.header.chno = chno.to_string();
             chno += 1;
         }
     }
 }
 
-fn exec_rename(pli: &PlaylistItem, rename: Option<&Vec<ConfigRename>>) {
+fn exec_rename(pli: &mut PlaylistItem, rename: Option<&Vec<ConfigRename>>) {
     if let Some(renames) = rename {
         if !renames.is_empty() {
             let result = pli;
@@ -153,7 +150,7 @@ fn exec_rename(pli: &PlaylistItem, rename: Option<&Vec<ConfigRename>>) {
                     debug_if_enabled!("Renamed {}={} to {}", &r.field, value, cap);
                 }
                 let value = cap.into_owned();
-                set_field_value(result, &r.field, Rc::new(value));
+                set_field_value(result, &r.field, value);
             }
         }
     }
@@ -170,7 +167,7 @@ fn rename_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
                         if matches!(r.field, ItemField::Group) {
                             let cap = r.re.as_ref().unwrap().replace_all(&grp.title, &r.new_name);
                             debug_if_enabled!("Renamed group {} to {} for {}", &grp.title, cap, target.name);
-                            grp.title = Rc::new(cap.into_owned());
+                            grp.title = cap.into_owned();
                         }
                     }
 
@@ -193,19 +190,20 @@ macro_rules! apply_pattern {
     }};
 }
 
-fn map_channel(channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
+fn map_channel(mut channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
     if !mapping.mapper.is_empty() {
-        let header = channel.header.borrow();
-        let channel_name = if mapping.match_as_ascii { Rc::new(unidecode(&header.name)) } else { header.name.clone() };
+        let header = &channel.header;
+        let channel_name = if mapping.match_as_ascii { unidecode(&header.name) } else { header.name.to_string() };
         if mapping.match_as_ascii && log_enabled!(Level::Trace) { trace!("Decoded {} for matching to {}", &header.name, &channel_name); };
-        drop(header);
-        let ref_chan = RefCell::new(&channel);
-        let provider = ValueProvider { pli: ref_chan.clone() };
+        // let ref_chan = &mut channel;
+        let ref_chan = &mut channel;
         let mut mock_processor = MockValueProcessor {};
         for m in &mapping.mapper {
-            let mut processor = MappingValueProcessor { pli: ref_chan.clone(), mapper: m };
+            let provider = ValueProvider { pli:  &ref_chan.clone() };
+            let mut processor = MappingValueProcessor { pli: ref_chan, mapper: m };
             match &m.t_filter {
                 Some(filter) => {
+
                     if filter.filter(&provider, &mut mock_processor) {
                         apply_pattern!(&m.t_pattern, &provider, &mut processor);
                     }
@@ -235,15 +233,15 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
         let mut grp_id: u32 = 0;
         for playlist_group in new_playlist {
             for channel in &playlist_group.channels {
-                let cluster = &channel.header.borrow().xtream_cluster;
-                let title = &channel.header.borrow().group;
+                let cluster = &channel.header.xtream_cluster;
+                let title = &channel.header.group;
                 if let Some(grp) = new_groups.iter_mut().find(|x| *x.title == **title) {
                     grp.channels.push(channel.clone());
                 } else {
                     grp_id += 1;
                     new_groups.push(PlaylistGroup {
                         id: grp_id,
-                        title: Rc::clone(title),
+                        title: title.to_string(),
                         channels: vec![channel.clone()],
                         xtream_cluster: *cluster,
                     });
@@ -256,29 +254,29 @@ fn map_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Option
     }
 }
 
-fn map_playlist_counter(target: &ConfigTarget, playlist: &[PlaylistGroup]) {
+fn map_playlist_counter(target: &ConfigTarget, playlist: &mut [PlaylistGroup]) {
     if target.t_mapping.is_some() {
         let mut mock_processor = MockValueProcessor {};
         let mappings = target.t_mapping.as_ref().unwrap();
         for mapping in mappings {
             if let Some(counter_list) = &mapping.t_counter {
                 for counter in counter_list {
-                    for plg in playlist {
-                        for channel in &plg.channels {
-                            let provider = ValueProvider { pli: RefCell::new(channel) };
+                    for plg in &mut *playlist {
+                        for channel in &mut plg.channels {
+                            let provider = ValueProvider { pli: channel };
                             if counter.filter.filter(&provider, &mut mock_processor) {
                                 let cntval = counter.value.load(core::sync::atomic::Ordering::SeqCst);
                                 let new_value = if counter.modifier == CounterModifier::Assign {
                                     cntval.to_string()
                                 } else {
-                                    let value = channel.header.borrow_mut().get_field(&counter.field).map_or_else(String::new, |field_value| field_value.to_string());
+                                    let value = channel.header.get_field(&counter.field).map_or_else(String::new, |field_value| field_value.to_string());
                                     if counter.modifier == CounterModifier::Suffix {
                                         format!("{value}{}{cntval}", counter.concat)
                                     } else {
                                         format!("{cntval}{}{value}", counter.concat)
                                     }
                                 };
-                                channel.header.borrow_mut().set_field(&counter.field, new_value.as_str());
+                                channel.header.set_field(&counter.field, new_value.as_str());
                                 counter.value.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
                             }
                         }
@@ -401,7 +399,7 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
     for (index, _) in config.sources.iter().enumerate() {
         // We're using the file lock this way on purpose
         let source_lock_path = PathBuf::from(format!("source_{index}"));
-        let Ok(update_lock) = config.file_locks.try_write_lock(&source_lock_path) else {
+        let Ok(update_lock) = config.file_locks.try_write_lock(&source_lock_path).await else {
             warn!("The update operation for the source at index {index} was skipped because an update is already in progress.");
             continue;
         };
@@ -414,11 +412,13 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
             let http_client = Arc::clone(&client);
             let handles = &mut handle_list;
             let process = move || {
-                System::new().block_on(async {
+                // TODO better way ?
+                let rt  = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
                     let (input_stats, target_stats, mut res_errors) = process_source(Arc::clone(&http_client), cfg, index, usr_trgts).await;
-                    shared_errors.lock().append(&mut res_errors);
+                    shared_errors.lock().await.append(&mut res_errors);
                     let process_stats = SourceStats::new(input_stats, target_stats);
-                    shared_stats.lock().push(process_stats);
+                    shared_stats.lock().await.push(process_stats);
                 });
             };
             handles.push(thread::spawn(process));
@@ -427,9 +427,9 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
             }
         } else {
             let (input_stats, target_stats, mut res_errors) = process_source(Arc::clone(&client), cfg, index, usr_trgts).await;
-            shared_errors.lock().append(&mut res_errors);
+            shared_errors.lock().await.append(&mut res_errors);
             let process_stats = SourceStats::new(input_stats, target_stats);
-            shared_stats.lock().push(process_stats);
+            shared_stats.lock().await.push(process_stats);
         }
         drop(update_lock);
     }
@@ -482,9 +482,9 @@ fn execute_pipe<'a>(target: &ConfigTarget, pipe: &ProcessingPipe, fpl: &FetchedP
 fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
     let mut sort_order: Vec<PlaylistGroup> = vec![];
     let mut idx: usize = 0;
-    let mut group_map: HashMap<(Rc<String>, XtreamCluster), usize> = HashMap::new();
+    let mut group_map: HashMap<(String, XtreamCluster), usize> = HashMap::new();
     for group in playlistgroups {
-        let key = (Rc::clone(&group.title), group.xtream_cluster);
+        let key = (group.title.to_string(), group.xtream_cluster);
         match group_map.entry(key) {
             std::collections::hash_map::Entry::Vacant(v) => {
                 v.insert(idx);
@@ -513,7 +513,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     for provider_fpl in playlists.iter_mut() {
         let mut processed_fpl = execute_pipe(target, &pipe, provider_fpl, &mut duplicates);
         playlist_resolve_series(Arc::clone(&client), cfg, target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
-        playlist_resolve_vod(Arc::clone(&client), cfg, target, errors, &processed_fpl).await;
+        playlist_resolve_vod(Arc::clone(&client), cfg, target, errors, &mut processed_fpl).await;
         // stats
         let input_stats = stats.get_mut(&processed_fpl.input.name);
         if let Some(stat) = input_stats {
@@ -535,7 +535,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     for mut fp in processed_fetched_playlists {
         // collect all epg_channel ids
         let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
-            .filter_map(|c| c.header.borrow().epg_channel_id.clone()).collect();
+            .filter_map(|c| c.header.epg_channel_id.clone()).collect();
 
         new_playlist.append(&mut fp.playlistgroups);
         if epg_channel_ids.is_empty() {
@@ -554,8 +554,8 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     } else {
         let mut flat_new_playlist = flatten_groups(new_playlist);
         sort_playlist(target, &mut flat_new_playlist);
-        channel_no_playlist(&flat_new_playlist);
-        map_playlist_counter(target, &flat_new_playlist);
+        channel_no_playlist(&mut flat_new_playlist);
+        map_playlist_counter(target, &mut flat_new_playlist);
         process_watch(target, cfg, &flat_new_playlist);
         persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg).await
     }

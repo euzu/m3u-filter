@@ -1,34 +1,32 @@
-use actix_cors::Cors;
-use actix_web::middleware::Logger;
-use actix_web::web::Data;
-use actix_web::{web, App, HttpResponse, HttpServer};
-use parking_lot::{Mutex as PlMutex};
-use log::{error, info};
-use std::io::ErrorKind;
-use std::path::PathBuf;
-use std::sync::Arc;
-use chrono::{DateTime, Utc};
-use mime::APPLICATION_JSON;
+use crate::api::endpoints::hdhomerun_api::hdhr_api_register;
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
-use crate::api::model::app_state::{AppState, HdHomerunAppState};
-use crate::api::model::download::DownloadQueue;
-use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
-use crate::api::scheduler::start_scheduler;
 use crate::api::endpoints::v1_api::v1_api_register;
 use crate::api::endpoints::web_index::index_register;
 use crate::api::endpoints::xmltv_api::xmltv_api_register;
 use crate::api::endpoints::xtream_api::xtream_api_register;
+use crate::api::model::active_provider_manager::ActiveProviderManager;
 use crate::api::model::active_user_manager::ActiveUserManager;
+use crate::api::model::app_state::{AppState, HdHomerunAppState};
+use crate::api::model::download::DownloadQueue;
+use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
+use crate::api::scheduler::start_scheduler;
 use crate::model::config::{validate_targets, Config, ProcessTargets, ScheduleConfig};
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::processor::playlist;
-use crate::tools::lru_cache::{LRUResourceCache};
+use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::size_utils::human_readable_byte_size;
 use crate::utils::sys_utils;
 use crate::{BUILD_TIMESTAMP, VERSION};
-use crate::api::endpoints::hdhomerun_api::{hdhr_api_register};
-use crate::api::model::active_provider_manager::ActiveProviderManager;
+use axum::response::IntoResponse;
+use chrono::{DateTime, Utc};
+use log::{error, info};
+use std::io::ErrorKind;
+use std::path::PathBuf;
+use std::sync::Arc;
+use axum::debug_handler;
+use tokio::sync::Mutex;
+use std::future::IntoFuture;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
@@ -40,12 +38,17 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
     Ok(web_dir_path)
 }
 
-fn create_healthcheck(app_state: &web::Data<Arc<AppState>>) -> Healthcheck {
+async fn create_healthcheck(app_state: &Arc<AppState>) -> Healthcheck {
     let server_time = chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string();
-    let cache = app_state.cache.as_ref().as_ref().map(|c| c.lock().get_size_text());
-    let (active_clients, active_connections) =  {
+    let cache = match app_state.cache.as_ref().as_ref() {
+        None => None,
+        Some(lock) => {
+            Some(lock.lock().await.get_size_text())
+        }
+    };
+    let (active_clients, active_connections) = {
         let active_user = &app_state.active_users;
-        (active_user.active_users(), active_user.active_connections())
+        (active_user.active_users().await, active_user.active_connections().await)
     };
     let build_time: Option<String> = BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string());
     Healthcheck {
@@ -60,27 +63,29 @@ fn create_healthcheck(app_state: &web::Data<Arc<AppState>>) -> Healthcheck {
     }
 }
 
-async fn healthcheck(app_state: web::Data<Arc<AppState>>,) -> HttpResponse {
-    HttpResponse::Ok().json(create_healthcheck(&app_state))
+#[debug_handler]
+async fn healthcheck(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> impl axum::response::IntoResponse {
+    axum::Json(create_healthcheck(&app_state).await)
 }
 
-async fn status(app_state: web::Data<Arc<AppState>>,) -> HttpResponse {
-    let status = create_healthcheck(&app_state);
+async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> impl axum::response::IntoResponse {
+    let status = create_healthcheck(&app_state).await;
     match serde_json::to_string_pretty(&status) {
-        Ok(pretty_json) => HttpResponse::Ok().content_type(APPLICATION_JSON).body(pretty_json),
-        Err(_) => HttpResponse::Ok().json(status),
+        Ok(pretty_json) => axum::response::Response::builder().status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string()).body(pretty_json).unwrap().into_response(),
+        Err(_) => axum::Json(status).into_response(),
     }
 }
 
 fn create_shared_data(cfg: &Arc<Config>) -> AppState {
-    let lru_cache = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()).and_then(|c| if c.enabled  {
-        Some(PlMutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
-    } else { None} );
+    let lru_cache = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()).and_then(|c| if c.enabled {
+        Some(Mutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
+    } else { None });
     let cache = Arc::new(lru_cache);
     let cache_scanner = Arc::clone(&cache);
-    actix_rt::spawn(async move {
+    tokio::spawn(async move {
         if let Some(m) = cache_scanner.as_ref() {
-            let mut c = m.lock();
+            let mut c = m.lock().await;
             if let Err(err) = (*c).scan() {
                 error!("Failed to scan cache {err}");
             }
@@ -102,7 +107,7 @@ fn exec_update_on_boot(client: Arc<reqwest::Client>, cfg: &Arc<Config>, targets:
     if cfg.update_on_boot {
         let cfg_clone = Arc::clone(cfg);
         let targets_clone = Arc::clone(targets);
-        actix_rt::spawn(
+        tokio::spawn(
             async move { playlist::exec_processing(client, cfg_clone, targets_clone).await }
         );
     }
@@ -145,7 +150,7 @@ fn exec_scheduler(client: &Arc<reqwest::Client>, cfg: &Arc<Config>, targets: &Ar
         let exec_targets = get_process_targets(cfg, targets, schedule.targets.as_ref());
         let cfg_clone = Arc::clone(cfg);
         let http_client = Arc::clone(client);
-        actix_rt::spawn(async move {
+        tokio::spawn(async move {
             start_scheduler(http_client, expression.as_str(), cfg_clone, exec_targets).await;
         });
     }
@@ -171,22 +176,32 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
                     let port = device.port;
                     let device_clone = Arc::new(device.clone());
                     infos.push(format!("HdHomeRun Server '{}' running: http://{host}:{port}", device.name));
-                    actix_rt::spawn(async move {
-                        HttpServer::new(move || {
-                            App::new()
-                                .wrap(Logger::default())
-                                .wrap(Cors::default()
-                                    .supports_credentials()
-                                    .allow_any_origin()
-                                    .allowed_methods(vec!["GET", "POST", "OPTIONS", "HEAD"])
-                                    .allow_any_header()
-                                    .max_age(3600))
-                                .app_data(Data::new(HdHomerunAppState {
-                                    app_state: Arc::clone(&app_data),
-                                    device: Arc::clone(&device_clone),
-                                }))
-                                .configure(hdhr_api_register)
-                        }).bind(format!("{}:{port}", app_host.clone()))?.run().await
+                    tokio::spawn(async move {
+                        let cors = tower_http::cors::CorsLayer::new()
+                            // .allow_credentials(true)
+                            .allow_origin(tower_http::cors::Any)
+                            .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::OPTIONS, axum::http::Method::HEAD])
+                            .allow_headers(tower_http::cors::Any)
+                            .max_age(std::time::Duration::from_secs(3600));
+
+                        let router = axum::Router::<Arc<HdHomerunAppState>>::new()
+                            .layer(cors)
+                            // .layer(TraceLayer::new_for_http()) // `Logger::default()`
+                            .merge(hdhr_api_register());
+
+                        let router: axum::Router<()> = router.with_state(Arc::new(HdHomerunAppState {
+                            app_state: Arc::clone(&app_data),
+                            device: Arc::clone(&device_clone),
+                        }));
+
+                        match tokio::net::TcpListener::bind(format!("{}:{}", app_host.clone(), port)).await {
+                            Ok(listener) => {
+                                if let Err(err) = axum::serve(listener, router).into_future().await {
+                                    error!("{err}");
+                                }
+                            },
+                            Err(err) =>  error!("{err}"),
+                        }
                     });
                 }
             }
@@ -194,7 +209,6 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
     }
 }
 
-#[actix_web::main]
 pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> futures::io::Result<()> {
     let mut infos = Vec::new();
     let host = cfg.api.host.to_string();
@@ -208,13 +222,13 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         infos.push(format!("Web root: {:?}", &web_dir_path));
     }
     let app_state = Arc::new(create_shared_data(&cfg));
-    let shared_data = Data::new(Arc::clone(&app_state));
+    let shared_data = Arc::clone(&app_state);
 
     exec_scheduler(&Arc::clone(&shared_data.http_client), &cfg, &targets);
     exec_update_on_boot(Arc::clone(&shared_data.http_client), &cfg, &targets);
     let web_auth_enabled = is_web_auth_enabled(&cfg, web_ui_enabled);
 
-    if cfg.t_api_proxy.read().is_some() {
+    if cfg.t_api_proxy.read().await.is_some() {
         start_hdhomerun(&cfg, &app_state, &mut infos);
     }
 
@@ -222,34 +236,66 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     for info in &infos {
         info!("{info}");
     }
+
     // Web Server
-    HttpServer::new(move || {
-        App::new()
-            .wrap(Logger::default())
-            .wrap(Cors::default()
-                .supports_credentials()
-                .allow_any_origin()
-                .allowed_methods(vec!["GET", "POST", "OPTIONS", "HEAD"])
-                .allow_any_header()
-                .max_age(3600))
-            .app_data(shared_data.clone())
-            // .wrap(Condition::new(web_auth_enabled, ErrorHandlers::new().handler(StatusCode::UNAUTHORIZED, handle_unauthorized)))
-            .configure(|srvcfg| {
-                if web_ui_enabled {
-                    srvcfg.service(actix_files::Files::new("/static", web_dir_path.join("static")));
-                    srvcfg.configure(v1_api_register(web_auth_enabled));
-                }
-                srvcfg.service(web::resource("/healthcheck").route(web::get().to(healthcheck)));
-                srvcfg.service(web::resource("/status").route(web::get().to(status)));
-            })
-            .configure(xtream_api_register)
-            .configure(m3u_api_register)
-            .configure(xmltv_api_register)
-            .configure(hls_api_register)
-            .configure(|srvcfg| {
-                if web_ui_enabled {
-                    srvcfg.configure(index_register(&web_dir_path));
-                }
-            })
-    }).bind(format!("{host}:{port}"))?.run().await
+    let cors = tower_http::cors::CorsLayer::new()
+        // .allow_credentials(true)
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::OPTIONS, axum::http::Method::HEAD])
+        .allow_headers(tower_http::cors::Any)
+        .max_age(std::time::Duration::from_secs(3600));
+
+    let mut router = axum::Router::new()
+        .layer(cors)
+        // .layer(TraceLayer::new_for_http()) // `Logger::default()`
+        .route("/healthcheck", axum::routing::get(healthcheck))
+        .route("/status", axum::routing::get(status));
+    if web_ui_enabled {
+        router = router
+            .nest_service("/static", tower_http::services::ServeDir::new(web_dir_path.join("static")))
+            .merge(v1_api_register(web_auth_enabled, Arc::clone(&shared_data)));
+    }
+    router = router
+        .merge(xtream_api_register())
+        .merge(m3u_api_register())
+        .merge(xmltv_api_register())
+        .merge(hls_api_register());
+
+    if web_ui_enabled {
+        router = router.merge(index_register(&web_dir_path));
+    }
+
+    let router: axum::Router<()> = router.with_state(shared_data.clone());
+    let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
+    axum::serve(listener, router).into_future().await
+
+    // HttpServer::new(move || {
+    //     App::new()
+    //         .wrap(Logger::default())
+    //         .wrap(Cors::default()
+    //             .supports_credentials()
+    //             .allow_any_origin()
+    //             .allowed_methods(vec!["GET", "POST", "OPTIONS", "HEAD"])
+    //             .allow_any_header()
+    //             .max_age(3600))
+    //         .app_data(shared_data.clone())
+    //         // .wrap(Condition::new(web_auth_enabled, ErrorHandlers::new().handler(StatusCode::UNAUTHORIZED, handle_unauthorized)))
+    //         .configure(|srvcfg| {
+    //             if web_ui_enabled {
+    //                 srvcfg.service(actix_files::Files::new("/static", web_dir_path.join("static")));
+    //                 srvcfg.configure(v1_api_register(web_auth_enabled));
+    //             }
+    //             srvcfg.service(web::resource("/healthcheck").route(web::get().to(healthcheck)));
+    //             srvcfg.service(web::resource("/status").route(web::get().to(status)));
+    //         })
+    //         .configure(xtream_api_register)
+    //         .configure(m3u_api_register)
+    //         .configure(xmltv_api_register)
+    //         .configure(hls_api_register)
+    //         .configure(|srvcfg| {
+    //             if web_ui_enabled {
+    //                 srvcfg.configure(index_register(&web_dir_path));
+    //             }
+    //         })
+    // }).bind(format!("{host}:{port}"))?.run().await
 }

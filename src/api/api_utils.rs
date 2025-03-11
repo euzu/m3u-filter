@@ -13,19 +13,16 @@ use crate::utils::file::file_utils::{create_new_file_for_write};
 use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::network::request;
 use crate::utils::network::request::sanitize_sensitive_info;
-use actix_files::NamedFile;
-use actix_web::body::{BodyStream, SizedStream};
-use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
-use actix_web::{web, HttpRequest, HttpResponse};
-use parking_lot::Mutex;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use log::{error, log_enabled, trace};
 use reqwest::StatusCode;
 use std::collections::HashMap;
 use std::io::BufWriter;
 use std::path::Path;
-use std::sync::Arc;
-use actix_web_httpauth::extractors::bearer::BearerAuth;
+use std::sync::{Arc};
+use tokio::sync::Mutex;
+use axum::http::HeaderMap;
+use axum::response::IntoResponse;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use url::Url;
 use crate::api::model::streams::active_client_stream::ActiveClientStream;
@@ -38,14 +35,14 @@ macro_rules! try_option_bad_request {
             Some(value) => value,
             None => {
                 if $msg_is_error {error!("{}", $msg);} else {debug!("{}", $msg);}
-                return HttpResponse::BadRequest().finish();
+                return axum::http::StatusCode::BAD_REQUEST.into_response();
             }
         }
     };
     ($option:expr) => {
         match $option {
             Some(value) => value,
-            None => return HttpResponse::BadRequest().finish(),
+            None => return axum::http::StatusCode::BAD_REQUEST.into_response(),
         }
     };
 }
@@ -57,14 +54,14 @@ macro_rules! try_result_bad_request {
             Ok(value) => value,
             Err(_) => {
                 if $msg_is_error {error!("{}", $msg);} else {debug!("{}", $msg);}
-                return HttpResponse::BadRequest().finish();
+                return axum::http::StatusCode::BAD_REQUEST.into_response();
             }
         }
     };
     ($option:expr) => {
         match $option {
             Ok(value) => value,
-            Err(_) => return HttpResponse::BadRequest().finish(),
+            Err(_) => return axum::http::StatusCode::BAD_REQUEST.into_response(),
         }
     };
 }
@@ -73,22 +70,32 @@ pub use try_option_bad_request;
 pub use try_result_bad_request;
 use crate::auth::authenticator::Claims;
 
-pub async fn serve_file(file_path: &Path, req: &HttpRequest, mime_type: mime::Mime) -> HttpResponse {
+pub async fn serve_file(file_path: &Path, mime_type: mime::Mime) -> impl axum::response::IntoResponse + Send {
     if file_path.exists() {
-        if let Ok(file) = actix_files::NamedFile::open_async(file_path).await {
-            let mut result = file.set_content_type(mime_type)
-                .disable_content_disposition().into_response(req);
-            let headers = result.headers_mut();
-            headers.insert(CACHE_CONTROL, HeaderValue::from_bytes(b"no-cache").unwrap());
-            return result;
-        }
+        return match tokio::fs::File::open(file_path).await {
+            Ok(file) => {
+                let reader = tokio::io::BufReader::new(file);
+                let stream = tokio_util::io::ReaderStream::new(reader);
+                let body = axum::body::Body::from_stream(stream);
+
+                axum::response::Response::builder()
+                    .status(StatusCode::OK)
+                    .header(axum::http::header::CONTENT_TYPE, mime_type.to_string())
+                    .header(axum::http::header::CACHE_CONTROL, axum::http::header::HeaderValue::from_static("no-cache"))
+                    .body(body)
+                    .unwrap()
+                    .into_response()
+            }
+            Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        };
     }
-    HttpResponse::NoContent().finish()
+    axum::http::StatusCode::NOT_FOUND.into_response()
+
 }
 
 pub async fn get_user_target_by_username<'a>(username: &str, app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() {
-        return app_state.config.get_target_for_username(username);
+        return app_state.config.get_target_for_username(username).await;
     }
     None
 }
@@ -96,13 +103,13 @@ pub async fn get_user_target_by_username<'a>(username: &str, app_state: &'a AppS
 pub async fn get_user_target_by_credentials<'a>(username: &str, password: &str, api_req: &'a UserApiRequest,
                                           app_state: &'a AppState) -> Option<(ProxyUserCredentials, &'a ConfigTarget)> {
     if !username.is_empty() && !password.is_empty() {
-        app_state.config.get_target_for_user(username, password)
+        app_state.config.get_target_for_user(username, password).await
     } else {
         let token = api_req.token.as_str().trim();
         if token.is_empty() {
             None
         } else {
-            app_state.config.get_target_for_user_by_token(token)
+            app_state.config.get_target_for_user_by_token(token).await
         }
     }
 }
@@ -130,26 +137,27 @@ fn get_stream_options(app_state: &AppState) -> (bool, bool, usize, bool) {
     (stream_retry, buffer_enabled, buffer_size, pipe_provider_stream)
 }
 
-fn get_stream_content_length(provider_response: Option<&(Vec<(String, String)>, StatusCode)>) -> u64 {
-    let content_length = provider_response
-        .as_ref()
-        .and_then(|(headers, _)| headers.iter().find(|(h, _)| h.eq(actix_web::http::header::CONTENT_LENGTH.as_str())))
-        .and_then(|(_, val)| val.parse::<u64>().ok())
-        .unwrap_or(0);
-    content_length
-}
+// fn get_stream_content_length(provider_response: Option<&(Vec<(String, String)>, StatusCode)>) -> u64 {
+//     let content_length = provider_response
+//         .as_ref()
+//         .and_then(|(headers, _)| headers.iter().find(|(h, _)| h.eq(axum::http::header::CONTENT_LENGTH.as_str())))
+//         .and_then(|(_, val)| val.parse::<u64>().ok())
+//         .unwrap_or(0);
+//     content_length
+// }
 
 pub async fn stream_response(app_state: &AppState, stream_url: &str,
-                             req: &HttpRequest, input: Option<&ConfigInput>,
+                             req_headers: &HeaderMap,
+                             input: Option<&ConfigInput>,
                              item_type: PlaylistItemType, target: &ConfigTarget,
-                             user: &ProxyUserCredentials) -> HttpResponse {
+                             user: &ProxyUserCredentials) ->  impl axum::response::IntoResponse + Send {
     if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", sanitize_sensitive_info(stream_url)); }
 
     let log_active_clients = app_state.config.log.as_ref().is_some_and(|l| l.active_clients);
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url, log_active_clients, user) {
-            return value;
+        if let Some(value) = shared_stream_response(app_state, stream_url, log_active_clients, user).await {
+            return value.into_response();
         }
     }
 
@@ -159,47 +167,65 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
     if let Ok(url) = Url::parse(stream_url) {
         let active_clients = Arc::clone(&app_state.active_users);
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
-            provider_stream::get_provider_pipe_stream(&app_state.config, &app_state.http_client, &url, req, input, item_type).await
+            provider_stream::get_provider_pipe_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, item_type).await
         } else {
             let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size, share_stream);
-            provider_stream::get_provider_reconnect_buffered_stream(&app_state.config, &app_state.http_client, &url, req, input, buffer_stream_options).await
+            provider_stream::get_provider_reconnect_buffered_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {
-            let content_length = get_stream_content_length(provider_response.as_ref());
-            let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients);
+            // let content_length = get_stream_content_length(provider_response.as_ref());
+            let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients).await;
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
-                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, buffer_size);
-                if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url) {
-                    let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
-                    if content_length > 0 { 
-                        response_builder.body(SizedStream::new(content_length, broadcast_stream)) } 
-                    else { 
-                        response_builder.body(BodyStream::new(broadcast_stream)) 
+                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, buffer_size).await;
+                if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
+                    let (status_code, header_map) = get_stream_response_with_headers(provider_response, stream_url);
+                    let mut response = axum::response::Response::builder()
+                        .status(status_code);
+                    for (key, value) in &header_map {
+                        response = response.header(key, value);
                     }
+                    response.body(axum::body::Body::from_stream(broadcast_stream)).unwrap().into_response()
+                    // if content_length > 0 {
+                    //     response_builder.body(SizedStream::new(content_length, broadcast_stream)) }
+                    // else {
+                    //     response_builder.body(BodyStream::new(broadcast_stream))
+                    // }
                 } else {
-                    HttpResponse::BadRequest().finish()
+                    axum::http::StatusCode::BAD_REQUEST.into_response()
                 }
             } else {
-                let mut response_builder = get_stream_response_with_headers(provider_response, stream_url);
-                if content_length > 0 { response_builder.body(SizedStream::new(content_length, stream)) } else { response_builder.streaming(stream) }
+                let (status_code, header_map) = get_stream_response_with_headers(provider_response, stream_url);
+                let mut response = axum::response::Response::builder()
+                    .status(status_code);
+                for (key, value) in &header_map {
+                    response = response.header(key, value);
+                }
+                response.body(axum::body::Body::from_stream(stream)).unwrap().into_response()
+
+                // if content_length > 0 { response_builder.body(SizedStream::new(content_length, stream)) } else { response_builder.streaming(stream) }
             };
 
-            return stream_resp;
+            return stream_resp.into_response();
         }
     }
     error!("Cant open stream {}", sanitize_sensitive_info(stream_url));
-    HttpResponse::BadRequest().finish()
+    axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
-fn shared_stream_response(app_state: &AppState, stream_url: &str, log_active_clients: bool, user: &ProxyUserCredentials) -> Option<HttpResponse> {
-    if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url) {
+async fn shared_stream_response(app_state: &AppState, stream_url: &str, log_active_clients: bool, user: &ProxyUserCredentials) -> Option<impl IntoResponse> {
+    if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
-        if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url) {
-            let mut response_builder = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
+        if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url).await {
+            let (status_code, header_map) = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
             let active_clients = Arc::clone(&app_state.active_users);
-            let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients);
-            return Some(response_builder.body(BodyStream::new(stream)));
+            let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients).await.boxed();
+            let mut response = axum::response::Response::builder()
+                .status(status_code);
+            for (key, value) in &header_map {
+                response = response.header(key, value);
+            }
+            return Some(response.body(axum::body::Body::from_stream(stream)).unwrap());
         }
     }
     None
@@ -209,9 +235,9 @@ pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarge
     (item_type == PlaylistItemType::Live  || item_type == PlaylistItemType::LiveHls) && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
 }
 
-pub type HeaderFilter = Option<Box<dyn Fn(&str) -> bool>>;
-pub fn get_headers_from_request(req: &HttpRequest, filter: &HeaderFilter) -> HashMap<String, Vec<u8>> {
-    req.headers()
+pub type HeaderFilter = Option<Box<dyn Fn(&str) -> bool + Send>>;
+pub fn get_headers_from_request(req_headers: &HeaderMap, filter: &HeaderFilter) -> HashMap<String, Vec<u8>> {
+    req_headers
         .iter()
         .filter(|(k, _)| match &filter {
             None => true,
@@ -221,36 +247,34 @@ pub fn get_headers_from_request(req: &HttpRequest, filter: &HeaderFilter) -> Has
         .collect()
 }
 
-fn get_add_cache_content(res_url: &str, cache: &Arc<Option<Mutex<LRUResourceCache>>>) -> Box<dyn Fn(usize)> {
+fn get_add_cache_content(res_url: &str, cache: &Arc<Option<Mutex<LRUResourceCache>>>) -> Arc<dyn Fn(usize) + Send + Sync> {
     let resource_url = String::from(res_url);
     let cache = Arc::clone(cache);
-    let add_cache_content: Box<dyn Fn(usize)> = Box::new(move |size| {
+    let add_cache_content: Arc<dyn Fn(usize)  + Send + Sync> = Arc::new(move |size| {
         let res_url = resource_url.clone();
         let cache = Arc::clone(&cache);
-        actix_rt::spawn(async move {
+        tokio::spawn(async move {
             if let Some(cache) = cache.as_ref() {
-                let mut guard = cache.lock();
-                let _ = guard.add_content(&res_url, size);
+                let _ = cache.lock().await.add_content(&res_url, size);
             }
         });
     });
     add_cache_content
 }
 
-pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &HttpRequest, input: Option<&ConfigInput>) -> HttpResponse {
+pub async fn resource_response(app_state: &AppState, resource_url: &str, req_headers: &HeaderMap, input: Option<&ConfigInput>) ->  impl axum::response::IntoResponse + Send {
     if resource_url.is_empty() {
-        return HttpResponse::NoContent().finish();
+        return axum::http::StatusCode::NO_CONTENT.into_response();
     }
     let filter: HeaderFilter = Some(Box::new(|key| key != "if-none-match" && key != "if-modified-since"));
-    let req_headers = get_headers_from_request(req, &filter);
+    let req_headers = get_headers_from_request(req_headers, &filter);
     if let Some(cache) = app_state.cache.as_ref() {
-        let mut guard = cache.lock();
+        let mut guard = cache.lock().await;
         if let Some(resource_path) = guard.get_content(resource_url) {
-            if let Ok(named_file) = NamedFile::open(resource_path) {
-                trace_if_enabled!("Responding resource from cache {}", sanitize_sensitive_info(resource_url));
-                return named_file.into_response(req);
-            }
+            trace_if_enabled!("Responding resource from cache {}", sanitize_sensitive_info(resource_url));
+            return serve_file(&resource_path, mime::APPLICATION_OCTET_STREAM).await.into_response();
         }
+
     }
     trace_if_enabled!("Try to fetch resource {}", sanitize_sensitive_info(resource_url));
     if let Ok(url) = Url::parse(resource_url) {
@@ -259,24 +283,23 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
             Ok(response) => {
                 let status = response.status();
                 if status.is_success() {
-                    let mut response_builder = HttpResponse::Ok();
-                    response.headers().iter().for_each(|(k, v)| {
-                        response_builder.insert_header((k.as_str(), v.as_ref()));
-                    });
+                    let mut response_builder = axum::response::Response::builder()
+                        .status(StatusCode::OK);
+                    for (key, value) in response.headers() {
+                        response_builder = response_builder.header(key, value);
+                    }
 
                     let byte_stream = response.bytes_stream().map_err(|err| StreamError::reqwest(&err));
                     if let Some(cache) = app_state.cache.as_ref() {
-                        let resource_path = {
-                            cache.lock().store_path(resource_url)
-                        };
+                        let resource_path = cache.lock().await.store_path(resource_url);
                         if let Ok(file) = create_new_file_for_write(&resource_path) {
                             let writer = BufWriter::new(file);
                             let add_cache_content = get_add_cache_content(resource_url, &app_state.cache);
                             let stream = PersistPipeStream::new(byte_stream, writer, add_cache_content);
-                            return response_builder.body(BodyStream::new(stream));
+                            return response_builder.body(axum::body::Body::from_stream(stream)).unwrap().into_response();
                         }
                     }
-                    return response_builder.body(BodyStream::new(byte_stream));
+                    return response_builder.body(axum::body::Body::from_stream(byte_stream)).unwrap().into_response();
                 }
                 debug_if_enabled!("Failed to open resource got status {} for {}", status, sanitize_sensitive_info(resource_url));
             }
@@ -287,7 +310,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req: &H
     } else {
         error!("Url is malformed {}", sanitize_sensitive_info(resource_url));
     }
-    HttpResponse::BadRequest().finish()
+    axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
 pub fn separate_number_and_remainder(input: &str) -> (String, Option<String>) {
@@ -298,18 +321,36 @@ pub fn separate_number_and_remainder(input: &str) -> (String, Option<String>) {
     })
 }
 
-pub fn empty_json_list_response() -> HttpResponse {
-    HttpResponse::Ok().content_type(mime::APPLICATION_JSON).body("[]")
+pub fn empty_json_list_response() ->  impl axum::response::IntoResponse + Send {
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", mime::APPLICATION_JSON.to_string())
+        .body("[]".to_string())
+        .unwrap()
+        .into_response()
 }
 
-pub fn get_username_from_auth_header(credentials: Option<BearerAuth>, app_state: &web::Data<Arc<AppState>>) -> Option<String> {
-    if let Some(bearer) = credentials {
-        if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
-            let secret_key = web_auth_config.secret.as_ref();
-            if let Ok(token_data) = decode::<Claims>(bearer.token(), &DecodingKey::from_secret(secret_key), &Validation::new(Algorithm::HS256)) {
-                return Some(token_data.claims.username);
-            }
+pub fn get_username_from_auth_header(
+    token: &str,
+    app_state: &Arc<AppState>,
+) -> Option<String> {
+    if let Some(web_auth_config) = &app_state.config.web_auth {
+        let secret_key: &str = web_auth_config.secret.as_ref();
+        if let Ok(token_data) = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(secret_key.as_bytes()),
+            &Validation::new(Algorithm::HS256),
+        ) {
+            return Some(token_data.claims.username);
         }
     }
     None
+}
+
+pub fn redirect(url: &str) -> impl IntoResponse {
+    axum::response::Response::builder()
+        .status(StatusCode::FOUND)
+        .header("Location", url)
+        .body(axum::body::Body::empty())
+        .unwrap()
 }
