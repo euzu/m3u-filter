@@ -415,7 +415,6 @@ fn get_non_empty<'a>(first: &'a str, second: &'a str, third: &'a str) -> &'a str
     }
 }
 
-#[axum::debug_handler]
 async fn xtream_player_api_timeshift_stream(
     req_headers: HeaderMap,
     axum::extract::Query(api_query_req): axum::extract::Query<UserApiRequest>,
@@ -713,7 +712,6 @@ fn xtream_create_content_stream(xtream_iter: impl Iterator<Item=(String, bool)>)
         })).chain(stream::once(async { Ok::<Bytes, String>(Bytes::from("]")) })))
 }
 
-#[axum::debug_handler]
 async fn xtream_player_api_get(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
@@ -727,7 +725,6 @@ async fn xtream_player_api_get(
 // ) ->  impl axum::response::IntoResponse + Send {
 //     xtream_player_api(&req, api_req.into_inner(), &app_state).await
 // }
-#[axum::debug_handler]
 async fn xtream_player_api_post(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Form(api_req): axum::extract::Form<UserApiRequest>,

@@ -40,7 +40,6 @@ async fn get_categories_from_m3u_playlist(target: &ConfigTarget, config: &Arc<Co
     groups
 }
 
-#[axum::debug_handler]
 async fn playlist_categories(
     axum_auth::AuthBearer(token): axum_auth::AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
@@ -98,7 +97,6 @@ async fn playlist_categories(
     axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
-#[axum::debug_handler]
 async fn save_playlist_bouquet(
     axum_auth::AuthBearer(token): axum_auth::AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
@@ -122,7 +120,6 @@ async fn save_playlist_bouquet(
     axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
-#[axum::debug_handler]
 async fn playlist_bouquet(
     axum_auth::AuthBearer(token): axum_auth::AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,

@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use axum::debug_middleware;
 use chrono::{Local, Duration};
 use jsonwebtoken::{Algorithm, DecodingKey, encode, decode, EncodingKey, Header, Validation, TokenData};
 use crate::model::config::WebAuthConfig;
@@ -90,7 +89,6 @@ fn validate_request(
     Err(())
 }
 
-#[debug_middleware]
 pub async fn validator_admin(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum_auth::AuthBearer(token): axum_auth::AuthBearer,
@@ -104,7 +102,6 @@ pub async fn validator_admin(
     }
 }
 
-#[debug_middleware]
 pub async fn validator_user(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum_auth::AuthBearer(token): axum_auth::AuthBearer,

@@ -27,7 +27,7 @@ cron = "0.15"
 axum = { version = "0" , features = ["macros", "default"]}
 axum-auth = "0"
 tower = "0"
-tower-http = { version = "0", features = ["cors", "auth", "fs"]}
+tower-http = { version = "0", features = ["cors", "auth", "fs", "compression-full"]}
 jsonwebtoken = "9.3"
 rust-argon2 = "2.1"
 futures = "0.3"

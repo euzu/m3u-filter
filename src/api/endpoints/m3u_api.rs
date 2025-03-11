@@ -46,14 +46,12 @@ async fn m3u_api(
 }
 
 
-#[axum::debug_handler]
 async fn m3u_api_get(axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
                      axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
     m3u_api(&api_req, &app_state).await
 }
 
-#[axum::debug_handler]
 async fn m3u_api_post(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Form(api_req): axum::extract::Form<UserApiRequest>,
@@ -61,7 +59,6 @@ async fn m3u_api_post(
     m3u_api(&api_req, &app_state).await.into_response()
 }
 
-#[axum::debug_handler]
 async fn m3u_api_stream(
     req_headers: axum::http::HeaderMap,
     axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,

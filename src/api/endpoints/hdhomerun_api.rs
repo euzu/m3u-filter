@@ -220,7 +220,6 @@ async fn lineup_status() -> impl IntoResponse {
             }))
 }
 
-#[axum::debug_handler]
 async fn lineup_json(axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {
     let cfg = Arc::clone(&app_state.app_state.config);
     if let Some((credentials, target)) = cfg.get_target_for_username(&app_state.device.t_username).await {

@@ -24,7 +24,6 @@ use log::{error, info};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
-use axum::debug_handler;
 use tokio::sync::Mutex;
 use std::future::IntoFuture;
 
@@ -63,7 +62,6 @@ async fn create_healthcheck(app_state: &Arc<AppState>) -> Healthcheck {
     }
 }
 
-#[debug_handler]
 async fn healthcheck(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> impl axum::response::IntoResponse {
     axum::Json(create_healthcheck(&app_state).await)
 }
@@ -165,6 +163,22 @@ fn is_web_auth_enabled(cfg: &Arc<Config>, web_ui_enabled: bool) -> bool {
     false
 }
 
+fn create_cors_layer() -> tower_http::cors::CorsLayer {
+    tower_http::cors::CorsLayer::new()
+        // .allow_credentials(true)
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::OPTIONS, axum::http::Method::HEAD])
+        .allow_headers(tower_http::cors::Any)
+        .max_age(std::time::Duration::from_secs(3600))
+}
+fn create_compression_layer() -> tower_http::compression::CompressionLayer {
+    tower_http::compression::CompressionLayer::new()
+        .br(true)
+        .deflate(true)
+        .gzip(true)
+        .zstd(true)
+}
+
 fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec<String>) {
     let host = cfg.api.host.to_string();
     if let Some(hdhomerun) = &cfg.hdhomerun {
@@ -177,15 +191,11 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
                     let device_clone = Arc::new(device.clone());
                     infos.push(format!("HdHomeRun Server '{}' running: http://{host}:{port}", device.name));
                     tokio::spawn(async move {
-                        let cors = tower_http::cors::CorsLayer::new()
-                            // .allow_credentials(true)
-                            .allow_origin(tower_http::cors::Any)
-                            .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::OPTIONS, axum::http::Method::HEAD])
-                            .allow_headers(tower_http::cors::Any)
-                            .max_age(std::time::Duration::from_secs(3600));
+
 
                         let router = axum::Router::<Arc<HdHomerunAppState>>::new()
-                            .layer(cors)
+                            .layer(create_cors_layer())
+                            .layer(create_compression_layer())
                             // .layer(TraceLayer::new_for_http()) // `Logger::default()`
                             .merge(hdhr_api_register());
 
@@ -238,16 +248,9 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     }
 
     // Web Server
-    let cors = tower_http::cors::CorsLayer::new()
-        // .allow_credentials(true)
-        .allow_origin(tower_http::cors::Any)
-        .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::OPTIONS, axum::http::Method::HEAD])
-        .allow_headers(tower_http::cors::Any)
-        .max_age(std::time::Duration::from_secs(3600));
-
     let mut router = axum::Router::new()
-        .layer(cors)
-        // .layer(TraceLayer::new_for_http()) // `Logger::default()`
+        .layer(create_cors_layer())
+        .layer(create_compression_layer())        // .layer(TraceLayer::new_for_http()) // `Logger::default()`
         .route("/healthcheck", axum::routing::get(healthcheck))
         .route("/status", axum::routing::get(status));
     if web_ui_enabled {

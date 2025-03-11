@@ -80,7 +80,6 @@ async fn hls_api_stream(
     stream_response(app_state, &pli_url, req_headers, Some(input), PlaylistItemType::Live, target, &user).await.into_response()
 }
 
-#[axum::debug_handler]
 async fn hls_api_stream_xtream(
     req_headers: axum::http::HeaderMap,
     axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
@@ -90,7 +89,6 @@ async fn hls_api_stream_xtream(
     hls_api_stream(&req_headers, &api_req, params, &app_state, TargetType::Xtream).await.into_response()
 }
 
-#[axum::debug_handler]
 async fn hls_api_stream_m3u(
     req_headers: axum::http::HeaderMap,
     axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,

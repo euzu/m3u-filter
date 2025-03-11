@@ -127,7 +127,6 @@ async fn save_config_api_proxy_config(
     axum::http::StatusCode::OK.into_response()
 }
 
-#[axum::debug_handler]
 async fn playlist_update(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Json(targets): axum::extract::Json<Vec<String>>,
@@ -257,7 +256,6 @@ async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Arc<Co
     (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid Arguments"}))).into_response()
 }
 
-#[axum::debug_handler]
 async fn playlist_content(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Json(playlist_req): axum::extract::Json<PlaylistRequest>,
