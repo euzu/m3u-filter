@@ -2,7 +2,7 @@
   "name": "m3u-filter",
   "description": "m3u-filter",
   "author": "euzu",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "private": true,
   "homepage": "",
   "license": "MIT",
@@ -18,17 +18,17 @@
     "analyze": "source-map-explorer 'build/static/js/*.js'"
   },
   "dependencies": {
+    "@fontsource/rubik": "5.1.1",
     "file-saver": "2.0.5",
+    "i18next": "24.2.2",
+    "jwt-decode": "4.0.0",
     "notistack": "3.0.2",
     "react": "19.0.0",
     "react-datepicker": "8.1.0",
     "react-dom": "19.0.0",
+    "react-i18next": "15.4.1",
     "react-tag-input-component": "2.0.2",
-    "rxjs": "7.8.1",
-    "@fontsource/rubik": "5.1.1",
-    "jwt-decode": "4.0.0",
-    "i18next": "24.2.2",
-    "react-i18next": "15.4.1"
+    "rxjs": "7.8.1"
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",
