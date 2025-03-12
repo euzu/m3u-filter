@@ -1,5 +1,22 @@
 # Changelog
-# 2.2.2 (2025-02-xx)
+# 2.2.3 (2023-04-xx)
+- input alias definition for same provider with same content but different credentials
+```yaml
+- sources:
+- inputs:
+  - url: 'http://provider.net'
+    name: my_provider
+    username: xyz
+    password: secret1
+    aliases:
+    - url: 'http://provider.net'
+      username: abcd
+      password: secret2
+  targets:
+  - name: test
+```
+
+# 2.2.2 (2025-03-12)
 - !BREAKING CHANGE! Target options moved to specific target output definitions.
 
 target options:
@@ -52,21 +69,6 @@ targets:
     options: {ignore_logo: false, share_live_streams: true, remove_duplicates: false}
 ```
 
-- input alias definition for same provider with same content but different credentials
-```yaml
-- sources:
-- inputs:
-  - url: 'http://provider.net'
-    name: my_provider
-    username: xyz
-    password: secret1
-    aliases:
-    - url: 'http://provider.net'
-      username: abcd
-      password: secret2
-  targets:
-  - name: test
-```
 - The Web UI now includes a login feature for playlist users, allowing them to set their groups for filtering and managing their own bouquet of groups.
  The playlist user can login with his credentials and can select the desired groups for his playlist.
 - Added `user_config_dir` to `config.yml`. It is the storage path for user configurations (f.e. bouquets).

@@ -21,6 +21,7 @@
 - Monitoring group changes and sending notifications.
 - Sharing live tv connections
 - Display own video stream when channel is unavailable
+- Define HdHomeRun devices to use with Plex/Emby/Jellyfin
 
 If you need to exclude certain entries from a playlist, you can create filters using headers and apply regex-based renaming or mapping.
 Run `m3u-filter` as a CLI or in server mode for a web-based UI to manage playlist content and save filtered groups.
@@ -323,8 +324,10 @@ and add it to the `config.yml`.
 ```yaml
 channel_unavailable_file: /freeze_frame.ts
 ```
+### 1.13 `user_config_dir`
+It is the storage path for user configurations (f.e. bouquets).
 
-### 1.13 `hdhomerun`
+### 1.14 `hdhomerun`
 
 It is possible to define `hdhomerun` target for output. To use this outputs we need to define HdHomeRun devices.
 
@@ -416,7 +419,6 @@ Each input has the following attributes:
 - `prefix` is optional, it is applied to the given field with the given value
 - `suffix` is optional, it is applied to the given field with the given value
 - `options` is optional,
-    + __`xtream_info_cache`__ deprecated.
     + `xtream_skip_live` true or false, live section can be skipped.
     + `xtream_skip_vod` true or false, vod section can be skipped. 
     + `xtream_skip_series` true or false, series section can be skipped.
@@ -509,19 +511,58 @@ sort:
 ### 2.2.2.2 `output`
 
 Is a list of output format:
-Each format has 2 properties
-- `type`
-- `filename` only _mandatory_ for `strm` output
+Each format has different properties
 
-`type` is _mandatory_  for `m3u`, `strm` and `xtream`.  
-`filename` is _mandatory_ if type is `strm`. if type is `m3u` the plain m3u file is written but it is not used by `m3u-filter`.
+#### 'Target types':
+`xtream`
+- type: xtream
+- skip_live_direct_source: true|false,
+- skip_video_direct_source: true|false,
+- skip_series_direct_source: true|false,
+- resolve_series: true|false,
+- resolve_series_delay: seconds,
+- resolve_vod: true|false,
+- resolve_vod_delay: true|false,
+
+`m3u`
+- type: m3u
+- filename: _optional_
+- include_type_in_url: _optional_, true|false, default false
+- mask_redirect_url: _optional_,  true|false, default false
+
+`strm`
+- directory: _mandatory_,
+- username: _optional_,
+- underscore_whitespace: _optional_,  true|false, default false
+- cleanup:  _optional_,  true|false, default false
+- kodi_style:  _optional_,  true|false, default false
+- strm_props: _optional_,  list of strings,
+
+`hdhomerun`
+- device: _mandatory_,
+- username: _mandatory_,
+- use_output: _optional_, m3u|xtream
+
+`options`
+- ignore_logo:  _optional_,  true|false, default false
+- share_live_streams:  _optional_,  true|false, default false
+- remove_duplicates:  _optional_,  true|false, default false
 
 ```yaml
-output:
-  - type: m3u
-  - type: xtream
-  - type: strm
-    filename: /share/media/kodi/iptv
+targets:
+  - name: xc_m3u
+    output:
+      - type: xtream
+        skip_live_direct_source: true,
+        skip_video_direct_source: true,
+      - type: m3u
+      - type: strm
+        directory: /tmp/kodi
+      - type: hdhomerun
+        username: hdhruser
+        device: hdhr1
+        use_output: xtream
+    options: {ignore_logo: false, share_live_streams: true, remove_duplicates: false}
 ```
 
 ### 2.2.2.3 `processing_order`
