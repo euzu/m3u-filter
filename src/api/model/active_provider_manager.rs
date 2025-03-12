@@ -77,6 +77,10 @@ impl ProviderConfig {
             *connections -= 1;
         }
     }
+
+    pub async fn get_connection(&self) -> u16 {
+        *self.current_connections.read().await
+    }
 }
 
 /// This manages different types of provider lineups:
@@ -370,6 +374,39 @@ impl ActiveProviderManager {
     pub async fn release_connection(&self, lineup_name: &str, provider_id: u16) {
         if let Some(lineup) = self.providers.get(lineup_name) {
             lineup.release(provider_id).await;
+        }
+    }
+
+    pub async fn active_connections(&self) -> Option<HashMap<String, u16>> {
+        let mut result = HashMap::<String, u16>::new();
+        for lineup in self.providers.values() {
+            match lineup {
+                ProviderLineup::Single(provider_lineup) => {
+                    let count = *provider_lineup.provider.current_connections.read().await;
+                    result.insert(provider_lineup.provider.name.to_string(), count);
+                }
+                ProviderLineup::Multi(provider_lineup) => {
+                    for provider_group in &provider_lineup.providers {
+                        match provider_group {
+                            ProviderPriorityGroup::SingleProviderGroup(provider) => {
+                                let count = *provider.current_connections.read().await;
+                                result.insert(provider.name.to_string(), count);
+                            }
+                            ProviderPriorityGroup::MultiProviderGroup(_, providers) => {
+                                for provider in providers {
+                                    let count = *provider.current_connections.read().await;
+                                    result.insert(provider.name.to_string(), count);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if  result.is_empty() {
+            None
+        } else {
+            Some(result)
         }
     }
 }

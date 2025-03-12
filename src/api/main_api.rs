@@ -49,6 +49,9 @@ async fn create_healthcheck(app_state: &Arc<AppState>) -> Healthcheck {
         let active_user = &app_state.active_users;
         (active_user.active_users().await, active_user.active_connections().await)
     };
+
+    let active_provider_connections = app_state.active_provider.active_connections().await;
+
     let build_time: Option<String> = BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string());
     Healthcheck {
         status: "ok".to_string(),
@@ -58,6 +61,7 @@ async fn create_healthcheck(app_state: &Arc<AppState>) -> Healthcheck {
         memory: sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
         active_clients,
         active_connections,
+        active_provider_connections,
         cache,
     }
 }
