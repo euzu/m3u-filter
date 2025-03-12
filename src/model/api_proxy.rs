@@ -35,8 +35,7 @@ impl Display for ProxyType {
         write!(f, "{}", match self {
             Self::Reverse => Self::REVERSE,
             Self::Redirect => Self::REDIRECT,
-        }
-        )
+        })
     }
 }
 

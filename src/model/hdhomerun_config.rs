@@ -32,6 +32,8 @@ pub struct HdHomeRunDeviceConfig {
     pub name: String,
     #[serde(default)]
     pub port: u16,
+    #[serde(default)]
+    pub tuner_count: u8,
     #[serde(skip)]
     pub t_username: String,
     #[serde(skip)]
@@ -39,18 +41,22 @@ pub struct HdHomeRunDeviceConfig {
 }
 
 impl HdHomeRunDeviceConfig {
-    pub fn prepare(&mut self, tuner: u8) {
+    pub fn prepare(&mut self, device_num: u8) {
         self.name = self.name.trim().to_string();
         if self.name.is_empty() {
-            self.name = format!("tuner{tuner}");
-            warn!("Tuner name empty, assigned new name: {}", self.name);
+            self.name = format!("device{device_num}");
+            warn!("Device name empty, assigned new name: {}", self.name);
         }
 
-        if tuner > 0 && self.friendly_name == default_friendly_name() {
-            self.friendly_name = format!("{} {}", self.friendly_name, tuner);
+        if self.tuner_count == 0 {
+            self.tuner_count = 1;
+        }
+
+        if device_num > 0 && self.friendly_name == default_friendly_name() {
+            self.friendly_name = format!("{} {}", self.friendly_name, device_num);
         }
         if self.device_udn == default_device_udn() {
-            self.device_udn = format!("{}:{}", self.device_udn, tuner+1);
+            self.device_udn = format!("{}:{}", self.device_udn, device_num+1);
         }
     }
 }
@@ -68,8 +74,8 @@ impl HdHomeRunConfig {
         let mut names = HashSet::new();
         let mut ports = HashSet::new();
         ports.insert(api_port);
-        for (tuner, device) in (0_u8..).zip(self.devices.iter_mut()) {
-            device.prepare(tuner);
+        for (device_num, device) in (0_u8..).zip(self.devices.iter_mut()) {
+            device.prepare(device_num);
             if names.contains(&device.name) {
                 names.insert(&device.name);
                 return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun duplicate device name {}", device.name);

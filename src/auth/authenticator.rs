@@ -3,6 +3,7 @@ use chrono::{Local, Duration};
 use jsonwebtoken::{Algorithm, DecodingKey, encode, decode, EncodingKey, Header, Validation, TokenData};
 use crate::model::config::WebAuthConfig;
 use crate::api::model::app_state::AppState;
+use crate::auth::auth_bearer::AuthBearer;
 use crate::m3u_filter_error::to_io_error;
 
 const ROLE_ADMIN: &str = "ADMIN";
@@ -91,7 +92,7 @@ fn validate_request(
 
 pub async fn validator_admin(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
-    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    AuthBearer(token): AuthBearer,
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
@@ -104,7 +105,7 @@ pub async fn validator_admin(
 
 pub async fn validator_user(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
-    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    AuthBearer(token): AuthBearer,
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {

@@ -74,12 +74,13 @@ impl Device {
   <manufacturer>{}</manufacturer>
   <modelName>{}</modelName>
   <modelNumber>{}</modelNumber>
+  <tunerCount>{}</tunerCount>
   <serialNumber>{}</serialNumber>
   <UDN>uuid:{}</UDN>
 </device>
 </root>"#,
                 self.base_url, self.friendly_name, self.manufacturer, self.model_number,
-                self.model_number, self.id, self.id
+                self.model_number, self.tuner_count, self.id, self.id
         )
     }
 }
@@ -168,7 +169,7 @@ async fn create_device(app_state: &Arc<HdHomerunAppState>) -> Option<Device> {
             model_number: device.model_number.to_string(),
             model_name: device.model_name.to_string(),
             firmware_name: device.firmware_name.to_string(),
-            tuner_count: 1, // app_state.config.hdhomerun.tuner_count,
+            tuner_count: device.tuner_count,
             firmware_version: device.firmware_version.to_string(),
             auth: String::new(),
             id: device.device_udn.to_string(),

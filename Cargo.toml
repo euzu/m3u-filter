@@ -25,7 +25,6 @@ reqwest = { version = "0", features = ["blocking", "json", "stream", "rustls-tls
 chrono = "0.4"
 cron = "0.15"
 axum = { version = "0" , features = ["macros", "default"]}
-axum-auth = "0"
 tower = "0"
 tower-http = { version = "0", features = ["cors", "auth", "fs", "compression-full"]}
 jsonwebtoken = "9.3"

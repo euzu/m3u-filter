@@ -362,6 +362,7 @@ For each output you need to define one device with a unique name. Each output ge
 HdHomeRun device config has the following attributes: 
 
 - `name`: _mandatory_ and must be unique
+- `tuner_count`: _optional_, default 1
 - `friendly_name`: _optional_
 - `manufacturer`: _optional_
 - `model_name`: _optional_

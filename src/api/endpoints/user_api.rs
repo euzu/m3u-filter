@@ -14,6 +14,7 @@ use log::error;
 use std::collections::HashSet;
 use std::sync::Arc;
 use axum::response::IntoResponse;
+use crate::auth::auth_bearer::AuthBearer;
 
 fn get_categories_from_xtream(categories: Option<Vec<PlaylistXtreamCategory>>) -> Vec<String> {
     let mut groups: Vec<String> = Vec::new();
@@ -41,7 +42,7 @@ async fn get_categories_from_m3u_playlist(target: &ConfigTarget, config: &Arc<Co
 }
 
 async fn playlist_categories(
-    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    AuthBearer(token): AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
     if let Some(username) = get_username_from_auth_header(&token, &app_state) {
@@ -98,7 +99,7 @@ async fn playlist_categories(
 }
 
 async fn save_playlist_bouquet(
-    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    AuthBearer(token): AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Json(bouquet): axum::extract::Json<PlaylistBouquetDto>,
 ) -> impl axum::response::IntoResponse + Send {
@@ -121,7 +122,7 @@ async fn save_playlist_bouquet(
 }
 
 async fn playlist_bouquet(
-    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    AuthBearer(token): AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
     if let Some(username) = get_username_from_auth_header(&token, &app_state) {

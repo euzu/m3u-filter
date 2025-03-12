@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use axum::response::IntoResponse;
 use crate::api::api_utils::serve_file;
 use crate::api::model::app_state::AppState;
+use crate::auth::auth_bearer::AuthBearer;
 use crate::auth::authenticator::{create_jwt_admin, create_jwt_user, is_admin, verify_token};
 use crate::auth::password::verify_password;
 use crate::auth::user::UserCredential;
@@ -51,7 +52,7 @@ async fn token(
 }
 
 async fn token_refresh(
-    axum_auth::AuthBearer(token): axum_auth::AuthBearer,
+    AuthBearer(token): AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) ->  impl axum::response::IntoResponse + Send {
     match &app_state.config.web_auth {
