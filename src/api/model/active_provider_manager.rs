@@ -1,4 +1,4 @@
-use crate::model::config::{ConfigInput, ConfigInputAlias, InputType};
+use crate::model::config::{Config, ConfigInput, ConfigInputAlias, InputType};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::RwLock;
@@ -348,20 +348,27 @@ pub struct ActiveProviderManager {
 }
 
 impl ActiveProviderManager {
-    pub fn new(user_access_control: bool) -> Self {
-        Self {
+    pub fn new(cfg: &Config) -> Self {
+        let user_access_control = cfg.user_access_control;
+        let mut this = Self {
             user_access_control,
             providers: HashMap::new(),
+        };
+        for source in &cfg.sources {
+            for input in &source.inputs {
+                this.add_provider(input);
+            }
         }
+        this
     }
 
-    pub fn add_provider(&mut self, name: &str, input: &ConfigInput) {
+    pub fn add_provider(&mut self, input: &ConfigInput) {
         let lineup = if input.aliases.as_ref().is_some_and(|a| !a.is_empty()) {
             ProviderLineup::Multi(MultiProviderLineup::new(input))
         } else {
             ProviderLineup::Single(SingleProviderLineup::new(input))
         };
-        self.providers.insert(name.to_string(), lineup);
+        self.providers.insert(input.name.to_string(), lineup);
     }
 
     pub async fn acquire_connection(&self, lineup_name: &str) -> Option<&ProviderConfig> {

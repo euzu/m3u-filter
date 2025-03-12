@@ -85,6 +85,8 @@ async fn m3u_api_stream(
         }
     };
 
+    let input = app_state.config.get_input_by_name(m3u_item.input_name.as_str());
+
     let is_hls_request = stream_ext.as_deref() == Some(HLS_EXT);
 
     if user.proxy == ProxyType::Redirect {
@@ -96,12 +98,12 @@ async fn m3u_api_stream(
     // Reverse proxy mode
     if is_hls_request {
         let target_name = &target.name;
-        let input = try_option_bad_request!(app_state.config.get_input_by_name(m3u_item.input_name.as_str()), true,
+        let hls_input = try_option_bad_request!(input, true,
             format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
-        return handle_hls_stream_request(&app_state, &user, &m3u_item, input, TargetType::M3u).await.into_response();
+        return handle_hls_stream_request(&app_state, &user, &m3u_item, hls_input, TargetType::M3u).await.into_response();
     }
 
-    stream_response(&app_state, m3u_item.url.as_str(), &req_headers, None, m3u_item.item_type, target, &user).await.into_response()
+    stream_response(&app_state, m3u_item.url.as_str(), &req_headers, input, m3u_item.item_type, target, &user).await.into_response()
 }
 
 async fn m3u_api_resource(

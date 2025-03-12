@@ -1,28 +1,23 @@
-use crate::api::model::active_user_manager::ActiveUserManager;
 use crate::api::model::stream_error::StreamError;
 use crate::api::model::streams::provider_stream_factory::ResponseStream;
-use crate::model::api_proxy::ProxyUserCredentials;
 use bytes::Bytes;
 use futures::Stream;
-use log::info;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
+use crate::api::model::event_manager::{Event, EventManager};
 
 pub(in crate::api) struct ActiveClientStream {
     inner: ResponseStream,
-    active_clients: Arc<ActiveUserManager>,
-    log_active_clients: bool,
+    event_manager: Arc<EventManager>,
     username: String,
+    input_name: Option<String>,
 }
 
 impl ActiveClientStream {
-    pub(crate) async fn new(inner: ResponseStream, active_clients: Arc<ActiveUserManager>, user: &ProxyUserCredentials, log_active_clients: bool) -> Self {
-        let (client_count, connection_count) = active_clients.add_connection(&user.username).await;
-        if log_active_clients {
-            info!("Active clients: {client_count}, active connections {connection_count}");
-        }
-        Self { inner, active_clients, log_active_clients, username: user.username.clone() }
+    pub(crate) async fn new(inner: ResponseStream, event_manager: Arc<EventManager>, username: &str, input_name: Option<String>) -> Self {
+        event_manager.fire(Event::StreamConnect((username.to_string(), input_name.clone()))).await;
+        Self { inner, event_manager, username: username.to_string(), input_name }
     }
 }
 impl Stream for ActiveClientStream {
@@ -37,15 +32,11 @@ impl Stream for ActiveClientStream {
 impl Drop for ActiveClientStream {
     fn drop(&mut self) {
         let username = self.username.clone();
-        let log_active_clients = self.log_active_clients;
-        let active_clients = Arc::clone(&self.active_clients);
+        let input_name = self.input_name.clone();
+        let event_manager = Arc::clone(&self.event_manager);
 
         tokio::spawn(async move {
-            let username = username.clone();
-            let (client_count, connection_count) = active_clients.remove_connection(&username).await;
-            if log_active_clients {
-                info!("Active clients: {client_count}, active connections {connection_count}");
-            }
+            event_manager.fire(Event::StreamDisconnect((username.to_string(), input_name))).await;
         });
     }
 }

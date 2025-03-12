@@ -153,10 +153,9 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
                              user: &ProxyUserCredentials) ->  impl axum::response::IntoResponse + Send {
     if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", sanitize_sensitive_info(stream_url)); }
 
-    let log_active_clients = app_state.config.log.as_ref().is_some_and(|l| l.active_clients);
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url, log_active_clients, user).await {
+        if let Some(value) = shared_stream_response(app_state, stream_url, user, input).await {
             return value.into_response();
         }
     }
@@ -165,7 +164,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         get_stream_options(app_state);
 
     if let Ok(url) = Url::parse(stream_url) {
-        let active_clients = Arc::clone(&app_state.active_users);
+        let event_manager = Arc::clone(&app_state.event_manager);
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
             provider_stream::get_provider_pipe_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, item_type).await
         } else {
@@ -174,7 +173,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         };
         if let Some(stream) = stream_opt {
             // let content_length = get_stream_content_length(provider_response.as_ref());
-            let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients).await;
+            let stream = ActiveClientStream::new(stream, event_manager, &user.username, input.map(|c| c.name.clone())).await;
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
                 SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, buffer_size).await;
@@ -213,13 +212,13 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
     axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
-async fn shared_stream_response(app_state: &AppState, stream_url: &str, log_active_clients: bool, user: &ProxyUserCredentials) -> Option<impl IntoResponse> {
+async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &ProxyUserCredentials, input: Option<&ConfigInput>,) -> Option<impl IntoResponse> {
     if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
         if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url).await {
             let (status_code, header_map) = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
-            let active_clients = Arc::clone(&app_state.active_users);
-            let stream = ActiveClientStream::new(stream, active_clients, user, log_active_clients).await.boxed();
+            let event_manager = Arc::clone(&app_state.event_manager);
+            let stream = ActiveClientStream::new(stream, event_manager, &user.username, input.map(|c| c.name.clone())).await.boxed();
             let mut response = axum::response::Response::builder()
                 .status(status_code);
             for (key, value) in &header_map {
