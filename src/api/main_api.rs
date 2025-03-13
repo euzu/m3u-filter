@@ -12,7 +12,7 @@ use crate::api::model::download::DownloadQueue;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
 use crate::model::config::{validate_targets, Config, ProcessTargets, ScheduleConfig};
-use crate::model::healthcheck::Healthcheck;
+use crate::model::healthcheck::{StatusCheck, Healthcheck};
 use crate::processing::processor::playlist;
 use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::size_utils::human_readable_byte_size;
@@ -38,41 +38,62 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
     Ok(web_dir_path)
 }
 
-async fn create_healthcheck(app_state: &Arc<AppState>) -> Healthcheck {
-    let server_time = chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string();
+
+fn get_server_time() -> String {
+    chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string()
+}
+
+fn get_build_time() -> Option<String> {
+    BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string())
+}
+
+fn get_memory_usage() -> String {
+    sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size)
+}
+
+fn create_healthcheck() -> Healthcheck {
+    Healthcheck {
+        status: "ok".to_string(),
+        version: VERSION.to_string(),
+        build_time: get_build_time(),
+        server_time: get_server_time(),
+        memory: get_memory_usage(),
+    }
+}
+
+async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
     let cache = match app_state.cache.as_ref().as_ref() {
         None => None,
         Some(lock) => {
             Some(lock.lock().await.get_size_text())
         }
     };
-    let (active_clients, active_connections) = {
+    let (active_clients, active_client_connections) = {
         let active_user = &app_state.active_users;
         (active_user.active_users().await, active_user.active_connections().await)
     };
 
     let active_provider_connections = app_state.active_provider.active_connections();
 
-    let build_time: Option<String> = BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string());
-    Healthcheck {
+    StatusCheck {
         status: "ok".to_string(),
         version: VERSION.to_string(),
-        build_time,
-        server_time,
-        memory: sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size),
+        build_time: get_build_time(),
+        server_time: get_server_time(),
+        memory: get_memory_usage(),
         active_clients,
-        active_connections,
+        active_client_connections,
         active_provider_connections,
         cache,
     }
 }
 
-async fn healthcheck(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> impl axum::response::IntoResponse {
-    axum::Json(create_healthcheck(&app_state).await)
+async fn healthcheck() -> impl axum::response::IntoResponse {
+    axum::Json(create_healthcheck())
 }
 
 async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> impl axum::response::IntoResponse {
-    let status = create_healthcheck(&app_state).await;
+    let status = create_status_check(&app_state).await;
     match serde_json::to_string_pretty(&status) {
         Ok(pretty_json) => axum::response::Response::builder().status(axum::http::StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string()).body(pretty_json).unwrap().into_response(),
