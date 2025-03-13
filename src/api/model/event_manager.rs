@@ -38,7 +38,7 @@ impl EventManager {
                 }
                 if let Some(input) = input_name {
                     // TODO this is the wrong place, move it later to the right place
-                    // self.active_provider.acquire_connection(&input).await;
+                    self.active_provider.acquire_connection(&input);
                 }
             }
             Event::StreamDisconnect((username, input_name)) => {
@@ -47,7 +47,7 @@ impl EventManager {
                     info!("Active clients: {client_count}, active connections {connection_count}");
                 }
                 if let Some(input) = input_name {
-                    // self.active_provider.release_connection(&input).await;
+                    self.active_provider.release_connection(&input);
                 }
             }
         };

@@ -1108,6 +1108,11 @@ pub struct StreamConfig {
     pub retry: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub buffer: Option<StreamBufferConfig>,
+    #[serde(default)]
+    pub forced_retry_interval_secs: u32,
+    #[serde(default)]
+    pub connect_timeout_secs: u32,
+
 }
 
 impl StreamConfig {

@@ -1,7 +1,7 @@
+use std::cell::RefCell;
 use crate::model::config::{Config, ConfigInput, ConfigInputAlias, InputType};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::sync::RwLock;
+use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
 
 /// This struct represents an individual provider configuration with fields like:
 ///
@@ -20,7 +20,7 @@ pub struct ProviderConfig {
     pub input_type: InputType,
     max_connections: u16,
     priority: i16,
-    current_connections: RwLock<u16>,
+    current_connections: AtomicU16,
 }
 
 impl ProviderConfig {
@@ -34,7 +34,7 @@ impl ProviderConfig {
             input_type: cfg.input_type.clone(),
             max_connections: cfg.max_connections,
             priority: cfg.priority,
-            current_connections: RwLock::new(0),
+            current_connections: AtomicU16::new(0),
         }
     }
 
@@ -48,13 +48,13 @@ impl ProviderConfig {
             input_type: cfg.input_type.clone(),
             max_connections: alias.max_connections,
             priority: alias.priority,
-            current_connections: RwLock::new(0),
+            current_connections: AtomicU16::new(0),
         }
     }
 
     #[inline]
-    pub async fn is_exhausted(&self) -> bool {
-        self.max_connections > 0 && *self.current_connections.read().await >= self.max_connections
+    pub fn is_exhausted(&self) -> bool {
+        self.max_connections > 0 && self.current_connections.load(Ordering::SeqCst) >= self.max_connections
     }
     //
     // #[inline]
@@ -62,24 +62,24 @@ impl ProviderConfig {
     //     !self.is_exhausted()
     // }
 
-    pub async fn try_allocate(&self, force: bool) -> bool {
-        let mut connections = self.current_connections.write().await;
-        if force || *connections < self.max_connections {
-            *connections += 1;
+    pub fn try_allocate(&self, force: bool) -> bool {
+        let connections = self.current_connections.load(Ordering::SeqCst);
+        if force || self.max_connections == 0 || connections < self.max_connections {
+            self.current_connections.fetch_add(1, Ordering::SeqCst);
             return true;
         }
         false
     }
 
-    pub async fn release(&self) {
-        let mut connections = self.current_connections.write().await;
-        if *connections > 0 {
-            *connections -= 1;
+    pub fn release(&self) {
+        let connections = self.current_connections.load(Ordering::SeqCst);
+        if connections > 0 {
+            self.current_connections.fetch_sub(1, Ordering::SeqCst);
         }
     }
 
-    pub async fn get_connection(&self) -> u16 {
-        *self.current_connections.read().await
+    pub fn get_connection(&self) -> u16 {
+        self.current_connections.load(Ordering::SeqCst)
     }
 }
 
@@ -94,17 +94,17 @@ enum ProviderLineup {
 }
 
 impl ProviderLineup {
-    async fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
+    fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
         match self {
-            ProviderLineup::Single(lineup) => lineup.acquire(force).await,
-            ProviderLineup::Multi(lineup) => lineup.acquire(force).await,
+            ProviderLineup::Single(lineup) => lineup.acquire(force),
+            ProviderLineup::Multi(lineup) => lineup.acquire(force),
         }
     }
 
-    async fn release(&self, provider_id: u16) {
+    fn release(&self, provider_name: &str) {
         match self {
-            ProviderLineup::Single(lineup) => lineup.release(provider_id).await,
-            ProviderLineup::Multi(lineup) => lineup.release(provider_id).await,
+            ProviderLineup::Single(lineup) => lineup.release(provider_name),
+            ProviderLineup::Multi(lineup) => lineup.release(provider_name),
         }
     }
 }
@@ -122,17 +122,17 @@ impl SingleProviderLineup {
         }
     }
 
-    async fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
-        if self.provider.try_allocate(force).await {
+    fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
+        if self.provider.try_allocate(force) {
             Some(&self.provider)
         } else {
             None
         }
     }
 
-    async fn release(&self, provider_id: u16) {
-        if self.provider.id == provider_id {
-            self.provider.release().await;
+    fn release(&self, provider_name: &str) {
+        if self.provider.name == provider_name {
+            self.provider.release();
         }
     }
 }
@@ -149,12 +149,12 @@ enum ProviderPriorityGroup {
 }
 
 impl ProviderPriorityGroup {
-    async fn is_exhausted(&self) -> bool {
+    fn is_exhausted(&self) -> bool {
         match self {
-            ProviderPriorityGroup::SingleProviderGroup(g) => g.is_exhausted().await,
+            ProviderPriorityGroup::SingleProviderGroup(g) => g.is_exhausted(),
             ProviderPriorityGroup::MultiProviderGroup(_, groups) => {
                 for g in groups {
-                    if !g.is_exhausted().await {
+                    if !g.is_exhausted() {
                         return false;
                     }
                 }
@@ -232,10 +232,10 @@ impl MultiProviderLineup {
     ///     println!("No available providers in group 0.");
     /// }
     /// ```
-    async fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup) -> Option<&ProviderConfig> {
+    fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup) -> Option<&ProviderConfig> {
         match priority_group {
             ProviderPriorityGroup::SingleProviderGroup(p) => {
-                if p.try_allocate(false).await {
+                if p.try_allocate(false) {
                     return Some(p);
                 }
             }
@@ -245,7 +245,7 @@ impl MultiProviderLineup {
                 for _ in 0..provider_count {
                     let p = pg.get(idx).unwrap();
                     idx = (idx + 1) % provider_count;
-                    if p.try_allocate(false).await {
+                    if p.try_allocate(false) {
                         index.store(idx, Ordering::SeqCst);
                         return Some(p);
                     }
@@ -286,15 +286,15 @@ impl MultiProviderLineup {
     ///     println!("No available providers.");
     /// }
     /// ```
-    async fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
+    fn acquire(&self, force: bool) -> Option<&ProviderConfig> {
         let mut main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
 
         for _ in 0..provider_count {
             let priority_group = &self.providers[main_idx];
             main_idx = (main_idx + 1) % provider_count;
-            if let Some(provider) = Self::acquire_next_provider_from_group(priority_group).await {
-                if priority_group.is_exhausted().await {
+            if let Some(provider) = Self::acquire_next_provider_from_group(priority_group) {
+                if priority_group.is_exhausted() {
                     self.index.store(main_idx, Ordering::SeqCst);
                 }
                 return Some(provider);
@@ -319,19 +319,19 @@ impl MultiProviderLineup {
     }
 
 
-    async fn release(&self, provider_id: u16) {
+    fn release(&self, provider_name: &str) {
         for g in &self.providers {
             match g {
                 ProviderPriorityGroup::SingleProviderGroup(pc) => {
-                    if pc.id == provider_id {
-                        pc.release().await;
+                    if pc.name == provider_name {
+                        pc.release();
                         break;
                     }
                 }
                 ProviderPriorityGroup::MultiProviderGroup(_, group) => {
                     for pc in group {
-                        if pc.id == provider_id {
-                            pc.release().await;
+                        if pc.name == provider_name {
+                            pc.release();
                             return;
                         }
                     }
@@ -344,7 +344,7 @@ impl MultiProviderLineup {
 
 pub struct ActiveProviderManager {
     user_access_control: bool,
-    providers: HashMap<String, ProviderLineup>,
+    providers: Vec<ProviderLineup>,
 }
 
 impl ActiveProviderManager {
@@ -352,7 +352,7 @@ impl ActiveProviderManager {
         let user_access_control = cfg.user_access_control;
         let mut this = Self {
             user_access_control,
-            providers: HashMap::new(),
+            providers: Vec::new(),
         };
         for source in &cfg.sources {
             for input in &source.inputs {
@@ -368,41 +368,28 @@ impl ActiveProviderManager {
         } else {
             ProviderLineup::Single(SingleProviderLineup::new(input))
         };
-        self.providers.insert(input.name.to_string(), lineup);
+        self.providers.push(lineup);
     }
 
-    pub async fn acquire_connection(&self, lineup_name: &str) -> Option<&ProviderConfig> {
-        match self.providers.get(lineup_name) {
-            None => None,
-            Some(lineup) => lineup.acquire(self.user_access_control).await
-        }
-    }
-
-    pub async fn release_connection(&self, lineup_name: &str, provider_id: u16) {
-        if let Some(lineup) = self.providers.get(lineup_name) {
-            lineup.release(provider_id).await;
-        }
-    }
-
-    pub async fn active_connections(&self) -> Option<HashMap<String, u16>> {
-        let mut result = HashMap::<String, u16>::new();
-        for lineup in self.providers.values() {
-            match lineup {
-                ProviderLineup::Single(provider_lineup) => {
-                    let count = *provider_lineup.provider.current_connections.read().await;
-                    result.insert(provider_lineup.provider.name.to_string(), count);
+    fn get_provider_config(&self, name: &str) -> Option<(&ProviderLineup, &ProviderConfig)> {
+        for lineup in &self.providers {
+            match  lineup {
+                ProviderLineup::Single(single) => {
+                    if single.provider.name == name {
+                        return Some((lineup, &single.provider));
+                    }
                 }
-                ProviderLineup::Multi(provider_lineup) => {
-                    for provider_group in &provider_lineup.providers {
-                        match provider_group {
-                            ProviderPriorityGroup::SingleProviderGroup(provider) => {
-                                let count = *provider.current_connections.read().await;
-                                result.insert(provider.name.to_string(), count);
+                ProviderLineup::Multi(multi) => {
+                    for group in &multi.providers {
+                        match group {
+                            ProviderPriorityGroup::SingleProviderGroup(config) => {
+                                return Some((lineup, config));
                             }
-                            ProviderPriorityGroup::MultiProviderGroup(_, providers) => {
-                                for provider in providers {
-                                    let count = *provider.current_connections.read().await;
-                                    result.insert(provider.name.to_string(), count);
+                            ProviderPriorityGroup::MultiProviderGroup(_, configs) => {
+                                for config in configs {
+                                    if config.name == name {
+                                        return Some((lineup, config));
+                                    }
                                 }
                             }
                         }
@@ -410,10 +397,56 @@ impl ActiveProviderManager {
                 }
             }
         }
-        if  result.is_empty() {
+        None
+    }
+
+    pub fn acquire_connection(&self, input_name: &str) -> Option<&ProviderConfig> {
+        match self.get_provider_config(input_name) {
+            None => None,
+            Some((lineup, _config)) => lineup.acquire(self.user_access_control)
+        }
+    }
+
+    pub fn release_connection(&self, provider_name: &str) {
+        if let Some((lineup, _config)) = self.get_provider_config(provider_name) {
+            lineup.release(provider_name);
+        }
+    }
+
+    pub fn active_connections(&self) -> Option<HashMap<String, u16>> {
+        let result = RefCell::new(HashMap::<String, u16>::new());
+        let add_provider = |provider: &ProviderConfig| {
+            let count = provider.current_connections.load(Ordering::SeqCst);
+            if count > 0 {
+                result.borrow_mut().insert(provider.name.to_string(), count);
+            }
+        };
+        for lineup in &self.providers {
+            match lineup {
+                ProviderLineup::Single(provider_lineup) => {
+                    add_provider(&provider_lineup.provider);
+                }
+                ProviderLineup::Multi(provider_lineup) => {
+                    for provider_group in &provider_lineup.providers {
+                        match provider_group {
+                            ProviderPriorityGroup::SingleProviderGroup(provider) => {
+                                add_provider(provider);
+                            }
+                            ProviderPriorityGroup::MultiProviderGroup(_, providers) => {
+                                for provider in providers {
+                                    add_provider(provider);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let status = result.take();
+        if  status.is_empty() {
             None
         } else {
-            Some(result)
+            Some(status)
         }
     }
 }

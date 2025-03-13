@@ -120,21 +120,21 @@ pub async fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a App
     get_user_target_by_credentials(username, password, api_req, app_state).await
 }
 
-fn get_stream_options(app_state: &AppState) -> (bool, bool, usize, bool) {
-    let (stream_retry, buffer_enabled, buffer_size) = app_state
+fn get_stream_options(app_state: &AppState) -> (bool, u32, u32, bool, usize, bool) {
+    let (stream_retry, stream_force_retry_secs, stream_connect_timeout_secs, buffer_enabled, buffer_size) = app_state
         .config
         .reverse_proxy
         .as_ref()
         .and_then(|reverse_proxy| reverse_proxy.stream.as_ref())
-        .map_or((false, false, 0), |stream| {
+        .map_or((false, 0, 0, false, 0), |stream| {
             let (buffer_enabled, buffer_size) = stream
                 .buffer
                 .as_ref()
                 .map_or((false, 0), |buffer| (buffer.enabled, buffer.size));
-            (stream.retry, buffer_enabled, buffer_size)
+            (stream.retry, stream.forced_retry_interval_secs, stream.connect_timeout_secs, buffer_enabled, buffer_size)
         });
     let pipe_provider_stream = !stream_retry && !buffer_enabled;
-    (stream_retry, buffer_enabled, buffer_size, pipe_provider_stream)
+    (stream_retry, stream_force_retry_secs, stream_connect_timeout_secs, buffer_enabled, buffer_size, pipe_provider_stream)
 }
 
 // fn get_stream_content_length(provider_response: Option<&(Vec<(String, String)>, StatusCode)>) -> u64 {
@@ -160,7 +160,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         }
     }
 
-    let (stream_retry, buffer_enabled, buffer_size, direct_pipe_provider_stream) =
+    let (stream_retry, stream_force_retry_secs, stream_connect_timeout, buffer_enabled, buffer_size, direct_pipe_provider_stream) =
         get_stream_options(app_state);
 
     if let Ok(url) = Url::parse(stream_url) {
@@ -168,7 +168,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         let (stream_opt, provider_response) = if direct_pipe_provider_stream {
             provider_stream::get_provider_pipe_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, item_type).await
         } else {
-            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, buffer_enabled, buffer_size, share_stream);
+            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, stream_force_retry_secs, stream_connect_timeout, buffer_enabled, buffer_size, share_stream);
             provider_stream::get_provider_reconnect_buffered_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {

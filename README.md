@@ -6,10 +6,9 @@
 
 **m3u-filter** is a versatile tool for processing playlists. Key capabilities include:
 
-- Filtering, renaming, mapping, and sorting playlist entries and saving them in EXTM3U, XTREAM, or Kodi formats.
+- Filtering, renaming, mapping, and sorting playlist entries and saving them in EXTM3U, XTREAM, or Strm (Kodi) formats.
 - Process multiple input files and create multiple output files through target definitions.
-- Act as a simple Xtream or M3U server after processing entries.
-- Serve as a redirect or reverse proxy for Xtream.
+- Act as a simple Xtream or M3U redirect or reverse proxy after processing entries.
 - Schedule updates in server mode.
 - Running as a CLI tool to deliver playlists through web servers (e.g., Nginx, Apache).
 - Define multiple filtering targets to create several playlists from a large one.
@@ -24,20 +23,17 @@
 - Define HdHomeRun devices to use with Plex/Emby/Jellyfin
 
 If you need to exclude certain entries from a playlist, you can create filters using headers and apply regex-based renaming or mapping.
-Run `m3u-filter` as a CLI or in server mode for a web-based UI to manage playlist content and save filtered groups.
-From the Web-UI, you can view the playlist contents, filter or search entries.
+Run `m3u-filter` in server mode for a web-based UI to view the playlist contents, filter or search entries.
+Playlist User can also defie their Group filter through the Web-UI.
 
 ![m3u-filter_function](https://github.com/user-attachments/assets/1b5ba462-712a-4f41-9140-8cca913ba5f4)
 
 ## Starting in server mode for Web-UI
 The Web-UI is available in server mode. You need to start `m3u-filter` with the `-s` (`--server`) option.
 On the first page you can select one of the defined input sources in the configuration, or write an url to the text field.
-The contents of the playlist are displayed in the tree-view. Each link has one or more buttons. 
-The first is for copying the url into clipboard. The others are visible if you have configured the `video`section. 
+The contents of the playlist are displayed in Gallery or Tree-View. Each link has one or more buttons. 
+The first is for copying the url into clipboard. The others are visible if you have configured the `video` section. 
 Based on the stream type, you will be able to download or search in a configured movie database for this entry.   
-
-In the tree-view each entry has a checkbox in front. Selecting the checkbox means **discarding** this entry from the 
-manual download when you hit the `Save` button.
 
 ## Command line Arguments
 ```
@@ -60,7 +56,7 @@ Options:
 
 ## 1. `config.yml`
 
-For running in cli mode, you need to define a `config.yml` file which can be xonfig directory next to the executable or provided with the
+For running in cli mode, you need to define a `config.yml` file which can be inside config directory next to the executable or provided with the
 `-c` cli argument.
 
 For running specific targets use the `-t` argument like `m3u-filter -t <target_name> -t <other_target_name>`.
@@ -82,11 +78,13 @@ Top level entries in the config files are:
 * `log` _optional
 * `user_access_control` _optional_
 * `channel_unavailable_file` _optional_
+* `hdhomerun` _optional_
 
 ### 1.1. `threads`
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
 Don't use too many threads, you should consider max of `cpu cores * 2`.
 Default is `0`.
+If you process the same provider multiple times each thread uses a connection. Keep in mind that you hit the provider max-connection.  
 
 ### 1.2. `api`
 `api` contains the `server-mode` settings. To run `m3u-filter` in `server-mode` you need to start it with the `-s`cli argument.
@@ -98,9 +96,11 @@ Default is `0`.
 
 With this configuration, you should create a `data` directory where you execute the binary.
 
+Be aware that different configurations (e.g. user bouquets) along the playlists are stored in this directory.
+ 
 ### 1.4 `messaging`
 `messaging` is an optional configuration for receiving messages.
-Currently only  and rest is supported.
+Currently `telegram`, `rest` and `pushover.net` is supported.
 
 Messaging is Opt-In, you need to set the `notify_on` message types which are
 - `info`

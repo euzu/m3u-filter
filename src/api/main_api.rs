@@ -51,7 +51,7 @@ async fn create_healthcheck(app_state: &Arc<AppState>) -> Healthcheck {
         (active_user.active_users().await, active_user.active_connections().await)
     };
 
-    let active_provider_connections = app_state.active_provider.active_connections().await;
+    let active_provider_connections = app_state.active_provider.active_connections();
 
     let build_time: Option<String> = BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string());
     Healthcheck {

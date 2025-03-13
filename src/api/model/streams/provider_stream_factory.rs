@@ -20,6 +20,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use url::Url;
+use crate::api::model::streams::timed_client_stream::TimedClientStream;
 
 // TODO make this configurable
 pub const STREAM_QUEUE_SIZE: usize = 4096; // mpsc channel holding messages. with possible 8092byte chunks
@@ -32,6 +33,8 @@ pub struct BufferStreamOptions {
     #[allow(dead_code)]
     item_type: PlaylistItemType,
     reconnect_enabled: bool,
+    force_reconnect_secs: u32,
+    connect_timeout_secs: u32,
     buffer_enabled: bool,
     buffer_size: usize,
     share_stream: bool,
@@ -41,6 +44,8 @@ impl BufferStreamOptions {
     pub(crate) fn new(
         item_type: PlaylistItemType,
         reconnect_enabled: bool,
+        force_reconnect_secs: u32,
+        connect_timeout: u32,
         buffer_enabled: bool,
         buffer_size: usize,
         share_stream: bool
@@ -48,6 +53,8 @@ impl BufferStreamOptions {
         Self {
             item_type,
             reconnect_enabled,
+            force_reconnect_secs,
+            connect_timeout_secs: connect_timeout,
             buffer_enabled,
             buffer_size,
             share_stream,
@@ -87,6 +94,8 @@ struct ProviderStreamOptions {
     continue_flag: Arc<AtomicOnceFlag>,
     url: Url,
     reconnect: bool,
+    reconnect_force_secs: u32,
+    connect_timeout_secs: u32,
     headers: HeaderMap,
     range_bytes: Arc<Option<AtomicUsize>>,
 }
@@ -170,7 +179,7 @@ fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Opti
 fn get_client_stream_request_params(
     req_headers: &HeaderMap,
     input: Option<&ConfigInput>,
-    options: &BufferStreamOptions) -> (usize, Option<usize>, bool, HeaderMap)
+    options: &BufferStreamOptions) -> (usize, Option<usize>, bool, u32, u32, HeaderMap)
 {
     let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 1 };
     let filter_header = get_header_filter_for_item_type(options.item_type);
@@ -185,7 +194,7 @@ fn get_client_stream_request_params(
     // We merge configured input headers with the headers from the request.
     let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
 
-    (stream_buffer_size, req_range_start_bytes, options.is_reconnect_enabled(), headers)
+    (stream_buffer_size, req_range_start_bytes, options.is_reconnect_enabled(), options.force_reconnect_secs, options.connect_timeout_secs, headers)
 }
 
 fn prepare_client(request_client: &Arc<reqwest::Client>, url: &Url, headers: &HeaderMap, range_start_bytes_to_request: Option<usize>) -> (reqwest::RequestBuilder, bool) {
@@ -248,15 +257,25 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
     debug_if_enabled!("stream provider {}", sanitize_sensitive_info(url.as_str()));
     while stream_options.should_continue() {
         debug_if_enabled!("Reconnecting stream {}", sanitize_sensitive_info(url.as_str()));
-        let (client, _) = prepare_client(&client, url, headers, range_start);
+        let (client_builder, _) = prepare_client(&client, url, headers, range_start);
+        let client = if stream_options.connect_timeout_secs > 0 {
+            client_builder.timeout(Duration::from_secs(u64::from(stream_options.connect_timeout_secs)))
+        } else {
+            client_builder
+        };
         match client.send().await {
             Ok(response) => {
                 let status = response.status();
                 if status.is_success() {
-                    return Some(response.bytes_stream().map_err(|err| {
+                    let provider_stream = response.bytes_stream().map_err(|err| {
                         error!("Stream error {err}");
                         StreamError::reqwest(&err)
-                    }).boxed());
+                    }).boxed();
+                    return if stream_options.reconnect_force_secs > 0 {
+                        Some(TimedClientStream::new(provider_stream, stream_options.reconnect_force_secs).boxed())
+                    } else {
+                        Some(provider_stream)
+                    }
                 }
                 if status.is_client_error() {
                     return None;
@@ -319,7 +338,8 @@ fn create_provider_stream_options(stream_url: &Url,
                                   req_headers: &HeaderMap,
                                   input: Option<&ConfigInput>,
                                   options: &BufferStreamOptions) -> ProviderStreamOptions {
-    let (buffer_size, req_range_start_bytes, reconnect, headers) = get_client_stream_request_params(req_headers, input, options);
+    let (buffer_size, req_range_start_bytes, reconnect, reconnect_force_secs, connect_timeout_secs,  headers)
+        = get_client_stream_request_params(req_headers, input, options);
     let url = stream_url.clone();
     let range_bytes = Arc::new(req_range_start_bytes.map(AtomicUsize::new));
     let continue_flag = Arc::new(AtomicOnceFlag::new());
@@ -329,6 +349,8 @@ fn create_provider_stream_options(stream_url: &Url,
         continue_flag,
         url,
         reconnect,
+        reconnect_force_secs,
+        connect_timeout_secs,
         headers,
         range_bytes,
     }

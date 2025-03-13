@@ -15,6 +15,9 @@
   targets:
   - name: test
 ```
+- added two options to reverse proxy config `forced_retry_interval_secs` and `connect_timeout_secs`
+`forced_retry_interval_secs` forces every x seconds a econnect to the provider,
+`connect_timeout_secs` tries only x seconds for connection, if not successfull starts a retry. 
 
 # 2.2.2 (2025-03-12)
 - !BREAKING CHANGE! Target options moved to specific target output definitions.
