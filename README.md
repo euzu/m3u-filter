@@ -553,8 +553,8 @@ targets:
   - name: xc_m3u
     output:
       - type: xtream
-        skip_live_direct_source: true,
-        skip_video_direct_source: true,
+        skip_live_direct_source: true
+        skip_video_direct_source: true
       - type: m3u
       - type: strm
         directory: /tmp/kodi
