@@ -1,69 +1,73 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
-
 source "${HOME}/.ghcr.io"
 
+WORKING_DIR=$(pwd)
+BIN_DIR="${WORKING_DIR}/bin"
+RESOURCES_DIR="${WORKING_DIR}/resources"
+DOCKER_DIR="${WORKING_DIR}/docker"
+FRONTEND_DIR="${WORKING_DIR}/frontend"
 TARGET=x86_64-unknown-linux-musl
-
-(bin/build_fe.sh && bin/build_lin_static.sh && bin/build_resources.sh ) || exit 1;
-
-# Check if the binary exists
-if [ ! -f "./target/${TARGET}/release/m3u-filter" ]; then
-    echo "Error: Static binary '../target/${TARGET}/release/m3u-filter' does not exist."
-    exit 1
-fi
-
-# Check if the frontend build directory exists
-if [ ! -d "./frontend/build" ]; then
-    echo "Error: Web directory '../frontend/build' does not exist."
-    exit 1
-fi
-
-if [ ! -f "./resources/freeze_frame.ts" ]; then
-    echo "Error: ./resources/freeze_frame.ts does not exist."
-    exit 1
-fi
-
-# Prepare Docker build context
-cd ./docker
-cp "../target/${TARGET}/release/m3u-filter" .
-rm -rf ./web
-cp -r ../frontend/build ./web
-cp -r ../resources/freeze_frame.ts .
-
-# Get the version from the binary
-VERSION=$(./m3u-filter -V | sed 's/m3u-filter *//')
+VERSION=$(grep -Po '^version\s*=\s*"\K[0-9\.]+' Cargo.toml)
 if [ -z "${VERSION}" ]; then
-    echo "Error: Failed to determine the version from the binary."
+    echo "Error: Failed to determine the version from Cargo.toml."
     exit 1
 fi
 
 # Split the version into its components using '.' as a delimiter
 IFS='.' read -r major minor patch <<< "$VERSION"
-
 # Increment the patch version
 patch=$((patch + 1))
-
 # Combine the components back into a version string
 VERSION="$major.$minor.${patch}-beta"
 
-echo "Building Docker images for version ${VERSION}"
+if [ ! -f "${BIN_DIR}/build_resources.sh" ]; then
+  "${BIN_DIR}/build_resources.sh"
+fi
 
-# Build beta image and tag as "latest"
-docker build -f Dockerfile-manual -t ghcr.io/euzu/m3u-filter-beta:"${VERSION}" --target scratch-final .
-docker tag ghcr.io/euzu/m3u-filter-beta:"${VERSION}" ghcr.io/euzu/m3u-filter-beta:latest
+cd "$FRONTEND_DIR" && rm -rf build && yarn  && yarn build
+cd "$WORKING_DIR"
+
+# Check if the frontend build directory exists
+if [ ! -d "$FRONTEND_DIR/build" ]; then
+    echo "Error: Web directory '$FRONTEND_DIR/build' does not exist."
+    exit 1
+fi
+
+cargo clean
+env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$TARGET"
+
+# Check if the binary exists
+if [ ! -f "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" ]; then
+    echo "Error: Static binary '${WORKING_DIR}/target/${TARGET}/release/m3u-filter' does not exist."
+    exit 1
+fi
+
+# Prepare Docker build context
+cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
+rm -rf "${DOCKER_DIR}/web"
+cp -r "${WORKING_DIR}/frontend/build" "${DOCKER_DIR}/web"
+cp -r "${RESOURCES_DIR}/freeze_frame.ts" "${DOCKER_DIR}/"
+
+cd "${DOCKER_DIR}"
+echo "Building Docker images for version ${VERSION}"
+SCRATCH_IMAGE_NAME=m3u-filter-beta
+
+# Build scratch image and tag as "latest"
+docker build -f Dockerfile-manual -t ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" --target scratch-final .
+docker tag ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
 
 echo "Logging into GitHub Container Registry..."
 docker login ghcr.io -u euzu -p "${GHCR_IO_TOKEN}"
 
-# Push beta
-docker push ghcr.io/euzu/m3u-filter-beta:"${VERSION}"
-docker push ghcr.io/euzu/m3u-filter-beta:latest
+# Push scratch
+docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}"
+docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
 
 # Clean up
 echo "Cleaning up build artifacts..."
-rm -rf ./web
-rm -f ./m3u-filter
-rm -f ./freeze_frame.ts
+rm -rf "${DOCKER_DIR}/web"
+rm -f "${DOCKER_DIR}/m3u-filter"
+rm -f "${DOCKER_DIR}/freeze_frame.ts"
 
-echo "Docker images for version ${VERSION} have been successfully built, tagged, and pushed."
+echo "Docker images ghcr.io/euzu/${SCRATCH_IMAGE_NAME}${VERSION} have been successfully built, tagged, and pushed."

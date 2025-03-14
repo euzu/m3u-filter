@@ -1,11 +1,23 @@
 #!/usr/bin/env bash
 
+
+# Function to print usage instructions
+print_usage() {
+    echo "Usage: $(basename "$0") [-f] [-h]"
+    echo
+    echo "Options:"
+    echo "  -f    Force resource creation"
+    echo "  -h    Display this help message"
+    exit 0
+}
+
 flag_force=false
 
-# Optionen parsen
-while getopts "f" opt; do
+# parse options
+while getopts "fh" opt; do
   case $opt in
     f) flag_force=true ;;
+    h) print_usage ;;
     \?) echo "Unknown option: -$OPTARG" >&2 ;;
   esac
 done

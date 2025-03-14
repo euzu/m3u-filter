@@ -1,6 +1,27 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 source "${HOME}/.ghcr.io"
+
+# Function to print usage instructions
+print_usage() {
+    echo "Usage: $(basename "$0") [-r] [-h]"
+    echo
+    echo "Options:"
+    echo "  -r    Enable release image mode (default: false)"
+    echo "  -h    Display this help message"
+    exit 0
+}
+
+beta_image=true
+
+# parse options
+while getopts "rh" opt; do
+  case $opt in
+    r) beta_image=true ;;
+    h) print_usage ;;
+    \?) echo "Unknown option: -$OPTARG" >&2 ;;
+  esac
+done
 
 WORKING_DIR=$(pwd)
 BIN_DIR="${WORKING_DIR}/bin"
@@ -14,10 +35,18 @@ if [ -z "${VERSION}" ]; then
     exit 1
 fi
 
+if [ "$beta_image" = true ]; then
+  # Split the version into its components using '.' as a delimiter
+  IFS='.' read -r major minor patch <<< "$VERSION"
+  # Increment the patch version
+  patch=$((patch + 1))
+  # Combine the components back into a version string
+  VERSION="$major.$minor.${patch}-beta"
+fi
+
 if [ ! -f "${BIN_DIR}/build_resources.sh" ]; then
   "${BIN_DIR}/build_resources.sh"
 fi
-
 
 cd "$FRONTEND_DIR" && rm -rf build && yarn  && yarn build
 cd "$WORKING_DIR"
@@ -37,19 +66,19 @@ if [ ! -f "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" ]; then
     exit 1
 fi
 
-
 # Prepare Docker build context
 cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${WORKING_DIR}/frontend/build" "${DOCKER_DIR}/web"
 cp -r "${RESOURCES_DIR}/freeze_frame.ts" "${DOCKER_DIR}/"
 
-# Get the version from the binary
-# VERSION=$(./m3u-filter -V | sed 's/m3u-filter *//')
-
 cd "${DOCKER_DIR}"
 echo "Building Docker images for version ${VERSION}"
-SCRATCH_IMAGE_NAME=m3u-filter-aarch64
+if [ "$beta_image" = true ]; then
+  SCRATCH_IMAGE_NAME=m3u-filter-aarch64-beta
+else
+  SCRATCH_IMAGE_NAME=m3u-filter-aarch64
+fi
 
 # Build scratch image and tag as "latest"
 docker build -f Dockerfile-manual -t ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" --target scratch-final .
