@@ -4,7 +4,7 @@ use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::model::api_proxy::ProxyType;
 use crate::model::config::TargetType;
-use crate::model::playlist::{FieldGetAccessor, XtreamCluster};
+use crate::model::playlist::{FieldGetAccessor, PlaylistItemType, XtreamCluster};
 use crate::repository::m3u_playlist_iterator::{M3U_RESOURCE_PATH, M3U_STREAM_PATH};
 use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
 use crate::repository::playlist_repository::HLS_EXT;
@@ -87,7 +87,7 @@ async fn m3u_api_stream(
 
     let input = app_state.config.get_input_by_name(m3u_item.input_name.as_str());
 
-    let is_hls_request = stream_ext.as_deref() == Some(HLS_EXT);
+    let is_hls_request = m3u_item.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
 
     if user.proxy == ProxyType::Redirect {
         let redirect_url = if is_hls_request { &replace_extension(&m3u_item.url, "m3u8") } else { &m3u_item.url };
@@ -98,9 +98,8 @@ async fn m3u_api_stream(
     // Reverse proxy mode
     if is_hls_request {
         let target_name = &target.name;
-        let hls_input = try_option_bad_request!(input, true,
-            format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
-        return handle_hls_stream_request(&app_state, &user, &m3u_item, hls_input, TargetType::M3u).await.into_response();
+        let hls_input = try_option_bad_request!(input, true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
+        return handle_hls_stream_request(&app_state, &user, &m3u_item.url, m3u_item.virtual_id, hls_input, TargetType::M3u).await.into_response();
     }
 
     stream_response(&app_state, m3u_item.url.as_str(), &req_headers, input, m3u_item.item_type, target, &user).await.into_response()

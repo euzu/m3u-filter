@@ -1,51 +1,45 @@
 use crate::model::api_proxy::ProxyUserCredentials;
-use std::str;
 use crate::model::config::TargetType;
+use crate::model::hls::HlsEntry;
+use crate::repository::storage::hash_string_as_hex;
+use std::collections::HashMap;
+use std::str;
+use tokio::time::Instant;
+use crate::utils::string_utils::replace_after_last_slash;
 
-// /hlsr/{token}/{username}/{password}/{channel}/{hash}/{chunk}
-#[derive(Debug)]
-pub struct HlsrPath {
-    token: String,
-    // username: String,
-    // password: String,
-    // channel: String,
-    hash: String,
-    chunk: String,
-}
-fn parse_hlsr_path(input: &str) -> Option<HlsrPath> {
-    let parts: Vec<&str> = input.split('/').collect();
+pub const HLS_PREFIX: &str = "hls";
 
-    if parts.len() != 8 || !parts[0].is_empty() || parts[1] != "hlsr" {
-        return None;
+pub fn rewrite_hls(base_url: &str, content: &str, hls_url: &str, virtual_id: u32, user: &ProxyUserCredentials,
+                   target_type: &TargetType, input_name: &str) -> (HlsEntry, String) {
+    let token = hash_string_as_hex(hls_url);
+    let username = &user.username;
+    let password = &user.password;
+    let mut chunk: u32 = 1;
+    let mut chunks = HashMap::new();
+    let mut result = Vec::new();
+    for line in content.lines() {
+        if line.starts_with('#') {
+            result.push(line.to_string());
+        } else {
+            let url = if line.starts_with("http") {
+                line.to_string()
+            } else {
+                replace_after_last_slash(hls_url, line)
+            };
+            chunks.insert(chunk, url);
+            result.push(format!("{base_url}/{HLS_PREFIX}/{token}/{username}/{password}/{virtual_id}/{chunk}"));
+            chunk += 1;
+        }
     }
 
-    Some(HlsrPath {
-        token: parts[2].to_string(),
-        // username: parts[3].to_string(),
-        // password: parts[4].to_string(),
-        // channel: parts[5].to_string(),
-        hash: parts[6].to_string(),
-        chunk: parts[7].to_string(),
-    })
-}
-
-pub const M3U_HLSR_PREFIX: &str = "mhlsr";
-
-pub fn rewrite_hls_url(stream_id: u32, username: &str, password: &str, hlsr: &HlsrPath, target_type: &TargetType) -> String {
-    let prefix = if *target_type == TargetType::Xtream { "hlsr" } else { M3U_HLSR_PREFIX };
-    format!("/{prefix}/{}/{username}/{password}/{stream_id}/{}/{}", hlsr.token, hlsr.hash, hlsr.chunk)
-}
-
-pub fn rewrite_hls(content: &str, virtual_id: u32, user: &ProxyUserCredentials, target_type: &TargetType) -> String {
-    content.lines().map(|line| {
-        if line.starts_with('#') {
-            line.to_string()
-        } else {
-            match parse_hlsr_path(line) {
-                None => line.to_string(),
-                Some(hlsr) => rewrite_hls_url(virtual_id, &user.username, &user.password, &hlsr, target_type)
-            }
-        }
-    }).collect::<Vec<_>>()
-        .join("\r\n")
+    let hls = HlsEntry {
+        ts: Instant::now(),
+        token,
+        target_type: target_type.clone(),
+        input_name: input_name.to_string(),
+        virtual_id,
+        chunk,
+        chunks,
+    };
+    (hls, result.join("\r\n"))
 }

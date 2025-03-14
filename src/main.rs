@@ -25,14 +25,9 @@ use env_logger::Builder;
 use log::{error, info, LevelFilter};
 
 const LOG_ERROR_LEVEL_MOD: &[&str] = &[
-    "actix_web::middleware::logger",
     "reqwest::async_impl::client",
     "reqwest::connect",
     "hyper_util::client",
-    "actix_server::worker",
-    "actix_server::server",
-    "actix_server::builder",
-    "actix_server::accept",
 ];
 
 

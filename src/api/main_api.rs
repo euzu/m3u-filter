@@ -27,6 +27,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::future::IntoFuture;
 use crate::api::model::event_manager::EventManager;
+use crate::api::model::hls_cache::HlsCache;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
@@ -124,8 +125,9 @@ fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     AppState {
         config: Arc::clone(cfg),
         http_client: Arc::new(reqwest::Client::new()),
-        downloads: Arc::from(DownloadQueue::new()),
+        downloads: Arc::new(DownloadQueue::new()),
         cache,
+        hls_cache: HlsCache::garbage_collected(),
         shared_stream_manager: Arc::new(SharedStreamManager::new()),
         active_users,
         active_provider,
@@ -303,34 +305,4 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     let router: axum::Router<()> = router.with_state(shared_data.clone());
     let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
     axum::serve(listener, router).into_future().await
-
-    // HttpServer::new(move || {
-    //     App::new()
-    //         .wrap(Logger::default())
-    //         .wrap(Cors::default()
-    //             .supports_credentials()
-    //             .allow_any_origin()
-    //             .allowed_methods(vec!["GET", "POST", "OPTIONS", "HEAD"])
-    //             .allow_any_header()
-    //             .max_age(3600))
-    //         .app_data(shared_data.clone())
-    //         // .wrap(Condition::new(web_auth_enabled, ErrorHandlers::new().handler(StatusCode::UNAUTHORIZED, handle_unauthorized)))
-    //         .configure(|srvcfg| {
-    //             if web_ui_enabled {
-    //                 srvcfg.service(actix_files::Files::new("/static", web_dir_path.join("static")));
-    //                 srvcfg.configure(v1_api_register(web_auth_enabled));
-    //             }
-    //             srvcfg.service(web::resource("/healthcheck").route(web::get().to(healthcheck)));
-    //             srvcfg.service(web::resource("/status").route(web::get().to(status)));
-    //         })
-    //         .configure(xtream_api_register)
-    //         .configure(m3u_api_register)
-    //         .configure(xmltv_api_register)
-    //         .configure(hls_api_register)
-    //         .configure(|srvcfg| {
-    //             if web_ui_enabled {
-    //                 srvcfg.configure(index_register(&web_dir_path));
-    //             }
-    //         })
-    // }).bind(format!("{host}:{port}"))?.run().await
 }

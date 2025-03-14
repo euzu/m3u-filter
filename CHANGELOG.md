@@ -1,5 +1,6 @@
 # Changelog
 # 2.2.3 (2023-04-xx)
+- hls reverse proxy
 - input alias definition for same provider with same content but different credentials
 ```yaml
 - sources:

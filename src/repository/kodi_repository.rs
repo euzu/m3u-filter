@@ -966,7 +966,7 @@ async fn remove_empty_dirs(root_path: PathBuf) {
 //     use crate::repository::kodi_repository::remove_empty_dirs;
 //     use std::path::PathBuf;
 //
-//     #[actix_web::test]
+//     #[tokio::test]
 //     async fn test_empty_dirs() {
 //         remove_empty_dirs(PathBuf::from("/tmp/hello")).await;
 //     }

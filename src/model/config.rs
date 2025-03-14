@@ -52,6 +52,7 @@ macro_rules! valid_property {
 pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 use crate::model::hdhomerun_config::HdHomeRunConfig;
+use crate::utils::file::config_reader::resolve_env_var;
 use crate::utils::string_utils::get_trimmed_string;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
@@ -419,12 +420,13 @@ impl ConfigTarget {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unique target name is required for xtream type output: {}", self.name);
                     }
                 }
-                TargetOutput::M3u(_) => {
+                TargetOutput::M3u(m3u_output) => {
                     m3u_cnt += 1;
+                    m3u_output.filename = m3u_output.filename.as_ref().map(|s| resolve_env_var(s.trim()));
                 }
                 TargetOutput::Strm(strm_output) => {
                     strm_cnt += 1;
-                    strm_output.directory =  strm_output.directory.trim().to_string();
+                    strm_output.directory =  resolve_env_var(strm_output.directory.trim());
                     if strm_output.directory.trim().is_empty() {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "directory is required for strm type: {}", self.name);
                     }
@@ -741,6 +743,7 @@ impl ConfigInput {
         if self.url.is_empty() {
             return Err(info_err!("url for input is mandatory".to_string()));
         }
+        self.url = resolve_env_var(&self.url);
         self.username = get_trimmed_string(&self.username);
         self.password = get_trimmed_string(&self.password);
         check_input_credentials!(self, self.input_type);

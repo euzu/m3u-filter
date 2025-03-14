@@ -8,7 +8,7 @@ use crate::utils::sys_utils::exit;
 use crate::model::config::{Config, ProcessTargets};
 use crate::processing::processor::playlist::exec_processing;
 
-fn datetime_to_instant(datetime: DateTime<FixedOffset>) -> Instant {
+pub fn datetime_to_instant(datetime: DateTime<FixedOffset>) -> Instant {
     // Convert DateTime<FixedOffset> to SystemTime
     let target_system_time: SystemTime = datetime.into();
 
@@ -44,11 +44,12 @@ pub async fn start_scheduler(client: Arc<reqwest::Client>, expression: &str, con
 mod tests {
     use std::str::FromStr;
     use std::sync::atomic::{AtomicU8, Ordering};
+    use std::time::Instant;
     use chrono::Local;
     use cron::Schedule;
     use crate::api::scheduler::datetime_to_instant;
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_run_scheduler() {
         // Define a cron expression that runs every second
         let expression = "0/1 * * * * * *"; // every second
@@ -63,7 +64,7 @@ mod tests {
                 loop {
                     let mut upcoming = schedule.upcoming(offset).take(1);
                     if let Some(datetime) = upcoming.next() {
-                        tokio::time::sleep_until(actix_rt::time::Instant::from(datetime_to_instant(datetime))).await;
+                        tokio::time::sleep_until(tokio::time::Instant::from(datetime_to_instant(datetime))).await;
                         run_me();
                     }
                     if runs.load(Ordering::SeqCst) == 6 {

@@ -421,7 +421,7 @@ pub async fn create_provider_stream(cfg: &Config,
 //     use std::sync::Arc;
 //     use crate::model::config::Config;
 //
-//     #[actix_rt::test]
+//     #[tokio::test]
 //     async fn test_stream() {
 //         let app = App::new().route("/test", web::get().to(test_stream_handler));
 //         let server = test::init_service(app).await;

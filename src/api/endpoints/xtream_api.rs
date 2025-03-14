@@ -34,7 +34,7 @@ use crate::repository::{user_repository, xtream_repository};
 use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils::get_u32_from_serde_value;
-use crate::utils::network::request::{extract_extension_from_url, replace_extension, sanitize_sensitive_info};
+use crate::utils::network::request::{extract_extension_from_url, sanitize_sensitive_info};
 use crate::utils::network::xtream::{create_vod_info_from_item, ACTION_GET_LIVE_CATEGORIES, ACTION_GET_LIVE_STREAMS, ACTION_GET_SERIES, ACTION_GET_SERIES_CATEGORIES, ACTION_GET_SERIES_INFO, ACTION_GET_VOD_CATEGORIES, ACTION_GET_VOD_INFO, ACTION_GET_VOD_STREAMS};
 use crate::utils::json_utils;
 use crate::utils::debug_if_enabled;
@@ -159,12 +159,7 @@ async fn xtream_player_api_stream(
     let (pli, mapping) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
-    if pli.item_type == PlaylistItemType::LiveHls {
-        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
-        return redirect(&pli.url).into_response();
-    }
-
-    let is_hls_request = stream_ext.as_deref() == Some(HLS_EXT);
+    let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
 
     if user.proxy == ProxyType::Redirect {
         if pli.xtream_cluster == XtreamCluster::Series {
@@ -176,14 +171,19 @@ async fn xtream_player_api_stream(
             return redirect(&stream_url).into_response();
         }
 
-        let redirect_url = if is_hls_request { &replace_extension(&pli.url, "m3u8") } else { &pli.url };
-        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
-        return redirect(redirect_url.as_str()).into_response();
+        // if pli.item_type == PlaylistItemType::LiveHls {
+        //    let redirect_url = &replace_extension(&pli.url, "m3u8");
+        //     debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
+        //     return redirect(redirect_url).into_response();
+        // }
+
+        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
+        return redirect(&pli.url).into_response();
     }
 
     // Reverse proxy mode
     if is_hls_request {
-        return handle_hls_stream_request(app_state, &user, &pli, input, TargetType::Xtream).await.into_response();
+        return handle_hls_stream_request(app_state, &user, &pli.url, pli.virtual_id, input, TargetType::Xtream).await.into_response();
     }
 
     let extension = stream_ext.unwrap_or_else(

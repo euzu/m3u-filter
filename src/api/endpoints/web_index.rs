@@ -96,13 +96,3 @@ pub fn index_register(web_dir_path: &Path) -> axum::Router<Arc<AppState>> {
             .route("/", axum::routing::get(index))
             .fallback(axum::routing::get_service(tower_http::services::ServeDir::new(web_dir_path))))
 }
-// pub fn index_register(web_dir_path: &Path) -> impl Fn(&mut web::ServiceConfig) + '_ {
-//     move |cfg: &mut web::ServiceConfig| {
-//         cfg.service(web::scope("/auth")
-//             .route("/token", web::post().to(token))
-//             .route("/refresh", web::post().to(token_refresh)));
-//         cfg.service(web::scope("")
-//             .route("/", web::get().to(index))
-//             .service(actix_files::Files::new("", web_dir_path)));
-//     }
-// }

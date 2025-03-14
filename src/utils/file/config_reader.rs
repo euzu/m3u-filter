@@ -144,6 +144,9 @@ pub fn save_main_config(file_path: &str, backup_dir: &str, config: &ConfigDto) -
 static ENV_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap());
 
 pub fn resolve_env_var(value: &str) -> String {
+    if value.is_empty() {
+        return String::new();
+    }
     ENV_REGEX.replace_all(value, |caps: &regex::Captures| {
         let var_name = &caps["var"];
         env::var(var_name).unwrap_or_else(|_| format!("${{env:{var_name}}}"))
