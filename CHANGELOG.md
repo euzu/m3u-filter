@@ -1,6 +1,6 @@
 # Changelog
 # 2.2.3 (2023-04-xx)
-- hls reverse proxy
+- hls reverse proxy implemented
 - input alias definition for same provider with same content but different credentials
 ```yaml
 - sources:
@@ -17,43 +17,43 @@
   - name: test
 ```
 - added two options to reverse proxy config `forced_retry_interval_secs` and `connect_timeout_secs`
-`forced_retry_interval_secs` forces every x seconds a econnect to the provider,
-`connect_timeout_secs` tries only x seconds for connection, if not successfull starts a retry. 
+`forced_retry_interval_secs` forces every x seconds a reconnect to the provider,
+`connect_timeout_secs` tries only x seconds for connection, if not successfully starts a retry. 
 
 # 2.2.2 (2025-03-12)
 - !BREAKING CHANGE! Target options moved to specific target output definitions.
 
-target options:
-- ignore_logo: true|false,
-- share_live_streams: true|false,
-- remove_duplicates: true|false,
+target `options`:
+- `ignore_logo`: `true`|`false`,
+- `share_live_streams`: `true`|`false`,
+- `remove_duplicates`: `true`|`false`,
 
-target output type xtream:
-- skip_live_direct_source: true|false,
-- skip_video_direct_source: true|false,
-- skip_series_direct_source: true|false,
-- resolve_series: true|false,
-- resolve_series_delay: seconds,
-- resolve_vod: true|false,
-- resolve_vod_delay: true|false,
+target output type `xtream`:
+- `skip_live_direct_source`: `true`|`false`,
+- `skip_video_direct_source`: `true`|`false`,
+- `skip_series_direct_source`: `true`|`false`,
+- `resolve_series`: `true`|`false`,
+- `resolve_series_delay`: seconds,
+- `resolve_vod`: `true`|`false`,
+- `resolve_vod_delay`: `true`|`false`,
 
-target output type m3u:
-- filename: _optional_
-- include_type_in_url: true|false,
-- mask_redirect_url: true|false,
+target output type `m3u`:
+- `filename`: _optional_
+- `include_type_in_url`: `true`|`false`,
+- `mask_redirect_url`: `true`|`false`,
 
-target output type strm:
-- directory: _mandatory_,
-- username: _optional_,
-- underscore_whitespace: true|false,
-- cleanup: true|false,
-- kodi_style: true|false,
-- strm_props: _optional_,  list of strings,
+target output type `strm`:
+- `directory`: _mandatory_,
+- `username`: _optional_,
+- `underscore_whitespace`: `true`|`false`,
+- `cleanup`: `true`|`false`,
+- `kodi_style`: `true`|`false`,
+- `strm_props`: _optional_,  list of strings,
 
-target output type hdhomerun:
-- device: _mandatory_,
-- username: _mandatory_,
-- use_output: _optional_, m3u|xtream
+target output type `hdhomerun`:
+- `device`: _mandatory_,
+- `username`: _mandatory_,
+- `use_output`: _optional_, `m3u`|`xtream`
 
 Example:
 ```yaml
