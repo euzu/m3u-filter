@@ -53,6 +53,7 @@ paste = "1.0"
 tempfile = "3.16"
 ruzstd = "0"
 filetime = "0.2"
+uuid = { version = "1", features = ["v4"] }
 #[cfg(target_os = "macos")]
 libc = "0"
 #[cfg(target_os = "windows")]

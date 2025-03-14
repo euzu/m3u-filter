@@ -22,3 +22,8 @@ pub fn generate_playlist_uuid(key: &str, provider_id: &str, item_type: PlaylistI
     }
     hash_string(url)
 }
+
+#[inline]
+pub fn uuid_v4() -> String {
+    uuid::Uuid::new_v4().to_string().replace("-", "")
+}
