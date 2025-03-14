@@ -1,16 +1,17 @@
 # Build rust stage
 FROM rust:bookworm as rust-build
 
-RUN apt-get update && \
-  apt-get install pkg-config musl-tools libssl-dev
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config musl-tools libssl-dev
 
-RUN rustup update
+# Update Rust toolchain and add necessary target
+RUN rustup update && rustup target add x86_64-unknown-linux-musl
+
+# Set Rust compiler flags for better optimization and reproducibility
 ENV RUSTFLAGS='--remap-path-prefix $HOME=~ -C target-feature=+crt-static'
 
-COPY . /src
+# Copy the actual source code and build the project
 WORKDIR /src
-
-RUN rustup target add x86_64-unknown-linux-musl
+COPY . /src
 RUN cargo build --target x86_64-unknown-linux-musl --release
 
 # Build node stage
@@ -21,13 +22,8 @@ ENV NODE_OPTIONS=--openssl-legacy-provider
 COPY ./frontend /app
 WORKDIR /app
 
-RUN yarn install \
-  --prefer-offline \
-  --frozen-lockfile \
-  --non-interactive \
-  --production=false
-RUN yarn build
-RUN rm -rf node_modules
+RUN yarn install --prefer-offline --frozen-lockfile --non-interactive --production=false && \
+    yarn build &&  rm -rf node_modules
 
 # Build resource stage (using ffmpeg)
 FROM jrottenberg/ffmpeg:latest as resource-build
