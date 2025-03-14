@@ -1,6 +1,7 @@
-use crate::api::api_utils::{stream_response};
-use crate::api::api_utils::{try_option_bad_request};
+use crate::api::api_utils::stream_response;
+use crate::api::api_utils::try_option_bad_request;
 use crate::api::model::app_state::AppState;
+use crate::api::model::streams::provider_stream::create_freeze_frame_stream;
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, TargetType};
 use crate::model::playlist::{PlaylistItemType, XtreamCluster};
@@ -10,6 +11,7 @@ use crate::utils::network::request;
 use crate::utils::network::request::{replace_extension, sanitize_sensitive_info};
 use axum::response::IntoResponse;
 use log::{debug, error};
+use reqwest::StatusCode;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -44,6 +46,16 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
         }
         Err(err) => {
             error!("Failed to download m3u8 {}", sanitize_sensitive_info(err.to_string().as_str()));
+            if let Some((stream, (headers, status_code)))
+                = create_freeze_frame_stream(&app_state.config, &[], StatusCode::BAD_REQUEST) {
+                let mut builder = axum::response::Response::builder()
+                    .status(status_code);
+                for (key, value) in headers {
+                    builder = builder.header(key, value);
+                }
+                return builder.body(axum::body::Body::from_stream(stream))
+                    .unwrap().into_response();
+            }
             axum::http::StatusCode::NO_CONTENT.into_response()
         }
     }

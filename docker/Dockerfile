@@ -34,6 +34,7 @@ FROM jrottenberg/ffmpeg:latest as resource-build
 WORKDIR /src
 COPY resources ./resources
 RUN ffmpeg -loop 1 -i ./resources/freeze_frame.jpg -t 10 -r 1 -an \
+  -vf "scale=1920:1080" \
   -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
   ./resources/freeze_frame.ts
 
