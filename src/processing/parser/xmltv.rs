@@ -170,8 +170,6 @@ mod tests {
     use std::collections::HashSet;
     use std::io;
     use std::path::PathBuf;
-    use std::rc::Rc;
-
     use crate::model::xmltv::{TVGuide};
 
     #[test]
@@ -181,7 +179,7 @@ mod tests {
         let tv_guide = TVGuide { file: PathBuf::from(file_path) };
 
         let channel_ids = vec!["channel.1", "channel.2", "channel.3"];
-        let channel_ids : HashSet<Arc<String>> =  channel_ids.into_iter().map(|s| Arc::new(s.to_string())).collect();
+        let channel_ids : HashSet<String> =  channel_ids.into_iter().map(|s| s.to_string()).collect();
 
         match tv_guide.filter(&channel_ids) {
             None => assert!(false, "No epg filtered"),

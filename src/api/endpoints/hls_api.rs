@@ -1,17 +1,15 @@
 use crate::api::api_utils::stream_response;
 use crate::api::api_utils::try_option_bad_request;
 use crate::api::model::app_state::AppState;
-use crate::api::model::streams::provider_stream::create_freeze_frame_stream;
+use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, TargetType};
 use crate::model::playlist::{PlaylistItemType, XtreamCluster};
 use crate::processing::parser::hls::rewrite_hls;
-use crate::repository::playlist_repository::HLS_EXT;
 use crate::utils::network::request;
-use crate::utils::network::request::{replace_extension, sanitize_sensitive_info};
+use crate::utils::network::request::{is_hls_url, replace_url_extension, sanitize_sensitive_info, HLS_EXT};
 use axum::response::IntoResponse;
 use log::{debug, error};
-use reqwest::StatusCode;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -31,7 +29,7 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
                                                       virtual_id: u32,
                                                       input: &ConfigInput,
                                                       target_type: TargetType) -> impl axum::response::IntoResponse + Send {
-    let url = replace_extension(hls_url, HLS_EXT);
+    let url = replace_url_extension(hls_url, HLS_EXT);
     let server_info = app_state.config.get_user_server_info(user).await;
     match request::download_text_content(Arc::clone(&app_state.http_client), input, &url, None).await {
         Ok(content) => {
@@ -46,17 +44,7 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
         }
         Err(err) => {
             error!("Failed to download m3u8 {}", sanitize_sensitive_info(err.to_string().as_str()));
-            if let Some((stream, (headers, status_code)))
-                = create_freeze_frame_stream(&app_state.config, &[], StatusCode::BAD_REQUEST) {
-                let mut builder = axum::response::Response::builder()
-                    .status(status_code);
-                for (key, value) in headers {
-                    builder = builder.header(key, value);
-                }
-                return builder.body(axum::body::Body::from_stream(stream))
-                    .unwrap().into_response();
-            }
-            axum::http::StatusCode::NO_CONTENT.into_response()
+            create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::ChannelUnavailable).into_response()
         }
     }
 }
@@ -69,9 +57,13 @@ async fn hls_api_stream(
     let (user, target) = try_option_bad_request!(
         app_state.config.get_target_for_user(&params.username, &params.password).await, false,
         format!("Could not find any user {}", params.username));
-    if !user.has_permissions(&app_state).await {
+    if user.permission_denied(&app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
+    if user.connections_exhausted(&app_state).await {
+        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+    }
+
 
     let Some(hls_entry) = app_state.hls_cache.get_entry(&params.token).await else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
     let Some(hls_url) = hls_entry.get_chunk_url(params.chunk) else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
@@ -79,7 +71,7 @@ async fn hls_api_stream(
     let virtual_id = params.stream_id;
     let input = try_option_bad_request!(app_state.config.get_input_by_name(&hls_entry.input_name), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
 
-    if hls_url.ends_with(HLS_EXT) {
+    if is_hls_url(hls_url) {
         return handle_hls_stream_request(&app_state, &user, hls_url, virtual_id, input, hls_entry.target_type.clone()).await.into_response();
     }
 

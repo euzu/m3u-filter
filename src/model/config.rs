@@ -1154,6 +1154,17 @@ impl ReverseProxyConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
+pub struct CustomStreamResponseConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_unavailable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_connection_exhausted: Option<String>, // user has no more connections
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_connection_exhausted: Option<String>, // provider limit reached, has no more connections
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
     pub threads: u8,
@@ -1165,7 +1176,7 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_config_dir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub channel_unavailable_file: Option<String>,
+    pub custom_stream_response: Option<CustomStreamResponseConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub templates: Option<Vec<PatternTemplate>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1201,7 +1212,11 @@ pub struct Config {
     #[serde(skip)]
     pub file_locks: Arc<FileLockManager>,
     #[serde(skip)]
-    pub t_channel_unavailable_file: Option<Arc<Vec<u8>>>,
+    pub t_channel_unavailable_video: Option<Arc<Vec<u8>>>,
+    #[serde(skip)]
+    pub t_user_connections_exhausted_video: Option<Arc<Vec<u8>>>,
+    #[serde(skip)]
+    pub t_provider_connections_exhausted_video: Option<Arc<Vec<u8>>>,
 }
 
 impl Config {
@@ -1417,54 +1432,72 @@ impl Config {
     pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
         let work_dir = if resolve_var { &config_reader::resolve_env_var(&self.working_dir) } else { &self.working_dir };
         self.working_dir = file_utils::get_working_path(work_dir);
-
-        if let Some(channel_unavailable_file) = &self.channel_unavailable_file {
-            let channel_unavailable = file_utils::make_absolute_path(channel_unavailable_file, &self.working_dir, resolve_var);
-            match file_utils::read_file_as_bytes(&PathBuf::from(&channel_unavailable)) {
-                Ok(data) => {
-                    self.t_channel_unavailable_file = Some(Arc::new(data));
-                }
-                Err(err) => {
-                    error!("Failed to load channel unavailable file: {channel_unavailable} {err}");
-                }
-            }
-            self.channel_unavailable_file = Some(channel_unavailable);
-        }
-
-        if self.backup_dir.is_none() {
-            self.backup_dir = Some(PathBuf::from(&self.working_dir).join("backup").clean().to_string_lossy().to_string());
-        } else {
-            self.backup_dir = self.backup_dir.as_ref().map(|backup_dir| {
-                if resolve_var {
-                    config_reader::resolve_env_var(backup_dir)
-                } else {
-                    backup_dir.to_owned()
-                }
-            }).map(|dir| dir.to_string());
-        }
-        if self.user_config_dir.is_none() {
-            self.user_config_dir = Some(PathBuf::from(&self.working_dir).join("user_config").clean().to_string_lossy().to_string());
-        } else {
-            self.user_config_dir = self.user_config_dir.as_ref().map(|user_config_dir| {
-                if resolve_var {
-                    config_reader::resolve_env_var(user_config_dir)
-                } else {
-                    user_config_dir.to_owned()
-                }
-            }).map(|dir| dir.to_string());
-        }
+        self.prepare_custom_stream_response(resolve_var);
+        self.prepare_directories(resolve_var);
         if let Some(reverse_proxy) = self.reverse_proxy.as_mut() {
             reverse_proxy.prepare(&self.working_dir, resolve_var);
         }
+        self.prepare_hdhomerun()?;
+        self.api.prepare();
+        self.prepare_api_web_root(resolve_var);
+        self.prepare_templates()?;
+        self.check_unique_input_names()?;
+        let target_names = self.check_unique_target_names()?;
+        self.check_scheduled_targets(&target_names)?;
+        self.prepare_sources()?;
+        self.prepare_video_config()?;
+        self.prepare_web_auth(resolve_var)?;
 
+        Ok(())
+    }
+
+    fn prepare_directories(&mut self, resolve_var: bool) {
+        fn set_directory(path: &mut Option<String>, default_subdir: &str, working_dir: &str, resolve_var: bool) {
+            *path = Some(match path.as_ref() {
+                Some(existing) => {
+                    if resolve_var {
+                        resolve_env_var(existing)
+                    } else {
+                        existing.to_owned()
+                    }
+                }
+                None => PathBuf::from(working_dir).join(default_subdir).clean().to_string_lossy().to_string(),
+            });
+        }
+
+        set_directory(&mut self.backup_dir, "backup", &self.working_dir, resolve_var);
+        set_directory(&mut self.user_config_dir, "user_config", &self.working_dir, resolve_var);
+    }
+
+    fn prepare_hdhomerun(&mut self) -> Result<(), M3uFilterError> {
         if let Some(hdhomerun) = self.hdhomerun.as_mut() {
             if hdhomerun.enabled {
                 hdhomerun.prepare(self.api.port)?;
             }
         }
+        Ok(())
+    }
 
-        self.api.prepare();
-        self.prepare_api_web_root(resolve_var);
+    fn prepare_sources(&mut self) -> Result<(), M3uFilterError> {
+        // prepare sources and set id's
+        let mut source_index: u16 = 1;
+        let mut target_index: u16 = 1;
+        for source in &mut self.sources {
+            source_index = source.prepare(source_index)?;
+            for target in &mut source.targets {
+                // prepare target templates
+                let prepare_result = match &self.templates {
+                    Some(templ) => target.prepare(target_index, Some(templ)),
+                    _ => target.prepare(target_index, None)
+                };
+                prepare_result?;
+                target_index += 1;
+            }
+        }
+        Ok(())
+    }
+
+    fn prepare_templates(&mut self) -> Result<(), M3uFilterError> {
         if let Some(templates) = &mut self.templates {
             match prepare_templates(templates) {
                 Ok(tmplts) => {
@@ -1475,25 +1508,25 @@ impl Config {
                 }
             }
         };
-        // prepare sources and set id's
-        let mut source_index: u16 = 1;
-        let mut target_index: u16 = 1;
-        self.check_unique_input_names()?;
-        let target_names = self.check_unique_target_names()?;
-        self.check_scheduled_targets(&target_names)?;
-        for source in &mut self.sources {
-            source_index = source.prepare(source_index)?;
-            for target in &mut source.targets {
-                // prepare templates
-                let prepare_result = match &self.templates {
-                    Some(templ) => target.prepare(target_index, Some(templ)),
-                    _ => target.prepare(target_index, None)
-                };
-                prepare_result?;
-                target_index += 1;
-            }
+        Ok(())
+    }
+
+    fn prepare_web_auth(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
+        if !self.web_ui_enabled {
+            self.web_auth = None;
         }
 
+        if let Some(web_auth) = &mut self.web_auth {
+            if web_auth.enabled {
+                web_auth.prepare(&self.t_config_path, resolve_var)?;
+            } else {
+                self.web_auth = None;
+            }
+        }
+        Ok(())
+    }
+
+    fn prepare_video_config(&mut self) -> Result<(), M3uFilterError> {
         match &mut self.video {
             None => {
                 self.video = Some(VideoConfig {
@@ -1509,20 +1542,27 @@ impl Config {
                 }
             }
         };
-
-        if !self.web_ui_enabled {
-            self.web_auth = None;
-        }
-
-        if let Some(web_auth) = &mut self.web_auth {
-            if web_auth.enabled {
-                web_auth.prepare(&self.t_config_path, resolve_var)?;
-            } else {
-                self.web_auth = None;
-            }
-        }
-
         Ok(())
+    }
+
+    fn prepare_custom_stream_response(&mut self, resolve_var: bool) {
+        if let Some(custom_stream_response) = self.custom_stream_response.as_ref() {
+            fn load_and_set_file(path: Option<&String>, working_dir: &str, resolve_var: bool) -> Option<Arc<Vec<u8>>> {
+                path.as_ref()
+                    .map(|file| file_utils::make_absolute_path(file, working_dir, resolve_var))
+                    .and_then(|absolute_path| match file_utils::read_file_as_bytes(&PathBuf::from(&absolute_path)) {
+                        Ok(data) => Some(Arc::new(data)),
+                        Err(err) => {
+                            error!("Failed to load file: {absolute_path} {err}");
+                            None
+                        }
+                    })
+            }
+
+            self.t_channel_unavailable_video = load_and_set_file(custom_stream_response.channel_unavailable.as_ref(), &self.working_dir, resolve_var);
+            self.t_user_connections_exhausted_video = load_and_set_file(custom_stream_response.user_connection_exhausted.as_ref(), &self.working_dir, resolve_var);
+            self.t_provider_connections_exhausted_video = load_and_set_file(custom_stream_response.provider_connection_exhausted.as_ref(), &self.working_dir, resolve_var);
+        }
     }
 
     fn prepare_api_web_root(&mut self, resolve_var: bool) {

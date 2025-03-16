@@ -47,7 +47,7 @@ async fn playlist_categories(
 ) -> impl axum::response::IntoResponse + Send {
     if let Some(username) = get_username_from_auth_header(&token, &app_state) {
         if let Some((user, target)) = get_user_target_by_username(username.as_str(), &app_state).await {
-            if !user.has_permissions(&app_state).await {
+            if user.permission_denied(&app_state) {
                 return axum::http::StatusCode::FORBIDDEN.into_response();
             }
             let config = &app_state.config;
@@ -105,7 +105,7 @@ async fn save_playlist_bouquet(
 ) -> impl axum::response::IntoResponse + Send {
     if let Some(username) = get_username_from_auth_header(&token, &app_state) {
         if let Some((user, target)) = get_user_target_by_username(username.as_str(), &app_state).await {
-            if !user.has_permissions(&app_state).await {
+            if user.permission_denied(&app_state) {
                 return axum::http::StatusCode::FORBIDDEN.into_response();
             }
             match save_user_bouquet(&app_state.config, &target.name, &username, &bouquet).await {
@@ -127,7 +127,7 @@ async fn playlist_bouquet(
 ) -> impl axum::response::IntoResponse + Send {
     if let Some(username) = get_username_from_auth_header(&token, &app_state) {
         if let Some((user, _target)) = get_user_target_by_username(username.as_str(), &app_state).await {
-            if !user.has_permissions(&app_state).await {
+            if user.permission_denied(&app_state) {
                 return axum::http::StatusCode::FORBIDDEN.into_response();
             }
             let xtream = load_user_bouquet_as_json(&app_state.config, &username, TargetType::Xtream).await;

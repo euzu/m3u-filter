@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 # Function to print usage instructions
 print_usage() {
     echo "Usage: $(basename "$0") [-f] [-h]"
@@ -22,17 +21,20 @@ while getopts "fh" opt; do
   esac
 done
 
-if [ "$flag_force" = false ]; then
-  if [ -e ./resources/freeze_frame.ts ]; then
-      echo "Resource exists, skipping creation"
-      exit;
+declare -a resources=("channel_unavailable" "user_connections_exhausted")
+
+for resource in "${resources[@]}"; do
+  if [ "$flag_force" = false ]; then
+    if [ -e "./resources/${resource}.ts" ]; then
+      echo "Resource ${resource} exists, skipping creation"
+      continue
+    fi
   fi
-fi
 
-
-if which ffmpeg > /dev/null 2>&1; then
-    ffmpeg -loop 1 -i ./resources/freeze_frame.jpg -t 10 -r 1 -an -vf "scale=1920:1080" -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p ./resources/freeze_frame.ts
-else
-    echo "ffmpeg not found";
-    exit;
-fi
+  if which ffmpeg > /dev/null 2>&1; then
+    ffmpeg -loop 1 -i "./resources/${resource}.jpg" -t 10 -r 1 -an -vf "scale=1920:1080" -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p "./resources/${resource}.ts"
+  else
+    echo "ffmpeg not found"
+    exit
+  fi
+done

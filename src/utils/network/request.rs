@@ -26,6 +26,8 @@ use crate::utils::file::file_utils::{get_file_path, persist_file};
 use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::utils::debug_if_enabled;
 
+pub const HLS_EXT: &str = ".m3u8";
+
 pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
 }
@@ -426,22 +428,48 @@ pub fn classify_content_type(headers: &[(String, String)]) -> MimeCategory {
         })
 }
 
-pub fn replace_extension(path: &str, new_ext: &str) -> String {
-    let ext = if let Some(stripped) = new_ext.strip_prefix('.') { stripped } else { new_ext };
-    if let Some(pos) = path.rfind('/') {
-        if let Some(dot_pos) = path[pos..].rfind('.') {
-            let dot_index = pos + dot_pos;
-            return format!("{}{}.{}", &path[..dot_index], "", ext);
+const HLS_EXT_QUERY: &str = ".m3u8?";
+const HLS_EXT_FRAGMENT: &str = ".m3u8#";
+
+pub fn is_hls_url(url: &str) -> bool {
+    let lc_url = url.to_lowercase();
+    lc_url.ends_with(HLS_EXT) || lc_url.contains(HLS_EXT_QUERY) || lc_url.contains(HLS_EXT_FRAGMENT)
+}
+
+pub fn replace_url_extension(url: &str, new_ext: &str) -> String {
+    let ext = new_ext.strip_prefix('.').unwrap_or(new_ext); // Remove leading dot if exists
+
+    // Split URL into the base part (domain and path) and the suffix (query/fragment)
+    let (base_url, suffix) = match url.find(['?', '#'].as_ref()) {
+        Some(pos) => (&url[..pos], &url[pos..]), // Base URL and suffix
+        None => (url, ""), // No query or fragment
+    };
+
+    // Find the last '/' in the base URL, which marks the end of the domain and the beginning of the file path
+    if let Some(last_slash_pos) = base_url.rfind('/') {
+        if last_slash_pos < 9 { // protocol slash, return url as is
+            return url.to_string();
         }
-    } else if let Some(dot_pos) = path.rfind('.') {
-        return format!("{}{}.{}", &path[..dot_pos], "", ext);
+        let (path_part, file_name_with_extension) = base_url.split_at(last_slash_pos + 1);
+        // Find the last dot in the file name to replace the extension
+        if let Some(dot_pos) = file_name_with_extension.rfind('.') {
+            return format!(
+                "{}{}.{}{}",
+                path_part,
+                &file_name_with_extension[..dot_pos], // Keep the name part before the dot
+                ext, // Add the new extension
+                suffix // Add the query or fragment if any
+            );
+        }
     }
-    format!("{path}.{ext}")
+
+    // If no extension is found, add the new extension to the base URL
+    format!("{}{}.{}{}", base_url, "", ext, suffix)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::network::request::{replace_extension, sanitize_sensitive_info};
+    use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info};
 
     #[test]
     fn test_url_mask() {
@@ -454,17 +482,15 @@ mod tests {
     #[test]
     fn test_replace_ext() {
         let tests = [
-            "test.txt",
-            "folder/test.txt",
-            "folder/subfolder/file",
-            "/absolute/path/to/file.tar.gz",
-            "/home/user/script",
-            "no_extension",
-            "some/path/file.with.dots",
+            ("http://hello.world.com", "http://hello.world.com"),
+            ("http://hello.world.com/123", "http://hello.world.com/123.mp4"),
+            ("http://hello.world.com/123.ts?hello=world", "http://hello.world.com/123.mp4?hello=world"),
+            ("http://hello.world.com/123?hello=world", "http://hello.world.com/123.mp4?hello=world"),
+            ("http://hello.world.com/123#hello=world", "http://hello.world.com/123.mp4#hello=world")
         ];
 
-        for test in &tests {
-            println!("{} -> {}", test, replace_extension(test, ".mp4"));
+        for (test, expect) in &tests {
+            assert_eq!(replace_url_extension(test, ".mp4"),  *expect);
         }
     }
 }

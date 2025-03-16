@@ -47,7 +47,7 @@ fi
 cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${WORKING_DIR}/frontend/build" "${DOCKER_DIR}/web"
-cp -r "${RESOURCES_DIR}/freeze_frame.ts" "${DOCKER_DIR}/"
+cp -r "${RESOURCES_DIR}"/*.ts "${DOCKER_DIR}/"
 
 cd "${DOCKER_DIR}"
 echo "Building Docker images for version ${VERSION}"
@@ -68,6 +68,6 @@ docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
 echo "Cleaning up build artifacts..."
 rm -rf "${DOCKER_DIR}/web"
 rm -f "${DOCKER_DIR}/m3u-filter"
-rm -f "${DOCKER_DIR}/freeze_frame.ts"
+rm -f "${DOCKER_DIR}"/*.ts
 
 echo "Docker images ghcr.io/euzu/${SCRATCH_IMAGE_NAME}${VERSION} have been successfully built, tagged, and pushed."

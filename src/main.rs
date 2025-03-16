@@ -145,9 +145,9 @@ fn main() {
         Err(err) => exit!("{err}"),
     }
 
-    if cfg.t_channel_unavailable_file.is_some() {
-        info!("Freeze frame video loaded from {:?}", cfg.channel_unavailable_file.as_ref().map_or("?", |v| v.as_str()));
-    }
+    // if cfg.t_channel_unavailable_video.is_some() {
+    //     info!("Channel unavailable video loaded from {:?}", cfg.channel_unavailable_file.as_ref().map_or("?", |v| v.as_str()));
+    // }
 
     let rt  = tokio::runtime::Runtime::new().unwrap();
     let () = rt.block_on(async {

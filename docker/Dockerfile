@@ -29,10 +29,15 @@ RUN yarn install --prefer-offline --frozen-lockfile --non-interactive --producti
 FROM jrottenberg/ffmpeg:latest as resource-build
 WORKDIR /src
 COPY resources ./resources
-RUN ffmpeg -loop 1 -i ./resources/freeze_frame.jpg -t 10 -r 1 -an \
+RUN ffmpeg -loop 1 -i ./resources/channel_unavailable.jpg -t 10 -r 1 -an \
   -vf "scale=1920:1080" \
   -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
-  ./resources/freeze_frame.ts
+  ./resources/channel_unavailable.ts
+
+RUN ffmpeg -loop 1 -i ./resources/user_connections_exhausted.jpg -t 10 -r 1 -an \
+  -vf "scale=1920:1080" \
+  -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
+  ./resources/user_connections_exhausted.ts \
 
 # Final container (Scratch)
 FROM scratch as scratch-final
@@ -41,7 +46,8 @@ COPY --from=rust-build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=rust-build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter /m3u-filter
 COPY --from=node-build /app/build /web
-COPY --from=resource-build /src/resources/freeze_frame.ts /freeze_frame.ts
+COPY --from=resource-build /src/resources/channel_unavailable.ts /channel_unavailable.ts
+COPY --from=resource-build /src/resources/user_connections_exhausted.ts /user_connections_exhausted.ts
 ENTRYPOINT ["/m3u-filter"]
 CMD ["-s", "-p", "/config"]
 
@@ -51,6 +57,7 @@ RUN apk add --no-cache bash curl ca-certificates tini
 WORKDIR /app
 COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter m3u-filter
 COPY --from=node-build /app/build web
-COPY --from=resource-build /src/resources/freeze_frame.ts /freeze_frame.ts
+COPY --from=resource-build /src/resources/channel_unavailable.ts /channel_unavailable.ts
+COPY --from=resource-build /src/resources/user_connections_exhausted.ts /user_connections_exhausted.ts
 ENTRYPOINT ["/sbin/tini", "--", "/app/m3u-filter"]
 CMD ["-s", "-p", "/app/config"]

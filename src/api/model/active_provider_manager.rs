@@ -648,7 +648,7 @@ mod tests {
         assert!(lineup.acquire(false).is_some());
 
         // Release one connection
-        lineup.release(1);
+        lineup.release("provider7_1");
 
         // After release, one connection should be available
         assert!(lineup.acquire(false).is_some());
@@ -721,7 +721,7 @@ mod tests {
         }
 
         // Verify that only the capacity of the provider was utilized (2 connections)
-        assert_eq!(*lineup.provider.current_connections.read(), 2);
+        assert_eq!(lineup.provider.current_connections.load(Ordering::SeqCst), 2);
     }
 }
 

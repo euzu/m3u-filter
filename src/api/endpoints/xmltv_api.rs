@@ -175,7 +175,7 @@ async fn xmltv_api(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
     if let Some((user, target)) = get_user_target(&api_req, &app_state).await {
-        if !user.has_permissions(&app_state).await {
+        if user.permission_denied(&app_state) {
             return axum::http::StatusCode::FORBIDDEN.into_response();
         }
         match get_epg_path_for_target(&app_state.config, target) {

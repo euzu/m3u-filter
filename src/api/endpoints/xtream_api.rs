@@ -21,6 +21,7 @@ use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::endpoints::xmltv_api::get_empty_epg_response;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
+use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::api::model::xtream::XtreamAuthorizationResponse;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
@@ -28,13 +29,13 @@ use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH, SEASON_RESOURCE_PREFIX};
-use crate::repository::playlist_repository::{get_target_id_mapping, HLS_EXT};
+use crate::repository::playlist_repository::{get_target_id_mapping};
 use crate::repository::storage::{get_target_storage_path, hex_encode};
 use crate::repository::{user_repository, xtream_repository};
 use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils::get_u32_from_serde_value;
-use crate::utils::network::request::{extract_extension_from_url, sanitize_sensitive_info};
+use crate::utils::network::request::{extract_extension_from_url, sanitize_sensitive_info, HLS_EXT};
 use crate::utils::network::xtream::{create_vod_info_from_item, ACTION_GET_LIVE_CATEGORIES, ACTION_GET_LIVE_STREAMS, ACTION_GET_SERIES, ACTION_GET_SERIES_CATEGORIES, ACTION_GET_SERIES_INFO, ACTION_GET_VOD_CATEGORIES, ACTION_GET_VOD_INFO, ACTION_GET_VOD_STREAMS};
 use crate::utils::json_utils;
 use crate::utils::debug_if_enabled;
@@ -146,9 +147,13 @@ async fn xtream_player_api_stream(
     stream_req: XtreamApiStreamRequest<'_>,
 ) -> impl axum::response::IntoResponse + Send {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state).await, false, format!("Could not find any user {}", stream_req.username));
-    if !user.has_permissions(app_state).await {
+    if user.permission_denied(app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
+    if user.connections_exhausted(app_state).await {
+        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+    }
+
     let target_name = &target.name;
     if !target.has_output(&TargetType::Xtream) {
         debug!("Target has no xtream output {}", target_name);
@@ -337,7 +342,7 @@ async fn xtream_player_api_resource(
     resource_req: XtreamApiStreamRequest<'_>,
 ) ->  impl axum::response::IntoResponse {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(resource_req.username, resource_req.password, api_req, app_state).await, false, format!("Could not find any user {}", resource_req.username));
-    if !user.has_permissions(app_state).await {
+    if user.permission_denied(app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
     let target_name = &target.name;
@@ -617,7 +622,7 @@ async fn xtream_player_api(
             return axum::response::Json(get_user_info(&user, app_state).await).into_response();
         }
 
-        if !user.has_permissions(app_state).await {
+        if user.permission_denied(app_state) {
             return axum::http::StatusCode::FORBIDDEN.into_response();
         }
 
@@ -719,24 +724,13 @@ async fn xtream_player_api_get(
     xtream_player_api(api_req, &app_state).await
 }
 
-// async fn xtream_player_api_get(req: axum::http::Request<axum::body::Body>,
-//                                axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
-//                                axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
-// ) ->  impl axum::response::IntoResponse + Send {
-//     xtream_player_api(&req, api_req.into_inner(), &app_state).await
-// }
+
 async fn xtream_player_api_post(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Form(api_req): axum::extract::Form<UserApiRequest>,
 ) -> impl axum::response::IntoResponse + Send {
     xtream_player_api(api_req, &app_state).await
 }
-// async fn xtream_player_api_post(req: axum::http::Request<axum::body::Body>,
-//                                 api_req: web::Form<UserApiRequest>,
-//                                 axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
-// ) ->  impl axum::response::IntoResponse + Send {
-//     xtream_player_api(&req, api_req.into_inner(), &app_state).await
-// }
 
 macro_rules! register_xtream_api {
     ($router:expr, [$($path:expr),*]) => {{

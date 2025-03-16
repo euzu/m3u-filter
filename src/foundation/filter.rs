@@ -626,24 +626,24 @@ mod tests {
                 assert_eq!(filtered.len(), 2);
                 assert_eq!(
                     filtered.iter().any(|&chan| {
-                        let group = chan.header.borrow().group.to_string();
-                        let name = chan.header.borrow().name.to_string();
+                        let group = chan.header.group.to_string();
+                        let name = chan.header.name.to_string();
                         name.eq("24/7: Cars") && group.eq("FR Channels")
                     }),
                     true
                 );
                 assert_eq!(
                     filtered.iter().any(|&chan| {
-                        let group = chan.header.borrow().group.to_string();
-                        let name = chan.header.borrow().name.to_string();
+                        let group = chan.header.group.to_string();
+                        let name = chan.header.name.to_string();
                         name.eq("Entertainment") && group.eq("US Channels")
                     }),
                     true
                 );
                 assert_eq!(
                     filtered.iter().any(|&chan| {
-                        let group = chan.header.borrow().group.to_string();
-                        let name = chan.header.borrow().name.to_string();
+                        let group = chan.header.group.to_string();
+                        let name = chan.header.name.to_string();
                         name.eq("24/7: Cars") && group.eq("US Channels")
                     }),
                     false

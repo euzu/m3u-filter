@@ -7,14 +7,14 @@ use crate::model::config::TargetType;
 use crate::model::playlist::{FieldGetAccessor, PlaylistItemType, XtreamCluster};
 use crate::repository::m3u_playlist_iterator::{M3U_RESOURCE_PATH, M3U_STREAM_PATH};
 use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
-use crate::repository::playlist_repository::HLS_EXT;
-use crate::utils::network::request::{replace_extension, sanitize_sensitive_info};
+use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info, HLS_EXT};
 use crate::utils::debug_if_enabled;
 use axum::response::IntoResponse;
 use bytes::Bytes;
 use futures::stream;
 use log::{debug, error};
 use std::sync::Arc;
+use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 
 async fn m3u_api(
     api_req: &UserApiRequest,
@@ -69,8 +69,11 @@ async fn m3u_api_stream(
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
     else { return axum::http::StatusCode::BAD_REQUEST.into_response() };
-    if !user.has_permissions(&app_state).await {
+    if user.permission_denied(&app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
+    }
+    if user.connections_exhausted(&app_state).await {
+        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
     if !target.has_output(&TargetType::M3u) {
@@ -90,7 +93,7 @@ async fn m3u_api_stream(
     let is_hls_request = m3u_item.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
 
     if user.proxy == ProxyType::Redirect {
-        let redirect_url = if is_hls_request { &replace_extension(&m3u_item.url, "m3u8") } else { &m3u_item.url };
+        let redirect_url = if is_hls_request { &replace_url_extension(&m3u_item.url, "m3u8") } else { &m3u_item.url };
         // TODO alias processing
         debug_if_enabled!("Redirecting m3u stream request to {}", sanitize_sensitive_info(redirect_url));
         return redirect(redirect_url.as_str()).into_response();
@@ -114,7 +117,7 @@ async fn m3u_api_resource(
     let Ok(m3u_stream_id) = stream_id.parse::<u32>() else { return axum::http::StatusCode::BAD_REQUEST.into_response() };
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
     else { return axum::http::StatusCode::BAD_REQUEST.into_response() };
-    if !user.has_permissions(&app_state).await {
+    if user.permission_denied(&app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
 

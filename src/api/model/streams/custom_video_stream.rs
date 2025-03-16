@@ -8,13 +8,13 @@ use std::task::{Context, Poll};
 const CHUNK_SIZE: usize = 8192;
 
 
-pub struct FreezeFrameStream {
+pub struct CustomVideoStream {
     buffer: Arc<Vec<u8>>,
     buffer_len: usize,
     current_pos: usize, // Keep track of the current position in the buffer
 }
 
-impl FreezeFrameStream {
+impl CustomVideoStream {
     pub fn new(buffer: Arc<Vec<u8>>) -> Self {
         let buffer_len = buffer.len();
         Self {
@@ -25,7 +25,7 @@ impl FreezeFrameStream {
     }
 }
 
-impl Stream for FreezeFrameStream {
+impl Stream for CustomVideoStream {
     type Item = Result<Bytes, StreamError>;
 
     fn poll_next(

@@ -44,7 +44,6 @@ pub async fn start_scheduler(client: Arc<reqwest::Client>, expression: &str, con
 mod tests {
     use std::str::FromStr;
     use std::sync::atomic::{AtomicU8, Ordering};
-    use std::time::Instant;
     use chrono::Local;
     use cron::Schedule;
     use crate::api::scheduler::datetime_to_instant;

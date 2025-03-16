@@ -120,7 +120,16 @@ pub async fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a App
     get_user_target_by_credentials(username, password, api_req, app_state).await
 }
 
-fn get_stream_options(app_state: &AppState) -> (bool, u32, u32, bool, usize, bool) {
+pub struct StreamOptions {
+    pub stream_retry: bool,
+    pub stream_force_retry_secs: u32,
+    pub stream_connect_timeout_secs: u32,
+    pub buffer_enabled: bool,
+    pub buffer_size: usize,
+    pub pipe_provider_stream: bool
+}
+
+fn get_stream_options(app_state: &AppState) -> StreamOptions {
     let (stream_retry, stream_force_retry_secs, stream_connect_timeout_secs, buffer_enabled, buffer_size) = app_state
         .config
         .reverse_proxy
@@ -134,7 +143,7 @@ fn get_stream_options(app_state: &AppState) -> (bool, u32, u32, bool, usize, boo
             (stream.retry, stream.forced_retry_interval_secs, stream.connect_timeout_secs, buffer_enabled, buffer_size)
         });
     let pipe_provider_stream = !stream_retry && !buffer_enabled;
-    (stream_retry, stream_force_retry_secs, stream_connect_timeout_secs, buffer_enabled, buffer_size, pipe_provider_stream)
+    StreamOptions { stream_retry, stream_force_retry_secs, stream_connect_timeout_secs, buffer_enabled, buffer_size, pipe_provider_stream}
 }
 
 // fn get_stream_content_length(provider_response: Option<&(Vec<(String, String)>, StatusCode)>) -> u64 {
@@ -160,15 +169,14 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
         }
     }
 
-    let (stream_retry, stream_force_retry_secs, stream_connect_timeout, buffer_enabled, buffer_size, direct_pipe_provider_stream) =
-        get_stream_options(app_state);
+    let stream_options = get_stream_options(app_state); get_stream_options(app_state);
 
     if let Ok(url) = Url::parse(stream_url) {
         let event_manager = Arc::clone(&app_state.event_manager);
-        let (stream_opt, provider_response) = if direct_pipe_provider_stream {
-            provider_stream::get_provider_pipe_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, item_type).await
+        let (stream_opt, provider_response) = if stream_options.pipe_provider_stream {
+            provider_stream::get_provider_pipe_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, item_type, &stream_options).await
         } else {
-            let buffer_stream_options = BufferStreamOptions::new(item_type, stream_retry, stream_force_retry_secs, stream_connect_timeout, buffer_enabled, buffer_size, share_stream);
+            let buffer_stream_options = BufferStreamOptions::new(item_type,share_stream, &stream_options);
             provider_stream::get_provider_reconnect_buffered_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, buffer_stream_options).await
         };
         if let Some(stream) = stream_opt {
@@ -176,7 +184,7 @@ pub async fn stream_response(app_state: &AppState, stream_url: &str,
             let stream = ActiveClientStream::new(stream, event_manager, &user.username, input.map(|c| c.name.clone())).await;
             let stream_resp = if share_stream {
                 let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
-                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, buffer_size).await;
+                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, stream_options.buffer_size).await;
                 if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
                     let (status_code, header_map) = get_stream_response_with_headers(provider_response, stream_url);
                     let mut response = axum::response::Response::builder()

@@ -171,7 +171,7 @@ impl ProxyUserCredentials {
         Ok(())
     }
 
-    pub async fn has_permissions(&self, app_state: &AppState) -> bool {
+    pub fn has_permissions(&self, app_state: &AppState) -> bool {
         if app_state.config.user_access_control {
             if let Some(exp_date) = self.exp_date.as_ref() {
                 let now = Local::now();
@@ -180,12 +180,13 @@ impl ProxyUserCredentials {
                     return false;
                 }
             }
-            if let Some(max_connections) = self.max_connections.as_ref() {
-                if *max_connections < app_state.get_active_connections_for_user(&self.username).await {
-                    debug!("User access denied, too many connections: {}", self.username);
-                    return false;
-                }
-            }
+            // we allow requests with max connection reached, but we should block streaming
+            // if let Some(max_connections) = self.max_connections.as_ref() {
+            //     if *max_connections < app_state.get_active_connections_for_user(&self.username).await {
+            //         debug!("User access denied, too many connections: {}", self.username);
+            //         return false;
+            //     }
+            // }
             if let Some(status) = &self.status {
                 if !matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial) {
                     debug!("User access denied, status invalid: {status} for user: {}", self.username);
@@ -194,6 +195,29 @@ impl ProxyUserCredentials {
             }
         }
         true
+    }
+
+    #[inline]
+    pub fn permission_denied(&self, app_state: &AppState) -> bool {
+        !self.has_permissions(app_state)
+    }
+
+
+    pub async fn has_connections_left(&self, app_state: &AppState) -> bool {
+        if app_state.config.user_access_control {
+            if let Some(max_connections) = self.max_connections.as_ref() {
+                if *max_connections < app_state.get_active_connections_for_user(&self.username).await {
+                    debug!("User access denied, too many connections: {}", self.username);
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    #[inline]
+    pub async fn connections_exhausted(&self, app_state: &AppState) -> bool {
+        !self.has_connections_left(app_state).await
     }
 }
 

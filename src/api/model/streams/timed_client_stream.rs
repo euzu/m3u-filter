@@ -6,18 +6,18 @@ use std::pin::Pin;
 use std::task::Poll;
 use std::time::{Duration, Instant};
 
-pub struct TimedClientStream {
+pub struct TimeoutClientStream {
     inner: ResponseStream,
     duration: Duration,
     start_time: Instant,
 }
 
-impl TimedClientStream {
+impl TimeoutClientStream {
     pub(crate) fn new(inner: ResponseStream, duration: u32) -> Self {
         Self { inner, duration:  Duration::from_secs(u64::from(duration)) , start_time: Instant::now() }
     }
 }
-impl Stream for TimedClientStream {
+impl Stream for TimeoutClientStream {
     type Item = Result<Bytes, StreamError>;
 
     fn poll_next(mut self: Pin<&mut Self>,cx: &mut std::task::Context<'_>,) -> Poll<Option<Self::Item>> {

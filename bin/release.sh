@@ -91,7 +91,7 @@ for PLATFORM in "${!TARGETS[@]}"; do
     cp "$BIN" "$DIR"
     cp ../config/*.yml "$DIR"
     cp -rf "${FRONTEND_DIR}/build" "$DIR"/web
-    cp "${RESOURCES_DIR}/freeze_frame.ts" "$DIR"
+    cp -rf "${RESOURCES_DIR}"/*.ts "$DIR"
 
     # Create archive for the platform
     if [[ $PLATFORM == "WINDOWS" ]]; then

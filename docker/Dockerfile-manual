@@ -9,7 +9,8 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY ./m3u-filter /
 COPY ./web /web
-COPY ./freeze_frame.ts ./freeze_frame.ts
+COPY ./channel_unavailable.ts ./channel_unavailable.ts
+COPY ./user_connections_exhausted.ts ./user_connections_exhausted.ts
 
 CMD ["./m3u-filter", "-s", "-p", "/config"]
 

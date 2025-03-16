@@ -11,8 +11,7 @@ use crate::repository::storage::{ensure_target_storage_path, get_target_id_mappi
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
 use crate::utils::file::file_lock_manager::FileWriteGuard;
-
-pub const HLS_EXT: &str = ".m3u8";
+use crate::utils::network::request::is_hls_url;
 
 pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
                               target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
@@ -30,7 +29,7 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
             let header = &mut channel.header;
             let provider_id = header.get_provider_id().unwrap_or_default();
             if provider_id == 0 {
-                header.item_type = match (header.url.ends_with(HLS_EXT), header.item_type) {
+                header.item_type = match (is_hls_url(&header.url), header.item_type) {
                     (true, _) => PlaylistItemType::LiveHls,
                     (false, PlaylistItemType::Live) => PlaylistItemType::LiveUnknown,
                     _ => header.item_type,
