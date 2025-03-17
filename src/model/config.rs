@@ -1158,9 +1158,9 @@ pub struct CustomStreamResponseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel_unavailable: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub user_connection_exhausted: Option<String>, // user has no more connections
+    pub user_connections_exhausted: Option<String>, // user has no more connections
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provider_connection_exhausted: Option<String>, // provider limit reached, has no more connections
+    pub provider_connections_exhausted: Option<String>, // provider limit reached, has no more connections
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -1560,8 +1560,8 @@ impl Config {
             }
 
             self.t_channel_unavailable_video = load_and_set_file(custom_stream_response.channel_unavailable.as_ref(), &self.working_dir, resolve_var);
-            self.t_user_connections_exhausted_video = load_and_set_file(custom_stream_response.user_connection_exhausted.as_ref(), &self.working_dir, resolve_var);
-            self.t_provider_connections_exhausted_video = load_and_set_file(custom_stream_response.provider_connection_exhausted.as_ref(), &self.working_dir, resolve_var);
+            self.t_user_connections_exhausted_video = load_and_set_file(custom_stream_response.user_connections_exhausted.as_ref(), &self.working_dir, resolve_var);
+            self.t_provider_connections_exhausted_video = load_and_set_file(custom_stream_response.provider_connections_exhausted.as_ref(), &self.working_dir, resolve_var);
         }
     }
 
