@@ -30,7 +30,6 @@ type ResponseInfo = Option<(Vec<(String, String)>, StatusCode)>;
 type ProviderStreamFactoryResponse = (ResponseStream, ResponseInfo);
 
 pub struct BufferStreamOptions {
-    #[allow(dead_code)]
     item_type: PlaylistItemType,
     reconnect_enabled: bool,
     force_reconnect_secs: u32,

@@ -108,7 +108,6 @@ where
         }
     }
 
-    #[allow(dead_code)]
     fn query(&self, key: &K) -> Option<&V> {
         if self.is_leaf {
             return self.keys.binary_search(key).map_or(None, |idx| self.values.get(idx));
@@ -468,7 +467,6 @@ where
     //     self.root.count()
     // }
 
-    #[allow(dead_code)]
     pub fn query(&self, key: &K) -> Option<&V> {
         self.root.query(key)
     }

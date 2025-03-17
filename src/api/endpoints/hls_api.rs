@@ -14,7 +14,6 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 #[derive(Deserialize)]
-#[allow(dead_code)]
 struct HlsApiPathParams {
     token: String,
     username: String,
@@ -63,7 +62,6 @@ async fn hls_api_stream(
     if user.connections_exhausted(&app_state).await {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
-
 
     let Some(hls_entry) = app_state.hls_cache.get_entry(&params.token).await else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
     let Some(hls_url) = hls_entry.get_chunk_url(params.chunk) else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
