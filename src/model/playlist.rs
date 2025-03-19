@@ -74,7 +74,7 @@ impl TryFrom<PlaylistItemType> for XtreamCluster {
     type Error = String;
     fn try_from(item_type: PlaylistItemType) -> Result<Self, Self::Error> {
         match item_type {
-            PlaylistItemType::Live | PlaylistItemType::LiveHls | PlaylistItemType::LiveUnknown => Ok(Self::Live),
+            PlaylistItemType::Live | PlaylistItemType::LiveHls | PlaylistItemType::LiveDash | PlaylistItemType::LiveUnknown => Ok(Self::Live),
             PlaylistItemType::Video => Ok(Self::Video),
             PlaylistItemType::Series => Ok(Self::Series),
             _ => Err(format!("Cant convert {item_type}")),
@@ -93,6 +93,7 @@ pub enum PlaylistItemType {
     Catchup = 5,
     LiveUnknown = 6, // No Provider id
     LiveHls = 7, // m3u8 entry
+    LiveDash = 8, // mpd
 }
 
 impl From<XtreamCluster> for PlaylistItemType {
@@ -116,7 +117,7 @@ impl PlaylistItemType {
 impl Display for PlaylistItemType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Self::Live | Self::LiveHls | Self::LiveUnknown => Self::LIVE,
+            Self::Live | Self::LiveHls | Self::LiveDash |Self::LiveUnknown => Self::LIVE,
             Self::Video => Self::VIDEO,
             Self::Series => Self::SERIES,
             Self::SeriesInfo => Self::SERIES_INFO,

@@ -5,7 +5,7 @@ use crate::api::model::streams::buffered_stream::BufferedStream;
 use crate::api::model::streams::client_stream::ClientStream;
 use crate::api::model::streams::provider_stream::{create_channel_unavailable_stream, get_header_filter_for_item_type};
 use crate::api::model::streams::timed_client_stream::{TimeoutClientStream};
-use crate::model::config::{Config, ConfigInput};
+use crate::model::config::{Config};
 use crate::model::playlist::PlaylistItemType;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::debug_if_enabled;
@@ -173,7 +173,7 @@ fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Opti
 
 fn get_client_stream_request_params(
     req_headers: &HeaderMap,
-    input: Option<&ConfigInput>,
+    input_headers: Option<HashMap<String, String>>,
     options: &BufferStreamOptions) -> (usize, Option<usize>, bool, u32, u32, HeaderMap)
 {
     let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 1 };
@@ -184,8 +184,6 @@ fn get_client_stream_request_params(
     let req_range_start_bytes = get_request_range_start_bytes(&req_headers);
     req_headers.remove("range");
 
-    // These are the configured headers for this input.
-    let input_headers = input.map(|i| i.headers.clone());
     // We merge configured input headers with the headers from the request.
     let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
 
@@ -232,22 +230,22 @@ async fn provider_initial_request(cfg: &Config, request_client: Arc<reqwest::Cli
                     Some((response_headers, response.status()))
                 };
                 return Ok(Some((response.bytes_stream().map_err(|err| {
-                    error!("Failed to read response body: {err}");
+                    // error!("Failed to read response body: {err}");
                     StreamError::reqwest(&err)
                 }).boxed(), response_info)));
             }
-            if let Some((boxed_provider_stream, response_info)) =
+            if let (Some(boxed_provider_stream), response_info) =
                 create_channel_unavailable_stream(cfg, &get_response_headers(response.headers()), status)
             {
-                return Ok(Some((boxed_provider_stream, Some(response_info))));
+                return Ok(Some((boxed_provider_stream, response_info)));
             }
             Err(status)
         }
         Err(_err) => {
-            if let Some((boxed_provider_stream, response_info)) =
+            if let (Some(boxed_provider_stream), response_info) =
                 create_channel_unavailable_stream(cfg, &get_response_headers(stream_options.get_headers()), StatusCode::BAD_GATEWAY)
             {
-                Ok(Some((boxed_provider_stream, Some(response_info))))
+                Ok(Some((boxed_provider_stream, response_info)))
             } else {
                 Err(StatusCode::SERVICE_UNAVAILABLE)
             }
@@ -335,10 +333,10 @@ async fn get_initial_stream(cfg: &Config, client: Arc<reqwest::Client>, stream_o
 
 fn create_provider_stream_options(stream_url: &Url,
                                   req_headers: &HeaderMap,
-                                  input: Option<&ConfigInput>,
+                                  input_headers: Option<HashMap<String, String>>,
                                   options: &BufferStreamOptions) -> ProviderStreamOptions {
     let (buffer_size, req_range_start_bytes, reconnect, reconnect_force_secs, connect_timeout_secs, headers)
-        = get_client_stream_request_params(req_headers, input, options);
+        = get_client_stream_request_params(req_headers, input_headers, options);
     let url = stream_url.clone();
     let range_bytes = Arc::new(req_range_start_bytes.map(AtomicUsize::new));
     let continue_flag = Arc::new(AtomicOnceFlag::new());
@@ -359,9 +357,9 @@ pub async fn create_provider_stream(cfg: &Config,
                                     client: Arc<reqwest::Client>,
                                     stream_url: &Url,
                                     req_headers: &HeaderMap,
-                                    input: Option<&ConfigInput>,
+                                    input_headers: Option<HashMap<String, String>>,
                                     options: BufferStreamOptions) -> Option<ProviderStreamFactoryResponse> {
-    let stream_options = create_provider_stream_options(stream_url, req_headers, input, &options);
+    let stream_options = create_provider_stream_options(stream_url, req_headers, input_headers, &options);
 
     let client_stream_factory = |stream, reconnect_flag, range_cnt| {
         let stream = if stream_options.is_buffered() && !options.is_shared_stream() {

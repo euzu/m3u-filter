@@ -35,7 +35,7 @@ use crate::repository::{user_repository, xtream_repository};
 use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils::get_u32_from_serde_value;
-use crate::utils::network::request::{extract_extension_from_url, sanitize_sensitive_info, HLS_EXT};
+use crate::utils::network::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info, DASH_EXT, HLS_EXT};
 use crate::utils::network::xtream::{create_vod_info_from_item, ACTION_GET_LIVE_CATEGORIES, ACTION_GET_LIVE_STREAMS, ACTION_GET_SERIES, ACTION_GET_SERIES_CATEGORIES, ACTION_GET_SERIES_INFO, ACTION_GET_VOD_CATEGORIES, ACTION_GET_VOD_INFO, ACTION_GET_VOD_STREAMS};
 use crate::utils::json_utils;
 use crate::utils::debug_if_enabled;
@@ -108,7 +108,7 @@ pub fn serve_query(file_path: &Path, filter: &HashMap<&str, HashSet<String>>) ->
 }
 
 fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStreamContext, action_path: &str, fallback_url: &str) -> Option<String> {
-    if let Some(user_info) = input.get_user_info() {
+    if let Some(input_user_info) = input.get_user_info() {
         let ctx = match context {
             XtreamApiStreamContext::LiveAlt |
             XtreamApiStreamContext::Live => {
@@ -121,10 +121,10 @@ fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStre
         };
         let ctx_path = if ctx.is_empty() { String::new() } else { format!("{ctx}/") };
         Some(format!("{}/{}{}/{}/{}",
-                     &user_info.base_url,
+                     &input_user_info.base_url,
                      ctx_path,
-                     &user_info.username,
-                     &user_info.password,
+                     &input_user_info.username,
+                     &input_user_info.password,
                      action_path
         ))
     } else if !fallback_url.is_empty() {
@@ -177,10 +177,15 @@ async fn xtream_player_api_stream(
         }
 
         // if pli.item_type == PlaylistItemType::LiveHls {
-        //    let redirect_url = &replace_extension(&pli.url, "m3u8");
+        //    let redirect_url = &replace_extension(&pli.url, HLS_EXT);
         //     debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
         //     return redirect(redirect_url).into_response();
         // }
+        if pli.item_type == PlaylistItemType::LiveDash {
+               let redirect_url = &replace_url_extension(&pli.url, DASH_EXT);
+                debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
+                return redirect(redirect_url).into_response();
+        }
 
         debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
         return redirect(&pli.url).into_response();

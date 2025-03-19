@@ -40,20 +40,19 @@ mime = "0.3"
 log = "0.4"
 env_logger = "0.11"
 rustelebot = "0.3"
-bincode = { version = "2.0.0-rc.3",  features = ["std", "serde"] }
+bincode = { version = "2.0.1",  features = ["std", "serde"] }
 rand = "0.9"
 rpassword = "7.3"
 flate2 = "1"
-blake3 = "1.5"
+blake3 = "1.7"
 bytes = "1.10"
 tokio-stream = { version = "0.1", features = ["sync"] }
-tokio = { version = "1.43", features = ["rt-multi-thread", "parking_lot", "fs"] }
+tokio = { version = "1.44", features = ["rt-multi-thread", "parking_lot", "fs"] }
 tokio-util = "0.7"
 paste = "1.0"
-tempfile = "3.16"
+tempfile = "3.19"
 ruzstd = "0"
 filetime = "0.2"
-uuid = { version = "1", features = ["v4"] }
 #[cfg(target_os = "macos")]
 libc = "0"
 #[cfg(target_os = "windows")]

@@ -49,7 +49,7 @@ pub(in crate::processing) fn write_info_content_to_wal_file(writer: &mut BufWrit
 }
 
 pub(in crate::processing) fn create_resolve_episode_wal_files(cfg: &Config, input: &ConfigInput) -> Option<(File, PathBuf)> {
-    match get_input_storage_path(input, &cfg.working_dir) {
+    match get_input_storage_path(&input.name, &cfg.working_dir) {
         Ok(storage_path) => {
             let info_path = storage_path.join(format!("{FILE_SERIES_EPISODE_RECORD}.{FILE_SUFFIX_WAL}"));
             let info_file = append_or_crate_file(&info_path).ok()?;
@@ -60,7 +60,7 @@ pub(in crate::processing) fn create_resolve_episode_wal_files(cfg: &Config, inpu
 }
 
 pub(in crate::processing) fn create_resolve_info_wal_files(cfg: &Config, input: &ConfigInput, cluster: XtreamCluster) -> Option<(File, File, PathBuf, PathBuf)> {
-    match get_input_storage_path(input, &cfg.working_dir) {
+    match get_input_storage_path(&input.name, &cfg.working_dir) {
         Ok(storage_path) => {
             if let Some(file_prefix) = match cluster {
                 XtreamCluster::Live => None,
@@ -96,12 +96,12 @@ where
 {
     let mut processed_info_ids = HashMap::new();
 
-    let file_path = match get_input_storage_path(fpl.input, &cfg.working_dir)
+    let fpl_name = &fpl.input.name;
+    let file_path = match get_input_storage_path(fpl_name, &cfg.working_dir)
         .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type)).and_then(|opt| opt.ok_or_else(|| str_to_io_error("Not supported")))
     {
         Ok(file_path) => file_path,
         Err(err) => {
-            let fpl_name = &fpl.input.name;
             errors.push(notify_err!(format!("Could not create storage path for input {fpl_name}: {err}")));
             return processed_info_ids;
         }

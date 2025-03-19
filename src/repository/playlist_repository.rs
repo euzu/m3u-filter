@@ -1,5 +1,4 @@
-use std::path::{Path};
-use crate::m3u_filter_error::{info_err};
+use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config, ConfigTarget, TargetOutput};
 use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
@@ -11,7 +10,8 @@ use crate::repository::storage::{ensure_target_storage_path, get_target_id_mappi
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
 use crate::utils::file::file_lock_manager::FileWriteGuard;
-use crate::utils::network::request::is_hls_url;
+use crate::utils::network::request::{is_dash_url, is_hls_url};
+use std::path::Path;
 
 pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
                               target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
@@ -31,7 +31,13 @@ pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
             if provider_id == 0 {
                 header.item_type = match (is_hls_url(&header.url), header.item_type) {
                     (true, _) => PlaylistItemType::LiveHls,
-                    (false, PlaylistItemType::Live) => PlaylistItemType::LiveUnknown,
+                    (false, PlaylistItemType::Live) => {
+                        if is_dash_url(&header.url) {
+                            PlaylistItemType::LiveDash
+                        } else {
+                            PlaylistItemType::LiveUnknown
+                        }
+                    }
                     _ => header.item_type,
                 };
             }

@@ -7,7 +7,7 @@ use crate::model::config::TargetType;
 use crate::model::playlist::{FieldGetAccessor, PlaylistItemType, XtreamCluster};
 use crate::repository::m3u_playlist_iterator::{M3U_RESOURCE_PATH, M3U_STREAM_PATH};
 use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
-use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info, HLS_EXT};
+use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info, DASH_EXT, HLS_EXT};
 use crate::utils::debug_if_enabled;
 use axum::response::IntoResponse;
 use bytes::Bytes;
@@ -91,13 +91,16 @@ async fn m3u_api_stream(
     let input = app_state.config.get_input_by_name(m3u_item.input_name.as_str());
 
     let is_hls_request = m3u_item.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
+    let is_dash_request = !is_hls_request && m3u_item.item_type == PlaylistItemType::LiveDash || stream_ext.as_deref() == Some(DASH_EXT);
 
-    if user.proxy == ProxyType::Redirect {
-        let redirect_url = if is_hls_request { &replace_url_extension(&m3u_item.url, "m3u8") } else { &m3u_item.url };
+    if user.proxy == ProxyType::Redirect || is_dash_request {
+        let redirect_url = if is_hls_request { &replace_url_extension(&m3u_item.url, HLS_EXT) } else { &m3u_item.url };
+        let redirect_url = if is_dash_request { &replace_url_extension(redirect_url, DASH_EXT) } else { redirect_url };
         // TODO alias processing
         debug_if_enabled!("Redirecting m3u stream request to {}", sanitize_sensitive_info(redirect_url));
         return redirect(redirect_url.as_str()).into_response();
     }
+
     // Reverse proxy mode
     if is_hls_request {
         let target_name = &target.name;

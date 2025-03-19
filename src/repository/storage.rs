@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::fmt::Write;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigInput};
+use crate::model::config::{Config};
 use crate::model::playlist::UUIDType;
 use crate::m3u_filter_error::{notify_err};
 use crate::utils::file::file_utils;
@@ -56,8 +56,8 @@ pub fn get_target_storage_path(cfg: &Config, target_name: &str) -> Option<PathBu
     file_utils::get_file_path(&cfg.working_dir, Some(std::path::PathBuf::from(target_name.replace(' ', "_"))))
 }
 
-pub fn get_input_storage_path(input: &ConfigInput, working_dir: &str) -> std::io::Result<PathBuf> {
-    let name =  format!("input_{}", &input.name);
+pub fn get_input_storage_path(input_name: &str, working_dir: &str) -> std::io::Result<PathBuf> {
+    let name =  format!("input_{input_name}");
     let path = Path::new(working_dir).join(name);
     // Create the directory and return the path or propagate the error
     std::fs::create_dir_all(&path).map(|()| path)

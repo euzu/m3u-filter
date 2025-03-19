@@ -5,9 +5,9 @@ use crate::model::config::TargetType;
 #[derive(Clone)]
 pub struct HlsEntry {
     pub ts: Instant,
-    pub token: String,
+    pub token: u32,
     pub target_type: TargetType,
-    pub input_name: String,
+    pub input_id: u16,
     pub virtual_id: u32,
     pub chunk: u32,
     pub chunks: HashMap<u32, String>,

@@ -139,7 +139,7 @@ async fn process_series_info(
     let mut result: Vec<PlaylistGroup> = vec![];
     let input = fpl.input;
 
-    let Ok(Some((info_path, idx_path))) = get_input_storage_path(input, &cfg.working_dir)
+    let Ok(Some((info_path, idx_path))) = get_input_storage_path(&input.name, &cfg.working_dir)
         .map(|storage_path| xtream_get_info_file_paths(&storage_path, XtreamCluster::Series))
     else {
         errors.push(notify_err!("Failed to open input info file for series".to_string()));

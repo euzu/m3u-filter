@@ -27,6 +27,7 @@ use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::utils::debug_if_enabled;
 
 pub const HLS_EXT: &str = ".m3u8";
+pub const DASH_EXT: &str = ".mpd";
 
 pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
@@ -289,7 +290,7 @@ pub async fn download_text_content_as_file(client: Arc<reqwest::Client>, input: 
                 Err(Error::new(ErrorKind::NotFound, format!("Unknown file {file_path:?}")))
             })
         } else {
-            let file_path = persist_filepath.map_or_else(|| match get_input_storage_path(input, working_dir) {
+            let file_path = persist_filepath.map_or_else(|| match get_input_storage_path(&input.name, working_dir) {
                 Ok(download_path) => {
                     Ok(download_path.join(FILE_EPG))
                 }
@@ -430,10 +431,18 @@ pub fn classify_content_type(headers: &[(String, String)]) -> MimeCategory {
 
 const HLS_EXT_QUERY: &str = ".m3u8?";
 const HLS_EXT_FRAGMENT: &str = ".m3u8#";
+const DASH_EXT_QUERY: &str = ".mpd?";
+const DASH_EXT_FRAGMENT: &str = ".mpd#";
+
 
 pub fn is_hls_url(url: &str) -> bool {
     let lc_url = url.to_lowercase();
     lc_url.ends_with(HLS_EXT) || lc_url.contains(HLS_EXT_QUERY) || lc_url.contains(HLS_EXT_FRAGMENT)
+}
+
+pub fn is_dash_url(url: &str) -> bool {
+    let lc_url = url.to_lowercase();
+    lc_url.ends_with(DASH_EXT) || lc_url.contains(DASH_EXT_QUERY) || lc_url.contains(DASH_EXT_FRAGMENT)
 }
 
 pub fn replace_url_extension(url: &str, new_ext: &str) -> String {

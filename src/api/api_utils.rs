@@ -68,6 +68,8 @@ macro_rules! try_result_bad_request {
 
 pub use try_option_bad_request;
 pub use try_result_bad_request;
+use crate::api::model::active_provider_manager::ProviderConfig;
+use crate::api::model::streams::provider_stream::{create_provider_connections_exhausted_stream, ProviderStreamResponse};
 use crate::auth::authenticator::Claims;
 
 pub async fn serve_file(file_path: &Path, mime_type: mime::Mime) -> impl axum::response::IntoResponse + Send {
@@ -155,78 +157,141 @@ fn get_stream_options(app_state: &AppState) -> StreamOptions {
 //     content_length
 // }
 
-pub async fn stream_response(app_state: &AppState, stream_url: &str,
+fn get_stream_alternative_url(stream_url: &str, input: &ConfigInput, alias_input: &ProviderConfig) -> String {
+    let Some(input_user_info) = input.get_user_info() else { return stream_url.to_owned() };
+    let Some(alt_input_user_info) = alias_input.get_user_info() else { return stream_url.to_owned() };
+
+    let modified = stream_url.replace(&input_user_info.base_url, &alt_input_user_info.base_url);
+    let modified = modified.replace(&input_user_info.username, &alt_input_user_info.username);
+    let modified = modified.replace(&input_user_info.password, &alt_input_user_info.password);
+    modified
+}
+
+/**
+* If successfully a provider connection is used, do not forget to release if unsuccessfully
+*/
+fn get_stream_response_params(app_state: &AppState, stream_url: &str, input_opt: Option<&ConfigInput>)
+    -> (Option<ProviderStreamResponse>, Option<HashMap<String, String>>, Option<String>, Option<String>) {
+    let (custom_stream, input_headers, input_name, request_url) = if let Some(input) = input_opt {
+        let (stream_response, alias_input_name, request_url) = match app_state.active_provider.acquire_connection(&input.name) {
+            None => {
+                let stream = create_provider_connections_exhausted_stream(&app_state.config, &[]);
+                (Some(stream), None, None)
+            },
+            Some(alias_input) => {
+                if alias_input.id != input.id {
+                    (None, Some(alias_input.name.to_string()), Some(get_stream_alternative_url(stream_url, input, &alias_input)))
+                } else {
+                    (None, Some(input.name.to_string()), Some(stream_url.to_string()))
+                }
+            }
+        };
+        (stream_response, Some(input.headers.clone()), alias_input_name, request_url)
+    } else {
+        (None, None, None, None)
+    };
+    (custom_stream, input_headers, input_name, request_url)
+}
+
+async fn create_stream_response(app_state: &AppState, stream_options: &StreamOptions, stream_url: &str,
+                                req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
+                                item_type: PlaylistItemType, share_stream : bool) -> (ProviderStreamResponse, Option<String>) {
+    let (provider_stream, input_headers, stream_input_name, request_url) = get_stream_response_params(app_state, stream_url, input_opt);
+    if let Some(provider_stream_response) = provider_stream{
+        return (provider_stream_response, None);
+    }
+
+    let parsed_url = request_url.map_or_else(|| Url::parse(stream_url), |u| Url::parse(&u));
+
+    let (stream, stream_info) = if let Ok(url) = parsed_url {
+        if stream_options.pipe_provider_stream {
+            provider_stream::get_provider_pipe_stream(app_state, &url, req_headers, input_headers, item_type, &stream_options).await
+        } else {
+            let buffer_stream_options = BufferStreamOptions::new(item_type, share_stream, &stream_options);
+            provider_stream::get_provider_reconnect_buffered_stream(app_state, &url, req_headers, input_headers, buffer_stream_options).await
+        }
+    } else {
+        (None, None)
+    };
+
+    // if we have no stream we should release the provider
+    if stream.is_none() {
+        if let Some(alt_input_name) = &stream_input_name {
+            app_state.active_provider.release_connection(alt_input_name);
+        }
+    }
+
+    ((stream, stream_info), stream_input_name.or(input_opt.map(|i| i.name.to_string())))
+}
+
+pub async fn stream_response(app_state: &AppState,
+                             stream_url: &str,
                              req_headers: &HeaderMap,
                              input: Option<&ConfigInput>,
-                             item_type: PlaylistItemType, target: &ConfigTarget,
+                             item_type: PlaylistItemType,
+                             target: &ConfigTarget,
                              user: &ProxyUserCredentials) ->  impl axum::response::IntoResponse + Send {
     if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", sanitize_sensitive_info(stream_url)); }
 
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url, user, input).await {
+        if let Some(value) = shared_stream_response(app_state, stream_url, user).await {
             return value.into_response();
         }
     }
 
-    let stream_options = get_stream_options(app_state); get_stream_options(app_state);
-
-    if let Ok(url) = Url::parse(stream_url) {
-        let event_manager = Arc::clone(&app_state.event_manager);
-        let (stream_opt, provider_response) = if stream_options.pipe_provider_stream {
-            provider_stream::get_provider_pipe_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, item_type, &stream_options).await
-        } else {
-            let buffer_stream_options = BufferStreamOptions::new(item_type,share_stream, &stream_options);
-            provider_stream::get_provider_reconnect_buffered_stream(&app_state.config, &app_state.http_client, &url, req_headers, input, buffer_stream_options).await
-        };
-        if let Some(stream) = stream_opt {
-            // let content_length = get_stream_content_length(provider_response.as_ref());
-            let stream = ActiveClientStream::new(stream, event_manager, &user.username, input.map(|c| c.name.clone())).await;
-            let stream_resp = if share_stream {
-                let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
-                SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, stream_options.buffer_size).await;
-                if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
-                    let (status_code, header_map) = get_stream_response_with_headers(provider_response, stream_url);
-                    let mut response = axum::response::Response::builder()
-                        .status(status_code);
-                    for (key, value) in &header_map {
-                        response = response.header(key, value);
-                    }
-                    response.body(axum::body::Body::from_stream(broadcast_stream)).unwrap().into_response()
-                    // if content_length > 0 {
-                    //     response_builder.body(SizedStream::new(content_length, broadcast_stream)) }
-                    // else {
-                    //     response_builder.body(BodyStream::new(broadcast_stream))
-                    // }
-                } else {
-                    axum::http::StatusCode::BAD_REQUEST.into_response()
-                }
-            } else {
+    let stream_options = get_stream_options(app_state);
+    let event_manager = Arc::clone(&app_state.event_manager);
+    let ((stream_opt, provider_response), stream_input_name) = create_stream_response(app_state, &stream_options, &stream_url, req_headers, input, item_type, share_stream).await;
+    if let Some(stream) = stream_opt {
+        // let content_length = get_stream_content_length(provider_response.as_ref());
+        let stream = ActiveClientStream::new(stream, event_manager, &user.username, stream_input_name).await;
+        let stream_resp = if share_stream {
+            // Shared Stream response
+            let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
+            SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, stream_options.buffer_size).await;
+            if let Some(broadcast_stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
                 let (status_code, header_map) = get_stream_response_with_headers(provider_response, stream_url);
                 let mut response = axum::response::Response::builder()
                     .status(status_code);
                 for (key, value) in &header_map {
                     response = response.header(key, value);
                 }
-                response.body(axum::body::Body::from_stream(stream)).unwrap().into_response()
+                response.body(axum::body::Body::from_stream(broadcast_stream)).unwrap().into_response()
+                // if content_length > 0 {
+                //     response_builder.body(SizedStream::new(content_length, broadcast_stream)) }
+                // else {
+                //     response_builder.body(BodyStream::new(broadcast_stream))
+                // }
+            } else {
+                axum::http::StatusCode::BAD_REQUEST.into_response()
+            }
+        } else {
+            let (status_code, header_map) = get_stream_response_with_headers(provider_response, stream_url);
+            let mut response = axum::response::Response::builder()
+                .status(status_code);
+            for (key, value) in &header_map {
+                response = response.header(key, value);
+            }
+            response.body(axum::body::Body::from_stream(stream)).unwrap().into_response()
 
-                // if content_length > 0 { response_builder.body(SizedStream::new(content_length, stream)) } else { response_builder.streaming(stream) }
-            };
+            // if content_length > 0 { response_builder.body(SizedStream::new(content_length, stream)) } else { response_builder.streaming(stream) }
+        };
 
-            return stream_resp.into_response();
-        }
+        return stream_resp.into_response();
     }
+
     error!("Cant open stream {}", sanitize_sensitive_info(stream_url));
     axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
-async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &ProxyUserCredentials, input: Option<&ConfigInput>,) -> Option<impl IntoResponse> {
+async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &ProxyUserCredentials) -> Option<impl IntoResponse> {
     if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
         if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url).await {
             let (status_code, header_map) = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)), stream_url);
             let event_manager = Arc::clone(&app_state.event_manager);
-            let stream = ActiveClientStream::new(stream, event_manager, &user.username, input.map(|c| c.name.clone())).await.boxed();
+            let stream = ActiveClientStream::new(stream, event_manager, &user.username, None).await.boxed();
             let mut response = axum::response::Response::builder()
                 .status(status_code);
             for (key, value) in &header_map {
@@ -239,7 +304,7 @@ async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &P
 }
 
 pub fn is_stream_share_enabled(item_type: PlaylistItemType, target: &ConfigTarget) -> bool {
-    (item_type == PlaylistItemType::Live  || item_type == PlaylistItemType::LiveHls) && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
+    (item_type == PlaylistItemType::Live  /* || item_type == PlaylistItemType::LiveHls */) && target.options.as_ref().is_some_and(|opt| opt.share_live_streams)
 }
 
 pub type HeaderFilter = Option<Box<dyn Fn(&str) -> bool + Send>>;

@@ -4,14 +4,14 @@ use crate::model::hls::HlsEntry;
 use std::collections::HashMap;
 use std::str;
 use tokio::time::Instant;
-use crate::utils::hash_utils::uuid_v4;
 use crate::utils::string_utils::replace_after_last_slash;
 
 pub const HLS_PREFIX: &str = "hls";
 
-pub fn rewrite_hls(base_url: &str, content: &str, hls_url: &str, virtual_id: u32, user: &ProxyUserCredentials,
-                   target_type: &TargetType, input_name: &str) -> (HlsEntry, String) {
-    let token = uuid_v4();
+pub fn rewrite_hls(base_url: &str, content: &str, hls_url: &str, virtual_id: u32,
+                   token: u32,
+                   user: &ProxyUserCredentials,
+                   target_type: &TargetType, input_id: u16) -> (HlsEntry, String) {
     let username = &user.username;
     let password = &user.password;
     let mut chunk: u32 = 1;
@@ -36,7 +36,7 @@ pub fn rewrite_hls(base_url: &str, content: &str, hls_url: &str, virtual_id: u32
         ts: Instant::now(),
         token,
         target_type: target_type.clone(),
-        input_name: input_name.to_string(),
+        input_id,
         virtual_id,
         chunk,
         chunks,

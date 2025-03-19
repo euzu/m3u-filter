@@ -649,6 +649,41 @@ pub struct InputUserInfo {
     pub password: String,
 }
 
+impl InputUserInfo {
+    pub fn new(input_type: InputType, username: Option<&str>, password: Option<&str>, input_url: &str) -> Option<Self> {
+        if input_type == InputType::Xtream {
+            if let (Some(username), Some(password)) = (username, password) {
+                return Some(Self {
+                    base_url: input_url.to_string(),
+                    username: username.to_owned(),
+                    password: password.to_owned(),
+                });
+            }
+        } else if let Ok(url) = Url::parse(&input_url) {
+            let base_url = url.origin().ascii_serialization();
+            let mut username = None;
+            let mut password = None;
+            for (key, value) in url.query_pairs() {
+                if key.eq("username") {
+                    username = Some(value.into_owned());
+                } else if key.eq("password") {
+                    password = Some(value.into_owned());
+                }
+            }
+            if username.is_some() || password.is_some() {
+                if let (Some(username), Some(password)) = (username.as_ref(), password.as_ref()) {
+                    return Some(Self {
+                        base_url,
+                        username: username.to_owned(),
+                        password: password.to_owned(),
+                    });
+                }
+            }
+        }
+        None
+    }
+}
+
 macro_rules! check_input_credentials {
     ($this:ident, $input_type:expr) => {
      match $input_type {
@@ -756,36 +791,7 @@ impl ConfigInput {
     }
 
     pub fn get_user_info(&self) -> Option<InputUserInfo> {
-        if self.input_type == InputType::Xtream {
-            if let (Some(username), Some(password)) = (self.username.as_ref(), self.password.as_ref()) {
-                return Some(InputUserInfo {
-                    base_url: self.url.clone(),
-                    username: username.to_owned(),
-                    password: password.to_owned(),
-                });
-            }
-        } else if let Ok(url) = Url::parse(&self.url) {
-            let base_url = url.origin().ascii_serialization();
-            let mut username = None;
-            let mut password = None;
-            for (key, value) in url.query_pairs() {
-                if key.eq("username") {
-                    username = Some(value.into_owned());
-                } else if key.eq("password") {
-                    password = Some(value.into_owned());
-                }
-            }
-            if username.is_some() || password.is_some() {
-                if let (Some(username), Some(password)) = (username.as_ref(), password.as_ref()) {
-                    return Some(InputUserInfo {
-                        base_url,
-                        username: username.to_owned(),
-                        password: password.to_owned(),
-                    });
-                }
-            }
-        }
-        None
+        InputUserInfo::new(self.input_type.clone(), self.username.as_deref(), self.password.as_deref(), &self.url)
     }
 }
 
@@ -1330,6 +1336,17 @@ impl Config {
             for input in &source.inputs {
                 if input.name == input_name {
                     return Some(input);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn get_input_options_by_name(&self, input_name: &str) -> Option<&ConfigInputOptions> {
+        for source in &self.sources {
+            for input in &source.inputs {
+                if input.name == input_name {
+                    return input.options.as_ref();
                 }
             }
         }

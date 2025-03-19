@@ -305,46 +305,44 @@ async fn get_tmdb_value(
             }
         }
         std::collections::hash_map::Entry::Vacant(entry) => {
-            if let Some(input) = cfg.get_input_by_name(input_name) {
-                if let Ok(Some(tmdb_path)) = get_input_storage_path(input, &cfg.working_dir)
-                    .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type))
+            if let Ok(Some(tmdb_path)) = get_input_storage_path(input_name, &cfg.working_dir)
+                .map(|storage_path| xtream_get_record_file_path(&storage_path, item_type))
+            {
                 {
-                    {
-                        let file_lock = cfg.file_locks.read_lock(&tmdb_path).await;
-                        match item_type {
-                            PlaylistItemType::Series => {
-                                if let Ok(tree) =
-                                    BPlusTree::<u32, XtreamSeriesEpisode>::load(&tmdb_path)
-                                {
-                                    let tmdb_id = tree.query(&pid).map(|episode| {
-                                        InputTmdbIndexValue::Series(episode.clone())
-                                    });
-                                    entry.insert(Some((
-                                        file_lock,
-                                        InputTmdbIndexTree::Series(tree),
-                                    )));
-                                    return tmdb_id;
-                                }
+                    let file_lock = cfg.file_locks.read_lock(&tmdb_path).await;
+                    match item_type {
+                        PlaylistItemType::Series => {
+                            if let Ok(tree) =
+                                BPlusTree::<u32, XtreamSeriesEpisode>::load(&tmdb_path)
+                            {
+                                let tmdb_id = tree.query(&pid).map(|episode| {
+                                    InputTmdbIndexValue::Series(episode.clone())
+                                });
+                                entry.insert(Some((
+                                    file_lock,
+                                    InputTmdbIndexTree::Series(tree),
+                                )));
+                                return tmdb_id;
                             }
-                            PlaylistItemType::Video => {
-                                if let Ok(tree) =
-                                    BPlusTree::<u32, InputVodInfoRecord>::load(&tmdb_path)
-                                {
-                                    let tmdb_id = tree.query(&pid).map(|vod_record| {
-                                        InputTmdbIndexValue::Video(vod_record.clone())
-                                    });
-                                    entry.insert(Some((
-                                        file_lock,
-                                        InputTmdbIndexTree::Video(tree),
-                                    )));
-                                    return tmdb_id;
-                                }
-                            }
-                            _ => {}
                         }
-                    };
+                        PlaylistItemType::Video => {
+                            if let Ok(tree) =
+                                BPlusTree::<u32, InputVodInfoRecord>::load(&tmdb_path)
+                            {
+                                let tmdb_id = tree.query(&pid).map(|vod_record| {
+                                    InputTmdbIndexValue::Video(vod_record.clone())
+                                });
+                                entry.insert(Some((
+                                    file_lock,
+                                    InputTmdbIndexTree::Video(tree),
+                                )));
+                                return tmdb_id;
+                            }
+                        }
+                        _ => {}
+                    }
                 };
-            }
+            };
             entry.insert(None);
             None
         }

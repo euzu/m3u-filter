@@ -206,6 +206,7 @@ impl ProxyUserCredentials {
     pub async fn has_connections_left(&self, app_state: &AppState) -> bool {
         if app_state.config.user_access_control {
             if let Some(max_connections) = self.max_connections.as_ref() {
+                // info!("{max_connections} : {}", app_state.get_active_connections_for_user(&self.username).await);
                 if *max_connections < app_state.get_active_connections_for_user(&self.username).await {
                     debug!("User access denied, too many connections: {}", self.username);
                     return false;

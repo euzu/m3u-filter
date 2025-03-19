@@ -21,7 +21,7 @@ while getopts "fh" opt; do
   esac
 done
 
-declare -a resources=("channel_unavailable" "user_connections_exhausted")
+declare -a resources=("channel_unavailable" "user_connections_exhausted" "provider_connections_exhausted")
 
 for resource in "${resources[@]}"; do
   if [ "$flag_force" = false ]; then
