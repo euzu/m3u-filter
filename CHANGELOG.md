@@ -1,11 +1,14 @@
 # Changelog
 # 2.2.3 (2023-04-xx)
 - hls reverse proxy implemented
-- !BREAKING CHANGE! `channel_unavailable_file` is now under `custom_stream_response`, and new file `user_connections_exhausted` added. 
+- dash redirect implemented (reverse proxy not supported) 
+- !BREAKING CHANGE! `channel_unavailable_file` is now under `custom_stream_response`,
+- New custom streams `user_connections_exhausted` and `provider_connections_exhausted`added. 
 ```yaml
 custom_stream_response:
   channel_unavailable: /home/m3u-filter/channel_unavailable.ts
   user_connections_exhausted: /home/m3u-filter/user_connections_exhausted.ts
+  provider_connections_exhausted: /home/m3u-filter/provider_connections_exhausted.ts
 ```
 - input alias definition for same provider with same content but different credentials
 ```yaml

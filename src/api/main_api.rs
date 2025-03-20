@@ -26,7 +26,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::future::IntoFuture;
-use crate::api::model::event_manager::EventManager;
 use crate::api::model::hls_cache::HlsCache;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -117,10 +116,8 @@ fn create_shared_data(cfg: &Arc<Config>) -> AppState {
         }
     });
 
-    let log_active_clients = cfg.log.as_ref().is_some_and(|l| l.active_clients);
     let active_users = Arc::new(ActiveUserManager::new());
     let active_provider = Arc::new(ActiveProviderManager::new(cfg));
-    let event_manager = Arc::new(EventManager::new(&active_users, &active_provider, log_active_clients));
 
     AppState {
         config: Arc::clone(cfg),
@@ -131,7 +128,6 @@ fn create_shared_data(cfg: &Arc<Config>) -> AppState {
         shared_stream_manager: Arc::new(SharedStreamManager::new()),
         active_users,
         active_provider,
-        event_manager,
     }
 }
 

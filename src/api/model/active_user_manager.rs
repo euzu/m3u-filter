@@ -21,7 +21,7 @@ impl ActiveUserManager {
 
     pub async fn user_connections(&self, username: &str) -> u32 {
         if let Some(counter) = self.user.read().await.get(username) {
-            return counter.load(std::sync::atomic::Ordering::SeqCst);
+            return counter.load(Ordering::Acquire);
         }
         0
     }
@@ -31,13 +31,13 @@ impl ActiveUserManager {
     }
 
     pub async fn active_connections(&self) -> usize {
-        self.user.read().await.values().map(|c| c.load(Ordering::SeqCst) as usize).sum()
+        self.user.read().await.values().map(|c| c.load(Ordering::Acquire) as usize).sum()
     }
 
     pub async fn add_connection(&self, username: &str) -> (usize, usize) {
         let mut lock = self.user.write().await;
         if let Some(counter) = lock.get(username) {
-            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            counter.fetch_add(1, Ordering::AcqRel);
         } else {
             lock.insert(username.to_string(), AtomicU32::new(1));
         }
@@ -48,7 +48,7 @@ impl ActiveUserManager {
     pub async fn remove_connection(&self, username: &str) -> (usize, usize) {
         let mut lock = self.user.write().await;
         if let Some(counter) = lock.get(username) {
-            if counter.fetch_sub(1, std::sync::atomic::Ordering::SeqCst) == 1 {
+            if counter.fetch_sub(1, Ordering::AcqRel) == 1 {
                 lock.remove(username);
             }
         }

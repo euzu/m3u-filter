@@ -1,4 +1,3 @@
-use crate::api::model::streams::provider_stream_factory::ResponseStream;
 use bytes::Bytes;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -6,6 +5,7 @@ use std::sync::Arc;
 use std::task::{Poll};
 use futures::{Stream};
 use log::trace;
+use crate::api::model::stream::BoxedProviderStream;
 use crate::api::model::stream_error::StreamError;
 use crate::utils::trace_if_enabled;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
@@ -14,14 +14,14 @@ use crate::utils::network::request::sanitize_sensitive_info;
 /// This stream counts the send bytes for reconnecting to the actual position and
 /// sets the `close_signal`  if the client drops the connection.
 pub(in crate::api::model) struct ClientStream {
-    inner: ResponseStream,
+    inner: BoxedProviderStream,
     close_signal: Arc<AtomicOnceFlag>,
     total_bytes: Arc<Option<AtomicUsize>>,
     url: String,
 }
 
 impl ClientStream {
-    pub(crate) fn new(inner: ResponseStream, close_signal: Arc<AtomicOnceFlag>, total_bytes: Arc<Option<AtomicUsize>>, url: &str) -> Self {
+    pub(crate) fn new(inner: BoxedProviderStream, close_signal: Arc<AtomicOnceFlag>, total_bytes: Arc<Option<AtomicUsize>>, url: &str) -> Self {
         Self { inner, close_signal, total_bytes, url: url.to_string() }
     }
 }
@@ -32,29 +32,33 @@ impl Stream for ClientStream {
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        loop {
-            match Pin::as_mut(&mut self.inner).poll_next(cx) {
-                Poll::Ready(Some(Ok(bytes))) => {
-                    if bytes.is_empty() {
-                        trace!("client stream empty bytes");
-                        continue;
-                    }
+        if self.close_signal.is_active() {
+            loop {
+                match Pin::as_mut(&mut self.inner).poll_next(cx) {
+                    Poll::Ready(Some(Ok(bytes))) => {
+                        if bytes.is_empty() {
+                            trace!("client stream empty bytes");
+                            continue;
+                        }
 
-                    if let Some(counter) = self.total_bytes.as_ref() {
-                        counter.fetch_add(bytes.len(), Ordering::SeqCst);
-                    }
+                        if let Some(counter) = self.total_bytes.as_ref() {
+                            counter.fetch_add(bytes.len(), Ordering::AcqRel);
+                        }
 
-                    return Poll::Ready(Some(Ok(bytes)));
-                }
-                Poll::Ready(None) => {
-                    self.close_signal.notify();
-                    return Poll::Ready(None);
-                }
-                Poll::Pending => return Poll::Pending,
-                Poll::Ready(Some(Err(err))) => {
-                    trace!("client stream error: {err}");
+                        return Poll::Ready(Some(Ok(bytes)));
+                    }
+                    Poll::Ready(None) => {
+                        self.close_signal.notify();
+                        return Poll::Ready(None);
+                    }
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(Some(Err(err))) => {
+                        trace!("client stream error: {err}");
+                    }
                 }
             }
+        } else {
+            Poll::Ready(None)
         }
     }
 }

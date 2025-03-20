@@ -8,8 +8,6 @@ use crate::model::config::{Config};
 use crate::model::playlist::PlaylistItemType;
 use crate::utils::debug_if_enabled;
 use crate::utils::network::request::{get_request_headers, sanitize_sensitive_info};
-use bytes::Bytes;
-use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use log::{debug, error};
 use reqwest::StatusCode;
@@ -19,15 +17,12 @@ use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use url::Url;
 use crate::api::model::app_state::AppState;
-
-type BoxedProviderStream = BoxStream<'static, Result<Bytes, StreamError>>;
-type ProviderStreamHeader = Vec<(String, String)>;
-pub type ProviderStreamResponse = (Option<BoxedProviderStream>, Option<(ProviderStreamHeader, StatusCode)>);
+use crate::api::model::stream::ProviderStreamResponse;
 
 pub enum CustomVideoStreamType {
     ChannelUnavailable,
     UserConnectionsExhausted,
-    ProviderConnectionsExhausted,
+    // ProviderConnectionsExhausted,
 }
 
 fn create_video_stream(video: Option<&Arc<Vec<u8>>>, headers: &[(String, String)], log_message: &str) -> ProviderStreamResponse {
@@ -59,7 +54,7 @@ pub fn create_custom_video_stream_response(config: &Config, video_response: &Cus
     if let (Some(stream), Some((headers, status_code))) = match video_response {
         CustomVideoStreamType::ChannelUnavailable => create_channel_unavailable_stream(config, &[], StatusCode::BAD_REQUEST),
         CustomVideoStreamType::UserConnectionsExhausted => create_user_connections_exhausted_stream(config, &[]),
-        CustomVideoStreamType::ProviderConnectionsExhausted => create_provider_connections_exhausted_stream(config, &[]),
+        // CustomVideoStreamType::ProviderConnectionsExhausted => create_provider_connections_exhausted_stream(config, &[]),
     } {
         let mut builder = axum::response::Response::builder()
             .status(status_code);

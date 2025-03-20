@@ -369,10 +369,10 @@ static URL_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(.*://)
 static SANITIZE_SENSITIVE_INFO: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(true));
 
 pub fn set_sanitize_sensitive_info(value: bool) {
-    SANITIZE_SENSITIVE_INFO.store(value, Ordering::Relaxed);
+    SANITIZE_SENSITIVE_INFO.store(value, Ordering::Release);
 }
 pub fn sanitize_sensitive_info(query: &str) -> String {
-    if SANITIZE_SENSITIVE_INFO.load(Ordering::Relaxed) {
+    if SANITIZE_SENSITIVE_INFO.load(Ordering::Acquire) {
         // Replace with "***"
         let masked_query = USERNAME_REGEX.replace_all(query, "$1***");
         let masked_query = PASSWORD_REGEX.replace_all(&masked_query, "$1***");

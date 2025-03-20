@@ -64,9 +64,9 @@ impl HlsCache {
     }
 
     pub fn new_token(&self) -> u32 {
-        let token = self.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let token = self.counter.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         if token > TOKEN_MAX {
-            self.counter.store(1, std::sync::atomic::Ordering::SeqCst);
+            self.counter.store(1, std::sync::atomic::Ordering::Release);
             return 1;
         }
         return token;

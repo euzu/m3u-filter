@@ -25,7 +25,7 @@ impl Default for AtomicOnceFlag {
 }
 
 impl AtomicOnceFlag {
-    /// Creates a new `AtomicOnceFlag` with a default memory ordering of `Relaxed`.
+    /// Creates a new `AtomicOnceFlag`.
     pub fn new() -> Self {
         Self {
             enabled: AtomicBool::new(true),
@@ -36,13 +36,13 @@ impl AtomicOnceFlag {
     ///
     /// This operation is atomic and uses the specified memory ordering.
     pub fn notify(&self) {
-        self.enabled.store(false, Ordering::SeqCst);
+        self.enabled.store(false, Ordering::Release);
     }
 
     /// Checks if the flag is still active.
     ///
     /// Returns `true` if the flag is active (initial state). Returns `false` if the flag has been disabled.
     pub fn is_active(&self) -> bool {
-        self.enabled.load(Ordering::SeqCst)
+        self.enabled.load(Ordering::Acquire)
     }
 }

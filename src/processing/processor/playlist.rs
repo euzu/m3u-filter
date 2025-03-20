@@ -265,7 +265,7 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &mut [PlaylistGroup]) {
                         for channel in &mut plg.channels {
                             let provider = ValueProvider { pli: channel };
                             if counter.filter.filter(&provider, &mut mock_processor) {
-                                let cntval = counter.value.load(core::sync::atomic::Ordering::SeqCst);
+                                let cntval = counter.value.load(core::sync::atomic::Ordering::Acquire);
                                 let new_value = if counter.modifier == CounterModifier::Assign {
                                     cntval.to_string()
                                 } else {
@@ -277,7 +277,7 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &mut [PlaylistGroup]) {
                                     }
                                 };
                                 channel.header.set_field(&counter.field, new_value.as_str());
-                                counter.value.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+                                counter.value.fetch_add(1, core::sync::atomic::Ordering::AcqRel);
                             }
                         }
                     }

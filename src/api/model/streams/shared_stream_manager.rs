@@ -18,6 +18,7 @@ use log::{trace};
 use tokio::sync::{mpsc};
 use tokio::sync::mpsc::error::TrySendError;
 use tokio_stream::wrappers::ReceiverStream;
+use crate::api::model::stream::BoxedProviderStream;
 
 ///
 /// Wraps a `ReceiverStream` as Stream<Item = Result<Bytes, `StreamError`>>
@@ -73,7 +74,7 @@ impl SharedStreamState {
         }
     }
 
-    async fn subscribe(&self) -> BoxStream<'static, Result<Bytes, StreamError>> {
+    async fn subscribe(&self) -> BoxedProviderStream {
         let (tx, rx) = mpsc::channel(self.buf_size);
         self.subscribers.write().await.push(tx);
         convert_stream(ReceiverStream::new(rx).boxed())
@@ -155,7 +156,7 @@ impl SharedStreamManager {
         let _ = self.shared_streams.write().await.remove(stream_url);
     }
 
-    async fn subscribe_stream(&self, stream_url: &str) -> Option<BoxStream<'static, Result<Bytes, StreamError>>> {
+    async fn subscribe_stream(&self, stream_url: &str) -> Option<BoxedProviderStream> {
         let stream_data = self.shared_streams.read().await.get(stream_url)?.subscribe().await;
         Some(stream_data)
     }
@@ -185,7 +186,7 @@ impl SharedStreamManager {
     pub async fn subscribe_shared_stream(
         app_state: &AppState,
         stream_url: &str,
-    ) -> Option<BoxStream<'static, Result<Bytes, StreamError>>> {
+    ) -> Option<BoxedProviderStream> {
         debug_if_enabled!("Responding existing shared client stream {}", sanitize_sensitive_info(stream_url));
         app_state.shared_stream_manager.subscribe_stream(stream_url).await
     }

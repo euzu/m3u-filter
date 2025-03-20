@@ -8,5 +8,5 @@ pub(in crate::api) mod stream_error;
 pub(crate) mod streams;
 pub(in crate::api) mod active_user_manager;
 pub(in crate::api) mod active_provider_manager;
-pub(in crate::api) mod event_manager;
 pub(in crate::api) mod hls_cache;
+pub(in crate::api) mod stream;

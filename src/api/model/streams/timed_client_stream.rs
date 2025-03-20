@@ -1,19 +1,19 @@
 use crate::api::model::stream_error::StreamError;
-use crate::api::model::streams::provider_stream_factory::ResponseStream;
 use bytes::Bytes;
 use futures::Stream;
 use std::pin::Pin;
 use std::task::Poll;
 use std::time::{Duration, Instant};
+use crate::api::model::stream::BoxedProviderStream;
 
 pub struct TimeoutClientStream {
-    inner: ResponseStream,
+    inner: BoxedProviderStream,
     duration: Duration,
     start_time: Instant,
 }
 
 impl TimeoutClientStream {
-    pub(crate) fn new(inner: ResponseStream, duration: u32) -> Self {
+    pub(crate) fn new(inner: BoxedProviderStream, duration: u32) -> Self {
         Self { inner, duration:  Duration::from_secs(u64::from(duration)) , start_time: Instant::now() }
     }
 }

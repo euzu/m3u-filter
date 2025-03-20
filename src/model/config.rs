@@ -706,6 +706,7 @@ macro_rules! check_input_credentials {
 pub struct ConfigInputAlias {
     #[serde(skip)]
     pub id: u16,
+    pub name: String,
     pub url: String,
     pub username: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -720,6 +721,10 @@ pub struct ConfigInputAlias {
 impl ConfigInputAlias {
     pub fn prepare(&mut self, index: u16, input_type: &InputType) -> Result<(), M3uFilterError> {
         self.id = index;
+        self.name = self.name.trim().to_string();
+        if self.name.is_empty() {
+            return Err(info_err!("name for input is mandatory".to_string()));
+        }
         self.url = self.url.trim().to_string();
         if self.url.is_empty() {
             return Err(info_err!("url for input is mandatory".to_string()));
@@ -785,7 +790,7 @@ impl ConfigInput {
         self.persist = get_trimmed_string(&self.persist);
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;
-            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16), input_type)));
+            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+1+(idx as u16), input_type)));
         }
         Ok(index + self.aliases.as_ref().map_or(0, std::vec::Vec::len) as u16)
     }
@@ -1404,6 +1409,18 @@ impl Config {
                     return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
                 }
                 seen_names.insert(input_name);
+                if let Some(aliases) =  &input.aliases {
+                    for alias in aliases {
+                        let input_name = alias.name.trim().to_string();
+                        if input_name.is_empty() {
+                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input name required");
+                        }
+                        if seen_names.contains(input_name.as_str()) {
+                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
+                        }
+                        seen_names.insert(input_name);
+                    }
+                }
             }
         }
         Ok(())

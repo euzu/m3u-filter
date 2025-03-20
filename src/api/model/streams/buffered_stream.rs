@@ -1,4 +1,3 @@
-use crate::api::model::streams::provider_stream_factory::ResponseStream;
 use futures::{stream::Stream, task::{Context, Poll}, StreamExt};
 use std::{
     pin::Pin,
@@ -7,25 +6,28 @@ use std::{
 use log::trace;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
+use crate::api::model::stream::BoxedProviderStream;
 use crate::api::model::stream_error::StreamError;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 
 pub(in crate::api::model) struct BufferedStream {
     stream: ReceiverStream<Result<bytes::Bytes, StreamError>>,
+    close_signal: Arc<AtomicOnceFlag>
 }
 
 impl BufferedStream {
-    pub fn new(stream: ResponseStream, buffer_size: usize, client_close_signal: Arc<AtomicOnceFlag>, _url: &str) -> Self {
+    pub fn new(stream: BoxedProviderStream, buffer_size: usize, client_close_signal: Arc<AtomicOnceFlag>, _url: &str) -> Self {
         let (tx, rx) = channel(buffer_size);
-        tokio::spawn(Self::buffer_stream(tx, stream, client_close_signal));
+        tokio::spawn(Self::buffer_stream(tx, stream, Arc::clone(&client_close_signal)));
         Self {
-            stream: ReceiverStream::new(rx)
+            stream: ReceiverStream::new(rx),
+            close_signal: client_close_signal,
         }
     }
 
     async fn buffer_stream(
         tx: Sender<Result<bytes::Bytes, StreamError>>,
-        mut stream: ResponseStream,
+        mut stream: BoxedProviderStream,
         client_close_signal: Arc<AtomicOnceFlag>,
     ) {
         loop {
@@ -55,6 +57,7 @@ impl BufferedStream {
                 None => break,
             }
         }
+        drop(tx);
     }
 }
 
@@ -62,6 +65,10 @@ impl Stream for BufferedStream {
     type Item = Result<bytes::Bytes, StreamError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.get_mut().stream).poll_next(cx)
+        if self.close_signal.is_active() {
+            Pin::new(&mut self.get_mut().stream).poll_next(cx)
+        } else {
+            Poll::Ready(None)
+        }
     }
 }
