@@ -486,7 +486,7 @@ sources:
 ```
 
 Input alias definition for same provider with same content but different credentials.
-`max_connections` default is 1
+`max_connections` default is unlimited
 ```yaml
 - sources:
 - inputs:
