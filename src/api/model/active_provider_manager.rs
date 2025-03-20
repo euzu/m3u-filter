@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
 pub enum ProviderAllocation<'a> {
     Exhausted,
     Available(&'a ProviderConfig),
-    Tolerated(&'a ProviderConfig),
+    GracePeriod(&'a ProviderConfig),
 }
 
 /// This struct represents an individual provider configuration with fields like:
@@ -85,7 +85,7 @@ impl ProviderConfig {
         }
         if connections <= self.max_connections {
             self.current_connections.fetch_add(1, Ordering::AcqRel);
-            return if connections < self.max_connections { ProviderAllocation::Available(self) } else { ProviderAllocation::Tolerated(self) };
+            return if connections < self.max_connections { ProviderAllocation::Available(self) } else { ProviderAllocation::GracePeriod(self) };
         }
         ProviderAllocation::Exhausted
     }
@@ -253,7 +253,7 @@ impl MultiProviderLineup {
                 let result = p.try_allocate();
                 match result {
                     ProviderAllocation::Exhausted => {}
-                    ProviderAllocation::Available(_) | ProviderAllocation::Tolerated(_) => return result
+                    ProviderAllocation::Available(_) | ProviderAllocation::GracePeriod(_) => return result
                 }
             }
             ProviderPriorityGroup::MultiProviderGroup(index, pg) => {
@@ -265,7 +265,7 @@ impl MultiProviderLineup {
                     let result = p.try_allocate();
                     match result {
                         ProviderAllocation::Exhausted => {}
-                        ProviderAllocation::Available(_) | ProviderAllocation::Tolerated(_) => {
+                        ProviderAllocation::Available(_) | ProviderAllocation::GracePeriod(_) => {
                             index.store(idx, Ordering::Release);
                             return result;
                         }
@@ -314,7 +314,7 @@ impl MultiProviderLineup {
             match allocation {
                 ProviderAllocation::Exhausted => {}
                 ProviderAllocation::Available(_) |
-                ProviderAllocation::Tolerated(_) => {
+                ProviderAllocation::GracePeriod(_) => {
                     if priority_group.is_exhausted() {
                       self.index.store((index + 1) % provider_count, Ordering::Release);
                     }
@@ -535,7 +535,7 @@ mod tests {
             ProviderAllocation::Available(provider) => {
                 assert_eq!(provider.id, 1);
             }
-            ProviderAllocation::Tolerated(_) =>  assert!(false, "Should not tolerated"),
+            ProviderAllocation::GracePeriod(_) =>  assert!(false, "Exceeded grace period unexpectedly"),
         }
 
         // Try acquiring again
@@ -545,7 +545,7 @@ mod tests {
                 assert_eq!(provider.id, 2);
                 assert_eq!(provider.name, "provider1_1");
             }
-            ProviderAllocation::Tolerated(_) =>  assert!(false, "Should not tolerated"),
+            ProviderAllocation::GracePeriod(_) =>  assert!(false, "Exceeded grace period unexpectedly"),
         }
 
 
@@ -553,7 +553,7 @@ mod tests {
         match lineup.acquire() {
             ProviderAllocation::Exhausted => {},
             ProviderAllocation::Available(_) => assert!(false, "Should not available"),
-            ProviderAllocation::Tolerated(_) =>  assert!(false, "Should not tolerated"),
+            ProviderAllocation::GracePeriod(_) =>  assert!(false, "Exceeded grace period unexpectedly"),
         }
 
     }

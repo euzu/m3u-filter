@@ -174,14 +174,14 @@ type ProviderName = String;
 enum StreamingOption {
     CustomStream(ProviderStreamResponse),
     AvailableStream(Option<ProviderName>, StreamUrl),
-    ToleratedStream(Option<ProviderName>, StreamUrl),
+    GracePeriodStream(Option<ProviderName>, StreamUrl),
 }
 
 pub struct StreamDetails {
     pub stream: Option<BoxedProviderStream>,
     stream_info: ProviderStreamInfo,
     pub input_name: Option<String>,
-    pub tolerated: bool,
+    pub grace_period: bool,
     pub reconnect_flag: Option<Arc<AtomicOnceFlag>>,
 }
 
@@ -192,7 +192,7 @@ impl StreamDetails {
             stream: Some(stream),
             stream_info: None,
             input_name: None,
-            tolerated: false,
+            grace_period: false,
             reconnect_flag: None,
         }
     }
@@ -215,7 +215,7 @@ fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Opti
                 StreamingOption::CustomStream(stream)
             }
             ProviderAllocation::Available(provider)
-            | ProviderAllocation::Tolerated(provider) => {
+            | ProviderAllocation::GracePeriod(provider) => {
                 let (provider, url) = if provider.id != input.id {
                     (provider.name.to_string(), get_stream_alternative_url(stream_url, input, &provider))
                 } else {
@@ -225,7 +225,7 @@ fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Opti
                 if matches!(allocation, ProviderAllocation::Available(_)) {
                     StreamingOption::AvailableStream(Some(provider), url)
                 } else {
-                    StreamingOption::ToleratedStream(Some(provider), url)
+                    StreamingOption::GracePeriodStream(Some(provider), url)
                 }
             }
         };
@@ -239,7 +239,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                                         req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
                                         item_type: PlaylistItemType, share_stream: bool) -> StreamDetails {
     let (stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt);
-    let tolerated = matches!(stream_response_params, StreamingOption::ToleratedStream(_, _));
+    let grace_period = matches!(stream_response_params, StreamingOption::GracePeriodStream(_, _));
     match stream_response_params {
         StreamingOption::CustomStream(provider_stream) => {
             let (stream, stream_info) = provider_stream;
@@ -247,12 +247,12 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 stream,
                 stream_info,
                 input_name: None,
-                tolerated,
+                grace_period,
                 reconnect_flag: None,
             }
         }
         StreamingOption::AvailableStream(provider_name, request_url)
-        | StreamingOption::ToleratedStream(provider_name, request_url) => {
+        | StreamingOption::GracePeriodStream(provider_name, request_url) => {
             let parsed_url = Url::parse(&request_url);
             let ((stream, stream_info), reconnect_flag) = if let Ok(url) = parsed_url {
                 if stream_options.pipe_provider_stream {
@@ -289,7 +289,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 stream,
                 stream_info,
                 input_name: provider_name,
-                tolerated,
+                grace_period,
                 reconnect_flag,
             }
         }

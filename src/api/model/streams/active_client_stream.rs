@@ -13,7 +13,7 @@ use crate::api::model::app_state::AppState;
 use crate::api::model::stream::BoxedProviderStream;
 use crate::api::model::streams::chunked_buffer::ChunkedBuffer;
 
-const TOLERANCE_SECONDS: u64 = 2;
+const GRACE_PERIOD_SECONDS: u64 = 2;
 
 pub(in crate::api) struct ActiveClientStream {
     inner: BoxedProviderStream,
@@ -38,7 +38,7 @@ impl ActiveClientStream {
             info!("Active clients: {client_count}, active connections {connection_count}");
         }
 
-        let stop_flag = Self::stream_toleration(&stream_details, &active_provider);
+        let stop_flag = Self::stream_grace_period(&stream_details, &active_provider);
 
         Self {
             inner: stream_details.stream.take().unwrap(),
@@ -51,15 +51,15 @@ impl ActiveClientStream {
             custom_video: app_state.config.t_provider_connections_exhausted_video.as_ref().map(|a| ChunkedBuffer::new(Arc::clone(a))),
         }
     }
-    fn stream_toleration(stream_details: &StreamDetails, active_provider: &Arc<ActiveProviderManager>) -> Option<Arc<AtomicBool>> {
-        if stream_details.tolerated && stream_details.input_name.is_some() {
+    fn stream_grace_period(stream_details: &StreamDetails, active_provider: &Arc<ActiveProviderManager>) -> Option<Arc<AtomicBool>> {
+        if stream_details.grace_period && stream_details.input_name.is_some() {
             let provider_name = stream_details.input_name.as_ref().unwrap().to_string();
             let provider_manager = active_provider.clone();
             let stop_flag = Arc::new(AtomicBool::new(false));
             let stop_stream_flag = Arc::clone(&stop_flag);
             let reconnect_flag = stream_details.reconnect_flag.clone();
             tokio::spawn(async move {
-                tokio::time::sleep(tokio::time::Duration::from_secs(TOLERANCE_SECONDS)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(GRACE_PERIOD_SECONDS)).await;
                 if provider_manager.is_over_limit(&provider_name) {
                     info!("is over limit for active clients: {provider_name}");
                     stop_stream_flag.store(true, std::sync::atomic::Ordering::Release);

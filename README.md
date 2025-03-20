@@ -21,6 +21,7 @@
 - Sharing live tv connections
 - Display own video stream when channel is unavailable
 - Define HdHomeRun devices to use with Plex/Emby/Jellyfin
+- Define provider aliases to use multiple lines from same provider
 
 If you need to exclude certain entries from a playlist, you can create filters using headers and apply regex-based renaming or mapping.
 Run `m3u-filter` in server mode for a web-based UI to view the playlist contents, filter or search entries.
