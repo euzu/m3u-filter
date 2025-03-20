@@ -126,18 +126,18 @@ impl Drop for TargetIdMapping {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-    use crate::repository::bplustree::BPlusTree;
-    use crate::repository::target_id_mapping::{VirtualIdRecord};
+    // use std::path::PathBuf;
+    // use crate::repository::bplustree::BPlusTree;
+    // use crate::repository::target_id_mapping::{VirtualIdRecord};
 
-    #[test]
-    fn test_id_mapping() {
-        let path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/id_mapping.db");
-        let mapping = BPlusTree::<u32, VirtualIdRecord>::load(&path);
-        mapping.unwrap().traverse(|keys, values| {
-            for (key, value) in keys.iter().zip(values.iter()) {
-                println!("{key:?} {value:?}\n");
-            }
-        });
-    }
+    // #[test]
+    // fn test_id_mapping() {
+    //     let path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/id_mapping.db");
+    //     let mapping = BPlusTree::<u32, VirtualIdRecord>::load(&path);
+    //     mapping.unwrap().traverse(|keys, values| {
+    //         for (key, value) in keys.iter().zip(values.iter()) {
+    //             println!("{key:?} {value:?}\n");
+    //         }
+    //     });
+    // }
 }

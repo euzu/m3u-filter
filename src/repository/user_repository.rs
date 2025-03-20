@@ -99,12 +99,13 @@ pub fn merge_api_user(cfg: &Config, target_users: &[TargetUser]) -> Result<u64, 
 ///
 /// Will panic if `backup_dir` is not given
 pub fn backup_api_user_db_file(cfg: &Config, path: &Path) {
-    let backup_dir = cfg.backup_dir.as_ref().unwrap().as_str();
-    let backup_path = PathBuf::from(backup_dir).join(format!("{API_USER_DB_FILE}_{}", Local::now().format("%Y%m%d_%H%M%S")));
-    let _lock = cfg.file_locks.read_lock(path);
-    match std::fs::copy(path, &backup_path) {
-        Ok(_) => {}
-        Err(err) => { error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err) }
+    if let Some(backup_dir) = cfg.backup_dir.as_ref() {
+        let backup_path = PathBuf::from(backup_dir).join(format!("{API_USER_DB_FILE}_{}", Local::now().format("%Y%m%d_%H%M%S")));
+        let _lock = cfg.file_locks.read_lock(path);
+        match std::fs::copy(path, &backup_path) {
+            Ok(_) => {}
+            Err(err) => { error!("Could not backup file {}:{}", &backup_path.to_str().unwrap_or("?"), err) }
+        }
     }
 }
 

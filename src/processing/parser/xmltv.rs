@@ -174,20 +174,21 @@ mod tests {
 
     #[test]
     fn parse_test() -> io::Result<()> {
-        let file_path = "/tmp/epg.xml.gz";
+        let file_path = PathBuf::from("/tmp/epg.xml.gz");
 
-        let tv_guide = TVGuide { file: PathBuf::from(file_path) };
+        if file_path.exists() {
+            let tv_guide = TVGuide { file:  file_path};
 
-        let channel_ids = vec!["channel.1", "channel.2", "channel.3"];
-        let channel_ids : HashSet<String> =  channel_ids.into_iter().map(|s| s.to_string()).collect();
+            let channel_ids = vec!["channel.1", "channel.2", "channel.3"];
+            let channel_ids : HashSet<String> =  channel_ids.into_iter().map(|s| s.to_string()).collect();
 
-        match tv_guide.filter(&channel_ids) {
-            None => assert!(false, "No epg filtered"),
-            Some(epg) => {
-                assert_eq!(epg.children.len(), channel_ids.len() * 2, "Epg size does not match")
+            match tv_guide.filter(&channel_ids) {
+                None => assert!(false, "No epg filtered"),
+                Some(epg) => {
+                    assert_eq!(epg.children.len(), channel_ids.len() * 2, "Epg size does not match")
+                }
             }
         }
-
         Ok(())
     }
 }

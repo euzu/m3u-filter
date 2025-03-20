@@ -512,7 +512,7 @@ mod tests {
     use std::path::PathBuf;
 
     use serde::{Deserialize, Serialize};
-    use crate::model::playlist::XtreamPlaylistItem;
+    // use crate::model::playlist::XtreamPlaylistItem;
     use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
 
     // Example usage with a simple struct
@@ -585,14 +585,14 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_read_xt() -> io::Result<()> {
-        let main_path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/xtream/live.db");
-        let index_path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/xtream/live.idx");
-        let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&main_path, &index_path)?;
-        for doc in reader {
-            println!("{doc:?}");
-        }
-        Ok(())
-    }
+    // #[test]
+    // fn test_read_xt() -> io::Result<()> {
+    //     let main_path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/xtream/live.db");
+    //     let index_path = PathBuf::from("../m3u-test/settings/m3u-silver/data/xt_m3u/xtream/live.idx");
+    //     let reader = IndexedDocumentIterator::<u32, XtreamPlaylistItem>::new(&main_path, &index_path)?;
+    //     for doc in reader {
+    //         println!("{doc:?}");
+    //     }
+    //     Ok(())
+    // }
 }

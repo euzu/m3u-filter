@@ -1,17 +1,19 @@
-use std::env;
-use std::fs::File;
-use std::path::PathBuf;
-use std::sync::LazyLock;
+use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err, str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::model::api_proxy::ApiProxyConfig;
+use crate::model::config::{Config, ConfigDto, ConfigInputAlias, InputType};
+use crate::model::mapping::Mappings;
+use crate::utils::file::{file_utils, multi_file_reader};
+use crate::utils::sys_utils::exit;
 use chrono::Local;
 use log::{debug, error, info, warn};
 use regex::Regex;
 use serde::Serialize;
-use crate::utils::sys_utils::exit;
-use crate::m3u_filter_error::{to_io_error, M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error, create_m3u_filter_error_result, info_err, handle_m3u_filter_error_result};
-use crate::model::api_proxy::ApiProxyConfig;
-use crate::model::config::{Config, ConfigDto};
-use crate::model::mapping::Mappings;
-use crate::utils::file::{file_utils, multi_file_reader};
+use std::env;
+use std::fs::File;
+use std::io::{self, BufRead};
+use std::path::PathBuf;
+use std::sync::LazyLock;
+use url::Url;
 
 pub fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<Option<String>, M3uFilterError> {
     let mappings_file: String = args_mapping.unwrap_or_else(|| file_utils::get_default_mappings_path(cfg.t_config_path.as_str()));
@@ -80,7 +82,7 @@ pub fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterErr
             Ok(mut result) => {
                 handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, result.prepare());
                 return Ok(Some(result));
-            },
+            }
             Err(err) => {
                 return Err(info_err!(err.to_string()));
             }
@@ -92,29 +94,30 @@ pub fn read_mapping(mapping_file: &str) -> Result<Option<Mappings>, M3uFilterErr
 
 pub fn read_api_proxy(config: &Config, api_proxy_file: &str, resolve_var: bool) -> Option<ApiProxyConfig> {
     file_utils::open_file(&std::path::PathBuf::from(api_proxy_file)).map_or(None, |file| {
-            let mapping: Result<ApiProxyConfig, _> = serde_yaml::from_reader(file);
-            match mapping {
-                Ok(mut result) => {
-                    match result.prepare(config, resolve_var) {
-                        Err(err) => {
-                            exit!("cant read api-proxy-config file: {}", err);
-                        }
-                        _ => {
-                            Some(result)
-                        }
+        let mapping: Result<ApiProxyConfig, _> = serde_yaml::from_reader(file);
+        match mapping {
+            Ok(mut result) => {
+                match result.prepare(config, resolve_var) {
+                    Err(err) => {
+                        exit!("cant read api-proxy-config file: {}", err);
+                    }
+                    _ => {
+                        Some(result)
                     }
                 }
-                Err(err) => {
-                    error!("cant read api-proxy-config file: {}", err);
-                    None
-                }
             }
-        })
+            Err(err) => {
+                error!("cant read api-proxy-config file: {}", err);
+                None
+            }
+        }
+    })
 }
 
 fn write_config_file<T>(file_path: &str, backup_dir: &str, config: &T, default_name: &str) -> Result<(), M3uFilterError>
-    where
-        T: ?Sized + Serialize {
+where
+    T: ?Sized + Serialize,
+{
     let path = PathBuf::from(file_path);
     let filename = path.file_name().map_or(default_name.to_string(), |f| f.to_string_lossy().to_string());
     let backup_path = PathBuf::from(backup_dir).join(format!("{filename}_{}", Local::now().format("%Y%m%d_%H%M%S")));
@@ -129,8 +132,6 @@ fn write_config_file<T>(file_path: &str, backup_dir: &str, config: &T, default_n
     File::create(&path)
         .and_then(|f| serde_yaml::to_writer(f, &config).map_err(to_io_error))
         .map_err(|err| create_m3u_filter_error!(M3uFilterErrorKind::Info, "Could not write file {}: {}", &path.to_str().unwrap_or("?"), err))
-
-
 }
 
 pub fn save_api_proxy(file_path: &str, backup_dir: &str, config: &ApiProxyConfig) -> Result<(), M3uFilterError> {
@@ -153,13 +154,110 @@ pub fn resolve_env_var(value: &str) -> String {
     }).to_string()
 }
 
+//
+// pub fn read_yaml_inputs(input_type: InputType, file_path:  &str) -> Result<Config, M3uFilterError> {
+//
+// }
+//
+//
+// pub fn read_json_inputs(input_type: InputType, file_path: &str) -> Result<Config, M3uFilterError> {
+//
+// }
+
+const CSV_SEPARATOR: char = ',';
+const HEADER_PREFIX: char = '#';
+
+const FIELD_MAX_CON: &str = "max_connections";
+const FIELD_PRIO: &str = "priority";
+const FIELD_URL: &str = "url";
+
+fn csv_assign_config_input_column(config_input: &mut ConfigInputAlias, input_type: &InputType, header: &str, value: &str) -> Result<(), io::Error> {
+        match header {
+            FIELD_URL => {
+                let url = Url::parse(value.trim()).map_err(to_io_error)?;
+
+                match input_type {
+                    InputType::Xtream => {
+                        let username = url.query_pairs().find(|(key, _)| key == "username").map(|(_, value)| value);
+                        if let Some(uname) = username {
+                            config_input.username = Some(uname.to_string());
+                        }
+                        let password = url.query_pairs().find(|(key, _)| key == "password").map(|(_, value)| value);
+                        if let Some(pwd) = password {
+                            config_input.password = Some(pwd.to_string());
+                        }
+                        config_input.url = url.origin().ascii_serialization()
+                    }
+
+                    InputType::M3u => {
+                        config_input.url = url.to_string();
+                    }
+                };
+            },
+            FIELD_MAX_CON => {
+                let max_connections = value.parse::<u16>().unwrap_or(1);
+                config_input.max_connections = max_connections;
+            },
+            FIELD_PRIO => {
+                let priority = value.parse::<i16>().unwrap_or(0);
+                config_input.priority = priority;
+            },
+            _ => {}
+        }
+    Ok(())
+}
+
+pub fn csv_read_inputs(input_type: InputType, file_path: &str) -> Result<Vec<ConfigInputAlias>, io::Error> {
+    let inputs_file = std::path::PathBuf::from(file_path);
+    if let Ok(file) = file_utils::open_file(&inputs_file) {
+        let mut result = vec![];
+        let default_columns = vec![FIELD_URL, FIELD_MAX_CON, FIELD_PRIO];
+        let reader = io::BufReader::new(file);
+        for line in reader.lines().into_iter() {
+            let line = line?;
+            if line.is_empty() || line.starts_with(HEADER_PREFIX) {
+                continue;
+            }
+
+            let mut config_input = ConfigInputAlias {
+                id: 0,
+                name: "".to_string(),
+                url: "".to_string(),
+                username: None,
+                password: None,
+                priority: 0,
+                max_connections: 1,
+            };
+
+            let columns: Vec<&str> = line.split(CSV_SEPARATOR).collect();
+            for (&header, &value) in default_columns.iter().zip(columns.iter()).into_iter() {
+                if let Err(err) = csv_assign_config_input_column(&mut config_input, &input_type, header, value) {
+                    error!("Could not parse input line: {} err: {err}", line);
+                    continue;
+                }
+            }
+            result.push(config_input);
+        }
+        return Ok(result);
+    }
+    Err(str_to_io_error(&format!("Could not open {file_path}")))
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::utils::file::config_reader::resolve_env_var;
+    use crate::model::config::InputType;
+    use crate::utils::file::config_reader::{csv_read_inputs, resolve_env_var};
+
+    #[test]
+    fn test_read_inputs() {
+        let result = csv_read_inputs(InputType::Xtream, &resolve_env_var("${env:HOME}/projects/m3u-test/settings/inputs.txt"));
+        assert_eq!(result.is_ok(), true);
+        println!("result: {:?}", result.unwrap());
+    }
 
     #[test]
     fn test_resolve() {
-       let resolved =  resolve_env_var("${env:HOME}");
+        let resolved = resolve_env_var("${env:HOME}");
         assert_eq!(resolved, std::env::var("HOME").unwrap());
     }
 }
