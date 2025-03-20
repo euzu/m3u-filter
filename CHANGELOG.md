@@ -14,12 +14,14 @@ custom_stream_response:
 ```yaml
 - sources:
 - inputs:
-  - url: 'http://provider.net'
+  - type: xtream
     name: my_provider
+    url: 'http://provider.net'
     username: xyz
     password: secret1
     aliases:
-    - url: 'http://provider.net'
+    - name: my_provider_2 
+      url: 'http://provider.net'
       username: abcd
       password: secret2
   targets:

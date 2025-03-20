@@ -77,7 +77,7 @@ Top level entries in the config files are:
 * `reverse_proxy` _optional_
 * `log` _optional
 * `user_access_control` _optional_
-* `channel_unavailable_file` _optional_
+* `custom_stream_response` _optional_
 * `hdhomerun` _optional_
 
 ### 1.1. `threads`
@@ -197,8 +197,9 @@ This configuration is only used for reverse proxy mode. The Reverse Proxy mode c
 #### 1.6.1 `stream`
 Contains settings for the streaming.
 - The `retry`option is for transparent reconnections to the provider on provider disconnects or stream errors.
+- `connect_timeout_secs`: _optional_ and used for provider stream connections for connection timeout.
 - `buffer`: When buffer is `enabled`, the stream is buffered with the configured `size`.
-`size` is the amount of `8092 byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.  
+`size` is the amount of `8192 byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.  
 
 - *a.* if `retry` is `false` and `buffer.enabled` is `false`  the provider stream is piped as is to the client.
 - *b.* if `retry` is `true` or  `buffer.enabled` is `true` the provider stream is processed and send to the client.
@@ -214,10 +215,12 @@ If you have m3u-filter behind a reverse proxy and dont want rewritten resource u
 Default value is false.
 If you set it `true` `cache` is disabled! Because the cache cant work without rewritten urls.
 
+
 ```yaml
 reverse_proxy:
   resource_rewrite_disabled: false
   stream:
+    connect_timeout_secs: false
     retry: true
     buffer:
       enabled: true
@@ -311,19 +314,31 @@ If you set it to `true`,  the attributes (if available)
 
 are checked to permit or deny access.
 
-### 1.12 `channel_unavailable_file`
-If you want to send a `Unavailable Channel` picture instead of black screen when a channel is not available.
-A video file with name `freeze_frame.ts` is already available in the docker image. 
+### 1.12 `custom_stream_response`
+If you want to send a picture instead of black screen when a channel is not available or connections exhausted.
+
+Following attributes are available:
+
+- `channel_unavailable`: _optional_
+- `user_connections_exhausted`: _optional_
+- ` provider_connections_exhausted`: _optional_
+
+Video files with name `channel_unavailable.ts`, `user_connections_exhausted`, `provider_connections_exhausted` 
+are already available in the docker image. 
 
 You can convert an image with `ffmpeg`.
 
-`ffmpeg -loop 1 -i freeze_frame.jpg -t 10 -r 1 -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p freeze_frame.ts` 
+`ffmpeg -loop 1 -i blank_screen.jpg -t 10 -r 1 -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p blank_screen.ts` 
 
 and add it to the `config.yml`.
 
 ```yaml
-channel_unavailable_file: /freeze_frame.ts
+custom_stream_response:
+  channel_unavailable: /home/m3u-filter/channel_unavailable.ts
+  user_connections_exhausted: /home/m3u-filter/user_connections_exhausted.ts
+  provider_connections_exhausted: /home/m3u-filter/provider_connections_exhausted.ts
 ```
+
 ### 1.13 `user_config_dir`
 It is the storage path for user configurations (f.e. bouquets).
 
@@ -424,7 +439,7 @@ Each input has the following attributes:
     + `xtream_skip_series` true or false, series section can be skipped.
     + `xtream_live_stream_without_extension` default false, if set to true `.ts` extension is not added to the stream link.
     + `xtream_live_stream_use_prefix` default true, if set to true `/live/` prefix is added to the stream link.
-
+- `aliases`  for alias definitions for the same provider with different credentials
 
 `persist` should be different for `m3u` and `xtream` types. For `m3u` use full filename like `./playlist_{}.m3u`.
 For `xtream` use a prefix like `./playlist_`
@@ -469,6 +484,25 @@ sources:
       password: test
 ```
 
+Input alias definition for same provider with same content but different credentials.
+`max_connections` default is 1
+```yaml
+- sources:
+- inputs:
+  - type: xtream
+    name: my_provider
+    url: 'http://provider.net'
+    username: xyz
+    password: secret1
+    aliases:
+    - name: my_provider_2 
+      url: 'http://provider.net'
+      username: abcd
+      password: secret2
+      max_connections: 2
+  targets:
+  - name: test
+```
 
 ### 2.2.2 `targets`
 Has the following top level entries:

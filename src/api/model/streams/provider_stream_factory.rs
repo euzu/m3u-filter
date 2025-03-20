@@ -23,7 +23,7 @@ use url::Url;
 use crate::api::model::stream::{BoxedProviderStream, ProviderStreamFactoryResponse};
 
 // TODO make this configurable
-pub const STREAM_QUEUE_SIZE: usize = 4096; // mpsc channel holding messages. with possible 8092byte chunks
+pub const STREAM_QUEUE_SIZE: usize = 4096; // mpsc channel holding messages. with possible 8192byte chunks
 
 pub struct BufferStreamOptions {
     item_type: PlaylistItemType,

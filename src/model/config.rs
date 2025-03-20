@@ -41,7 +41,7 @@ pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
 pub const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
 pub const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
 
-const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8092byte chunks and 2Mbit/s approx 8MB
+const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8192byte chunks and 2Mbit/s approx 8MB
 
 #[macro_export]
 macro_rules! valid_property {
