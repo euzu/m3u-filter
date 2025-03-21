@@ -52,7 +52,7 @@ macro_rules! valid_property {
 pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 use crate::model::hdhomerun_config::HdHomeRunConfig;
-use crate::utils::file::config_reader::resolve_env_var;
+use crate::utils::file::config_reader::{csv_read_inputs, resolve_env_var};
 use crate::utils::network::request::{get_credentials_from_url, get_credentials_from_url_str};
 use crate::utils::string_utils::get_trimmed_string;
 
@@ -601,12 +601,15 @@ pub enum InputType {
     Xtream,
     #[serde(rename = "m3u_batch")]
     M3uBatch,
+    #[serde(rename = "xtream_batch")]
+    XtreamBatch,
 }
 
 impl InputType {
     const M3U: &'static str = "m3u";
     const XTREAM: &'static str = "xtream";
     const M3U_BATCH: &'static str = "m3u_batch";
+    const XTREAM_BATCH: &'static str = "xtream_batch";
 }
 
 impl Display for InputType {
@@ -615,6 +618,7 @@ impl Display for InputType {
             Self::M3u => Self::M3U,
             Self::Xtream => Self::XTREAM,
             Self::M3uBatch => Self::M3U_BATCH,
+            Self::XtreamBatch => Self::XTREAM_BATCH,
         })
     }
 }
@@ -684,7 +688,7 @@ impl InputUserInfo {
 macro_rules! check_input_credentials {
     ($this:ident, $input_type:expr) => {
      match $input_type {
-            InputType::M3u => {
+            InputType::M3u | InputType::M3uBatch => {
                 if $this.username.is_some() || $this.password.is_some() {
                     debug!("for input type m3u: username and password are ignored");
                 }
@@ -694,14 +698,9 @@ macro_rules! check_input_credentials {
                     $this.password = password;
                 }
             }
-            InputType::Xtream => {
+            InputType::Xtream | InputType::XtreamBatch => {
                 if $this.username.is_none() || $this.password.is_none() {
                     return Err(info_err!("for input type xtream: username and password are mandatory".to_string()));
-                }
-            }
-            InputType::M3uBatch => {
-                if $this.username.is_some() || $this.password.is_some() {
-                    debug!("for input type m3u_batch: username and password are ignored");
                 }
             }
         }
@@ -783,24 +782,71 @@ impl ConfigInput {
     #[allow(clippy::cast_possible_truncation)]
     pub fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         self.id = index;
+        self.check_url()?;
+        self.url = resolve_env_var(&self.url);
+        self.prepare_batch()?;
+
         self.name = self.name.trim().to_string();
         if self.name.is_empty() {
             return Err(info_err!("name for input is mandatory".to_string()));
         }
-        self.url = self.url.trim().to_string();
-        if self.url.is_empty() {
-            return Err(info_err!("url for input is mandatory".to_string()));
-        }
-        self.url = resolve_env_var(&self.url);
+
         self.username = get_trimmed_string(&self.username);
         self.password = get_trimmed_string(&self.password);
         check_input_credentials!(self, self.input_type);
         self.persist = get_trimmed_string(&self.persist);
+
+
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;
             handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+1+(idx as u16), input_type)));
         }
         Ok(index + self.aliases.as_ref().map_or(0, std::vec::Vec::len) as u16)
+    }
+
+    fn check_url(&mut self) -> Result<(), M3uFilterError> {
+        self.url = self.url.trim().to_string();
+        if self.url.is_empty() {
+            return Err(info_err!("url for input is mandatory".to_string()));
+        }
+        Ok(())
+    }
+
+    fn prepare_batch(&mut self) -> Result<(), M3uFilterError> {
+        if self.input_type == InputType::M3uBatch || self.input_type == InputType::XtreamBatch {
+            let input_type = if self.input_type == InputType::M3uBatch {
+                InputType::M3u
+            } else {
+                InputType::Xtream
+            };
+
+            match csv_read_inputs(input_type.clone(), &self.url) {
+                Ok(mut batch_aliases) => {
+                    if !batch_aliases.is_empty() {
+                        if let Some(mut first) = batch_aliases.pop() {
+                            self.username = first.username.take();
+                            self.password = first.password.take();
+                            self.url =  first.url.trim().to_string();
+                            if self.name.is_empty() {
+                                self.name = first.name.to_string();
+                            }
+                        }
+                        if !batch_aliases.is_empty() {
+                            if let Some(aliases) = self.aliases.as_mut() {
+                                aliases.extend(batch_aliases);
+                            } else {
+                                self.aliases = Some(batch_aliases);
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
+                }
+            }
+            self.input_type = input_type;
+        }
+        Ok(())
     }
 
     pub fn get_user_info(&self) -> Option<InputUserInfo> {

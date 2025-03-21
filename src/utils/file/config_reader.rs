@@ -14,6 +14,7 @@ use std::io::{self, BufRead};
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use url::{Url};
+use crate::utils::network::request::get_credentials_from_url;
 
 pub fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<Option<String>, M3uFilterError> {
     let mappings_file: String = args_mapping.unwrap_or_else(|| file_utils::get_default_mappings_path(cfg.t_config_path.as_str()));
@@ -170,18 +171,32 @@ const FIELD_MAX_CON: &str = "max_connections";
 const FIELD_PRIO: &str = "priority";
 const FIELD_URL: &str = "url";
 const FIELD_NAME: &str = "name";
+const FIELD_USERNAME: &str = "username";
+const FIELD_PASSWORD: &str = "password";
 const FIELD_UNKNOWN: &str = "?";
 
 fn csv_assign_mandatory_fields(alias: &mut ConfigInputAlias) {
     if alias.name.is_empty() && !alias.url.is_empty() {
         match  Url::parse(alias.url.as_str()) {
             Ok(url) => {
-                let username = alias.username.as_ref().map(|s|s.as_str()).unwrap_or_default();
-                let domain: Vec<&str> = url.domain().unwrap_or_default().split('.').collect();
-                if domain.len() > 1 {
-                    alias.name = format!("{}_{username}", domain[domain.len() - 2]);
+                let (username, password) = get_credentials_from_url(&url);
+                if username.is_none() || password.is_none() {
+                    // xtream url
+                    alias.url = url.origin().ascii_serialization().to_string();
                 } else {
-                    alias.name = format!("{username}");
+                    // m3u url
+                    alias.username = username;
+                    alias.password = password;
+                }
+
+                if alias.name.is_empty() {
+                    let username = alias.username.as_ref().map(|s|s.as_str()).unwrap_or_default();
+                    let domain: Vec<&str> = url.domain().unwrap_or_default().split('.').collect();
+                    if domain.len() > 1 {
+                        alias.name = format!("{}_{username}", domain[domain.len() - 2]);
+                    } else {
+                        alias.name = format!("{username}");
+                    }
                 }
             }
             Err(_err) => {}
@@ -193,25 +208,11 @@ fn csv_assign_config_input_column(config_input: &mut ConfigInputAlias, input_typ
         match header {
             FIELD_URL => {
                 let url = Url::parse(value.trim()).map_err(to_io_error)?;
-
                 match input_type {
-                    InputType::Xtream => {
-                        let username = url.query_pairs().find(|(key, _)| key == "username").map(|(_, value)| value);
-                        if let Some(uname) = username {
-                            config_input.username = Some(uname.to_string());
-                        }
-                        let password = url.query_pairs().find(|(key, _)| key == "password").map(|(_, value)| value);
-                        if let Some(pwd) = password {
-                            config_input.password = Some(pwd.to_string());
-                        }
-                        config_input.url = url.origin().ascii_serialization()
-                    }
-
-                    InputType::M3u => {
+                    InputType::Xtream | InputType::M3u => {
                         config_input.url = url.to_string();
                     }
-
-                    InputType::M3uBatch => {
+                    InputType::M3uBatch | InputType::XtreamBatch => {
                     }
                 };
             },
@@ -231,7 +232,8 @@ fn csv_assign_config_input_column(config_input: &mut ConfigInputAlias, input_typ
     Ok(())
 }
 
-pub fn csv_read_inputs(input_type: InputType, file_path: &str) -> Result<Vec<ConfigInputAlias>, io::Error> {
+pub fn csv_read_inputs(input_type: InputType, file_uri: &str) -> Result<Vec<ConfigInputAlias>, io::Error> {
+    let file_path = file_uri.strip_prefix("file://").unwrap_or(file_uri);
     let inputs_file = std::path::PathBuf::from(file_path);
     if let Ok(file) = file_utils::open_file(&inputs_file) {
         let mut result = vec![];

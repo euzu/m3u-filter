@@ -190,7 +190,7 @@ async fn get_playlist(client: Arc<reqwest::Client>, cfg_input: Option<&ConfigInp
                 match input.input_type {
                     InputType::M3u => m3u::get_m3u_playlist(client, cfg, input, &cfg.working_dir).await,
                     InputType::Xtream => xtream::get_xtream_playlist(client, input, &cfg.working_dir).await,
-                    InputType::M3uBatch => (vec![], vec![])
+                    InputType::M3uBatch | InputType::XtreamBatch => (vec![], vec![])
                 };
             if result.is_empty() {
                 let error_strings: Vec<String> = errors.iter().map(std::string::ToString::to_string).collect();
