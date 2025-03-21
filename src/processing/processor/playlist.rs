@@ -317,6 +317,7 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
             let (mut playlistgroups, mut error_list) = match input.input_type {
                 InputType::M3u => m3u::get_m3u_playlist(Arc::clone(&client), &cfg, input, &cfg.working_dir).await,
                 InputType::Xtream => xtream::get_xtream_playlist(Arc::clone(&client), input, &cfg.working_dir).await,
+                InputType::M3uBatch => (vec![], vec![])
             };
             let (tvguide, mut tvguide_errors) = if error_list.is_empty() {
                 epg::get_xmltv(Arc::clone(&client), &cfg, input, &cfg.working_dir).await

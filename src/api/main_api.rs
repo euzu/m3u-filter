@@ -27,6 +27,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::future::IntoFuture;
+use std::time::Duration;
+use reqwest::Client;
 use crate::api::model::hls_cache::HlsCache;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -120,9 +122,20 @@ fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let active_users = Arc::new(ActiveUserManager::new());
     let active_provider = Arc::new(ActiveProviderManager::new(cfg));
 
+    let client = match cfg.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map(|stream| stream.connect_timeout_secs) {
+        Some(timeout) => {
+            Client::builder()
+                .connect_timeout(Duration::from_secs(u64::from(timeout)))
+                .build().unwrap_or_else(|_| Client::new())
+        }
+        None => {
+            Client::new()
+        }
+    };
+
     AppState {
         config: Arc::clone(cfg),
-        http_client: Arc::new(reqwest::Client::new()),
+        http_client: Arc::new(client),
         downloads: Arc::new(DownloadQueue::new()),
         cache,
         hls_cache: HlsCache::garbage_collected(),

@@ -210,6 +210,9 @@ fn csv_assign_config_input_column(config_input: &mut ConfigInputAlias, input_typ
                     InputType::M3u => {
                         config_input.url = url.to_string();
                     }
+
+                    InputType::M3uBatch => {
+                    }
                 };
             },
             FIELD_MAX_CON => {

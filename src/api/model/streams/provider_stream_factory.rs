@@ -29,7 +29,6 @@ pub struct BufferStreamOptions {
     item_type: PlaylistItemType,
     reconnect_enabled: bool,
     force_reconnect_secs: u32,
-    connect_timeout_secs: u32,
     buffer_enabled: bool,
     buffer_size: usize,
     share_stream: bool,
@@ -46,7 +45,6 @@ impl BufferStreamOptions {
             item_type,
             reconnect_enabled: stream_options.stream_retry,
             force_reconnect_secs: stream_options.stream_force_retry_secs,
-            connect_timeout_secs: stream_options.stream_connect_timeout_secs,
             buffer_enabled: stream_options.buffer_enabled,
             buffer_size: stream_options.buffer_size,
             share_stream,
@@ -94,7 +92,6 @@ struct ProviderStreamOptions {
     url: Url,
     reconnect: bool,
     reconnect_force_secs: u32,
-    connect_timeout_secs: u32,
     headers: HeaderMap,
     range_bytes: Arc<Option<AtomicUsize>>,
 }
@@ -178,7 +175,7 @@ fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Opti
 fn get_client_stream_request_params(
     req_headers: &HeaderMap,
     input_headers: Option<HashMap<String, String>>,
-    options: &BufferStreamOptions) -> (usize, Option<usize>, bool, u32, u32, HeaderMap)
+    options: &BufferStreamOptions) -> (usize, Option<usize>, bool, u32, HeaderMap)
 {
     let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 1 };
     let filter_header = get_header_filter_for_item_type(options.item_type);
@@ -191,31 +188,26 @@ fn get_client_stream_request_params(
     // We merge configured input headers with the headers from the request.
     let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
 
-    (stream_buffer_size, req_range_start_bytes, options.is_reconnect_enabled(), options.force_reconnect_secs, options.connect_timeout_secs, headers)
+    (stream_buffer_size, req_range_start_bytes, options.is_reconnect_enabled(), options.force_reconnect_secs, headers)
 }
 
 fn prepare_client(request_client: &Arc<reqwest::Client>, stream_options: &ProviderStreamOptions) -> (reqwest::RequestBuilder, bool) {
     let url = stream_options.get_url();
     let range_start = stream_options.get_total_bytes_send();
     let headers = stream_options.get_headers();
-    let mut client = request_client.get(url.clone()).headers(headers.clone());
+    let mut request_builder = request_client.get(url.clone()).headers(headers.clone());
 
-    let (client_builder, partial) = {
+    let (client, partial) = {
         if let Some(range) = range_start {
             // on reconnect send range header to avoid starting from beginning for vod
             let range = format!("bytes={range}-", );
-            client = client.header(RANGE, range);
-            (client, true) // partial content
+            request_builder = request_builder.header(RANGE, range);
+            (request_builder, true) // partial content
         } else {
-            (client, false)
+            (request_builder, false)
         }
     };
 
-    let client = if stream_options.connect_timeout_secs > 0 {
-        client_builder.timeout(Duration::from_secs(u64::from(stream_options.connect_timeout_secs)))
-    } else {
-        client_builder
-    };
     (client, partial)
 }
 
@@ -338,7 +330,7 @@ fn create_provider_stream_options(stream_url: &Url,
                                   req_headers: &HeaderMap,
                                   input_headers: Option<HashMap<String, String>>,
                                   options: &BufferStreamOptions) -> ProviderStreamOptions {
-    let (buffer_size, req_range_start_bytes, reconnect, reconnect_force_secs, connect_timeout_secs, headers)
+    let (buffer_size, req_range_start_bytes, reconnect, reconnect_force_secs, headers)
         = get_client_stream_request_params(req_headers, input_headers, options);
     let url = stream_url.clone();
     let range_bytes = Arc::new(req_range_start_bytes.map(AtomicUsize::new));
@@ -349,7 +341,6 @@ fn create_provider_stream_options(stream_url: &Url,
         url,
         reconnect,
         reconnect_force_secs,
-        connect_timeout_secs,
         headers,
         range_bytes,
     }

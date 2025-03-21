@@ -126,27 +126,26 @@ pub async fn get_user_target<'a>(api_req: &'a UserApiRequest, app_state: &'a App
 pub struct StreamOptions {
     pub stream_retry: bool,
     pub stream_force_retry_secs: u32,
-    pub stream_connect_timeout_secs: u32,
     pub buffer_enabled: bool,
     pub buffer_size: usize,
     pub pipe_provider_stream: bool,
 }
 
 fn get_stream_options(app_state: &AppState) -> StreamOptions {
-    let (stream_retry, stream_force_retry_secs, stream_connect_timeout_secs, buffer_enabled, buffer_size) = app_state
+    let (stream_retry, stream_force_retry_secs, buffer_enabled, buffer_size) = app_state
         .config
         .reverse_proxy
         .as_ref()
         .and_then(|reverse_proxy| reverse_proxy.stream.as_ref())
-        .map_or((false, 0, 0, false, 0), |stream| {
+        .map_or((false, 0, false, 0), |stream| {
             let (buffer_enabled, buffer_size) = stream
                 .buffer
                 .as_ref()
                 .map_or((false, 0), |buffer| (buffer.enabled, buffer.size));
-            (stream.retry, stream.forced_retry_interval_secs, stream.connect_timeout_secs, buffer_enabled, buffer_size)
+            (stream.retry, stream.forced_retry_interval_secs, buffer_enabled, buffer_size)
         });
     let pipe_provider_stream = !stream_retry && !buffer_enabled;
-    StreamOptions { stream_retry, stream_force_retry_secs, stream_connect_timeout_secs, buffer_enabled, buffer_size, pipe_provider_stream }
+    StreamOptions { stream_retry, stream_force_retry_secs, buffer_enabled, buffer_size, pipe_provider_stream }
 }
 
 // fn get_stream_content_length(provider_response: Option<&(Vec<(String, String)>, StatusCode)>) -> u64 {
@@ -256,7 +255,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
             let parsed_url = Url::parse(&request_url);
             let ((stream, stream_info), reconnect_flag) = if let Ok(url) = parsed_url {
                 if stream_options.pipe_provider_stream {
-                    (provider_stream::get_provider_pipe_stream(app_state, &url, req_headers, input_headers, item_type, &stream_options).await, None)
+                    (provider_stream::get_provider_pipe_stream(app_state, &url, req_headers, input_headers, item_type).await, None)
                 } else {
                     let buffer_stream_options = BufferStreamOptions::new(item_type, share_stream, &stream_options);
                     let reconnect_flag = buffer_stream_options.get_reconnect_flag_clone();

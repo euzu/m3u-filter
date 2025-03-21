@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::api::api_utils::{get_headers_from_request, HeaderFilter, StreamOptions};
+use crate::api::api_utils::{get_headers_from_request, HeaderFilter};
 use crate::api::model::model_utils::get_response_headers;
 use crate::api::model::stream_error::StreamError;
 use crate::api::model::streams::custom_video_stream::CustomVideoStream;
@@ -12,7 +12,6 @@ use futures::TryStreamExt;
 use log::{debug, error};
 use reqwest::StatusCode;
 use std::sync::Arc;
-use std::time::Duration;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use url::Url;
@@ -78,8 +77,7 @@ pub async fn get_provider_pipe_stream(app_state: &AppState,
                                       stream_url: &Url,
                                       req_headers: &HeaderMap,
                                       input_headers: Option<HashMap<String, String>>,
-                                      item_type: PlaylistItemType,
-                                      stream_options: &StreamOptions) -> ProviderStreamResponse {
+                                      item_type: PlaylistItemType) -> ProviderStreamResponse {
     let filter_header = get_header_filter_for_item_type(item_type);
     let req_headers = get_headers_from_request(req_headers, &filter_header);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
@@ -87,12 +85,7 @@ pub async fn get_provider_pipe_stream(app_state: &AppState,
     // The stream url, we need to clone it because of move to async block.
     // We merge configured input headers with the headers from the request.
     let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
-    let client_builder = app_state.http_client.get(stream_url.clone()).headers(headers.clone());
-    let client = if stream_options.stream_connect_timeout_secs > 0 {
-        client_builder.timeout(Duration::from_secs(u64::from(stream_options.stream_connect_timeout_secs)))
-    } else {
-        client_builder
-    };
+    let client = app_state.http_client.get(stream_url.clone()).headers(headers.clone());
     match client.send().await {
         Ok(response) => {
             let response_headers = get_response_headers(response.headers());

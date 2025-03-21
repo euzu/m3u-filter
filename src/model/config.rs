@@ -599,11 +599,14 @@ pub enum InputType {
     M3u,
     #[serde(rename = "xtream")]
     Xtream,
+    #[serde(rename = "m3u_batch")]
+    M3uBatch,
 }
 
 impl InputType {
     const M3U: &'static str = "m3u";
     const XTREAM: &'static str = "xtream";
+    const M3U_BATCH: &'static str = "m3u_batch";
 }
 
 impl Display for InputType {
@@ -611,6 +614,7 @@ impl Display for InputType {
         write!(f, "{}", match self {
             Self::M3u => Self::M3U,
             Self::Xtream => Self::XTREAM,
+            Self::M3uBatch => Self::M3U_BATCH,
         })
     }
 }
@@ -684,10 +688,20 @@ macro_rules! check_input_credentials {
                 if $this.username.is_some() || $this.password.is_some() {
                     debug!("for input type m3u: username and password are ignored");
                 }
+                if $this.username.is_none() && $this.password.is_none() {
+                    let (username, password) = get_credentials_from_url_str(&$this.url);
+                    $this.username = username;
+                    $this.password = password;
+                }
             }
             InputType::Xtream => {
                 if $this.username.is_none() || $this.password.is_none() {
                     return Err(info_err!("for input type xtream: username and password are mandatory".to_string()));
+                }
+            }
+            InputType::M3uBatch => {
+                if $this.username.is_some() || $this.password.is_some() {
+                    debug!("for input type m3u_batch: username and password are ignored");
                 }
             }
         }
@@ -725,6 +739,7 @@ impl ConfigInputAlias {
         self.username = get_trimmed_string(&self.username);
         self.password = get_trimmed_string(&self.password);
         check_input_credentials!(self, input_type);
+
         Ok(())
     }
 }
@@ -780,11 +795,6 @@ impl ConfigInput {
         self.username = get_trimmed_string(&self.username);
         self.password = get_trimmed_string(&self.password);
         check_input_credentials!(self, self.input_type);
-        if self.username.is_none() && self.password.is_none() {
-            let (username, password) = get_credentials_from_url_str(&self.url);
-            self.username = username;
-            self.password = password;
-        }
         self.persist = get_trimmed_string(&self.persist);
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;
