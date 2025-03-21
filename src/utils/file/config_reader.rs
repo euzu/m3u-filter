@@ -13,7 +13,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 use std::sync::LazyLock;
-use url::Url;
+use url::{ParseError, Url};
 
 pub fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<Option<String>, M3uFilterError> {
     let mappings_file: String = args_mapping.unwrap_or_else(|| file_utils::get_default_mappings_path(cfg.t_config_path.as_str()));
@@ -164,12 +164,30 @@ pub fn resolve_env_var(value: &str) -> String {
 //
 // }
 
-const CSV_SEPARATOR: char = ',';
+const CSV_SEPARATOR: char = ';';
 const HEADER_PREFIX: char = '#';
-
 const FIELD_MAX_CON: &str = "max_connections";
 const FIELD_PRIO: &str = "priority";
 const FIELD_URL: &str = "url";
+const FIELD_NAME: &str = "name";
+const FIELD_UNKNOWN: &str = "?";
+
+fn csv_assign_mandatory_fields(alias: &mut ConfigInputAlias) {
+    if alias.name.is_empty() && !alias.url.is_empty() {
+        match  Url::parse(alias.url.as_str()) {
+            Ok(url) => {
+                let username = alias.username.as_ref().map(|s|s.as_str()).unwrap_or_default();
+                let domain: Vec<&str> = url.domain().unwrap_or_default().split('.').collect();
+                if domain.len() > 1 {
+                    alias.name = format!("{}_{username}", domain[domain.len() - 2]);
+                } else {
+                    alias.name = format!("{username}");
+                }
+            }
+            Err(err) => {}
+        }
+    }
+}
 
 fn csv_assign_config_input_column(config_input: &mut ConfigInputAlias, input_type: &InputType, header: &str, value: &str) -> Result<(), io::Error> {
         match header {
@@ -202,6 +220,9 @@ fn csv_assign_config_input_column(config_input: &mut ConfigInputAlias, input_typ
                 let priority = value.parse::<i16>().unwrap_or(0);
                 config_input.priority = priority;
             },
+            FIELD_NAME => {
+                config_input.name = value.to_string();
+            },
             _ => {}
         }
     Ok(())
@@ -211,11 +232,25 @@ pub fn csv_read_inputs(input_type: InputType, file_path: &str) -> Result<Vec<Con
     let inputs_file = std::path::PathBuf::from(file_path);
     if let Ok(file) = file_utils::open_file(&inputs_file) {
         let mut result = vec![];
-        let default_columns = vec![FIELD_URL, FIELD_MAX_CON, FIELD_PRIO];
+        let mut default_columns = vec![FIELD_URL, FIELD_MAX_CON, FIELD_PRIO, FIELD_NAME];
         let reader = io::BufReader::new(file);
         for line in reader.lines().into_iter() {
             let line = line?;
             if line.is_empty() || line.starts_with(HEADER_PREFIX) {
+                default_columns = line[1..].split(CSV_SEPARATOR).map(|s| {
+                    println!("{s}");
+                    match s {
+                        FIELD_URL => FIELD_URL,
+                        FIELD_MAX_CON => FIELD_MAX_CON,
+                        FIELD_PRIO => FIELD_PRIO,
+                        FIELD_NAME => FIELD_NAME,
+                        _ => {
+                            error!("Field {s} is unsupported for csv input");
+                            FIELD_UNKNOWN
+                        }
+                    }
+                    }).collect();
+                println!("{default_columns:?}");
                 continue;
             }
 
@@ -236,6 +271,7 @@ pub fn csv_read_inputs(input_type: InputType, file_path: &str) -> Result<Vec<Con
                     continue;
                 }
             }
+            csv_assign_mandatory_fields(&mut config_input);
             result.push(config_input);
         }
         return Ok(result);

@@ -53,7 +53,7 @@ where
     fn on_complete(&mut self) {
         if !self.completed {
             self.completed = true;
-            let size = self.size.load(Ordering::Acquire);
+            let size = self.size.load(Ordering::SeqCst);
             if self.writer.flush().is_ok() {
                 (self.callback)(size);
             }
@@ -62,7 +62,7 @@ where
 
     fn on_data(&mut self, data: &Result<Bytes, StreamError>) {
         if let Ok(bytes) = data {
-            self.size.fetch_add(bytes.len(), Ordering::AcqRel);
+            self.size.fetch_add(bytes.len(), Ordering::SeqCst);
             let bytes_to_write = bytes.clone();
             if let Err(e) = self.writer.write_all(&bytes_to_write) {
                 error!("Error writing to resource file: {e}");

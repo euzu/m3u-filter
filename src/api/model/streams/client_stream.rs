@@ -13,6 +13,7 @@ use crate::utils::network::request::sanitize_sensitive_info;
 
 /// This stream counts the send bytes for reconnecting to the actual position and
 /// sets the `close_signal`  if the client drops the connection.
+#[repr(align(64))]
 pub(in crate::api::model) struct ClientStream {
     inner: BoxedProviderStream,
     close_signal: Arc<AtomicOnceFlag>,
@@ -42,7 +43,7 @@ impl Stream for ClientStream {
                         }
 
                         if let Some(counter) = self.total_bytes.as_ref() {
-                            counter.fetch_add(bytes.len(), Ordering::AcqRel);
+                            counter.fetch_add(bytes.len(), Ordering::SeqCst);
                         }
 
                         return Poll::Ready(Some(Ok(bytes)));

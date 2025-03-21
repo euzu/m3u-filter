@@ -15,6 +15,7 @@ use crate::api::model::streams::chunked_buffer::ChunkedBuffer;
 
 const GRACE_PERIOD_SECONDS: u64 = 2;
 
+#[repr(align(64))]
 pub(in crate::api) struct ActiveClientStream {
     inner: BoxedProviderStream,
     username: String,
@@ -62,7 +63,7 @@ impl ActiveClientStream {
                 tokio::time::sleep(tokio::time::Duration::from_secs(GRACE_PERIOD_SECONDS)).await;
                 if provider_manager.is_over_limit(&provider_name) {
                     info!("is over limit for active clients: {provider_name}");
-                    stop_stream_flag.store(true, std::sync::atomic::Ordering::Release);
+                    stop_stream_flag.store(true, std::sync::atomic::Ordering::SeqCst);
                     if let Some(connect_flag) = reconnect_flag {
                         info!("stopped reconnect");
                         connect_flag.notify();
@@ -80,7 +81,7 @@ impl Stream for ActiveClientStream {
 
     fn poll_next(mut self: Pin<&mut Self>,cx: &mut std::task::Context<'_>,) -> Poll<Option<Self::Item>> {
         if let Some(send_custom_stream_flag) = &self.send_custom_stream_flag {
-             if send_custom_stream_flag.load(std::sync::atomic::Ordering::Acquire) {
+             if send_custom_stream_flag.load(std::sync::atomic::Ordering::SeqCst) {
                 return match self.custom_video.as_mut() {
                     None => {
                         Poll::Ready(None)

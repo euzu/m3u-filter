@@ -36,13 +36,13 @@ impl AtomicOnceFlag {
     ///
     /// This operation is atomic and uses the specified memory ordering.
     pub fn notify(&self) {
-        self.enabled.store(false, Ordering::Release);
+        self.enabled.store(false, Ordering::SeqCst);
     }
 
     /// Checks if the flag is still active.
     ///
     /// Returns `true` if the flag is active (initial state). Returns `false` if the flag has been disabled.
     pub fn is_active(&self) -> bool {
-        self.enabled.load(Ordering::Acquire)
+        self.enabled.load(Ordering::SeqCst)
     }
 }

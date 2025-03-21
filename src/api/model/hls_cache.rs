@@ -33,6 +33,7 @@ fn start_garbage_collector(cache: &Arc<HlsCache>) {
     });
 }
 
+#[repr(align(64))]
 pub struct HlsCache {
     pub entries: RwLock<HashMap<u32, HlsEntry>>,
     counter:  AtomicU32,
@@ -64,9 +65,9 @@ impl HlsCache {
     }
 
     pub fn new_token(&self) -> u32 {
-        let token = self.counter.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        let token = self.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if token > TOKEN_MAX {
-            self.counter.store(1, std::sync::atomic::Ordering::Release);
+            self.counter.store(1, std::sync::atomic::Ordering::SeqCst);
             return 1;
         }
         return token;

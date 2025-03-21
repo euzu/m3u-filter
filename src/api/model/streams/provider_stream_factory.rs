@@ -140,7 +140,7 @@ impl ProviderStreamOptions {
 
     #[inline]
     pub fn get_total_bytes_send(&self) -> Option<usize> {
-        self.range_bytes.as_ref().as_ref().map(|atomic| atomic.load(Ordering::Acquire))
+        self.range_bytes.as_ref().as_ref().map(|atomic| atomic.load(Ordering::SeqCst))
     }
 
     // pub fn get_range_bytes(&self) -> &Arc<Option<AtomicUsize>> {

@@ -65,12 +65,12 @@ impl ProviderConfig {
 
     #[inline]
     pub fn is_exhausted(&self) -> bool {
-        self.max_connections > 0 && self.current_connections.load(Ordering::Acquire) >= self.max_connections
+        self.max_connections > 0 && self.current_connections.load(Ordering::SeqCst) >= self.max_connections
     }
 
     #[inline]
     pub fn is_over_limit(&self) -> bool {
-        self.max_connections > 0 && self.current_connections.load(Ordering::Acquire) > self.max_connections
+        self.max_connections > 0 && self.current_connections.load(Ordering::SeqCst) > self.max_connections
     }
 
     //
@@ -80,26 +80,26 @@ impl ProviderConfig {
     // }
 
     pub fn try_allocate(&self, grace: bool) -> ProviderAllocation {
-        let connections = self.current_connections.load(Ordering::Acquire);
+        let connections = self.current_connections.load(Ordering::SeqCst);
         if self.max_connections == 0 {
             return ProviderAllocation::Available(self);
         }
         if (!grace && connections < self.max_connections) || (grace && connections <= self.max_connections)  {
-            self.current_connections.fetch_add(1, Ordering::AcqRel);
+            self.current_connections.fetch_add(1, Ordering::SeqCst);
             return if connections < self.max_connections { ProviderAllocation::Available(self) } else { ProviderAllocation::GracePeriod(self) };
         }
         ProviderAllocation::Exhausted
     }
 
     pub fn release(&self) {
-        let connections = self.current_connections.load(Ordering::Acquire);
+        let connections = self.current_connections.load(Ordering::SeqCst);
         if connections > 0 {
-            self.current_connections.fetch_sub(1, Ordering::AcqRel);
+            self.current_connections.fetch_sub(1, Ordering::SeqCst);
         }
     }
 
     pub fn get_connection(&self) -> u16 {
-        self.current_connections.load(Ordering::Acquire)
+        self.current_connections.load(Ordering::SeqCst)
     }
 }
 
@@ -182,6 +182,7 @@ impl ProviderPriorityGroup {
 
 
 /// Manages multiple providers, ensuring that connections are allocated in a round-robin manner based on priority.
+#[repr(align(64))]
 #[derive(Debug)]
 struct MultiProviderLineup {
     providers: Vec<ProviderPriorityGroup>,
@@ -256,7 +257,7 @@ impl MultiProviderLineup {
                 }
             }
             ProviderPriorityGroup::MultiProviderGroup(index, pg) => {
-                let mut idx = index.load(Ordering::Acquire);
+                let mut idx = index.load(Ordering::SeqCst);
                 let provider_count = pg.len();
                 for _ in idx..provider_count {
                     let p = pg.get(idx).unwrap();
@@ -265,12 +266,12 @@ impl MultiProviderLineup {
                     match result {
                         ProviderAllocation::Exhausted => {}
                         ProviderAllocation::Available(_) | ProviderAllocation::GracePeriod(_) => {
-                            index.store(idx, Ordering::Release);
+                            index.store(idx, Ordering::SeqCst);
                             return result;
                         }
                     }
                 }
-                index.store(idx, Ordering::Release);
+                index.store(idx, Ordering::SeqCst);
             }
         }
         ProviderAllocation::Exhausted
@@ -302,7 +303,7 @@ impl MultiProviderLineup {
     /// }
     /// ```
     fn acquire(&self) -> ProviderAllocation {
-        let main_idx = self.index.load(Ordering::Acquire);
+        let main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
 
         for index in main_idx..provider_count {
@@ -320,7 +321,7 @@ impl MultiProviderLineup {
                 ProviderAllocation::Available(_) |
                 ProviderAllocation::GracePeriod(_) => {
                     if priority_group.is_exhausted() {
-                        self.index.store((index + 1) % provider_count, Ordering::Release);
+                        self.index.store((index + 1) % provider_count, Ordering::SeqCst);
                     }
                     return allocation;
                 }
@@ -329,13 +330,13 @@ impl MultiProviderLineup {
 
         ProviderAllocation::Exhausted
         // let provider = &self.providers[main_idx];
-        // self.index.store((main_idx + 1) % provider_count, Ordering::Release);
+        // self.index.store((main_idx + 1) % provider_count, Ordering::SeqCst);
         //
         // match provider {
         //     ProviderPriorityGroup::SingleProviderGroup(p) => ProviderAllocation::Available(p),
         //     ProviderPriorityGroup::MultiProviderGroup(gindex, group) => {
-        //         let idx = gindex.load(Ordering::Acquire);
-        //         gindex.store((idx + 1) % group.len(), Ordering::Release);
+        //         let idx = gindex.load(Ordering::SeqCst);
+        //         gindex.store((idx + 1) % group.len(), Ordering::SeqCst);
         //         match group.get(idx) {
         //             None => ProviderAllocation::Exhausted,
         //             Some(p) => ProviderAllocation::Available(p)
@@ -439,7 +440,7 @@ impl ActiveProviderManager {
     pub fn active_connections(&self) -> Option<HashMap<String, u16>> {
         let result = RefCell::new(HashMap::<String, u16>::new());
         let add_provider = |provider: &ProviderConfig| {
-            let count = provider.current_connections.load(Ordering::Acquire);
+            let count = provider.current_connections.load(Ordering::SeqCst);
             if count > 0 {
                 result.borrow_mut().insert(provider.name.to_string(), count);
             }
@@ -742,9 +743,9 @@ mod tests {
             let handle = thread::spawn(move || {
                 // Each thread tries to acquire a connection
                 match lineup_clone.acquire() {
-                    ProviderAllocation::Exhausted => exhausted.fetch_sub(1, Ordering::Release),
-                    ProviderAllocation::Available(_) => available.fetch_sub(1, Ordering::Release),
-                    ProviderAllocation::GracePeriod(_) => grace_period.fetch_sub(1, Ordering::Release),
+                    ProviderAllocation::Exhausted => exhausted.fetch_sub(1, Ordering::SeqCst),
+                    ProviderAllocation::Available(_) => available.fetch_sub(1, Ordering::SeqCst),
+                    ProviderAllocation::GracePeriod(_) => grace_period.fetch_sub(1, Ordering::SeqCst),
                 }
 
             });
@@ -756,9 +757,9 @@ mod tests {
             handle.join().unwrap();
         }
 
-        assert_eq!(exhausted_count.load(Ordering::Acquire), 0);
-        assert_eq!(available_count.load(Ordering::Acquire), 0);
-        assert_eq!(grace_period_count.load(Ordering::Acquire), 0);
+        assert_eq!(exhausted_count.load(Ordering::SeqCst), 0);
+        assert_eq!(available_count.load(Ordering::SeqCst), 0);
+        assert_eq!(grace_period_count.load(Ordering::SeqCst), 0);
     }
 }
 

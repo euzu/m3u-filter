@@ -21,7 +21,7 @@ impl ActiveUserManager {
 
     pub async fn user_connections(&self, username: &str) -> u32 {
         if let Some(counter) = self.user.read().await.get(username) {
-            return counter.load(Ordering::Acquire);
+            return counter.load(Ordering::SeqCst);
         }
         0
     }
@@ -31,13 +31,13 @@ impl ActiveUserManager {
     }
 
     pub async fn active_connections(&self) -> usize {
-        self.user.read().await.values().map(|c| c.load(Ordering::Acquire) as usize).sum()
+        self.user.read().await.values().map(|c| c.load(Ordering::SeqCst) as usize).sum()
     }
 
     pub async fn add_connection(&self, username: &str) -> (usize, usize) {
         let mut lock = self.user.write().await;
         if let Some(counter) = lock.get(username) {
-            counter.fetch_add(1, Ordering::AcqRel);
+            counter.fetch_add(1, Ordering::SeqCst);
         } else {
             lock.insert(username.to_string(), AtomicU32::new(1));
         }
@@ -48,7 +48,7 @@ impl ActiveUserManager {
     pub async fn remove_connection(&self, username: &str) -> (usize, usize) {
         let mut lock = self.user.write().await;
         if let Some(counter) = lock.get(username) {
-            if counter.fetch_sub(1, Ordering::AcqRel) == 1 {
+            if counter.fetch_sub(1, Ordering::SeqCst) == 1 {
                 lock.remove(username);
             }
         }
@@ -56,3 +56,45 @@ impl ActiveUserManager {
         (self.active_users().await, self.active_connections().await)
     }
 }
+
+//
+// mod tests {
+//     use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+//     use std::time::Instant;
+//     use std::thread;
+//
+//     fn benchmark(ordering: Ordering, iterations: usize) -> u128 {
+//         let counter = Arc::new(AtomicUsize::new(0));
+//         let start = Instant::now();
+//
+//         let handles: Vec<_> = (0..32)
+//             .map(|_| {
+//                 let counter_ref = Arc::clone(&counter);
+//                 thread::spawn(move || {
+//                     for _ in 0..iterations {
+//                         counter_ref.fetch_add(1, ordering);
+//                     }
+//                 })
+//             })
+//             .collect();
+//
+//         for handle in handles {
+//             handle.join().unwrap();
+//         }
+//
+//         let duration = start.elapsed();
+//         duration.as_millis()
+//     }
+//
+//     #[test]
+//     fn test_ordering() {
+//         let iterations = 1_000_000;
+//
+//         let time_acqrel = benchmark(Ordering::SeqCst, iterations);
+//         println!("AcqRel: {} ms", time_acqrel);
+//
+//         let time_seqcst = benchmark(Ordering::SeqCst, iterations);
+//         println!("SeqCst: {} ms", time_seqcst);
+//     }
+//
+// }

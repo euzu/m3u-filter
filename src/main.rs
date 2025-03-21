@@ -91,11 +91,19 @@ const BUILD_TIMESTAMP:&str = env!("VERGEN_BUILD_TIMESTAMP");
 
 fn main() {
     let args = Args::parse();
-    let env_log_level = std::env::var("M3U_FILTER_LOG");
+
+    if args.genpwd {
+        match generate_password() {
+            Ok(pwd) => println!("{pwd}"),
+            Err(err) => eprintln!("{err}"),
+        }
+        return;
+    }
 
     let config_path: String = args.config_path.unwrap_or_else(file_utils::get_default_config_path);
     let config_file: String = args.config_file.unwrap_or_else(|| file_utils::get_default_config_file_path(&config_path));
 
+    let env_log_level = std::env::var("M3U_FILTER_LOG");
     init_logger(args.log_level.as_ref(), env_log_level.ok(), config_file.as_str());
 
     if args.healthcheck {
@@ -106,14 +114,6 @@ fn main() {
     let mut cfg = config_reader::read_config(config_path.as_str(), config_file.as_str(), sources_file.as_str()).unwrap_or_else(|err| exit!("{}", err));
 
     set_sanitize_sensitive_info(cfg.log.as_ref().is_none_or(|l| l.sanitize_sensitive_info));
-
-    if args.genpwd {
-        match generate_password() {
-            Ok(pwd) => println!("{pwd}"),
-            Err(err) => error!("{err}"),
-        }
-        return;
-    }
 
     let temp_path = PathBuf::from(&cfg.working_dir).join("tmp");
     create_directories(&cfg, &temp_path);

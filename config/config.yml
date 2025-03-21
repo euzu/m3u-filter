@@ -6,6 +6,7 @@ update_on_boot: false
 custom_stream_response:
   channel_unavailable: /home/m3u-filter/channel_unavailable.ts
   user_connections_exhausted: /home/m3u-filter/user_connections_exhausted.ts
+  provider_connections_exhausted: /home/m3u-filter/provider_connections_exhausted.ts
 
 # sec  min   hour   day of month   month   day of week   year
 schedules:
