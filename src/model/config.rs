@@ -53,6 +53,7 @@ pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 use crate::model::hdhomerun_config::HdHomeRunConfig;
 use crate::utils::file::config_reader::resolve_env_var;
+use crate::utils::network::request::{get_credentials_from_url, get_credentials_from_url_str};
 use crate::utils::string_utils::get_trimmed_string;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
@@ -659,17 +660,9 @@ impl InputUserInfo {
                     password: password.to_owned(),
                 });
             }
-        } else if let Ok(url) = Url::parse(&input_url) {
+        } else if let Ok(url) = Url::parse(input_url) {
             let base_url = url.origin().ascii_serialization();
-            let mut username = None;
-            let mut password = None;
-            for (key, value) in url.query_pairs() {
-                if key.eq("username") {
-                    username = Some(value.into_owned());
-                } else if key.eq("password") {
-                    password = Some(value.into_owned());
-                }
-            }
+            let (username, password) = get_credentials_from_url(&url);
             if username.is_some() || password.is_some() {
                 if let (Some(username), Some(password)) = (username.as_ref(), password.as_ref()) {
                     return Some(Self {
@@ -787,6 +780,11 @@ impl ConfigInput {
         self.username = get_trimmed_string(&self.username);
         self.password = get_trimmed_string(&self.password);
         check_input_credentials!(self, self.input_type);
+        if self.username.is_none() && self.password.is_none() {
+            let (username, password) = get_credentials_from_url_str(&self.url);
+            self.username = username;
+            self.password = password;
+        }
         self.persist = get_trimmed_string(&self.persist);
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;

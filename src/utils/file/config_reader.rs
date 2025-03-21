@@ -13,7 +13,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 use std::sync::LazyLock;
-use url::{ParseError, Url};
+use url::{Url};
 
 pub fn read_mappings(args_mapping: Option<String>, cfg: &mut Config) -> Result<Option<String>, M3uFilterError> {
     let mappings_file: String = args_mapping.unwrap_or_else(|| file_utils::get_default_mappings_path(cfg.t_config_path.as_str()));
@@ -184,7 +184,7 @@ fn csv_assign_mandatory_fields(alias: &mut ConfigInputAlias) {
                     alias.name = format!("{username}");
                 }
             }
-            Err(err) => {}
+            Err(_err) => {}
         }
     }
 }

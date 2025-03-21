@@ -1,10 +1,10 @@
-use std::sync::Arc;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::sync::LazyLock;
 use std::time::Instant;
 
@@ -16,15 +16,15 @@ use reqwest::header::CONTENT_ENCODING;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use url::Url;
 
+use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
 use crate::model::stats::format_elapsed_time;
 use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::FILE_EPG;
 use crate::utils::compression::compression_utils::{is_deflate, is_gzip, ENCODING_DEFLATE, ENCODING_GZIP};
-use crate::utils::file::file_utils::{get_file_path, persist_file};
-use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::utils::debug_if_enabled;
+use crate::utils::file::file_utils::{get_file_path, persist_file};
 
 pub const HLS_EXT: &str = ".m3u8";
 pub const DASH_EXT: &str = ".mpd";
@@ -476,6 +476,27 @@ pub fn replace_url_extension(url: &str, new_ext: &str) -> String {
     format!("{}{}.{}{}", base_url, "", ext, suffix)
 }
 
+pub fn get_credentials_from_url(url: &Url) -> (Option<String>, Option<String>) {
+    let mut username = None;
+    let mut password = None;
+    for (key, value) in url.query_pairs() {
+        if key.eq("username") {
+            username = Some(value.to_string());
+        } else if key.eq("password") {
+            password = Some(value.to_string());
+        }
+    }
+    (username, password)
+}
+
+pub fn get_credentials_from_url_str(url_with_credentials: &str) -> (Option<String>, Option<String>) {
+    if let Ok(url) = Url::parse(&url_with_credentials) {
+        get_credentials_from_url(&url)
+    } else {
+        (None, None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info};
@@ -499,7 +520,7 @@ mod tests {
         ];
 
         for (test, expect) in &tests {
-            assert_eq!(replace_url_extension(test, ".mp4"),  *expect);
+            assert_eq!(replace_url_extension(test, ".mp4"), *expect);
         }
     }
 }

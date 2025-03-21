@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use crate::api::endpoints::hdhomerun_api::hdhr_api_register;
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
@@ -73,7 +74,7 @@ async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
         (active_user.active_users().await, active_user.active_connections().await)
     };
 
-    let active_provider_connections = app_state.active_provider.active_connections();
+    let active_provider_connections = app_state.active_provider.active_connections().map(|c| c.into_iter().collect::<BTreeMap<_,_>>());
 
     StatusCheck {
         status: "ok".to_string(),

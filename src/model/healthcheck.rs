@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Healthcheck {
@@ -24,5 +24,5 @@ pub struct StatusCheck {
     pub active_clients: usize,
     pub active_client_connections: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_provider_connections: Option<HashMap<String, u16>>,
+    pub active_provider_connections: Option<BTreeMap<String, u16>>,
 }

@@ -12,7 +12,7 @@ use crate::utils::debug_if_enabled;
 use crate::utils::network::request::{classify_content_type, get_request_headers, sanitize_sensitive_info, MimeCategory};
 use futures::stream::{self};
 use futures::{StreamExt, TryStreamExt};
-use log::{error, warn};
+use log::{warn};
 use reqwest::header::{HeaderMap, RANGE};
 use reqwest::StatusCode;
 use std::collections::HashMap;
@@ -268,7 +268,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                 let status = response.status();
                 if status.is_success() {
                     let provider_stream = response.bytes_stream().map_err(|err| {
-                        error!("Stream error {err}");
+                        // error!("Stream error {err}");
                         StreamError::reqwest(&err)
                     }).boxed();
                     return if stream_options.reconnect_force_secs > 0 {
