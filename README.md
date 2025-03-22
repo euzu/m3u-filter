@@ -531,12 +531,12 @@ my_provider_2;user2;password2;http://my_provider_2.com:8080;1;0
 - inputs:
   - type: m3u_batch
     url: 'file:///home/m3u-filter/config/my_provider_batch.csv'
-    targets:
+  targets:
   - name: test
 ```
 
 ```csv
-#name;url;max_connections;priority
+#url;max_connections;priority
 http://my_provider_1.com:80/get_php?username=user1&password=password1;1;0
 http://my_provider_2.com:8080/get_php?username=user2&password=password2;1;0
 ```
