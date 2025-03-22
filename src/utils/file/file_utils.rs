@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 
 use crate::m3u_filter_error::str_to_io_error;
 use crate::utils::debug_if_enabled;
-use crate::utils::file::{config_reader};
 use log::{debug, error};
 use path_clean::PathClean;
 
@@ -262,10 +261,8 @@ pub fn read_file_as_bytes(path: &Path) -> std::io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
-pub fn make_absolute_path(path: &str, working_dir: &str, resolve_var: bool) -> String {
-    let resolved_path = if resolve_var { config_reader::resolve_env_var(path) } else { path.to_string() };
-
-    let rpb = std::path::PathBuf::from(&resolved_path);
+pub fn make_absolute_path(path: &str, working_dir: &str) -> String {
+    let rpb = std::path::PathBuf::from(path);
     if rpb.is_relative() {
         let mut rpb2 = std::path::PathBuf::from(working_dir).join(&rpb);
         if !rpb2.exists() {
@@ -281,5 +278,5 @@ pub fn make_absolute_path(path: &str, working_dir: &str, resolve_var: bool) -> S
             return String::from(rpb2.clean().to_str().unwrap_or_default());
         }
     }
-    resolved_path
+    path.to_string()
 }

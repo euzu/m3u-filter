@@ -505,6 +505,45 @@ Input alias definition for same provider with same content but different credent
   - name: test
 ```
 
+Input aliases can be defined as batches in csv files with `;` separator.
+There are 2 batch input types  `xtream_batch` and `m3u_batch`.
+
+##### `XtreamBatch`
+
+```yaml
+- sources:
+- inputs:
+  - type: xtream_batch
+    url: 'file:///home/m3u-filter/config/my_provider_batch.csv'
+  targets:
+  - name: test
+```
+
+```csv
+#name;username;password;url;max_connections;priority
+my_provider_1;user1;password1;http://my_provider_1.com:80;1;0
+my_provider_2;user2;password2;http://my_provider_2.com:8080;1;0
+```
+
+##### `M3uBatch`
+```yaml
+- sources:
+- inputs:
+  - type: m3u_batch
+    url: 'file:///home/m3u-filter/config/my_provider_batch.csv'
+    targets:
+  - name: test
+```
+
+```csv
+#name;url;max_connections;priority
+http://my_provider_1.com:80/get_php?username=user1&password=password1;1;0
+http://my_provider_2.com:8080/get_php?username=user2&password=password2;1;0
+```
+
+The Fields `max_connections` and `priority`are optional.
+`max_connections`  will be set default to `1`. This is different from yaml config where the default is `0=unlimited`
+
 ### 2.2.2 `targets`
 Has the following top level entries:
 - `enabled` _optional_ default is `true`, if you disable the processing is skipped

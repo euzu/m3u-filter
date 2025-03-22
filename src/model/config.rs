@@ -23,7 +23,6 @@ use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCrede
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
-use crate::utils::file::config_reader;
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
@@ -52,7 +51,7 @@ macro_rules! valid_property {
 pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 use crate::model::hdhomerun_config::HdHomeRunConfig;
-use crate::utils::file::config_reader::{csv_read_inputs, resolve_env_var};
+use crate::utils::file::config_reader::{csv_read_inputs};
 use crate::utils::network::request::{get_credentials_from_url, get_credentials_from_url_str};
 use crate::utils::string_utils::get_trimmed_string;
 
@@ -423,11 +422,11 @@ impl ConfigTarget {
                 }
                 TargetOutput::M3u(m3u_output) => {
                     m3u_cnt += 1;
-                    m3u_output.filename = m3u_output.filename.as_ref().map(|s| resolve_env_var(s.trim()));
+                    m3u_output.filename = m3u_output.filename.as_ref().map(|s| s.trim().to_string());
                 }
                 TargetOutput::Strm(strm_output) => {
                     strm_cnt += 1;
-                    strm_output.directory =  resolve_env_var(strm_output.directory.trim());
+                    strm_output.directory =  strm_output.directory.trim().to_string();
                     if strm_output.directory.trim().is_empty() {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "directory is required for strm type: {}", self.name);
                     }
@@ -783,7 +782,6 @@ impl ConfigInput {
     pub fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
         self.id = index;
         self.check_url()?;
-        self.url = resolve_env_var(&self.url);
         self.prepare_batch()?;
 
         self.name = self.name.trim().to_string();
@@ -823,6 +821,7 @@ impl ConfigInput {
             match csv_read_inputs(input_type.clone(), &self.url) {
                 Ok(mut batch_aliases) => {
                     if !batch_aliases.is_empty() {
+                        batch_aliases.reverse();
                         if let Some(mut first) = batch_aliases.pop() {
                             self.username = first.username.take();
                             self.password = first.password.take();
@@ -832,6 +831,7 @@ impl ConfigInput {
                             }
                         }
                         if !batch_aliases.is_empty() {
+                            batch_aliases.reverse();
                             if let Some(aliases) = self.aliases.as_mut() {
                                 aliases.extend(batch_aliases);
                             } else {
@@ -1053,14 +1053,7 @@ pub struct WebAuthConfig {
 }
 
 impl WebAuthConfig {
-    pub fn prepare(&mut self, config_path: &str, resolve_var: bool) -> Result<(), M3uFilterError> {
-        if resolve_var {
-            self.issuer = config_reader::resolve_env_var(&self.issuer);
-            self.secret = config_reader::resolve_env_var(&self.secret);
-            if let Some(file) = &self.userfile {
-                self.userfile = Some(config_reader::resolve_env_var(file));
-            }
-        }
+    pub fn prepare(&mut self, config_path: &str) -> Result<(), M3uFilterError> {
         let userfile_name = self.userfile.as_ref().map_or_else(|| file_utils::get_default_user_file_path(config_path), std::borrow::ToOwned::to_owned);
         self.userfile = Some(userfile_name.clone());
 
@@ -1128,13 +1121,13 @@ pub struct CacheConfig {
 }
 
 impl CacheConfig {
-    fn prepare(&mut self, working_dir: &str, resolve_var: bool) {
+    fn prepare(&mut self, working_dir: &str) {
         if self.enabled {
             let work_path = PathBuf::from(working_dir);
             if self.dir.is_none() {
                 self.dir = Some(work_path.join("cache").to_string_lossy().to_string());
             } else {
-                let mut cache_dir = if resolve_var { config_reader::resolve_env_var(self.dir.as_ref().unwrap()) } else { self.dir.as_ref().unwrap().to_string() };
+                let mut cache_dir = self.dir.as_ref().unwrap().to_string();
                 if PathBuf::from(&cache_dir).is_relative() {
                     cache_dir = work_path.join(&cache_dir).clean().to_string_lossy().to_string();
                 }
@@ -1203,7 +1196,7 @@ pub struct ReverseProxyConfig {
 }
 
 impl ReverseProxyConfig {
-    fn prepare(&mut self, working_dir: &str, resolve_var: bool) {
+    fn prepare(&mut self, working_dir: &str) {
         if let Some(stream) = self.stream.as_mut() {
             stream.prepare();
         }
@@ -1212,7 +1205,7 @@ impl ReverseProxyConfig {
                 warn!("The cache is disabled because resource rewrite is disabled");
                 cache.enabled = false;
             }
-            cache.prepare(working_dir, resolve_var);
+            cache.prepare(working_dir);
         }
     }
 }
@@ -1517,44 +1510,38 @@ impl Config {
         Ok(())
     }
 
-    pub fn prepare(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
-        let work_dir = if resolve_var { &config_reader::resolve_env_var(&self.working_dir) } else { &self.working_dir };
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        let work_dir = &self.working_dir;
         self.working_dir = file_utils::get_working_path(work_dir);
-        self.prepare_custom_stream_response(resolve_var);
-        self.prepare_directories(resolve_var);
+        self.prepare_custom_stream_response();
+        self.prepare_directories();
         if let Some(reverse_proxy) = self.reverse_proxy.as_mut() {
-            reverse_proxy.prepare(&self.working_dir, resolve_var);
+            reverse_proxy.prepare(&self.working_dir);
         }
         self.prepare_hdhomerun()?;
         self.api.prepare();
-        self.prepare_api_web_root(resolve_var);
+        self.prepare_api_web_root();
         self.prepare_templates()?;
-        self.check_unique_input_names()?;
+        self.prepare_sources()?;
         let target_names = self.check_unique_target_names()?;
         self.check_scheduled_targets(&target_names)?;
-        self.prepare_sources()?;
+        self.check_unique_input_names()?;
         self.prepare_video_config()?;
-        self.prepare_web_auth(resolve_var)?;
+        self.prepare_web_auth()?;
 
         Ok(())
     }
 
-    fn prepare_directories(&mut self, resolve_var: bool) {
-        fn set_directory(path: &mut Option<String>, default_subdir: &str, working_dir: &str, resolve_var: bool) {
+    fn prepare_directories(&mut self) {
+        fn set_directory(path: &mut Option<String>, default_subdir: &str, working_dir: &str) {
             *path = Some(match path.as_ref() {
-                Some(existing) => {
-                    if resolve_var {
-                        resolve_env_var(existing)
-                    } else {
-                        existing.to_owned()
-                    }
-                }
+                Some(existing) => existing.to_owned(),
                 None => PathBuf::from(working_dir).join(default_subdir).clean().to_string_lossy().to_string(),
             });
         }
 
-        set_directory(&mut self.backup_dir, "backup", &self.working_dir, resolve_var);
-        set_directory(&mut self.user_config_dir, "user_config", &self.working_dir, resolve_var);
+        set_directory(&mut self.backup_dir, "backup", &self.working_dir);
+        set_directory(&mut self.user_config_dir, "user_config", &self.working_dir);
     }
 
     fn prepare_hdhomerun(&mut self) -> Result<(), M3uFilterError> {
@@ -1599,14 +1586,14 @@ impl Config {
         Ok(())
     }
 
-    fn prepare_web_auth(&mut self, resolve_var: bool) -> Result<(), M3uFilterError> {
+    fn prepare_web_auth(&mut self) -> Result<(), M3uFilterError> {
         if !self.web_ui_enabled {
             self.web_auth = None;
         }
 
         if let Some(web_auth) = &mut self.web_auth {
             if web_auth.enabled {
-                web_auth.prepare(&self.t_config_path, resolve_var)?;
+                web_auth.prepare(&self.t_config_path)?;
             } else {
                 self.web_auth = None;
             }
@@ -1633,11 +1620,11 @@ impl Config {
         Ok(())
     }
 
-    fn prepare_custom_stream_response(&mut self, resolve_var: bool) {
+    fn prepare_custom_stream_response(&mut self) {
         if let Some(custom_stream_response) = self.custom_stream_response.as_ref() {
-            fn load_and_set_file(path: Option<&String>, working_dir: &str, resolve_var: bool) -> Option<Arc<Vec<u8>>> {
+            fn load_and_set_file(path: Option<&String>, working_dir: &str) -> Option<Arc<Vec<u8>>> {
                 path.as_ref()
-                    .map(|file| file_utils::make_absolute_path(file, working_dir, resolve_var))
+                    .map(|file| file_utils::make_absolute_path(file, working_dir))
                     .and_then(|absolute_path| match file_utils::read_file_as_bytes(&PathBuf::from(&absolute_path)) {
                         Ok(data) => Some(Arc::new(data)),
                         Err(err) => {
@@ -1647,15 +1634,15 @@ impl Config {
                     })
             }
 
-            self.t_channel_unavailable_video = load_and_set_file(custom_stream_response.channel_unavailable.as_ref(), &self.working_dir, resolve_var);
-            self.t_user_connections_exhausted_video = load_and_set_file(custom_stream_response.user_connections_exhausted.as_ref(), &self.working_dir, resolve_var);
-            self.t_provider_connections_exhausted_video = load_and_set_file(custom_stream_response.provider_connections_exhausted.as_ref(), &self.working_dir, resolve_var);
+            self.t_channel_unavailable_video = load_and_set_file(custom_stream_response.channel_unavailable.as_ref(), &self.working_dir);
+            self.t_user_connections_exhausted_video = load_and_set_file(custom_stream_response.user_connections_exhausted.as_ref(), &self.working_dir);
+            self.t_provider_connections_exhausted_video = load_and_set_file(custom_stream_response.provider_connections_exhausted.as_ref(), &self.working_dir);
         }
     }
 
-    fn prepare_api_web_root(&mut self, resolve_var: bool) {
+    fn prepare_api_web_root(&mut self) {
         if !self.api.web_root.is_empty() {
-            self.api.web_root = file_utils::make_absolute_path(&self.api.web_root, &self.working_dir, resolve_var);
+            self.api.web_root = file_utils::make_absolute_path(&self.api.web_root, &self.working_dir);
         }
     }
 

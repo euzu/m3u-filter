@@ -76,7 +76,7 @@ async fn save_config_api_proxy_user(
     let mut lock = app_state.config.t_api_proxy.write().await;
     if let Some(api_proxy) =  lock.as_mut() {
         api_proxy.user = users;
-        api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.prepare(true));
+        api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.prepare());
         if api_proxy.use_user_db {
             if let Err(err) = store_api_user(&app_state.config, &api_proxy.user) {
                 return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": err.to_string()}))).into_response();
@@ -350,7 +350,7 @@ async fn config(
                                                       app_state.config.t_config_file_path.as_str(),
                                                       app_state.config.t_sources_file_path.as_str()) {
         Ok(mut cfg) => {
-            let _ = cfg.prepare(true);
+            let _ = cfg.prepare();
             map_config(&cfg)
         }
         Err(_) => map_config(&app_state.config)

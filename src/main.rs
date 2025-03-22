@@ -23,6 +23,7 @@ use crate::utils::network::request::set_sanitize_sensitive_info;
 use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
+use crate::utils::file::config_reader::config_file_reader;
 
 const LOG_ERROR_LEVEL_MOD: &[&str] = &[
     "reqwest::async_impl::client",
@@ -137,7 +138,7 @@ fn main() {
         }
     }
 
-    match config_reader::read_mappings(args.mapping_file, &mut cfg) {
+    match config_reader::read_mappings(args.mapping_file, &mut cfg, true) {
         Ok(Some(mapping_file)) => {
             info!("Mapping file: {mapping_file:?}");
         }
@@ -226,7 +227,7 @@ fn init_logger(user_log_level: Option<&String>, env_log_level: Option<String>, c
         .or(env_log_level) // env
         .or_else(|| {               // config
             File::open(config_file).ok()
-                .and_then(|file| serde_yaml::from_reader::<_, LogLevelConfig>(file).ok())
+                .and_then(|file| serde_yaml::from_reader::<_, LogLevelConfig>(config_file_reader(file, true)).ok())
                 .and_then(|cfg| cfg.log.and_then(|l| l.log_level))
         })
         .unwrap_or_else(|| "info".to_string()); // Default
@@ -252,7 +253,7 @@ fn init_logger(user_log_level: Option<&String>, env_log_level: Option<String>, c
 fn healthcheck(config_file: &str) {
     let path = std::path::PathBuf::from(config_file);
     let file = File::open(path).expect("Failed to open config file");
-    let config: HealthcheckConfig = serde_yaml::from_reader(file).expect("Failed to parse config file");
+    let config: HealthcheckConfig = serde_yaml::from_reader(config_file_reader(file, true)).expect("Failed to parse config file");
 
     if let Ok(response) = reqwest::blocking::get(format!("http://localhost:{}/healthcheck", config.api.port)) {
         if let Ok(check) = response.json::<Healthcheck>() {

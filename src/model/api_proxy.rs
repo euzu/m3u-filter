@@ -128,15 +128,8 @@ pub struct ProxyUserCredentials {
 }
 
 impl ProxyUserCredentials {
-    pub fn prepare(&mut self, resolve_var: bool) {
-        if resolve_var {
-            self.username = config_reader::resolve_env_var(&self.username);
-            self.password = config_reader::resolve_env_var(&self.password);
-            if let Some(tkn) = &self.token {
-                self.token = Some(config_reader::resolve_env_var(tkn));
-            }
-            self.trim();
-        }
+    pub fn prepare(&mut self) {
+        self.trim();
     }
 
     pub fn matches_token(&self, token: &str) -> bool {
@@ -385,12 +378,12 @@ impl ApiProxyConfig {
         }
     }
 
-    fn prepare_target_user(&mut self, resolve_var: bool, errors: &mut Vec<String>) {
+    fn prepare_target_user(&mut self, errors: &mut Vec<String>) {
         let mut usernames = HashSet::new();
         let mut tokens = HashSet::new();
         for target_user in &mut self.user {
             for user in &mut target_user.credentials {
-                user.prepare(resolve_var);
+                user.prepare();
                 if usernames.contains(&user.username) {
                     errors.push(format!("Non unique username found {}", &user.username));
                 } else {
@@ -420,14 +413,14 @@ impl ApiProxyConfig {
         }
     }
 
-    pub fn prepare(&mut self, cfg: &Config, resolve_var: bool) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, cfg: &Config) -> Result<(), M3uFilterError> {
         let mut errors = Vec::new();
         if self.server.is_empty() {
             errors.push("No server info defined".to_string());
         } else {
             self.prepare_server_config(&mut errors);
         }
-        self.prepare_target_user(resolve_var, &mut errors);
+        self.prepare_target_user(&mut errors);
         self.migrate_api_user(cfg, &mut errors);
         if errors.is_empty() {
             Ok(())
