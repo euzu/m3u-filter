@@ -5,11 +5,20 @@ use crate::repository::user_repository::{backup_api_user_db_file, get_api_user_d
 use crate::utils::file::config_reader;
 use chrono::Local;
 use enum_iterator::Sequence;
-use log::{debug};
-use std::collections::{HashSet};
+use log::debug;
+use std::cmp::PartialEq;
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs;
 use std::str::FromStr;
+use std::sync::Arc;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub enum UserConnectionPermission {
+    Exhausted,
+    Allowed,
+    GracePeriod,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
 pub enum ProxyType {
@@ -173,13 +182,7 @@ impl ProxyUserCredentials {
                     return false;
                 }
             }
-            // we allow requests with max connection reached, but we should block streaming
-            // if let Some(max_connections) = self.max_connections.as_ref() {
-            //     if *max_connections < app_state.get_active_connections_for_user(&self.username).await {
-            //         debug!("User access denied, too many connections: {}", self.username);
-            //         return false;
-            //     }
-            // }
+
             if let Some(status) = &self.status {
                 if !matches!(status, ProxyUserStatus::Active | ProxyUserStatus::Trial) {
                     debug!("User access denied, status invalid: {status} for user: {}", self.username);
@@ -196,22 +199,30 @@ impl ProxyUserCredentials {
     }
 
 
-    pub async fn has_connections_left(&self, app_state: &AppState) -> bool {
+    pub async fn connection_permission(&self, app_state: &AppState) -> UserConnectionPermission {
         if app_state.config.user_access_control {
-            if let Some(max_connections) = self.max_connections.as_ref() {
-                // info!("{max_connections} : {}", app_state.get_active_connections_for_user(&self.username).await);
-                if *max_connections < app_state.get_active_connections_for_user(&self.username).await {
-                    debug!("User access denied, too many connections: {}", self.username);
-                    return false;
+
+            // we allow requests with max connection reached, but we should block streaming after grace period
+            if let Some(&max_connections) = self.max_connections.as_ref() {
+                if max_connections > 0 {
+                    let current_connections = app_state.get_active_connections_for_user(&self.username).await;
+                    if current_connections == max_connections + 1 {
+                        return UserConnectionPermission::GracePeriod;
+                    }
+                    if current_connections > max_connections {
+                        debug!("User access denied, too many connections: {}", self.username);
+                        return UserConnectionPermission::Exhausted;
+                    }
                 }
             }
         }
-        true
+        UserConnectionPermission::Allowed
     }
 
+
     #[inline]
-    pub async fn connections_exhausted(&self, app_state: &AppState) -> bool {
-        !self.has_connections_left(app_state).await
+    pub async fn connections_exhausted(&self, app_state: &Arc<AppState>) -> bool {
+        self.connection_permission(app_state).await == UserConnectionPermission::Exhausted
     }
 }
 
@@ -333,7 +344,7 @@ impl ApiProxyConfig {
                 Err(err) => {
                     println!("{err}");
                     errors.push(err.to_string());
-                },
+                }
             };
         } else {
             let user_db_path = get_api_user_db_path(cfg);

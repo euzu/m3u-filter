@@ -221,7 +221,7 @@ If you set it `true` `cache` is disabled! Because the cache cant work without re
 reverse_proxy:
   resource_rewrite_disabled: false
   stream:
-    connect_timeout_secs: false
+    connect_timeout_secs: 5
     retry: true
     buffer:
       enabled: true

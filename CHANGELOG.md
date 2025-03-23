@@ -1,5 +1,5 @@
 # Changelog
-# 2.2.3 (2023-04-xx)
+# 2.2.3 (2023-03-23)
 - variable resolving for config files now for all settings
 - hls reverse proxy implemented
 - dash redirect implemented (reverse proxy not supported) 
@@ -253,6 +253,7 @@ reverse_proxy:
     buffer:
       enabled: true
       size: 1024
+    connect_timeout_secs: 5
   cache:
     size: 500MB
     enabled: true

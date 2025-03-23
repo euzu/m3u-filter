@@ -318,7 +318,7 @@ pub async fn stream_response(app_state: &AppState,
     if stream_details.has_stream() {
         // let content_length = get_stream_content_length(provider_response.as_ref());
         let provider_response = stream_details.stream_info.as_ref().map_or(None, |(h, sc)| Some((h.clone(), sc.clone())));
-        let stream = ActiveClientStream::new(stream_details, app_state, &user.username).await;
+        let stream = ActiveClientStream::new(stream_details, app_state, &user).await;
         let stream_resp = if share_stream {
             // Shared Stream response
             let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
@@ -358,7 +358,7 @@ async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &P
         if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url).await {
             let (status_code, header_map) = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)));
             let stream_details = StreamDetails::from_stream(stream);
-            let stream = ActiveClientStream::new(stream_details, app_state, &user.username).await.boxed();
+            let stream = ActiveClientStream::new(stream_details, app_state, &user).await.boxed();
             let mut response = axum::response::Response::builder()
                 .status(status_code);
             for (key, value) in &header_map {
