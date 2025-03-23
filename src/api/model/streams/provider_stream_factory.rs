@@ -12,7 +12,7 @@ use crate::utils::debug_if_enabled;
 use crate::utils::network::request::{classify_content_type, get_request_headers, sanitize_sensitive_info, MimeCategory};
 use futures::stream::{self};
 use futures::{StreamExt, TryStreamExt};
-use log::{warn};
+use log::{debug, warn};
 use reqwest::header::{HeaderMap, RANGE};
 use reqwest::StatusCode;
 use std::collections::HashMap;
@@ -270,6 +270,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                     };
                 }
                 if status.is_client_error() {
+                    debug!("Client error status response : {status}");
                     return None;
                 }
                 if status.is_server_error() {
@@ -278,11 +279,16 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                         StatusCode::BAD_GATEWAY |
                         StatusCode::SERVICE_UNAVAILABLE |
                         StatusCode::GATEWAY_TIMEOUT => {}
-                        _ => return None
+                        _ => {
+                            debug!("Server error status response : {status}");
+                            return None
+                        }
                     }
                 }
             }
-            Err(_err) => {}
+            Err(err) => {
+                debug!("Server connection failed with {err}")
+            }
         }
         if !stream_options.should_continue() {
             return None;
