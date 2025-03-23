@@ -662,35 +662,35 @@ If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is ad
 - `m3u_mask_redirect_url`, default false, if true uses urls from `api_proxy.yml` for user in proxy mode `redirect`.
 
 `xtream` output has additional options
-- `xtream_skip_live_direct_source`  if true the direct_source property from provider for live is ignored
-- `xtream_skip_video_direct_source`  if true the direct_source property from provider for movies is ignored
-- `xtream_skip_series_direct_source`  if true the direct_source property from provider for series is ignored
+- `skip_live_direct_source`  if true the direct_source property from provider for live is ignored
+- `skip_video_direct_source`  if true the direct_source property from provider for movies is ignored
+- `skip_series_direct_source`  if true the direct_source property from provider for series is ignored
 
 Iptv player can act differently and use the direct-source attribute or can compose the url based on the server info.
-The options `xtream_skip_live_direct_source`, `xtream_skip_video_direct_source` and`xtream_skip_series_direct_source`
+The options `skip_live_direct_source`, `skip_video_direct_source` and`skip_series_direct_source`
 are default `true` to avoid this problem.
 You can set them fo `false`to keep the direct-source attribute.
 
 Because xtream api delivers only the metadata to series, we need to fetch the series and resolve them. But be aware,
 each series info entry needs to be fetched one by one and the provider can ban you if you are doing request too frequently.
-- `xtream_resolve_series` if is set to `true` and you have xtream input and m3u output, the series are fetched and resolved.
+- `resolve_series` if is set to `true` and you have xtream input and m3u output, the series are fetched and resolved.
   This can cause a lot of requests to the provider. Be cautious when using this option.
-- `xtream_resolve_series_delay` to avoid a provider ban you can set the seconds between series_info_request's. Default is 2 seconds.
+- `resolve_series_delay` to avoid a provider ban you can set the seconds between series_info_request's. Default is 2 seconds.
   But be aware that the more series entries there are, the longer the process takes.
 
-For `xtream_resolve_(vod|series)` the files are only fetched one for each input and cached. Only new and modified ones are updated.
+For `resolve_(vod|series)` the files are only fetched one for each input and cached. Only new and modified ones are updated.
 
 The `kodi` format for movies can contain the `tmdb-id` (_optional_). Because xtream api delivers the data only on request,
 we need to fetch this info for each movie entry. But be aware the provider can ban you if you are doing request too frequently.
-- `xtream_resolve_vod` if is set to `true` and you have xtream input, the movies info are fetched and stored.
+- `xtream` `resolve_vod` if is set to `true` and you have xtream input, the movies info are fetched and stored.
   This can cause a lot of requests to the provider. Be cautious when using this option.
-- `xtream_resolve_vod_delay` to avoid a provider ban you can set the seconds between vod_info_request's. Default is 2 seconds.
+- `xtream` `resolve_vod_delay` to avoid a provider ban you can set the seconds between vod_info_request's. Default is 2 seconds.
   But be aware that the more series entries there are, the longer the process takes.
 Unlike `series info` `movie info` is only fetched once for each movie. If the data is stored locally there will be no update.
 
-There is a difference for `xtream_resolve_vod` and `xtream_resolve_series`.
-`xtream_resolve_series` works only when input: `xtream` and output: `m3u`.
-`xtream_resolve_vod` works only when input: `xtream`.
+There is a difference for `resolve_vod` and `resolve_series`.
+`resolve_series` works only when input: `xtream` and output: `m3u`.
+`resolve_vod` works only when input: `xtream`.
 
 
 ### 2.2.2.5 `filter`
@@ -1490,7 +1490,7 @@ sources:
       output:
         - type: xtream
       filter: "!ALL_CHAN!"
-      options: {ignore_logo: false, xtream_skip_live_direct_source: true, xtream_skip_video_direct_source: true}
+      options: {ignore_logo: false, skip_live_direct_source: true, skip_video_direct_source: true}
       sort:
         match_as_ascii: true
         groups:
