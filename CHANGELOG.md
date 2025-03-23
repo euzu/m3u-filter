@@ -1,5 +1,5 @@
 # Changelog
-# 2.2.3 (2023-03-23)
+# 2.2.3 (2025-03-23)
 - variable resolving for config files now for all settings
 - hls reverse proxy implemented
 - dash redirect implemented (reverse proxy not supported) 
