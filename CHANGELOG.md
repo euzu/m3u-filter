@@ -1,4 +1,8 @@
 # Changelog
+# 2.2.3 (2025-04-xx)
+- fixed `connect_timeout_secs:0` prevents connection initiation issue.
+- fixed `hdhomerun` and `strm` config with non-existing username. 
+
 # 2.2.3 (2025-03-23)
 - variable resolving for config files now for all settings
 - hls reverse proxy implemented

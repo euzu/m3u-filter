@@ -1289,6 +1289,8 @@ impl Config {
                 if config_target.name != target_name {
                     return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "User:{username} does not belong to target: {}", target_name);
                 }
+            } else {
+                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "User: {username} does not exist");
             }
             Ok(())
         } else {

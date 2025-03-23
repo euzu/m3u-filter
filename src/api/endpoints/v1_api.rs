@@ -251,6 +251,7 @@ async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Arc<Co
                 ]));
             return (axum::http::StatusCode::OK, axum::body::Body::from_stream(json_stream)).into_response();
         } else if target.has_output(&TargetType::M3u) {
+            // TODO implement
             return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid Arguments"}))).into_response();
         }
     }

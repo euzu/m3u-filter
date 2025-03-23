@@ -122,7 +122,9 @@ fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let active_users = Arc::new(ActiveUserManager::new());
     let active_provider = Arc::new(ActiveProviderManager::new(cfg));
 
-    let client = match cfg.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map(|stream| stream.connect_timeout_secs) {
+    let client = match cfg.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref())
+        .map(|stream| stream.connect_timeout_secs)
+        .filter(|&timeout| timeout > 0) {
         Some(timeout) => {
             Client::builder()
                 .connect_timeout(Duration::from_secs(u64::from(timeout)))

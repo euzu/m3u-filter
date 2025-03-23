@@ -22,3 +22,4 @@ yarn.lock
 
 docker/web
 docker/m3u-filter
+docker/resources
