@@ -46,8 +46,7 @@ COPY --from=rust-build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=rust-build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter /m3u-filter
 COPY --from=node-build /app/build /web
-COPY --from=resource-build /src/resources/channel_unavailable.ts /channel_unavailable.ts
-COPY --from=resource-build /src/resources/user_connections_exhausted.ts /user_connections_exhausted.ts
+COPY --from=resource-build /src/resources /resources
 ENTRYPOINT ["/m3u-filter"]
 CMD ["-s", "-p", "/config"]
 
@@ -57,7 +56,6 @@ RUN apk add --no-cache bash curl ca-certificates tini
 WORKDIR /app
 COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter m3u-filter
 COPY --from=node-build /app/build web
-COPY --from=resource-build /src/resources/channel_unavailable.ts /channel_unavailable.ts
-COPY --from=resource-build /src/resources/user_connections_exhausted.ts /user_connections_exhausted.ts
+COPY --from=resource-build /src/resources /resources
 ENTRYPOINT ["/sbin/tini", "--", "/app/m3u-filter"]
 CMD ["-s", "-p", "/app/config"]

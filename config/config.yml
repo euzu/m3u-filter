@@ -4,9 +4,9 @@ working_dir: /home/m3u-filter/data
 backup_dir: /home/m3u-filter/.backup
 update_on_boot: false
 custom_stream_response:
-  channel_unavailable: /home/m3u-filter/channel_unavailable.ts
-  user_connections_exhausted: /home/m3u-filter/user_connections_exhausted.ts
-  provider_connections_exhausted: /home/m3u-filter/provider_connections_exhausted.ts
+  channel_unavailable: /home/m3u-filter/resources/channel_unavailable.ts
+  user_connections_exhausted: /home/m3u-filter/resources/user_connections_exhausted.ts
+  provider_connections_exhausted: /home/m3u-filter/resources/provider_connections_exhausted.ts
 
 # sec  min   hour   day of month   month   day of week   year
 schedules:

@@ -37,7 +37,7 @@ BIN_FILE=${WORKING_DIR}/target/${TARGET}/release/m3u-filter
 cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${FRONTEND_DIR}/build" "${DOCKER_DIR}/web"
-cp -r "${RESOURCES_DIR}"/*.ts "${DOCKER_DIR}/"
+cp -r "${RESOURCES_DIR}" "${DOCKER_DIR}/resources"
 
 # Get the version from the binary
 VERSION=$("$BIN_FILE" -V | sed 's/m3u-filter *//')
@@ -74,6 +74,6 @@ docker push ghcr.io/euzu/${ALPINE_IMAGE_NAME}:latest
 echo "Cleaning up build artifacts..."
 rm -rf "${DOCKER_DIR}/web"
 rm -f "${DOCKER_DIR}/m3u-filter"
-rm -f "${DOCKER_DIR}"/*.ts
+rm -rf "${DOCKER_DIR}/resources"
 
 echo "Docker images for version ${VERSION} have been successfully built, tagged, and pushed."

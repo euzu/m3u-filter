@@ -95,6 +95,6 @@ docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
 echo "Cleaning up build artifacts..."
 rm -rf "${DOCKER_DIR}/web"
 rm -f "${DOCKER_DIR}/m3u-filter"
-rm -f "${DOCKER_DIR}"/*.ts
+rm -rf "${DOCKER_DIR}/resources"
 
 echo "Docker images ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:${VERSION} have been successfully built, tagged, and pushed."
