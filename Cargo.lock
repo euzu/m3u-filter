@@ -1463,7 +1463,7 @@ checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
 
 [[package]]
 name = "m3u-filter"
-version = "2.2.3"
+version = "2.2.4"
 dependencies = [
  "axum",
  "bincode",
