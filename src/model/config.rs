@@ -818,7 +818,7 @@ impl ConfigInput {
                 InputType::Xtream
             };
 
-            match csv_read_inputs(input_type.clone(), &self.url) {
+            match csv_read_inputs(&self) {
                 Ok(mut batch_aliases) => {
                     if !batch_aliases.is_empty() {
                         batch_aliases.reverse();
@@ -1171,9 +1171,6 @@ pub struct StreamConfig {
     pub buffer: Option<StreamBufferConfig>,
     #[serde(default)]
     pub forced_retry_interval_secs: u32,
-    #[serde(default)]
-    pub connect_timeout_secs: u32,
-
 }
 
 impl StreamConfig {
@@ -1245,6 +1242,8 @@ pub struct Config {
     pub log: Option<LogConfig>,
     #[serde(default)]
     pub user_access_control: bool,
+    #[serde(default)]
+    pub connect_timeout_secs: u32,
     #[serde(default)]
     pub update_on_boot: bool,
     #[serde(default = "default_as_true")]

@@ -78,6 +78,7 @@ Top level entries in the config files are:
 * `reverse_proxy` _optional_
 * `log` _optional
 * `user_access_control` _optional_
+* `connect_timeout_secs`: _optional_ and used for provider requests connection timeout.
 * `custom_stream_response` _optional_
 * `hdhomerun` _optional_
 
@@ -198,7 +199,6 @@ This configuration is only used for reverse proxy mode. The Reverse Proxy mode c
 #### 1.6.1 `stream`
 Contains settings for the streaming.
 - The `retry`option is for transparent reconnections to the provider on provider disconnects or stream errors.
-- `connect_timeout_secs`: _optional_ and used for provider stream connections for connection timeout.
 - `buffer`: When buffer is `enabled`, the stream is buffered with the configured `size`.
 `size` is the amount of `8192 byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.  
 
@@ -216,12 +216,10 @@ If you have m3u-filter behind a reverse proxy and dont want rewritten resource u
 Default value is false.
 If you set it `true` `cache` is disabled! Because the cache cant work without rewritten urls.
 
-
 ```yaml
 reverse_proxy:
   resource_rewrite_disabled: false
   stream:
-    connect_timeout_secs: 5
     retry: true
     buffer:
       enabled: true
@@ -315,7 +313,11 @@ If you set it to `true`,  the attributes (if available)
 
 are checked to permit or deny access.
 
-### 1.12 `custom_stream_response`
+### 1.13 `connect_timeout_secs`
+Defines the connection timeout for requests. If the connection takes longer than the specified number of seconds, it is terminated.
+If set to 0, the connection attempt continues until the provider closes it or a network timeout occurs.
+
+### 1.14 `custom_stream_response`
 If you want to send a picture instead of black screen when a channel is not available or connections exhausted.
 
 Following attributes are available:
@@ -340,10 +342,10 @@ custom_stream_response:
   provider_connections_exhausted: /home/m3u-filter/provider_connections_exhausted.ts
 ```
 
-### 1.13 `user_config_dir`
+### 1.15 `user_config_dir`
 It is the storage path for user configurations (f.e. bouquets).
 
-### 1.14 `hdhomerun`
+### 1.16 `hdhomerun`
 
 It is possible to define `hdhomerun` target for output. To use this outputs we need to define HdHomeRun devices.
 

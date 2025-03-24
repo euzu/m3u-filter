@@ -1,11 +1,11 @@
 use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err, str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::ApiProxyConfig;
-use crate::model::config::{Config, ConfigDto, ConfigInputAlias, InputType};
+use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputAlias, InputType};
 use crate::model::mapping::Mappings;
 use crate::utils::file::env_resolving_reader::EnvResolvingReader;
 use crate::utils::file::file_utils::file_reader;
 use crate::utils::file::{file_utils, multi_file_reader};
-use crate::utils::network::request::get_credentials_from_url;
+use crate::utils::network::request::{get_credentials_from_url, get_local_file_content, sanitize_sensitive_info};
 use crate::utils::sys_utils::exit;
 use chrono::Local;
 use log::{debug, error, info, warn};
@@ -13,9 +13,9 @@ use regex::Regex;
 use serde::Serialize;
 use std::env;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Cursor, Read};
 use std::path::PathBuf;
-use std::sync::LazyLock;
+use std::sync::{LazyLock};
 use url::Url;
 
 enum EitherReader<L, R> {
@@ -320,13 +320,25 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
 }
 
 
-pub fn csv_read_inputs(batch_input_type: InputType, file_uri: &str) -> Result<Vec<ConfigInputAlias>, io::Error> {
-    let file_path = file_uri.strip_prefix("file://").unwrap_or(file_uri);
-    let inputs_file = std::path::PathBuf::from(file_path);
-    if let Ok(file) = file_utils::open_file(&inputs_file) {
-        return csv_read_inputs_from_reader(batch_input_type, EnvResolvingReader::new(file_reader(file)));
+pub fn csv_read_inputs(input: &ConfigInput) -> Result<Vec<ConfigInputAlias>, io::Error> {
+    let file_uri = input.url.to_string();
+    if let Ok(url) = file_uri.parse::<url::Url>() {
+        let result = if url.scheme() == "file" {
+            url.to_file_path().map_or_else(|()| Err(str_to_io_error(&format!("Unknown file {}", sanitize_sensitive_info(&file_uri)))), |file_path| get_local_file_content(&file_path))
+        } else {
+            return Err(str_to_io_error(&format!("Only file:// is supported {}", input.url)))
+        };
+        match result {
+            Ok(content) => {
+                return csv_read_inputs_from_reader(input.input_type.clone(), EnvResolvingReader::new(file_reader(Cursor::new(content))));
+            }
+            Err(err) => {
+                return Err(err)
+            }
+        }
     }
-    Err(str_to_io_error(&format!("Could not open {file_path}")))
+
+    Err(str_to_io_error(&format!("Could not open {file_uri}")))
 }
 
 #[cfg(test)]

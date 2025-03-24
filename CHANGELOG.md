@@ -1,7 +1,8 @@
 # Changelog
-# 2.2.3 (2025-04-xx)
+# 2.2.4 (2025-03-24)
 - fixed `connect_timeout_secs:0` prevents connection initiation issue.
-- fixed `hdhomerun` and `strm` config with non-existing username. 
+- fixed `hdhomerun` and `strm` config check for non-existing username. 
+- "Breaking CHANGE! Moved `connect_timeout_secs` is global timeout and defiend in config root and not `reverse_proxy.stream`. 
 
 # 2.2.3 (2025-03-23)
 - variable resolving for config files now for all settings

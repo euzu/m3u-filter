@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use crate::api::endpoints::hdhomerun_api::hdhr_api_register;
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
@@ -10,10 +9,11 @@ use crate::api::model::active_provider_manager::ActiveProviderManager;
 use crate::api::model::active_user_manager::ActiveUserManager;
 use crate::api::model::app_state::{AppState, HdHomerunAppState};
 use crate::api::model::download::DownloadQueue;
+use crate::api::model::hls_cache::HlsCache;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
 use crate::model::config::{validate_targets, Config, ProcessTargets, ScheduleConfig};
-use crate::model::healthcheck::{StatusCheck, Healthcheck};
+use crate::model::healthcheck::{Healthcheck, StatusCheck};
 use crate::processing::processor::playlist;
 use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::size_utils::human_readable_byte_size;
@@ -22,14 +22,14 @@ use crate::{BUILD_TIMESTAMP, VERSION};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
 use log::{error, info};
+use reqwest::Client;
+use std::collections::BTreeMap;
+use std::future::IntoFuture;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::Mutex;
-use std::future::IntoFuture;
 use std::time::Duration;
-use reqwest::Client;
-use crate::api::model::hls_cache::HlsCache;
+use tokio::sync::Mutex;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
@@ -76,7 +76,7 @@ async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
         (active_user.active_users().await, active_user.active_connections().await)
     };
 
-    let active_provider_connections = app_state.active_provider.active_connections().map(|c| c.into_iter().collect::<BTreeMap<_,_>>());
+    let active_provider_connections = app_state.active_provider.active_connections().map(|c| c.into_iter().collect::<BTreeMap<_, _>>());
 
     StatusCheck {
         status: "ok".to_string(),
@@ -122,17 +122,12 @@ fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let active_users = Arc::new(ActiveUserManager::new());
     let active_provider = Arc::new(ActiveProviderManager::new(cfg));
 
-    let client = match cfg.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref())
-        .map(|stream| stream.connect_timeout_secs)
-        .filter(|&timeout| timeout > 0) {
-        Some(timeout) => {
-            Client::builder()
-                .connect_timeout(Duration::from_secs(u64::from(timeout)))
-                .build().unwrap_or_else(|_| Client::new())
-        }
-        None => {
-            Client::new()
-        }
+    let client = if cfg.connect_timeout_secs > 0 {
+        Client::builder()
+            .connect_timeout(Duration::from_secs(u64::from(cfg.connect_timeout_secs)))
+            .build().unwrap_or_else(|_| Client::new())
+    } else {
+        Client::new()
     };
 
     AppState {
@@ -237,8 +232,6 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
                     let device_clone = Arc::new(device.clone());
                     infos.push(format!("HdHomeRun Server '{}' running: http://{host}:{port}", device.name));
                     tokio::spawn(async move {
-
-
                         let router = axum::Router::<Arc<HdHomerunAppState>>::new()
                             .layer(create_cors_layer())
                             .layer(create_compression_layer())
@@ -255,8 +248,8 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
                                 if let Err(err) = axum::serve(listener, router).into_future().await {
                                     error!("{err}");
                                 }
-                            },
-                            Err(err) =>  error!("{err}"),
+                            }
+                            Err(err) => error!("{err}"),
                         }
                     });
                 }

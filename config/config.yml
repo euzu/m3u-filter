@@ -8,6 +8,8 @@ custom_stream_response:
   user_connections_exhausted: /home/m3u-filter/resources/user_connections_exhausted.ts
   provider_connections_exhausted: /home/m3u-filter/resources/provider_connections_exhausted.ts
 
+connect_timeout_secs: 10
+
 # sec  min   hour   day of month   month   day of week   year
 schedules:
   - schedule: "0  0  8,12,16,20,22,1  *  *  *  *"

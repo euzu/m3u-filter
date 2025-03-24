@@ -165,7 +165,7 @@ pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, cu
     headers
 }
 
-fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
+pub fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
     // Check if the file is accessible
     if file_path.exists() && file_path.is_file() {
         if let Ok(content) = fs::read(file_path) {
