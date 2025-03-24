@@ -17,7 +17,7 @@ beta_image=true
 # parse options
 while getopts "rh" opt; do
   case $opt in
-    r) beta_image=true ;;
+    r) beta_image=false ;;
     h) print_usage ;;
     \?) echo "Unknown option: -$OPTARG" >&2 ;;
   esac
@@ -70,7 +70,7 @@ fi
 cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${WORKING_DIR}/frontend/build" "${DOCKER_DIR}/web"
-cp -r "${RESOURCES_DIR}"/*.ts "${DOCKER_DIR}/"
+cp -r "${RESOURCES_DIR}" "${DOCKER_DIR}/"
 
 cd "${DOCKER_DIR}"
 echo "Building Docker images for version ${VERSION}"
