@@ -43,7 +43,7 @@ function filterMatchingChannels(grp: PlaylistGroup, searchRequest: SearchRequest
 
 function filterMatchingGroups(playlistCategories: PlaylistCategories, searchRequest: SearchRequest): Observable<PlaylistCategories> {
     return new Observable<PlaylistCategories>((observer) => {
-        searchRequest.filter = searchRequest.filter.toLowerCase();
+        searchRequest.filter = searchRequest.regexp ? searchRequest.filter :  searchRequest.filter.toLowerCase();
         const result: PlaylistCategories = {
             live:[],
             vod: [],
