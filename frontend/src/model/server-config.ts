@@ -193,6 +193,7 @@ export interface StreamBufferConfig {
 export interface StreamConfig {
     retry: boolean,
     buffer?: StreamBufferConfig,
+    throttle_kpbs?: number,
 }
 
 export interface CacheConfig {
