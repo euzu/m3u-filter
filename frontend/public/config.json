@@ -1,0 +1,7 @@
+{
+  "app_title": "m3u-filter",
+  "app_logo": null,
+  "api": {
+    "serverUrl": "/api/v1/"
+  }
+}
