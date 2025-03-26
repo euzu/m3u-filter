@@ -1,7 +1,5 @@
 import {first, Observable} from "rxjs";
 
-console.log(process.env.PUBLIC_URL);
-
 const fetchJson = (fileName: string): Observable<any> => {
     return new Observable((observer) => {
         fetch(process.env.PUBLIC_URL + fileName, {method: 'GET'})

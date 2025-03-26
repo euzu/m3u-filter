@@ -2,7 +2,7 @@ use crate::api::endpoints::hdhomerun_api::hdhr_api_register;
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
 use crate::api::endpoints::v1_api::v1_api_register;
-use crate::api::endpoints::web_index::index_register;
+use crate::api::endpoints::web_index::{index_register_without_path, index_register_with_path};
 use crate::api::endpoints::xmltv_api::xmltv_api_register;
 use crate::api::endpoints::xtream_api::xtream_api_register;
 use crate::api::model::active_provider_manager::ActiveProviderManager;
@@ -281,6 +281,8 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         start_hdhomerun(&cfg, &app_state, &mut infos);
     }
 
+    let web_ui_path = cfg.web_ui_path.as_ref().map(|p| format!("/{p}")).unwrap_or_default();
+
     infos.push(format!("Server running: http://{}:{}", &cfg.api.host, &cfg.api.port));
     for info in &infos {
         info!("{info}");
@@ -294,8 +296,12 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         .route("/status", axum::routing::get(status));
     if web_ui_enabled {
         router = router
-            .nest_service("/static", tower_http::services::ServeDir::new(web_dir_path.join("static")))
-            .merge(v1_api_register(web_auth_enabled, Arc::clone(&shared_data)));
+            .nest_service(&format!("{web_ui_path}/static"), tower_http::services::ServeDir::new(web_dir_path.join("static")))
+            .nest_service(&format!("{web_ui_path}/assets"), tower_http::services::ServeDir::new(web_dir_path.join("assets")))
+            .merge(v1_api_register(web_auth_enabled, Arc::clone(&shared_data), web_ui_path.as_str()));
+        if !web_ui_path.is_empty() {
+            router = router.merge(index_register_with_path(&web_dir_path, web_ui_path.as_str()));
+        }
     }
     router = router
         .merge(xtream_api_register())
@@ -303,8 +309,8 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         .merge(xmltv_api_register())
         .merge(hls_api_register());
 
-    if web_ui_enabled {
-        router = router.merge(index_register(&web_dir_path));
+    if web_ui_enabled && web_ui_path.is_empty(){
+        router = router.merge(index_register_without_path(&web_dir_path));
     }
 
     let router: axum::Router<()> = router.with_state(shared_data.clone());

@@ -1,4 +1,8 @@
 # Changelog
+# 2.2.5 (2025-03-xx)
+- fixed web ui playlist regexp search
+- added `web_ui_path` to `config.yml`
+
 # 2.2.4 (2025-03-24)
 - fixed `connect_timeout_secs:0` prevents connection initiation issue.
 - fixed `hdhomerun` and `strm` config check for non-existing username. 

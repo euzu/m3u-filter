@@ -42,6 +42,7 @@ const CONFIG_FIELDS = [
     {name: 'backup_dir', label: 'LABEL.BACKUP_DIR', fieldType: FormFieldType.TEXT, validator: undefined},
     {name: 'update_on_boot', label: 'LABEL.UPDATE_ON_BOOT', fieldType: FormFieldType.CHECK, validator: undefined},
     {name: 'web_ui_enabled', label: 'LABEL.WEB_UI', fieldType: FormFieldType.CHECK, validator: undefined},
+    {name: 'web_ui_path', label: 'LABEL.WEB_UI_PATH', fieldType: FormFieldType.TEXT, validator: undefined},
 ];
 
 const CONFIG_SCHEDULES_FIELDS = [
@@ -218,6 +219,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 log: cfgLog,
                 update_on_boot: mainConfig.update_on_boot,
                 web_ui_enabled: mainConfig.web_ui_enabled,
+                web_ui_path: mainConfig.web_ui_path,
                 web_auth: mainConfig.web_auth,
             };
 
@@ -241,7 +243,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
             <button data-tooltip='LABEL.SAVE' onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
         <TabSet tabs={configs.tabs} active={activeTab} onTabChange={handleTabChange}></TabSet>
-        <div className={'main-config__content'}>
+        <div className={'ntent'}>
             <div className={'main-config__content-form' + ('api' !== activeTab ? ' hidden' : '')}>
                 <FormView data={apiConfig} fields={configs.api_fields}></FormView>
                 <div className={'main-config__content-help'}>

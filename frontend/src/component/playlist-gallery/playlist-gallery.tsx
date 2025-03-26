@@ -131,7 +131,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
     //             {playlistItem.header.name}
     //         </div>
     //         <div className="playlist-gallery__showcase-card-content">
-    //             <img alt="logo" src={playlistItem.header.logo || playlistItem.header.logo_small || 'placeholder.png'}/>
+    //             <img alt="logo" src={playlistItem.header.logo || playlistItem.header.logo_small || 'assets/placeholder.png'}/>
     //         </div>
     //         <div className="playlist-gallery__showcase-card-footer">
     //             <div className={'tool-button'} data-item={playlistItem.id} onClick={handleClipboardUrl}>
@@ -264,7 +264,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                      className={'playlist-gallery__channels-channel channel-' + channel.xtream_cluster}>
                     <div className="playlist-gallery__channels-channel-logo">
                         {getLogo(channel) && <img loading='lazy' alt={"logo"} src={getLogo(channel)}
-                                                  onError={(e: any) => (e.target.onerror=null) || (e.target.src="/missing-logo.svg")}/>}
+                                                  onError={(e: any) => (e.target.onerror=null) || (e.target.src="assets/missing-logo.svg")}/>}
                     </div>
                     <div className="playlist-gallery__channels-channel-name">
                         {channel.title}

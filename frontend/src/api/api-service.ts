@@ -23,8 +23,6 @@ export default interface ApiService {
 
 export class DefaultApiService implements ApiService {
 
-    private apiBaseUrl: string = config.api.serverUrl;
-
     private readonly DEFAULT_ERROR = {'origin': 'server', 'message': 'Server error'};
 
     private static getLanguage(): string {
@@ -32,7 +30,8 @@ export class DefaultApiService implements ApiService {
     }
 
     protected getBaseUrl(): string {
-        return this.apiBaseUrl.substring(0, this.apiBaseUrl.indexOf('/api/'));
+        const apiBaseUrl = ServiceContext.config().getUiConfig().api.serverUrl;
+        return apiBaseUrl.substring(0, apiBaseUrl.indexOf('/api/'));
     }
 
     private prepareError(err: any): any {
@@ -67,7 +66,8 @@ export class DefaultApiService implements ApiService {
     }
 
     protected getUrl(query: string, url?: string) {
-        return (url ? url : this.apiBaseUrl) + query;
+        const apiBaseUrl = ServiceContext.config().getUiConfig().api.serverUrl;
+        return (url ? url : apiBaseUrl) + query;
     }
 
     get<T>(query: string, url?: string): Observable<T> {

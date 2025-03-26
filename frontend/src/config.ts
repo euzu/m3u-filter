@@ -1,20 +1,12 @@
-const location = window.location;
-
 const dev = {
     app: {
         version: process.env.REACT_APP_VERSION,
     },
-    api: {
-        serverUrl: 'http://localhost:8901/api/v1/',
-    }
 };
 
 const prod = {
     app: {
         version: process.env.REACT_APP_VERSION,
-    },
-    api: {
-        serverUrl: location.origin + '/api/v1/',
     },
 };
 

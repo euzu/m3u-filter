@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::auth::user::UserCredential;
@@ -42,6 +42,12 @@ pub const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8192byte chunks and 2Mbit/s approx 8MB
 
+const RESERVED_PATHS: &[&str] = &[
+    "live", "movie", "series", "m3u-stream", "healthcheck", "status",
+    "player_api.php", "panel_api.php", "xtream", "timeshift", "timeshift.php", "streaming",
+    "get.php", "apiget", "m3u", "resource"
+];
+
 #[macro_export]
 macro_rules! valid_property {
   ($key:expr, $array:expr) => {{
@@ -51,7 +57,7 @@ macro_rules! valid_property {
 pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 use crate::model::hdhomerun_config::HdHomeRunConfig;
-use crate::utils::file::config_reader::{csv_read_inputs};
+use crate::utils::file::config_reader::csv_read_inputs;
 use crate::utils::network::request::{get_credentials_from_url, get_credentials_from_url_str};
 use crate::utils::string_utils::get_trimmed_string;
 
@@ -354,7 +360,7 @@ pub struct HdHomeRunTargetOutput {
     pub device: String,
     pub username: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_output: Option<TargetType>
+    pub use_output: Option<TargetType>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -409,7 +415,7 @@ impl ConfigTarget {
         let mut xtream_cnt = 0;
         let mut strm_needs_xtream = false;
         let mut hdhr_cnt = 0;
-        let mut hdhomerun_needs_m3u=false;
+        let mut hdhomerun_needs_m3u = false;
         let mut hdhomerun_needs_xtream = false;
 
         for target_output in &mut self.output {
@@ -426,7 +432,7 @@ impl ConfigTarget {
                 }
                 TargetOutput::Strm(strm_output) => {
                     strm_cnt += 1;
-                    strm_output.directory =  strm_output.directory.trim().to_string();
+                    strm_output.directory = strm_output.directory.trim().to_string();
                     if strm_output.directory.trim().is_empty() {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "directory is required for strm type: {}", self.name);
                     }
@@ -448,9 +454,9 @@ impl ConfigTarget {
                     }
 
                     if let Some(use_output) = hdhomerun_output.use_output.as_ref() {
-                        match  &use_output {
-                            TargetType::M3u => { hdhomerun_needs_m3u=true;},
-                            TargetType::Xtream => {hdhomerun_needs_xtream=true;},
+                        match &use_output {
+                            TargetType::M3u => { hdhomerun_needs_m3u = true; }
+                            TargetType::Xtream => { hdhomerun_needs_xtream = true; }
                             _ => return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun output option `use_output` only accepts `m3u` or `xtream` for target: {}", self.name),
                         };
                     }
@@ -547,10 +553,10 @@ impl ConfigTarget {
     pub fn has_output(&self, tt: &TargetType) -> bool {
         for target_output in &self.output {
             match target_output {
-                TargetOutput::Xtream(_) => { if tt == &TargetType::Xtream { return true } }
-                TargetOutput::M3u(_) => { if tt == &TargetType::M3u { return true } }
-                TargetOutput::Strm(_) => { if tt == &TargetType::Strm { return true } }
-                TargetOutput::HdHomeRun(_) => { if tt == &TargetType::HdHomeRun { return true } }
+                TargetOutput::Xtream(_) => { if tt == &TargetType::Xtream { return true; } }
+                TargetOutput::M3u(_) => { if tt == &TargetType::M3u { return true; } }
+                TargetOutput::Strm(_) => { if tt == &TargetType::Strm { return true; } }
+                TargetOutput::HdHomeRun(_) => { if tt == &TargetType::HdHomeRun { return true; } }
             }
         }
         false
@@ -825,7 +831,7 @@ impl ConfigInput {
                         if let Some(mut first) = batch_aliases.pop() {
                             self.username = first.username.take();
                             self.password = first.password.take();
-                            self.url =  first.url.trim().to_string();
+                            self.url = first.url.trim().to_string();
                             if self.name.is_empty() {
                                 self.name = first.name.to_string();
                             }
@@ -1249,6 +1255,8 @@ pub struct Config {
     #[serde(default = "default_as_true")]
     pub web_ui_enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub web_ui_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub web_auth: Option<WebAuthConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub messaging: Option<MessagingConfig>,
@@ -1366,8 +1374,8 @@ impl Config {
 
     pub async fn get_target_for_username(&self, username: &str) -> Option<(ProxyUserCredentials, &ConfigTarget)> {
         if let Some(credentials) = self.get_user_credentials(username).await {
-           return self.t_api_proxy.read().await.as_ref()
-               .and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(&credentials.username, &credentials.password)));
+            return self.t_api_proxy.read().await.as_ref()
+                .and_then(|api_proxy| self.intern_get_target_for_user(api_proxy.get_target_name(&credentials.username, &credentials.password)));
         }
         None
     }
@@ -1457,7 +1465,7 @@ impl Config {
                     return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
                 }
                 seen_names.insert(input_name);
-                if let Some(aliases) =  &input.aliases {
+                if let Some(aliases) = &input.aliases {
                     for alias in aliases {
                         let input_name = alias.name.trim().to_string();
                         if input_name.is_empty() {
@@ -1528,7 +1536,7 @@ impl Config {
         self.check_scheduled_targets(&target_names)?;
         self.check_unique_input_names()?;
         self.prepare_video_config()?;
-        self.prepare_web_auth()?;
+        self.prepare_web()?;
 
         Ok(())
     }
@@ -1587,10 +1595,19 @@ impl Config {
         Ok(())
     }
 
-    fn prepare_web_auth(&mut self) -> Result<(), M3uFilterError> {
+    fn prepare_web(&mut self) -> Result<(), M3uFilterError> {
         if !self.web_ui_enabled {
             self.web_auth = None;
         }
+
+        if let Some(web_ui_path) = self.web_ui_path.as_ref() {
+            let web_path = web_ui_path.trim().trim_start_matches('/').trim_end_matches('/').to_string();
+            if RESERVED_PATHS.contains(&web_path.to_lowercase().as_str()) {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("web ui path is a reserved path. Do not use {RESERVED_PATHS:?}")));
+            }
+            self.web_ui_path = Some(web_path);
+        }
+
 
         if let Some(web_auth) = &mut self.web_auth {
             if web_auth.enabled {

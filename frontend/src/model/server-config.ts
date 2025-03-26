@@ -218,6 +218,7 @@ export interface ServerMainConfig {
     log?: LogConfig,
     update_on_boot: boolean,
     web_ui_enabled: boolean,
+    web_ui_path: string,
     web_auth?: WebAuthConfig,
     reverse_proxy?: ReverseProxyConfig,
 }

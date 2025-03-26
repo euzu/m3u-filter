@@ -10,16 +10,16 @@ export default interface AuthApiService extends ApiService {
 }
 
 export class DefaultAuthApiService extends DefaultApiService implements AuthApiService {
-    private readonly authBaseUrl;
     constructor() {
         super();
-        this.authBaseUrl = this.getBaseUrl() + '/auth';
     }
     authenticate(username: string, password: string): Observable<{ token: string }> {
-        return this.post<TokenResponse>('/token', {username, password}, this.authBaseUrl);
+        const authBaseUrl = this.getBaseUrl() + '/auth';
+        return this.post<TokenResponse>('/token', {username, password}, authBaseUrl);
     }
 
     refresh(): Observable<TokenResponse> {
-        return this.post<TokenResponse>('/refresh', {}, this.authBaseUrl);
+        const authBaseUrl = this.getBaseUrl() + '/auth';
+        return this.post<TokenResponse>('/refresh', {}, authBaseUrl);
     }
 }

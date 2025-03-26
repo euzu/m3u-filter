@@ -365,7 +365,7 @@ async fn config(
     axum::response::Json(result).into_response()
 }
 
-pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>) -> axum::Router<Arc<AppState>> {
+pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>, web_ui_path: &str) -> axum::Router<Arc<AppState>> {
     let mut router = axum::Router::new();
     router = router.route("/config", axum::routing::get(config))
         .route("/config/main", axum::routing::post(save_config_main))
@@ -381,5 +381,5 @@ pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>) -> axum
 
     axum::Router::new()
         .merge(user_api_register(app_state))
-        .nest("/api/v1", router)
+        .nest(&format!("{web_ui_path}/api/v1"), router)
 }

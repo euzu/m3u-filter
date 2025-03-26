@@ -12,7 +12,7 @@ export default function i18n_init(languages: string[]): Observable<boolean> {
         }
 
         i18next.use(initReactI18next)
-        zip(languages.map(lang => Fetcher.fetchJson('/i18n/' + lang + '_common.json')))
+        zip(languages.map(lang => Fetcher.fetchJson('assets/i18n/' + lang + '_common.json')))
             .subscribe({
                 next: (responses) => {
                     let savedLanguage = localStorage.getItem(LANGUAGE_LOCAL_STORAGE_KEY);

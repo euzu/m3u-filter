@@ -1,22 +1,26 @@
-use std::sync::Arc;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use axum::response::IntoResponse;
 use crate::api::api_utils::serve_file;
 use crate::api::model::app_state::AppState;
 use crate::auth::auth_bearer::AuthBearer;
 use crate::auth::authenticator::{create_jwt_admin, create_jwt_user, is_admin, verify_token};
 use crate::auth::password::verify_password;
 use crate::auth::user::UserCredential;
+use axum::response::IntoResponse;
+use log::error;
+use regex::Regex;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock};
+use serde_json::json;
+use tower::Service;
 
-fn no_web_auth_token() ->  impl axum::response::IntoResponse + Send {
+fn no_web_auth_token() -> impl axum::response::IntoResponse + Send {
     axum::Json(HashMap::from([("token", "authorized")])).into_response()
 }
 
 async fn token(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Json(mut req): axum::extract::Json<UserCredential>,
-) ->  impl axum::response::IntoResponse + Send {
+) -> impl axum::response::IntoResponse + Send {
     match &app_state.config.web_auth {
         None => no_web_auth_token().into_response(),
         Some(web_auth) => {
@@ -54,7 +58,7 @@ async fn token(
 async fn token_refresh(
     AuthBearer(token): AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
-) ->  impl axum::response::IntoResponse + Send {
+) -> impl axum::response::IntoResponse + Send {
     match &app_state.config.web_auth {
         None => no_web_auth_token().into_response(),
         Some(web_auth) => {
@@ -66,7 +70,7 @@ async fn token_refresh(
             if let Some(token_data) = maybe_token_data {
                 let username = token_data.claims.username.clone();
                 let web_auth_cfg = app_state.config.web_auth.as_ref().unwrap();
-                let new_token =  if is_admin(Some(token_data)) {
+                let new_token = if is_admin(Some(token_data)) {
                     create_jwt_admin(web_auth_cfg, &username)
                 } else {
                     create_jwt_user(web_auth_cfg, &username)
@@ -80,14 +84,68 @@ async fn token_refresh(
     }
 }
 
+static BASE_HREF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"(href|src)="/([^"]*)""#).unwrap());
+
 async fn index(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
     let path: PathBuf = [&app_state.config.api.web_root, "index.html"].iter().collect();
+    if let Some(web_ui_path) = app_state.config.web_ui_path.as_ref() {
+        match tokio::fs::read_to_string(&path).await {
+            Ok(content) => {
+                let mut new_content = BASE_HREF.replace_all(&content, |caps: &regex::Captures| {
+                    format!(r#"{}="/{web_ui_path}/{}""#, &caps[1], &caps[2])
+                }).to_string();
+
+                let base_href = format!(r#"<head><base href="/{web_ui_path}/">"#);
+                if let Some(pos) = new_content.find("<head>") {
+                    new_content.replace_range(pos..pos + 6, &base_href);
+                };
+
+                return axum::response::Response::builder()
+                    .header("Content-Type", mime::TEXT_HTML_UTF_8.as_ref())
+                    .body(new_content.into())
+                    .unwrap();
+            }
+            Err(err) => {
+                error!("Failed to read web ui index.hml: {err}");
+            }
+        }
+    }
     serve_file(&path, mime::TEXT_HTML_UTF_8).await.into_response()
 }
 
-pub fn index_register(web_dir_path: &Path) -> axum::Router<Arc<AppState>> {
+async fn index_config(
+    axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
+) -> impl axum::response::IntoResponse + Send {
+    let path: PathBuf = [&app_state.config.api.web_root, "config.json"].iter().collect();
+    if let Some(web_ui_path) = app_state.config.web_ui_path.as_ref() {
+        match tokio::fs::read_to_string(&path).await {
+            Ok(content) => {
+                if let Ok(mut json_data) = serde_json::from_str::<serde_json::Value>(&content){
+                    if let Some(server_url) = json_data.get_mut("serverUrl") {
+                        if let Some(url) = server_url.as_str() {
+                            let new_url = format!("{web_ui_path}{url}");
+                            *server_url = json!(new_url);
+                        }
+                    }
+                    if let Ok(json_content) = serde_json::to_string(&json_data) {
+                        return axum::response::Response::builder()
+                            .header("Content-Type", mime::APPLICATION_JSON.as_ref())
+                            .body(axum::body::Body::from(json_content))
+                            .unwrap()
+                    }
+                }
+            }
+            Err(err) => {
+                error!("Failed to read web ui config.json: {err}");
+            }
+        }
+    }
+    serve_file(&path, mime::APPLICATION_JSON).await.into_response()
+}
+
+pub fn index_register_without_path(web_dir_path: &Path) -> axum::Router<Arc<AppState>> {
     axum::Router::new()
         .nest("/auth", axum::Router::new()
             .route("/token", axum::routing::post(token))
@@ -95,4 +153,44 @@ pub fn index_register(web_dir_path: &Path) -> axum::Router<Arc<AppState>> {
         .merge(axum::Router::new()
             .route("/", axum::routing::get(index))
             .fallback(axum::routing::get_service(tower_http::services::ServeDir::new(web_dir_path))))
+}
+pub fn index_register_with_path(web_dir_path: &Path, web_ui_path: &str) -> axum::Router<Arc<AppState>> {
+    axum::Router::new()
+        .nest(&format!("{web_ui_path}/auth"), axum::Router::new()
+            .route("/token", axum::routing::post(token))
+            .route("/refresh", axum::routing::post(token_refresh)))
+        .merge(axum::Router::new()
+            .nest(&format!("{web_ui_path}/"), axum::Router::new()
+                .route("/config.json", axum::routing::get(index_config))
+                .route("/", axum::routing::get(index))
+                .fallback({
+                    let mut serve_dir = tower_http::services::ServeDir::new(web_dir_path);
+                    let path_prefix = web_ui_path.to_string();
+                    move |req: axum::http::Request<_>| {
+                        let mut path = req.uri().path().to_string();
+
+                        if path.starts_with(&path_prefix) {
+                            path = path[path_prefix.len()..].to_string();
+                        }
+
+                        let mut builder = axum::http::Uri::builder();
+                        if let Some(scheme) = req.uri().scheme() {
+                            builder = builder.scheme(scheme.clone());
+                        }
+                        if let Some(authority) = req.uri().authority() {
+                            builder = builder.authority(authority.clone());
+                        }
+                        let new_uri = builder.path_and_query(path)
+                            .build()
+                            .unwrap();
+
+                        let new_req = axum::http::Request::builder()
+                            .method(req.method())
+                            .uri(new_uri)
+                            .body(req.into_body())
+                            .unwrap();
+
+                        serve_dir.call(new_req)
+                    }
+                })))
 }
