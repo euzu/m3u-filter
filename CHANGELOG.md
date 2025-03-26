@@ -2,6 +2,15 @@
 # 2.2.5 (2025-03-xx)
 - fixed web ui playlist regexp search
 - added `web_ui_path` to `config.yml`
+- added bandwidth throttle `throttle_kibps` attribute for `reverse_proxy.stream` in  `config.yml`
+
+| Resolution      |Framerate| Bitrate (KiB/s) | Quality     |
+|-----------------|---------|-----------------|-------------|
+|480p (854x480)   |  30 fps | 100–300 KiB/s   | Low-Quality |
+|720p (1280x720)  |  30 fps | 300–700 KiB/s   | HD-Streams  |
+|1080p (1920x1080)|  30 fps | 700–1500 KiB/s  | Full-HD     |
+|4K (3840x2160)   |  30 fps | 2500–6000 KiB/s | Ultra-HD    |
+
 
 # 2.2.4 (2025-03-24)
 - fixed `connect_timeout_secs:0` prevents connection initiation issue.

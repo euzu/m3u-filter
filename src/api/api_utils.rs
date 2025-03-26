@@ -72,6 +72,7 @@ macro_rules! try_result_bad_request {
 pub use try_option_bad_request;
 pub use try_result_bad_request;
 use crate::api::model::stream::{BoxedProviderStream, ProviderStreamInfo, ProviderStreamResponse};
+use crate::api::model::streams::throttled_stream::ThrottledStream;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 
 pub async fn serve_file(file_path: &Path, mime_type: mime::Mime) -> impl axum::response::IntoResponse + Send {
@@ -341,7 +342,20 @@ pub async fn stream_response(app_state: &AppState,
             for (key, value) in &header_map {
                 response = response.header(key, value);
             }
-            response.body(axum::body::Body::from_stream(stream)).unwrap().into_response()
+
+            let throttle_kibps = get_stream_throttle(app_state);
+
+            let body_stream = if throttle_kibps > 0 {
+                match item_type {
+                    PlaylistItemType::Video | PlaylistItemType::Series  | PlaylistItemType::SeriesInfo => {
+                        axum::body::Body::from_stream(ThrottledStream::new(stream.boxed(), throttle_kibps as usize))
+                    }
+                    _ => axum::body::Body::from_stream(stream)
+               }
+            } else {
+                axum::body::Body::from_stream(stream)
+            };
+            response.body(body_stream).unwrap().into_response()
             // if content_length > 0 { response_builder.body(SizedStream::new(content_length, stream)) } else { response_builder.streaming(stream) }
         };
 
@@ -350,6 +364,14 @@ pub async fn stream_response(app_state: &AppState,
 
     error!("Cant open stream {}", sanitize_sensitive_info(stream_url));
     axum::http::StatusCode::BAD_REQUEST.into_response()
+}
+
+fn get_stream_throttle(app_state: &AppState) -> u32 {
+    app_state.config
+        .reverse_proxy
+        .as_ref()
+        .and_then(|reverse_proxy| reverse_proxy.stream.as_ref())
+        .map(|stream| stream.throttle_kibps).map_or(0, |t| t.unwrap_or_default())
 }
 
 async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &ProxyUserCredentials) -> Option<impl IntoResponse> {

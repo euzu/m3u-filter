@@ -29,6 +29,7 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use std::net::SocketAddr;
 use tokio::sync::Mutex;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -245,7 +246,7 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
 
                         match tokio::net::TcpListener::bind(format!("{}:{}", app_host.clone(), port)).await {
                             Ok(listener) => {
-                                if let Err(err) = axum::serve(listener, router).into_future().await {
+                                if let Err(err) = axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>()).into_future().await {
                                     error!("{err}");
                                 }
                             }

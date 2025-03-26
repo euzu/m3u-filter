@@ -6,7 +6,8 @@ pub enum StreamError {
     // StdIo(std::io::Error),
     // ReceiverClosed,
     ReceiverError(BroadcastStreamRecvError),
-    LockError(String)
+    LockError(String),
+    TokenBucketEmpty
 }
 
 impl StreamError {
@@ -28,6 +29,7 @@ impl std::fmt::Display for StreamError {
             // StreamError::ReceiverClosed =>  write!(f, "Receiver closed"),
             StreamError::ReceiverError(e) =>  write!(f, "Receiver error {e}"),
             StreamError::LockError(e) =>  write!(f, "{e}"),
+            StreamError::TokenBucketEmpty =>  write!(f, "Throttled Stream bucket empty"),
         }
     }
 }

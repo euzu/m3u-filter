@@ -1175,6 +1175,7 @@ pub struct StreamConfig {
     pub retry: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub buffer: Option<StreamBufferConfig>,
+    pub throttle_kibps: Option<u32>,
     #[serde(default)]
     pub forced_retry_interval_secs: u32,
 }

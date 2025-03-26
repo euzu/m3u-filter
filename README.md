@@ -197,15 +197,38 @@ You could be banned from your server. Twice a day should be enough.
 This configuration is only used for reverse proxy mode. The Reverse Proxy mode can be activated for each user individually.
 
 #### 1.6.1 `stream`
-Contains settings for the streaming.
-- The `retry`option is for transparent reconnections to the provider on provider disconnects or stream errors.
-- `buffer`: When buffer is `enabled`, the stream is buffered with the configured `size`.
+Attributes:
+- `retry`
+- `buffer`
+- `throttle_kibps`
+
+##### 1.6.1.1 `retry`
+If set to `true` on connection loss to provider, the stream will be reconnected.
+
+##### 1.6.1.2 `buffer`
+Has 2 attributes
+- `enabled`
+- `size`
+
+If `enabled` = true The stream is buffered. This is only possible if the provider stream is faster than the consumer.
+The stream is buffered with the configured `size`.
 `size` is the amount of `8192 byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.  
 
 - *a.* if `retry` is `false` and `buffer.enabled` is `false`  the provider stream is piped as is to the client.
 - *b.* if `retry` is `true` or  `buffer.enabled` is `true` the provider stream is processed and send to the client.
 
 - The key difference: the `b.` approach is based on complex stream handling and more memory footprint.
+
+##### 1.6.1.3 `throttle_kibps` in KiB/s
+Bandwidth throttle (speed limit).
+
+| Resolution      |Framerate| Bitrate (KiB/s) | Quality     |
+|-----------------|---------|-----------------|-------------|
+|480p (854x480)   |  30 fps | 100–300 KiB/s   | Low-Quality |
+|720p (1280x720)  |  30 fps | 300–700 KiB/s   | HD-Streams  |
+|1080p (1920x1080)|  30 fps | 700–1500 KiB/s  | Full-HD     |
+|4K (3840x2160)   |  30 fps | 2500–6000 KiB/s | Ultra-HD    |
+
 
 #### 1.6.2 `cache`
 LRU-Cache is for resources. If it is `enabled`, the resources/images are persisted in the given `dir`. If the cache size exceeds `size`,
@@ -220,6 +243,7 @@ If you set it `true` `cache` is disabled! Because the cache cant work without re
 reverse_proxy:
   resource_rewrite_disabled: false
   stream:
+    throttle_kibps: 2000
     retry: true
     buffer:
       enabled: true
