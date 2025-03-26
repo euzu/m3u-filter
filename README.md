@@ -1,4 +1,3 @@
-[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Feuzu%2Fm3u-filter&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com) 
 [![wiki](https://github.com/user-attachments/assets/68251546-7c96-44c1-bebe-f8eaf2675992)](https://github.com/euzu/m3u-filter/wiki)
 
 
@@ -200,7 +199,7 @@ This configuration is only used for reverse proxy mode. The Reverse Proxy mode c
 Attributes:
 - `retry`
 - `buffer`
-- `throttle_kibps`
+- `throttle_kbps` Kilobit per second  
 
 ##### 1.6.1.1 `retry`
 If set to `true` on connection loss to provider, the stream will be reconnected.
@@ -219,15 +218,15 @@ The stream is buffered with the configured `size`.
 
 - The key difference: the `b.` approach is based on complex stream handling and more memory footprint.
 
-##### 1.6.1.3 `throttle_kibps` in KiB/s
+##### 1.6.1.3 `throttle_kbps` in Kilobits per seconds
 Bandwidth throttle (speed limit).
 
-| Resolution      |Framerate| Bitrate (KiB/s) | Quality     |
-|-----------------|---------|-----------------|-------------|
-|480p (854x480)   |  30 fps | 100–300 KiB/s   | Low-Quality |
-|720p (1280x720)  |  30 fps | 300–700 KiB/s   | HD-Streams  |
-|1080p (1920x1080)|  30 fps | 700–1500 KiB/s  | Full-HD     |
-|4K (3840x2160)   |  30 fps | 2500–6000 KiB/s | Ultra-HD    |
+| Resolution      |Framerate| Bitrate (kbps) | Quality     |
+|-----------------|---------|----------------|-------------|
+|480p (854x480)   |  30 fps | 819–2.457      | Low-Quality |
+|720p (1280x720)  |  30 fps | 2.457–5.737    | HD-Streams  |
+|1080p (1920x1080)|  30 fps | 5.737–12.288   | Full-HD     |
+|4K (3840x2160)   |  30 fps | 20.480–49.152  | Ultra-HD    |
 
 
 #### 1.6.2 `cache`

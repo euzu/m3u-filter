@@ -343,12 +343,12 @@ pub async fn stream_response(app_state: &AppState,
                 response = response.header(key, value);
             }
 
-            let throttle_kibps = get_stream_throttle(app_state);
+            let throttle_kbps = get_stream_throttle(app_state);
 
-            let body_stream = if throttle_kibps > 0 {
+            let body_stream = if throttle_kbps > 0 {
                 match item_type {
                     PlaylistItemType::Video | PlaylistItemType::Series  | PlaylistItemType::SeriesInfo => {
-                        axum::body::Body::from_stream(ThrottledStream::new(stream.boxed(), throttle_kibps as usize))
+                        axum::body::Body::from_stream(ThrottledStream::new(stream.boxed(), throttle_kbps as usize))
                     }
                     _ => axum::body::Body::from_stream(stream)
                }
@@ -371,7 +371,7 @@ fn get_stream_throttle(app_state: &AppState) -> u32 {
         .reverse_proxy
         .as_ref()
         .and_then(|reverse_proxy| reverse_proxy.stream.as_ref())
-        .map(|stream| stream.throttle_kibps).map_or(0, |t| t.unwrap_or_default())
+        .map(|stream| stream.throttle_kbps).map_or(0, |t| t.unwrap_or_default())
 }
 
 async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &ProxyUserCredentials) -> Option<impl IntoResponse> {

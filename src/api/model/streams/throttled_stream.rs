@@ -1,13 +1,13 @@
+use crate::api::model::stream_error::StreamError;
 use bytes::Bytes;
-use futures::{Stream};
+use futures::Stream;
+use std::future::Future;
 use std::{
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
-use std::future::Future;
 use tokio::time::{sleep, Sleep};
-use crate::api::model::stream_error::StreamError;
 
 pub struct ThrottledStream<S> {
     inner: S,
@@ -16,9 +16,9 @@ pub struct ThrottledStream<S> {
 }
 
 impl<S> ThrottledStream<S> {
-    pub fn new(inner: S, throttle_kibps: usize) -> Self {
-        assert!(throttle_kibps > 0, "Rate must be greater than 0");
-        let rate_bytes_per_sec = (throttle_kibps as f64) * 1024.0;
+    pub fn new(inner: S, throttle_kbps: usize) -> Self {
+        assert!(throttle_kbps > 0, "Rate must be greater than 0");
+        let rate_bytes_per_sec = (throttle_kbps as f64) *  1000.0 / 8.0;
         Self {
             inner,
             rate_bytes_per_sec,
@@ -29,7 +29,7 @@ impl<S> ThrottledStream<S> {
 
 impl<S> Stream for ThrottledStream<S>
 where
-    S: Stream<Item = Result<Bytes, StreamError>> + Unpin,
+    S: Stream<Item=Result<Bytes, StreamError>> + Unpin,
 {
     type Item = Result<Bytes, StreamError>;
 
