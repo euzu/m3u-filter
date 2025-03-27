@@ -64,7 +64,15 @@ export default function FormView(props: FormViewProps) {
 
     const handleInputValueChange = useCallback((evt: any) => {
         const field = evt.target.dataset.field;
-        const value = evt.target.value;
+        let value = evt.target.value;
+        for (const fieldDef of fields) {
+            if (fieldDef.name === field) {
+                if (fieldDef.fieldType === FormFieldType.NUMBER) {
+                    value = parseInt(value);
+                }
+            }
+        }
+
         if (data) {
             data[field] = value;
         }

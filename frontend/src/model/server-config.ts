@@ -203,9 +203,15 @@ export interface CacheConfig {
     dir?: string,
 }
 
+export interface RateLimitConfig {
+    enabled: boolean,
+    period_millis: number,
+    burst_size: number,
+}
 export interface ReverseProxyConfig {
     stream?: StreamConfig,
     cache?: CacheConfig,
+    rate_limit?: RateLimitConfig,
     resource_rewrite_disabled: boolean,
 }
 

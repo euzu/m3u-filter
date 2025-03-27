@@ -4,7 +4,7 @@ import ServerConfig, {
     CacheConfig,
     LogConfig,
     MessagingConfig,
-    PushoverConfig,
+    PushoverConfig, RateLimitConfig,
     RestConfig,
     ReverseProxyConfig,
     ServerApiConfig,
@@ -72,9 +72,14 @@ const CONFIG_REVERSE_PROXY_STREAM_BUFFER_FIELDS = [
 const CONFIG_REVERSE_PROXY_CACHE_FIELDS = [
     {name: 'enabled', label: 'LABEL.ENABLED', fieldType: FormFieldType.CHECK},
     {name: 'size', label: 'LABEL.SIZE', fieldType: FormFieldType.TEXT},
-    {name: 'sir', label: 'LABEL.CACHE_DIR', fieldType: FormFieldType.TEXT},
+    {name: 'dir', label: 'LABEL.CACHE_DIR', fieldType: FormFieldType.TEXT},
 ];
 
+const CONFIG_REVERSE_PROXY_RATE_LIMIT_FIELDS = [
+    {name: 'enabled', label: 'LABEL.ENABLED', fieldType: FormFieldType.CHECK},
+    {name: 'period_millis', label: 'LABEL.PERIOD_MILLIS', fieldType: FormFieldType.NUMBER},
+    {name: 'burst_size', label: 'LABEL.BURST_SIZE', fieldType: FormFieldType.NUMBER},
+];
 
 const CONFIG_MESSAGING_FIELDS = [
     {
@@ -147,6 +152,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
     const reverseProxyStreamConfig = useMemo<StreamConfig>(() => config?.reverse_proxy?.stream || {} as any, [config]);
     const reverseProxyStreamBufferConfig = useMemo<StreamBufferConfig>(() => config?.reverse_proxy?.stream?.buffer || {} as any, [config]);
     const reverseProxyCacheConfig = useMemo<CacheConfig>(() => config?.reverse_proxy?.cache || {} as any, [config]);
+    const reverseProxyRateLimitConfig = useMemo<RateLimitConfig>(() => config?.reverse_proxy?.rate_limit || {} as any, [config]);
     const logConfig = useMemo<LogConfig>(() => config?.log || {} as any, [config]);
     const configs = useMemo(() => {
         const translations: any = {
@@ -158,6 +164,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
             reverse_proxy_stream_fields: translateLabels(CONFIG_REVERSE_PROXY_STREAM_FIELDS, translate),
             reverse_proxy_stream_buffer_fields: translateLabels(CONFIG_REVERSE_PROXY_STREAM_BUFFER_FIELDS, translate),
             reverse_proxy_cache_fields: translateLabels(CONFIG_REVERSE_PROXY_CACHE_FIELDS, translate),
+            reverse_proxy_rate_limit_fields: translateLabels(CONFIG_REVERSE_PROXY_RATE_LIMIT_FIELDS, translate),
             messaging_fields: translateLabels(CONFIG_MESSAGING_FIELDS, translate),
             telegram_fields: translateLabels(CONFIG_TELEGRAM_FIELDS, translate),
             rest_fields: translateLabels(CONFIG_REST_FIELDS, translate),
@@ -200,6 +207,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 resource_rewrite_disabled: reverseProxyConfig.resource_rewrite_disabled,
                 stream: cfgReverseProxyStreamBuffer ?? undefined,
                 cache: reverseProxyCacheConfig ?? undefined,
+                rate_limit: reverseProxyRateLimitConfig ?? undefined,
             };
 
             const cfgVideo = {
@@ -234,7 +242,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
         }
     }, [mainConfig, apiConfig, videoConfig, messagingConfig, telegramConfig, restConfig, pushoverConfig,
         videoDownloadConfig, reverseProxyConfig, enqueueSnackbar, services, logConfig,
-        reverseProxyCacheConfig, reverseProxyStreamConfig, reverseProxyStreamBufferConfig,
+        reverseProxyRateLimitConfig, reverseProxyCacheConfig, reverseProxyStreamConfig, reverseProxyStreamBufferConfig,
         translate]);
 
     const handleTabChange = useCallback((tab: string) => {
@@ -277,6 +285,8 @@ export default function MainConfigView(props: MainConfigViewProps) {
                           fields={configs.reverse_proxy_stream_buffer_fields}></FormView>
                 <label className="main-config__content-form__section-title">{translate('LABEL.CACHE')}</label>
                 <FormView data={reverseProxyCacheConfig} fields={configs.reverse_proxy_cache_fields}></FormView>
+                <label className="main-config__content-form__section-title">{translate('LABEL.RATE_LIMIT')}</label>
+                <FormView data={reverseProxyRateLimitConfig} fields={configs.reverse_proxy_rate_limit_fields}></FormView>
             </div>
             <div className={'main-config__content-form' + ('messaging' !== activeTab ? ' hidden' : '')}>
                 <FormView data={messagingConfig} fields={configs.messaging_fields}></FormView>

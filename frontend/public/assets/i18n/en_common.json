@@ -85,7 +85,10 @@
     "XTREAM_CODES": "xtream codes",
     "XC": "xc",
     "M3U": "m3u",
-    "PLAYLIST_BROWSER": "Playlist Browser"
+    "PLAYLIST_BROWSER": "Playlist Browser",
+    "RATE_LIMIT": "Rate Limit",
+    "PERIOD_MILLIS": "Period Millis",
+    "BURST_SIZE": "Burst Size"
   },
   "TITLE": {
     "USER_BOUQUET_EDITOR": "User group editor"
