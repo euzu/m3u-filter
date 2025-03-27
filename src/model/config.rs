@@ -1167,7 +1167,6 @@ impl StreamBufferConfig {
     }
 }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StreamConfig {
@@ -1193,6 +1192,27 @@ impl StreamConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
+pub struct RateLimitConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    pub period_millis: u64,
+    pub burst_size: u32,
+}
+
+impl RateLimitConfig {
+    fn prepare(&self) -> Result<(), M3uFilterError> {
+        if self.period_millis == 0 {
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Rate limiter period can't be 0".to_string()));
+        }
+        if self.burst_size == 0 {
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Rate limiter bust can't be 0".to_string()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ReverseProxyConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stream: Option<StreamConfig>,
@@ -1200,10 +1220,13 @@ pub struct ReverseProxyConfig {
     pub cache: Option<CacheConfig>,
     #[serde(default)]
     pub resource_rewrite_disabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit:  Option<RateLimitConfig>,
+
 }
 
 impl ReverseProxyConfig {
-    fn prepare(&mut self, working_dir: &str) {
+    fn prepare(&mut self, working_dir: &str) -> Result<(), M3uFilterError> {
         if let Some(stream) = self.stream.as_mut() {
             stream.prepare();
         }
@@ -1214,6 +1237,13 @@ impl ReverseProxyConfig {
             }
             cache.prepare(working_dir);
         }
+
+        if let Some(rate_limit) = self.rate_limit.as_mut() {
+            if rate_limit.enabled {
+                rate_limit.prepare()?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -1507,7 +1537,6 @@ impl Config {
         Ok(seen_names)
     }
 
-
     fn check_scheduled_targets(&mut self, target_names: &HashSet<String>) -> Result<(), M3uFilterError> {
         if let Some(schedules) = &self.schedules {
             for schedule in schedules {
@@ -1529,7 +1558,7 @@ impl Config {
         self.prepare_custom_stream_response();
         self.prepare_directories();
         if let Some(reverse_proxy) = self.reverse_proxy.as_mut() {
-            reverse_proxy.prepare(&self.working_dir);
+            reverse_proxy.prepare(&self.working_dir)?;
         }
         self.prepare_hdhomerun()?;
         self.api.prepare();

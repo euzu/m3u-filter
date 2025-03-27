@@ -12,7 +12,7 @@ use crate::api::model::download::DownloadQueue;
 use crate::api::model::hls_cache::HlsCache;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
-use crate::model::config::{validate_targets, Config, ProcessTargets, ScheduleConfig};
+use crate::model::config::{validate_targets, Config, ProcessTargets, RateLimitConfig, ScheduleConfig};
 use crate::model::healthcheck::{Healthcheck, StatusCheck};
 use crate::processing::processor::playlist;
 use crate::tools::lru_cache::LRUResourceCache;
@@ -30,7 +30,9 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use axum::Router;
 use tokio::sync::Mutex;
+use tower_governor::key_extractor::SmartIpKeyExtractor;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
@@ -319,9 +321,35 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     if web_ui_enabled && web_ui_path.is_empty() {
         router = router.merge(index_register_without_path(&web_dir_path));
     }
+
+    let mut rate_limiting = false;
+    if let Some(rate_limiter) = app_state.config.reverse_proxy.as_ref().and_then(|r| r.rate_limit.clone()) {
+        rate_limiting = rate_limiter.enabled;
+        router = add_rate_limiter(router, rate_limiter);
+    }
     // router = router.layer(axum::middleware::from_fn(log_routes));
 
     let router: axum::Router<()> = router.with_state(shared_data.clone());
     let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
-    axum::serve(listener, router).into_future().await
+    if rate_limiting {
+        axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>()).into_future().await
+    } else {
+        axum::serve(listener, router).into_future().await
+    }
+}
+
+fn add_rate_limiter(router: Router<Arc<AppState>>, rate_limit_cfg: RateLimitConfig) -> Router<Arc<AppState>> {
+    if rate_limit_cfg.enabled {
+        let governor_conf = Arc::new(tower_governor::governor::GovernorConfigBuilder::default()
+            .key_extractor(SmartIpKeyExtractor)
+            .per_millisecond(rate_limit_cfg.period_millis)
+            .burst_size(rate_limit_cfg.burst_size)
+            .finish()
+            .unwrap());
+        router.layer(tower_governor::GovernorLayer {
+            config: governor_conf,
+        })
+    } else {
+        router
+    }
 }

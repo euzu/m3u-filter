@@ -9,7 +9,7 @@ use crate::model::playlist::PlaylistItemType;
 use crate::utils::debug_if_enabled;
 use crate::utils::network::request::{get_request_headers, sanitize_sensitive_info};
 use futures::TryStreamExt;
-use log::{debug, error};
+use log::{error, trace};
 use reqwest::StatusCode;
 use std::sync::Arc;
 use axum::http::HeaderMap;
@@ -26,7 +26,7 @@ pub enum CustomVideoStreamType {
 
 fn create_video_stream(video: Option<&Arc<Vec<u8>>>, headers: &[(String, String)], log_message: &str) -> ProviderStreamResponse {
     if let Some(video) = video {
-        debug!("{}", log_message);
+        trace!("{}", log_message);
         let mut response_headers: Vec<(String, String)> = headers.iter()
             .filter(|(key, _)| !(key.eq("content-type") || key.eq("content-length") || key.contains("range")))
             .map(|(key, value)| (key.to_string(), value.to_string())).collect();

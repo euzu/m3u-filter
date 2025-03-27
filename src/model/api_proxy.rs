@@ -5,7 +5,7 @@ use crate::repository::user_repository::{backup_api_user_db_file, get_api_user_d
 use crate::utils::file::config_reader;
 use chrono::Local;
 use enum_iterator::Sequence;
-use log::debug;
+use log::{debug, trace};
 use std::cmp::PartialEq;
 use std::collections::HashSet;
 use std::fmt::Display;
@@ -210,7 +210,7 @@ impl ProxyUserCredentials {
                         return UserConnectionPermission::GracePeriod;
                     }
                     if current_connections > max_connections {
-                        debug!("User access denied, too many connections: {}", self.username);
+                        trace!("User access denied, too many connections: {}", self.username);
                         return UserConnectionPermission::Exhausted;
                     }
                 }

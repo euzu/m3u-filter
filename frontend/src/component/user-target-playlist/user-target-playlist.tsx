@@ -88,7 +88,7 @@ export default function UserTargetPlaylist(props: UserTargetPlaylistProps) {
         const clusterSelections = (selections as any)[activeTab];
         // eslint-disable-next-line eqeqeq
         const selected =  clusterSelections?.[cat] === true;
-        return <div className={'user-target-playlist__categories__category'} key={cat} data-tooltip={cat}>
+        return <div className={'user-target-playlist__categories__category'} key={cat}>
             <Checkbox label={cat}
                       value={cat}
                       checked={selected}

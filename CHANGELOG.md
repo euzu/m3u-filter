@@ -1,4 +1,16 @@
 # Changelog
+# 2.2.6 (2025-03-xx)
+- Added rate limiting per IP. The burst_size defines the initial number of available connections, 
+ while period_millis specifies the interval at which one connection is replenished.
+The configuration below allows up to 10 connections initially and then replenishes 1 connection every 500 milliseconds.
+```yaml
+reverse_proxy:
+  rate_limit:
+    enabled: true
+    period_millis: 500
+    burst_size: 10
+```
+
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search
 - added `web_ui_path` to `config.yml`
