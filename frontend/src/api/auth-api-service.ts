@@ -20,7 +20,6 @@ export class DefaultAuthApiService extends DefaultApiService implements AuthApiS
         if (authUrl.endsWith("/")) {
             authUrl = authUrl.slice(0, -1);
         }
-        console.log('authUrl', authUrl);
         return authUrl;
     }
 
