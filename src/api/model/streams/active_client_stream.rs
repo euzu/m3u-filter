@@ -10,13 +10,13 @@ use bytes::Bytes;
 use futures::Stream;
 use log::info;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU8};
+use std::sync::atomic::AtomicU8;
 use std::sync::Arc;
 use std::task::Poll;
 
-const GRACE_PERIOD_SECONDS: u64 = 2;
-const PROVIDER_EXHAUSTED: u8 = 1;
-const USER_EXHAUSTED: u8 = 2;
+const GRACE_PERIOD_MILLIS: u64 = 500;
+const PROVIDER_EXHAUSTED_FLAG: u8 = 1;
+const USER_EXHAUSTED_FLAG: u8 = 2;
 
 #[repr(align(64))]
 pub(in crate::api) struct ActiveClientStream {
@@ -81,17 +81,16 @@ impl ActiveClientStream {
             None
         };
 
-
         if provider_grace_check.is_some() || user_grace_check.is_some() {
             let stop_flag = Arc::new(AtomicU8::new(0));
             let stop_stream_flag = Arc::clone(&stop_flag);
             tokio::spawn(async move {
-                tokio::time::sleep(tokio::time::Duration::from_secs(GRACE_PERIOD_SECONDS)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(GRACE_PERIOD_MILLIS)).await;
                 if let Some((username, user_manager, max_connections, reconnect_flag)) = user_grace_check {
                     let active_connections = user_manager.user_connections(&username).await;
                     if active_connections > max_connections {
                         info!("User connections exhausted for active clients: {username}");
-                        stop_stream_flag.store(USER_EXHAUSTED, std::sync::atomic::Ordering::SeqCst);
+                        stop_stream_flag.store(USER_EXHAUSTED_FLAG, std::sync::atomic::Ordering::SeqCst);
                         if let Some(connect_flag) = reconnect_flag {
                             info!("Stopped reconnect, user connections exhausted");
                             connect_flag.notify();
@@ -101,7 +100,7 @@ impl ActiveClientStream {
                 if let Some((provider_name, provider_manager, reconnect_flag)) = provider_grace_check {
                     if provider_manager.is_over_limit(&provider_name) {
                         info!("Provider connections exhausted for active clients: {provider_name}");
-                        stop_stream_flag.store(PROVIDER_EXHAUSTED, std::sync::atomic::Ordering::SeqCst);
+                        stop_stream_flag.store(PROVIDER_EXHAUSTED_FLAG, std::sync::atomic::Ordering::SeqCst);
                         if let Some(connect_flag) = reconnect_flag {
                             info!("Stopped reconnect, provider connections exhausted");
                             connect_flag.notify();
@@ -121,7 +120,7 @@ impl Stream for ActiveClientStream {
         if let Some(send_custom_stream_flag) = &self.send_custom_stream_flag {
             let send_custom_stream = send_custom_stream_flag.load(std::sync::atomic::Ordering::SeqCst);
             if send_custom_stream > 0 {
-                let custom_video = if send_custom_stream == PROVIDER_EXHAUSTED {
+                let custom_video = if send_custom_stream == PROVIDER_EXHAUSTED_FLAG {
                     self.custom_video.0.as_mut()
                 } else {
                     self.custom_video.1.as_mut()

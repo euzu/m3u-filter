@@ -3,7 +3,6 @@ use std::{
     pin::Pin,
     sync::Arc,
 };
-use log::trace;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use crate::api::model::stream::BoxedProviderStream;
@@ -46,7 +45,7 @@ impl BufferedStream {
                     }
                 }
                 Some(Err(err)) => {
-                    trace!("Buffered Stream Error: {err:?}");
+                    //trace!("Buffered Stream Error: {err:?}");
                     // tokio::time::sleep(sleep_duration).await;
                     // Attempt to send error to client
                     if tx.send(Err(err)).await.is_err() {

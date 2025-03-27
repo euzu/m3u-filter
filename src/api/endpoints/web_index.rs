@@ -7,10 +7,10 @@ use crate::auth::user::UserCredential;
 use axum::response::IntoResponse;
 use log::error;
 use regex::Regex;
+use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
-use serde_json::json;
 use tower::Service;
 
 fn no_web_auth_token() -> impl axum::response::IntoResponse + Send {
@@ -122,18 +122,26 @@ async fn index_config(
     if let Some(web_ui_path) = app_state.config.web_ui_path.as_ref() {
         match tokio::fs::read_to_string(&path).await {
             Ok(content) => {
-                if let Ok(mut json_data) = serde_json::from_str::<serde_json::Value>(&content){
-                    if let Some(server_url) = json_data.get_mut("serverUrl") {
-                        if let Some(url) = server_url.as_str() {
-                            let new_url = format!("{web_ui_path}{url}");
-                            *server_url = json!(new_url);
+                if let Ok(mut json_data) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(api) = json_data.get_mut("api") {
+                        if let Some(api_url) = api.get_mut("apiUrl") {
+                            if let Some(url) = api_url.as_str() {
+                                let new_url = format!("/{web_ui_path}{url}");
+                                *api_url = json!(new_url);
+                            }
+                        }
+                        if let Some(auth_url) = api.get_mut("authUrl") {
+                            if let Some(url) = auth_url.as_str() {
+                                let new_url = format!("/{web_ui_path}{url}");
+                                *auth_url = json!(new_url);
+                            }
                         }
                     }
                     if let Ok(json_content) = serde_json::to_string(&json_data) {
                         return axum::response::Response::builder()
                             .header("Content-Type", mime::APPLICATION_JSON.as_ref())
                             .body(axum::body::Body::from(json_content))
-                            .unwrap()
+                            .unwrap();
                     }
                 }
             }
@@ -154,43 +162,43 @@ pub fn index_register_without_path(web_dir_path: &Path) -> axum::Router<Arc<AppS
             .route("/", axum::routing::get(index))
             .fallback(axum::routing::get_service(tower_http::services::ServeDir::new(web_dir_path))))
 }
+
 pub fn index_register_with_path(web_dir_path: &Path, web_ui_path: &str) -> axum::Router<Arc<AppState>> {
     axum::Router::new()
         .nest(&format!("{web_ui_path}/auth"), axum::Router::new()
             .route("/token", axum::routing::post(token))
             .route("/refresh", axum::routing::post(token_refresh)))
         .merge(axum::Router::new()
-            .nest(&format!("{web_ui_path}/"), axum::Router::new()
-                .route("/config.json", axum::routing::get(index_config))
-                .route("/", axum::routing::get(index))
-                .fallback({
-                    let mut serve_dir = tower_http::services::ServeDir::new(web_dir_path);
-                    let path_prefix = web_ui_path.to_string();
-                    move |req: axum::http::Request<_>| {
-                        let mut path = req.uri().path().to_string();
+            .route(&format!("{web_ui_path}/"), axum::routing::get(index))
+            .route(&format!("{web_ui_path}/config.json"), axum::routing::get(index_config))
+            .fallback({
+                let mut serve_dir = tower_http::services::ServeDir::new(web_dir_path);
+                let path_prefix = web_ui_path.to_string();
+                move |req: axum::http::Request<_>| {
+                    let mut path = req.uri().path().to_string();
 
-                        if path.starts_with(&path_prefix) {
-                            path = path[path_prefix.len()..].to_string();
-                        }
-
-                        let mut builder = axum::http::Uri::builder();
-                        if let Some(scheme) = req.uri().scheme() {
-                            builder = builder.scheme(scheme.clone());
-                        }
-                        if let Some(authority) = req.uri().authority() {
-                            builder = builder.authority(authority.clone());
-                        }
-                        let new_uri = builder.path_and_query(path)
-                            .build()
-                            .unwrap();
-
-                        let new_req = axum::http::Request::builder()
-                            .method(req.method())
-                            .uri(new_uri)
-                            .body(req.into_body())
-                            .unwrap();
-
-                        serve_dir.call(new_req)
+                    if path.starts_with(&path_prefix) {
+                        path = path[path_prefix.len()..].to_string();
                     }
-                })))
+
+                    let mut builder = axum::http::Uri::builder();
+                    if let Some(scheme) = req.uri().scheme() {
+                        builder = builder.scheme(scheme.clone());
+                    }
+                    if let Some(authority) = req.uri().authority() {
+                        builder = builder.authority(authority.clone());
+                    }
+                    let new_uri = builder.path_and_query(path)
+                        .build()
+                        .unwrap();
+
+                    let new_req = axum::http::Request::builder()
+                        .method(req.method())
+                        .uri(new_uri)
+                        .body(req.into_body())
+                        .unwrap();
+
+                    serve_dir.call(new_req)
+                }
+            }))
 }

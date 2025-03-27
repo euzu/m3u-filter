@@ -13,9 +13,9 @@ export default function Login(): JSX.Element {
     const services = useServices();
     const appTitle = useMemo(() => services.config().getUiConfig().app_title ?? 'm3u-filter', [services]);
     const appLogo = useMemo(() => {
-        let logo =  services.config().getUiConfig().app_logo;
+        let logo = services.config().getUiConfig().app_logo;
         if (logo) {
-            return <img src={logo} alt="logo" />;
+            return <img src={logo} alt="logo"/>;
         } else {
             return getIconByName('Logo');
         }
@@ -40,17 +40,20 @@ export default function Login(): JSX.Element {
     }, [handleLogin]);
 
 
-    return <div className={'login-view'}>
+    return <>
         <div className={'login-view__logo'}>{appLogo}</div>
-        <div className={'login-view__title'}>Login to {appTitle}</div>
-        <form>
-            <div className="login-view__form">
-                <input ref={usernameRef} type="text" name="username" placeholder="username"/>
-                <input ref={passwordRef} type="password" name="password" placeholder="password" onKeyDown={handleKeyDown}/>
-                <button type="button" onClick={handleLogin}>Login</button>
-                <span className={authorized ? 'hidden' : 'error-text'}>Failed to login</span>
-            </div>
-        </form>
-    </div>
+        <div className={'login-view'}>
+            <div className={'login-view__title'}>Login to {appTitle}</div>
+            <form>
+                <div className="login-view__form">
+                    <input ref={usernameRef} type="text" name="username" placeholder="username" autoFocus={true}/>
+                    <input ref={passwordRef} type="password" name="password" placeholder="password"
+                           onKeyDown={handleKeyDown}/>
+                    <button type="button" onClick={handleLogin}>Login</button>
+                    <span className={authorized ? 'hidden' : 'error-text'}>Failed to login</span>
+                </div>
+            </form>
+        </div>
+    </>
 
 }

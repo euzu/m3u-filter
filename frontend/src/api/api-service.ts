@@ -1,6 +1,5 @@
 import {Observable} from "rxjs";
 import axios from "axios";
-import config from "../config";
 import ServiceContext from "../service/service-context";
 
 const HEADER_CONTENT_TYPE = 'Content-Type';
@@ -27,11 +26,6 @@ export class DefaultApiService implements ApiService {
 
     private static getLanguage(): string {
         return "en";
-    }
-
-    protected getBaseUrl(): string {
-        const apiBaseUrl = ServiceContext.config().getUiConfig().api.serverUrl;
-        return apiBaseUrl.substring(0, apiBaseUrl.indexOf('/api/'));
     }
 
     private prepareError(err: any): any {
@@ -66,7 +60,7 @@ export class DefaultApiService implements ApiService {
     }
 
     protected getUrl(query: string, url?: string) {
-        const apiBaseUrl = ServiceContext.config().getUiConfig().api.serverUrl;
+        const apiBaseUrl = ServiceContext.config().getUiConfig().api.apiUrl;
         return (url ? url : apiBaseUrl) + query;
     }
 

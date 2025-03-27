@@ -2,7 +2,7 @@ use crate::api::endpoints::hdhomerun_api::hdhr_api_register;
 use crate::api::endpoints::hls_api::hls_api_register;
 use crate::api::endpoints::m3u_api::m3u_api_register;
 use crate::api::endpoints::v1_api::v1_api_register;
-use crate::api::endpoints::web_index::{index_register_without_path, index_register_with_path};
+use crate::api::endpoints::web_index::{index_register_with_path, index_register_without_path};
 use crate::api::endpoints::xmltv_api::xmltv_api_register;
 use crate::api::endpoints::xtream_api::xtream_api_register;
 use crate::api::model::active_provider_manager::ActiveProviderManager;
@@ -26,10 +26,10 @@ use reqwest::Client;
 use std::collections::BTreeMap;
 use std::future::IntoFuture;
 use std::io::ErrorKind;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use std::net::SocketAddr;
 use tokio::sync::Mutex;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -259,6 +259,11 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
     }
 }
 
+// async fn log_routes(request: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
+//     println!("Route : {}", request.uri().path());
+//     next.run(request).await
+// }
+
 pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> futures::io::Result<()> {
     let mut infos = Vec::new();
     let host = cfg.api.host.to_string();
@@ -289,12 +294,13 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         info!("{info}");
     }
 
+
     // Web Server
     let mut router = axum::Router::new()
         .layer(create_cors_layer())
         .layer(create_compression_layer())        // .layer(TraceLayer::new_for_http()) // `Logger::default()`
         .route("/healthcheck", axum::routing::get(healthcheck))
-        .route("/status", axum::routing::get(status));
+        .route(&format!("{web_ui_path}/status"), axum::routing::get(status));
     if web_ui_enabled {
         router = router
             .nest_service(&format!("{web_ui_path}/static"), tower_http::services::ServeDir::new(web_dir_path.join("static")))
@@ -310,9 +316,10 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         .merge(xmltv_api_register())
         .merge(hls_api_register());
 
-    if web_ui_enabled && web_ui_path.is_empty(){
+    if web_ui_enabled && web_ui_path.is_empty() {
         router = router.merge(index_register_without_path(&web_dir_path));
     }
+    // router = router.layer(axum::middleware::from_fn(log_routes));
 
     let router: axum::Router<()> = router.with_state(shared_data.clone());
     let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
