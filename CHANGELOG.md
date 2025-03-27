@@ -7,7 +7,7 @@
   a grace period can be given during the switchover.
   If this period is set too short, it may result in access being denied in some cases.
   The default is 1000 milliseconds (1sec).
-- added bandwidth throttle `_` attribute for `reverse_proxy.stream` in  `config.yml`
+- added bandwidth `throttle_kbps` attribute for `reverse_proxy.stream` in  `config.yml`
 
 | Resolution      |Framerate| Bitrate (kbps) | Quality     |
 |-----------------|---------|----------------|-------------|
