@@ -2,6 +2,7 @@
 # 2.2.6 (2025-03-xx)
 - Added rate limiting per IP. The burst_size defines the initial number of available connections, 
  while period_millis specifies the interval at which one connection is replenished.
+If behind a proxy `x-forwarded-for`, `x-real-ip` or `forwarded` should be set as header. 
 The configuration below allows up to 10 connections initially and then replenishes 1 connection every 500 milliseconds.
 ```yaml
 reverse_proxy:
