@@ -14,7 +14,6 @@ use std::sync::atomic::AtomicU8;
 use std::sync::Arc;
 use std::task::Poll;
 
-const GRACE_PERIOD_MILLIS: u64 = 500;
 const PROVIDER_EXHAUSTED_FLAG: u8 = 1;
 const USER_EXHAUSTED_FLAG: u8 = 2;
 
@@ -84,8 +83,9 @@ impl ActiveClientStream {
         if provider_grace_check.is_some() || user_grace_check.is_some() {
             let stop_flag = Arc::new(AtomicU8::new(0));
             let stop_stream_flag = Arc::clone(&stop_flag);
+            let grace_period_millis = stream_details.grace_period_millis;
             tokio::spawn(async move {
-                tokio::time::sleep(tokio::time::Duration::from_millis(GRACE_PERIOD_MILLIS)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(grace_period_millis)).await;
                 if let Some((username, user_manager, max_connections, reconnect_flag)) = user_grace_check {
                     let active_connections = user_manager.user_connections(&username).await;
                     if active_connections > max_connections {

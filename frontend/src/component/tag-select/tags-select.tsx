@@ -52,7 +52,7 @@ export default function TagSelect(props: TagSelectProps) {
             };
             const result = getSelections();
             const newSelections = Object.keys(result).map((key: any) => result[key] ? options[key].value : undefined).filter(Boolean);
-            onSelect(name, multi ? selections : (newSelections.length ? newSelections[0] : undefined));
+            onSelect(name, multi ? newSelections : (newSelections.length ? newSelections[0] : undefined));
             return result;
         });
     }, [multi, radio, onSelect, name, options]);

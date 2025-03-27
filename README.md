@@ -188,7 +188,7 @@ schedules:
 - schedule: "0  0  20  *  *  *  *"
 ```
 
-At the given times the complete processing is started. Do not start it every second or minute.
+At the given times the update is started. Do not start it every second or minute.
 You could be banned from your server. Twice a day should be enough.
 
 ### 1.6 `reverse_proxy`
@@ -199,7 +199,8 @@ This configuration is only used for reverse proxy mode. The Reverse Proxy mode c
 Attributes:
 - `retry`
 - `buffer`
-- `throttle_kbps` Kilobit per second  
+- `throttle_kbps` Kilobit per second
+- `grace_period_millis` 
 
 ##### 1.6.1.1 `retry`
 If set to `true` on connection loss to provider, the stream will be reconnected.
@@ -228,6 +229,12 @@ Bandwidth throttle (speed limit).
 |1080p (1920x1080)|  30 fps | 5.737–12.288   | Full-HD     |
 |4K (3840x2160)   |  30 fps | 20.480–49.152  | Ultra-HD    |
 
+##### 1.6.1.3 `grace_period_millis`
+If you have a provider or a user where the max_connection attribute is greater than 0, 
+a grace period can be given during the switchover. 
+If this period is set too short, it may result in access being denied in some cases. 
+The default is 1000 milliseconds (1sec).
+If the connection is not throttled, the player will play its buffered content longer than expected.
 
 #### 1.6.2 `cache`
 LRU-Cache is for resources. If it is `enabled`, the resources/images are persisted in the given `dir`. If the cache size exceeds `size`,
@@ -242,7 +249,7 @@ If you set it `true` `cache` is disabled! Because the cache cant work without re
 reverse_proxy:
   resource_rewrite_disabled: false
   stream:
-    throttle_kibps: 2000
+    throttle_kbps: 12500
     retry: true
     buffer:
       enabled: true

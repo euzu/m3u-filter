@@ -30,6 +30,7 @@
     "RESOURCE_REWRITE_DISABLE": "Resource Rewrite disable",
     "RECONNECT": "Reconnect",
     "THROTTLE_KBPS": "Throttle kbps",
+    "GRACE_PERIOD": "Grace period ms",
     "BUFFER_ENABLED": "Buffer Enabled",
     "BUFFER_SIZE": "Buffer Size",
     "ENABLED": "Enabled",

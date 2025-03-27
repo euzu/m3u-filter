@@ -74,6 +74,7 @@ pub use try_result_bad_request;
 use crate::api::model::stream::{BoxedProviderStream, ProviderStreamInfo, ProviderStreamResponse};
 use crate::api::model::streams::throttled_stream::ThrottledStream;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
+use crate::utils::default_utils::default_grace_period_millis;
 
 pub async fn serve_file(file_path: &Path, mime_type: mime::Mime) -> impl axum::response::IntoResponse + Send {
     if file_path.exists() {
@@ -182,6 +183,7 @@ pub struct StreamDetails {
     stream_info: ProviderStreamInfo,
     pub input_name: Option<String>,
     pub grace_period: bool,
+    pub grace_period_millis: u64,
     pub reconnect_flag: Option<Arc<AtomicOnceFlag>>,
 }
 
@@ -193,6 +195,7 @@ impl StreamDetails {
             stream_info: None,
             input_name: None,
             grace_period: false,
+            grace_period_millis: default_grace_period_millis(),
             reconnect_flag: None,
         }
     }
@@ -240,6 +243,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                                         item_type: PlaylistItemType, share_stream: bool) -> StreamDetails {
     let (stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt);
     let grace_period = matches!(stream_response_params, StreamingOption::GracePeriodStream(_, _));
+    let grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map(|s| s.grace_period_millis).unwrap_or_else(default_grace_period_millis);
     match stream_response_params {
         StreamingOption::CustomStream(provider_stream) => {
             let (stream, stream_info) = provider_stream;
@@ -248,6 +252,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 stream_info,
                 input_name: None,
                 grace_period,
+                grace_period_millis,
                 reconnect_flag: None,
             }
         }
@@ -290,6 +295,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 stream_info,
                 input_name: provider_name,
                 grace_period,
+                grace_period_millis,
                 reconnect_flag,
             }
         }

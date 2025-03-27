@@ -2,7 +2,12 @@
 # 2.2.5 (2025-03-xx)
 - fixed web ui playlist regexp search
 - added `web_ui_path` to `config.yml`
-- added bandwidth throttle `throttle_kbps` attribute for `reverse_proxy.stream` in  `config.yml`
+- added grace period `grace_period_millis`  attribute for `reverse_proxy.stream` in  `config.yml`
+  If you have a provider or a user where the max_connection attribute is greater than 0,
+  a grace period can be given during the switchover.
+  If this period is set too short, it may result in access being denied in some cases.
+  The default is 1000 milliseconds (1sec).
+- added bandwidth throttle `_` attribute for `reverse_proxy.stream` in  `config.yml`
 
 | Resolution      |Framerate| Bitrate (kbps) | Quality     |
 |-----------------|---------|----------------|-------------|

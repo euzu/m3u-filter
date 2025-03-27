@@ -1,10 +1,14 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
 
-.main-config__form, .reverse-proxy__form {
+@media (min-width: common.$media-size-mobile) {
+  .main-config__form, .reverse-proxy__form {
     .form-view__col-label {
-      width: 12em;
+      min-width: 200px !important;
+      max-width: 200px !important;
+      width: 200px !important;
     }
+  }
 }
 
 .main-config {

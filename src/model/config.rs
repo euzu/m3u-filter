@@ -22,7 +22,7 @@ use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16};
+use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16, default_grace_period_millis};
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
@@ -1175,7 +1175,10 @@ pub struct StreamConfig {
     pub retry: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub buffer: Option<StreamBufferConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub throttle_kbps: Option<u32>,
+    #[serde(default = "default_grace_period_millis")]
+    pub grace_period_millis: u64,
     #[serde(default)]
     pub forced_retry_interval_secs: u32,
 }

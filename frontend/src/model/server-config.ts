@@ -194,6 +194,7 @@ export interface StreamConfig {
     retry: boolean,
     buffer?: StreamBufferConfig,
     throttle_kpbs?: number,
+    grace_period_millis?: number,
 }
 
 export interface CacheConfig {
