@@ -1,6 +1,6 @@
 [package]
 name = "m3u-filter"
-version = "2.2.4"
+version = "2.2.5"
 edition = "2021"
 
 [profile.release]

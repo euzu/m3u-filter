@@ -1,5 +1,5 @@
 # Changelog
-# 2.2.5 (2025-03-xx)
+# 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search
 - added `web_ui_path` to `config.yml`
 - added grace period `grace_period_millis`  attribute for `reverse_proxy.stream` in  `config.yml`
