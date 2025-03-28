@@ -60,12 +60,20 @@ where
         match reader.read_event_into(&mut buf) {
             Ok(Event::Eof) => break,
             Ok(Event::Start(e)) => {
-                let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                let is_tv_tag = name == EPG_TAG_TV;
+                let name = String::from_utf8_lossy(e.name().as_ref()).as_ref().to_owned();
+                let (is_tv_tag, is_channel, is_program)  = match name.as_str() {
+                    EPG_TAG_TV => (true, false, false),
+                    EPG_TAG_CHANNEL => (false, true, false),
+                    EPG_TAG_PROGRAMME => (false, false, true),
+                    _ => (false, false, false)
+                };
                 let attributes = e.attributes().filter_map(Result::ok)
                     .filter_map(|a| {
                         let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
-                        let value = String::from(a.unescape_value().unwrap().as_ref());
+                        let mut value = String::from(a.unescape_value().unwrap().as_ref());
+                        if (is_channel &&  key == EPG_ATTRIB_ID) || (is_program &&  key == EPG_ATTRIB_CHANNEL) {
+                            value = value.to_lowercase().to_string();
+                        }
                         if value.is_empty() {
                             None
                         } else {

@@ -128,7 +128,8 @@ fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, u
             }
         }
         // plih.virtual_id = plih.id;
-        plih.epg_channel_id = Some(plih.id.to_string());
+        plih.epg_channel_id = Some(plih.id.to_lowercase().to_string());
+
     }
 
     if video_suffixes.iter().any(|suffix| url.ends_with(suffix)) {

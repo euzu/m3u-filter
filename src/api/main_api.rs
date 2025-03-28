@@ -312,21 +312,24 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
             router = router.merge(index_register_with_path(&web_dir_path, web_ui_path.as_str()));
         }
     }
-    router = router
+
+    let mut api_router = axum::Router::new()
         .merge(xtream_api_register())
         .merge(m3u_api_register())
         .merge(xmltv_api_register())
         .merge(hls_api_register());
+    let mut rate_limiting = false;
+    if let Some(rate_limiter) = app_state.config.reverse_proxy.as_ref().and_then(|r| r.rate_limit.clone()) {
+        rate_limiting = rate_limiter.enabled;
+        api_router = add_rate_limiter(api_router, rate_limiter);
+    }
+
+    router = router.merge(api_router);
 
     if web_ui_enabled && web_ui_path.is_empty() {
         router = router.merge(index_register_without_path(&web_dir_path));
     }
 
-    let mut rate_limiting = false;
-    if let Some(rate_limiter) = app_state.config.reverse_proxy.as_ref().and_then(|r| r.rate_limit.clone()) {
-        rate_limiting = rate_limiter.enabled;
-        router = add_rate_limiter(router, rate_limiter);
-    }
     // router = router.layer(axum::middleware::from_fn(log_routes));
 
     let router: axum::Router<()> = router.with_state(shared_data.clone());

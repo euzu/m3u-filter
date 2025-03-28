@@ -516,6 +516,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                             return redirect(&info_url).into_response();
                         }
 
+                        // TODO serve epg from own db
                         return match request::download_text_content(Arc::clone(&app_state.http_client), input, info_url.as_str(), None).await {
                             Ok(content) => (axum::http::StatusCode::OK, axum::Json(content)).into_response(),
                             Err(err) => {
