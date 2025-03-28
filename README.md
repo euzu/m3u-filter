@@ -233,7 +233,7 @@ Bandwidth throttle (speed limit).
 If you have a provider or a user where the max_connection attribute is greater than 0, 
 a grace period can be given during the switchover. 
 If this period is set too short, it may result in access being denied in some cases. 
-The default is 1000 milliseconds (1sec).
+The default is 0 milliseconds.
 If the connection is not throttled, the player will play its buffered content longer than expected.
 
 #### 1.6.2 `cache`

@@ -296,7 +296,6 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         info!("{info}");
     }
 
-
     // Web Server
     let mut router = axum::Router::new()
         .layer(create_cors_layer())

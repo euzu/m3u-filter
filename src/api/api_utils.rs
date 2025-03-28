@@ -1,3 +1,4 @@
+use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConfig};
 use crate::api::model::app_state::AppState;
 use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::request::UserApiRequest;
@@ -5,8 +6,10 @@ use crate::api::model::stream_error::StreamError;
 use crate::api::model::streams::active_client_stream::ActiveClientStream;
 use crate::api::model::streams::persist_pipe_stream::PersistPipeStream;
 use crate::api::model::streams::provider_stream;
+use crate::api::model::streams::provider_stream::create_provider_connections_exhausted_stream;
 use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
+use crate::auth::authenticator::Claims;
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTarget};
 use crate::model::playlist::PlaylistItemType;
@@ -27,9 +30,6 @@ use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use url::Url;
-use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConfig};
-use crate::api::model::streams::provider_stream::{create_provider_connections_exhausted_stream};
-use crate::auth::authenticator::Claims;
 
 #[macro_export]
 macro_rules! try_option_bad_request {
@@ -182,25 +182,28 @@ pub struct StreamDetails {
     pub stream: Option<BoxedProviderStream>,
     stream_info: ProviderStreamInfo,
     pub input_name: Option<String>,
-    pub grace_period: bool,
     pub grace_period_millis: u64,
     pub reconnect_flag: Option<Arc<AtomicOnceFlag>>,
 }
 
 impl StreamDetails {
-
     pub fn from_stream(stream: BoxedProviderStream) -> Self {
         Self {
             stream: Some(stream),
             stream_info: None,
             input_name: None,
-            grace_period: false,
             grace_period_millis: default_grace_period_millis(),
             reconnect_flag: None,
         }
     }
+    #[inline]
     pub fn has_stream(&self) -> bool {
         self.stream.is_some()
+    }
+
+    #[inline]
+    pub fn has_grace_period(&self) -> bool {
+        self.grace_period_millis > 0
     }
 }
 
@@ -210,7 +213,6 @@ impl StreamDetails {
 fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Option<&ConfigInput>)
                          -> (StreamingOption, Option<HashMap<String, String>>) {
     if let Some(input) = input_opt {
-
         let allocation = app_state.active_provider.acquire_connection(&input.name);
         let stream_response_params = match allocation {
             ProviderAllocation::Exhausted => {
@@ -242,8 +244,8 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                                         req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
                                         item_type: PlaylistItemType, share_stream: bool) -> StreamDetails {
     let (stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt);
-    let grace_period = matches!(stream_response_params, StreamingOption::GracePeriodStream(_, _));
-    let grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map(|s| s.grace_period_millis).unwrap_or_else(default_grace_period_millis);
+    let config_grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map(|s| s.grace_period_millis).unwrap_or_else(default_grace_period_millis);
+    let grace_period_millis = if config_grace_period_millis > 0 && matches!(stream_response_params, StreamingOption::GracePeriodStream(_, _)) { config_grace_period_millis } else { 0 };
     match stream_response_params {
         StreamingOption::CustomStream(provider_stream) => {
             let (stream, stream_info) = provider_stream;
@@ -251,7 +253,6 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 stream,
                 stream_info,
                 input_name: None,
-                grace_period,
                 grace_period_millis,
                 reconnect_flag: None,
             }
@@ -294,7 +295,6 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 stream,
                 stream_info,
                 input_name: provider_name,
-                grace_period,
                 grace_period_millis,
                 reconnect_flag,
             }
@@ -352,7 +352,7 @@ pub async fn stream_response(app_state: &AppState,
             let throttle_kbps = get_stream_throttle(app_state);
 
             let body_stream = if throttle_kbps > 0 && matches!(item_type, PlaylistItemType::Video | PlaylistItemType::Series  | PlaylistItemType::SeriesInfo) {
-               axum::body::Body::from_stream(ThrottledStream::new(stream.boxed(), throttle_kbps as usize))
+                axum::body::Body::from_stream(ThrottledStream::new(stream.boxed(), throttle_kbps as usize))
             } else {
                 axum::body::Body::from_stream(stream)
             };

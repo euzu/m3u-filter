@@ -5,7 +5,7 @@ use crate::repository::user_repository::{backup_api_user_db_file, get_api_user_d
 use crate::utils::file::config_reader;
 use chrono::Local;
 use enum_iterator::Sequence;
-use log::{debug, trace};
+use log::{debug};
 use std::cmp::PartialEq;
 use std::collections::HashSet;
 use std::fmt::Display;
@@ -204,14 +204,7 @@ impl ProxyUserCredentials {
             // we allow requests with max connection reached, but we should block streaming after grace period
             if let Some(&max_connections) = self.max_connections.as_ref() {
                 if max_connections > 0 {
-                    let current_connections = app_state.get_active_connections_for_user(&self.username).await;
-                    if current_connections == max_connections + 1 {
-                        return UserConnectionPermission::GracePeriod;
-                    }
-                    if current_connections > max_connections {
-                        trace!("User access denied, too many connections: {}", self.username);
-                        return UserConnectionPermission::Exhausted;
-                    }
+                    return app_state.get_connection_permission(&self.username, max_connections).await;
                 }
             }
         }

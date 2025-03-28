@@ -62,7 +62,7 @@ impl ActiveClientStream {
     }
     fn stream_grace_period(stream_details: &StreamDetails, active_provider: &Arc<ActiveProviderManager>,
                            user_grace_period: bool, user: &ProxyUserCredentials, active_user: &Arc<ActiveUserManager>) -> Option<Arc<AtomicU8>> {
-        let provider_grace_check = if stream_details.grace_period && stream_details.input_name.is_some() {
+        let provider_grace_check = if stream_details.has_grace_period() && stream_details.input_name.is_some() {
             let provider_name = stream_details.input_name.as_deref().unwrap_or_default().to_string();
             let provider_manager = Arc::clone(active_provider);
             let reconnect_flag = stream_details.reconnect_flag.clone();
@@ -153,14 +153,17 @@ impl Drop for ActiveClientStream {
         let log_active_clients = self.log_active_clients;
         let active_user = Arc::clone(&self.active_user);
         let active_provider = Arc::clone(&self.active_provider);
-        tokio::spawn(async move {
-            let (client_count, connection_count) = active_user.remove_connection(&username).await;
-            if log_active_clients {
-                info!("Active clients: {client_count}, active connections {connection_count}");
-            }
-            if let Some(input) = input_name {
-                active_provider.release_connection(&input);
-            }
+        tokio::task::block_in_place(move || {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let (client_count, connection_count) = active_user.remove_connection(&username).await;
+                if log_active_clients {
+                    info!("Active clients: {client_count}, active connections {connection_count}");
+                }
+                if let Some(input) = input_name {
+                    active_provider.release_connection(&input);
+                }
+            });
         });
     }
 }

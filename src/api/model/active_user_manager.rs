@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
+use log::{trace};
 use tokio::sync::RwLock;
+use crate::model::api_proxy::UserConnectionPermission;
 
 pub struct ActiveUserManager {
     pub user: RwLock<HashMap<String, AtomicU32>>,
@@ -26,6 +28,21 @@ impl ActiveUserManager {
         0
     }
 
+    pub async fn connection_permission(&self, username: &str, max_connections: u32, grace_period: bool) -> UserConnectionPermission {
+        if let Some(counter) = self.user.read().await.get(username) {
+            let current_connections = counter.load(Ordering::SeqCst);
+            let extra_con = if grace_period { 1 } else { 0 };
+            if current_connections < max_connections + extra_con {
+                return UserConnectionPermission::GracePeriod;
+            }
+            if current_connections >= max_connections {
+                trace!("User access denied, too many connections: {username}");
+                return UserConnectionPermission::Exhausted;
+            }
+        }
+        UserConnectionPermission::Allowed
+    }
+
     pub async fn active_users(&self) -> usize {
         self.user.read().await.len()
     }
@@ -48,7 +65,8 @@ impl ActiveUserManager {
     pub async fn remove_connection(&self, username: &str) -> (usize, usize) {
         let mut lock = self.user.write().await;
         if let Some(counter) = lock.get(username) {
-            if counter.fetch_sub(1, Ordering::SeqCst) == 1 {
+            let new_count = counter.fetch_sub(1, Ordering::SeqCst) - 1;
+            if new_count == 0 {
                 lock.remove(username);
             }
         }
