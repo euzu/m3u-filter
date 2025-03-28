@@ -29,7 +29,7 @@
     "ACTIVE_CLIENTS": "Active Clients",
     "RESOURCE_REWRITE_DISABLE": "Resource Rewrite disable",
     "RECONNECT": "Reconnect",
-    "THROTTLE_KBPS": "Throttle kbps",
+    "THROTTLE": "Throttle",
     "GRACE_PERIOD": "Grace period ms",
     "BUFFER_ENABLED": "Buffer Enabled",
     "BUFFER_SIZE": "Buffer Size",
@@ -150,7 +150,8 @@
         "ACTIVE_CLIENTS": "Activates active clients info log"
       },
       "PROXY": {
-       "RESOURCE_REWRITE_DISABLE": "If activated the URL rewrite of resources in reverse proxy mode is disabled"
+       "RESOURCE_REWRITE_DISABLE": "If activated the URL rewrite of resources in reverse proxy mode is disabled",
+       "THROTTLE": "Supported units are KB/s,MB/s,KiB/s,MiB/s,kbps,mbps,Mibps"
       }
     }
   }

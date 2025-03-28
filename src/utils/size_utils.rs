@@ -64,3 +64,47 @@ pub fn human_readable_byte_size(bytes: u64) -> String {
 
     format!("{size:.2} {unit}")
 }
+
+pub fn parse_to_kbps(input: &str) ->  Result<u64, String> {
+    // Define unit conversion factors (in bits per second)
+    let units: &[(&str, u64)] = &[
+        ("KB/s", 8),            // Kilobytes per second to kbps
+        ("MB/s", 8000),         // Megabytes per second to kbps
+        ("KiB/s", 8 * 1024 / 1000), // Kibibytes per second to kbps
+        ("MiB/s", 8 * 1024),    // Mebibytes per second to kbps
+        ("kbps", 1),            // Kilobits per second (already in kbps)
+        ("Kbps", 1),            // Kilobits per second (already in kbps)
+        ("mbps", 1000),         // Megabits per second to kbps
+        ("Mbps", 1000),         // Megabits per second to kbps
+        ("Mibps", 1024),        // Mebibits per second to kbps
+    ];
+
+    let speed_str = input.trim();
+    for (unit, multiplier) in units {
+        if speed_str.ends_with(unit) {
+            let number_part = speed_str[..speed_str.len() - unit.len()].trim();
+            let value = u64::from_str(number_part).map_err(|_| format!("Invalid speed: {number_part}"))?;
+            return value.checked_mul(*multiplier).ok_or_else(|| format!("Speed too large: {speed_str}"));
+        }
+    }
+
+    u64::from_str(&speed_str).map_err(|_| format!("Invalid speed: {speed_str}, supported units are {}", units.iter().map(|p| p.0).collect::<Vec<_>>().join(",")))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::utils::size_utils::parse_to_kbps;
+
+    #[test]
+    fn test_parse_kpbs() {
+        assert_eq!(parse_to_kbps("1KB/s").unwrap(), 8);
+        assert_eq!(parse_to_kbps("1MB/s").unwrap(), 8000);
+        assert_eq!(parse_to_kbps("1KiB/s").unwrap(), 8 * 1024 / 1000);
+        assert_eq!(parse_to_kbps("1MiB/s").unwrap(), 8 * 1024);
+        assert_eq!(parse_to_kbps("1kbps").unwrap(), 1);
+        assert_eq!(parse_to_kbps("1mbps").unwrap(), 1000);
+        assert_eq!(parse_to_kbps("1Kbps").unwrap(), 1);
+        assert_eq!(parse_to_kbps("1Mbps").unwrap(), 1000);
+        assert_eq!(parse_to_kbps("1Mibps").unwrap(), 1024);
+    }
+}

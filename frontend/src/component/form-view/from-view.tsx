@@ -68,7 +68,11 @@ export default function FormView(props: FormViewProps) {
         for (const fieldDef of fields) {
             if (fieldDef.name === field) {
                 if (fieldDef.fieldType === FormFieldType.NUMBER) {
-                    value = parseInt(value);
+                    if (value.trim().isEmpty()) {
+                        value = undefined;
+                    } else {
+                        value = parseInt(value);
+                    }
                 }
             }
         }

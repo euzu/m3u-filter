@@ -201,7 +201,6 @@ impl ProxyUserCredentials {
 
     pub async fn connection_permission(&self, app_state: &AppState) -> UserConnectionPermission {
         if app_state.config.user_access_control {
-
             // we allow requests with max connection reached, but we should block streaming after grace period
             if let Some(&max_connections) = self.max_connections.as_ref() {
                 if max_connections > 0 {

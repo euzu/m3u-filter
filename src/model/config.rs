@@ -26,7 +26,7 @@ use crate::utils::default_utils::{default_as_default, default_as_true, default_a
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
-use crate::utils::size_utils::parse_size_base_2;
+use crate::utils::size_utils::{parse_size_base_2, parse_to_kbps};
 use crate::utils::sys_utils::exit;
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15";
@@ -1175,18 +1175,24 @@ pub struct StreamConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub buffer: Option<StreamBufferConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub throttle_kbps: Option<u32>,
+    pub throttle: Option<String>,
     #[serde(default = "default_grace_period_millis")]
     pub grace_period_millis: u64,
     #[serde(default)]
     pub forced_retry_interval_secs: u32,
+    #[serde(default, skip)]
+    pub throttle_kbps: u64,
 }
 
 impl StreamConfig {
-    fn prepare(&mut self) {
+    fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if let Some(buffer) = self.buffer.as_mut() {
             buffer.prepare();
         }
+        if let Some (throttle) = &self.throttle {
+            self.throttle_kbps = parse_to_kbps(throttle).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err))?;
+        }
+        Ok(())
     }
 }
 
@@ -1227,7 +1233,7 @@ pub struct ReverseProxyConfig {
 impl ReverseProxyConfig {
     fn prepare(&mut self, working_dir: &str) -> Result<(), M3uFilterError> {
         if let Some(stream) = self.stream.as_mut() {
-            stream.prepare();
+            stream.prepare()?;
         }
         if let Some(cache) = self.cache.as_mut() {
             if cache.enabled && self.resource_rewrite_disabled {

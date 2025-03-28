@@ -1,5 +1,8 @@
 # Changelog
 # 2.2.6 (2025-03-xx)
+- !BREAKING CHANGE!  bandwidth `throttle_kbps` attribute for `reverse_proxy.stream` in  `config.yml` 
+is now `throttle` and supports units. Allowed units are `KB/s`,`MB/s`,`KiB/s`,`MiB/s`,`kbps`,`mbps`,`Mibps`.
+Default unit is `kbps`.
 - Added rate limiting per IP. The burst_size defines the initial number of available connections, 
  while period_millis specifies the interval at which one connection is replenished.
 If behind a proxy `x-forwarded-for`, `x-real-ip` or `forwarded` should be set as header. 
