@@ -68,7 +68,7 @@ export default function FormView(props: FormViewProps) {
         for (const fieldDef of fields) {
             if (fieldDef.name === field) {
                 if (fieldDef.fieldType === FormFieldType.NUMBER) {
-                    if (value.trim().isEmpty()) {
+                    if (value == null || value.trim() == '') {
                         value = undefined;
                     } else {
                         value = parseInt(value);
@@ -80,7 +80,7 @@ export default function FormView(props: FormViewProps) {
         if (data) {
             data[field] = value;
         }
-        setFormData((prevData: any) => ({...prevData, [field]: value ?? ''}));
+        setFormData((prevData: any) => ({...prevData, [field]: value}));
     }, [data]);
 
     const handleChange = useCallback((field: string, value: any) => {

@@ -92,14 +92,14 @@ const usernameExists = (uname: string, targets: TargetUser[]): boolean => {
 
 const checkuser = (user: Credentials): string | undefined => {
     if (!user.username?.trim().length) {
-        return "MESSAGES.USER.USERNAME_REQUIRED";
+        return "MESSAGES.SAVE.USER.USERNAME_REQUIRED";
     }
     // eslint-disable-next-line eqeqeq
     if (user.max_connections != undefined) {
         const max_con = parseInt(user.max_connections as any);
         // eslint-disable-next-line eqeqeq
         if (isNaN(max_con) || max_con < 0 || (('' + max_con) != user.max_connections as any)) {
-            return 'MESSAGES.USER.MAX_CONNECTIONS_INVALID';
+            return 'MESSAGES.SAVE.USER.MAX_CONNECTIONS_INVALID';
         } else {
             if (max_con < 1) {
                 user.max_connections = undefined;
