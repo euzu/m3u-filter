@@ -159,6 +159,7 @@ pub struct PlaylistItemHeader {
     #[serde(default)]
     pub category_id: u32,
     pub input_name: String,
+    pub stream_icon: Option<String>,
 }
 
 impl PlaylistItemHeader {
