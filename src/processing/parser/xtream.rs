@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use serde_json::Value;
 
+use deunicode::deunicode;
+
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result};
 use crate::model::config::ConfigInput;
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
@@ -148,7 +150,8 @@ pub fn parse_xtream(input: &ConfigInput,
                                 group: category_name.to_string(),
                                 title: stream.name.to_string(),
                                 url: stream_url.to_string(),
-                                epg_channel_id: stream.epg_channel_id.as_ref().map(|id| id.to_lowercase().to_string()),
+                                epg_channel_id: stream.epg_channel_id.as_ref().map(|id| deunicode(id.to_lowercase().to_string().as_str())),
+                                //epg_channel_id: stream.epg_channel_id.as_ref().map(|id| id.to_lowercase().to_string()),
                                 item_type,
                                 xtream_cluster,
                                 additional_properties: stream.get_additional_properties(),
@@ -180,4 +183,3 @@ pub fn parse_xtream(input: &ConfigInput,
         Err(err) => Err(err)
     }
 }
-
