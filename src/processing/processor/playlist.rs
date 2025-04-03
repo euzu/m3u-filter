@@ -16,6 +16,8 @@ use log::{debug, error, info, log_enabled, trace, warn, Level};
 use std::time::Instant;
 use unidecode::unidecode;
 
+use unicode_normalization::UnicodeNormalization;
+
 use crate::foundation::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, get_errors_notify_message, notify_err};
 use crate::messaging::{send_message, MsgKind};
@@ -32,6 +34,9 @@ use crate::processing::processor::xtream_vod::playlist_resolve_vod;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::{debug_if_enabled};
+
+use crate::model::xmltv::{TVGuide};
+use crate::utils::network::epg::parse_epg;
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli };
@@ -513,6 +518,9 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     let mut processed_fetched_playlists: Vec<FetchedPlaylist> = vec![];
     for provider_fpl in playlists.iter_mut() {
         let mut processed_fpl = execute_pipe(target, &pipe, provider_fpl, &mut duplicates);
+
+        auto_assign_epg_channel_ids(&mut processed_fpl.playlistgroups, provider_fpl.epg.as_ref());
+
         playlist_resolve_series(Arc::clone(&client), cfg, target, errors, &pipe, provider_fpl, &mut processed_fpl).await;
         playlist_resolve_vod(Arc::clone(&client), cfg, target, errors, &mut processed_fpl).await;
         // stats
@@ -562,6 +570,103 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     }
 }
 
+
+fn auto_assign_epg_channel_ids(groups: &mut [PlaylistGroup], xmltv: Option<&TVGuide>) {
+    use std::collections::HashMap;
+
+    let Some(tv) = xmltv else {
+        warn!("EPG: TVGuide is None");
+        return;
+    };
+
+    let epg_path = &tv.file;
+
+    match parse_epg(epg_path) {
+        Ok(parsed_epg) => {
+            let mut epg_names: Vec<(String, String)> = vec![];
+            let mut epg_icons: HashMap<String, Option<String>> = HashMap::new();
+
+            for tag in &parsed_epg.children {
+                if tag.name == "channel" {
+                    let Some(id) = tag.get_attribute_value("id").cloned() else {
+                        continue;
+                    };
+
+                    let mut icon_url: Option<String> = None;
+
+                    if let Some(children) = &tag.children {
+                        for child in children {
+                            let child = child.as_ref();
+                            match child.name.as_str() {
+                                "display-name" => {
+                                    if let Some(name) = &child.value {
+                                        let norm = normalize_channel_name(name);
+                                        epg_names.push((norm.clone(), id.clone()));
+                                    }
+                                }
+                                "icon" => {
+                                    if let Some(src) = child.get_attribute_value("src") {
+                                        icon_url = Some(src.clone());
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    epg_icons.insert(id.clone(), icon_url);
+                }
+            }
+
+            for group in groups.iter_mut() {
+                for chan in group.channels.iter_mut() {
+                    let epg_id_empty = chan.header.epg_channel_id
+                        .as_deref()
+                        .map_or(true, |v| v.trim().is_empty());
+
+                    if epg_id_empty {
+                        let chan_name_raw = &chan.header.name;
+                        let chan_name_norm = normalize_channel_name(chan_name_raw);
+
+                        if let Some((_, epg_id)) = epg_names.iter().find(|(k, _)| k == &chan_name_norm) {
+                            chan.header.epg_channel_id = Some(epg_id.clone());
+                            if let Some(icon) = epg_icons.get(epg_id).and_then(|i| i.clone()) {
+                                chan.header.stream_icon = Some(icon);
+                            }
+                            info!("Exact match '{}' → '{}'", chan_name_raw, epg_id);
+                        } else if let Some((match_key, epg_id)) = epg_names.iter().find(|(k, _)| k.contains(&chan_name_norm)) {
+                            chan.header.epg_channel_id = Some(epg_id.clone());
+                            if let Some(icon) = epg_icons.get(epg_id).and_then(|i| i.clone()) {
+                                chan.header.stream_icon = Some(icon);
+                            }
+                            info!("Fallback match '{}' → '{}' (from '{}')", chan_name_raw, epg_id, match_key);
+                        }
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            error!("Failed to parse EPG: {:?}", e);
+        }
+    }
+
+    fn normalize_channel_name(name: &str) -> String {
+        name.nfkd()
+            .collect::<String>()
+            .to_lowercase()
+            .replace(|c: char| !c.is_alphanumeric(), "")
+            .replace("3840p", "")
+            .replace("uhd", "")
+            .replace("fhd", "")
+            .replace("hd", "")
+            .replace("sd", "")
+            .replace("4k", "")
+            .replace("plus", "")
+            .replace("raw", "")
+    }
+}
+
+
 fn process_watch(target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<PlaylistGroup>) {
     if target.t_watch_re.is_some() {
         if default_as_default().eq_ignore_ascii_case(&target.name) {
@@ -599,4 +704,3 @@ pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, tar
     let elapsed = start_time.elapsed().as_secs();
     info!("Update process finished! Took {elapsed} secs.");
 }
-
