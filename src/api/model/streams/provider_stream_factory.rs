@@ -177,7 +177,7 @@ fn get_client_stream_request_params(
     input_headers: Option<HashMap<String, String>>,
     options: &BufferStreamOptions) -> (usize, Option<usize>, bool, u32, HeaderMap)
 {
-    let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 1 };
+    let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 0 };
     let filter_header = get_header_filter_for_item_type(options.item_type);
     let mut req_headers = get_headers_from_request(req_headers, &filter_header);
     debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());

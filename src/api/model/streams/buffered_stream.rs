@@ -3,6 +3,7 @@ use std::{
     pin::Pin,
     sync::Arc,
 };
+use std::cmp::min;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use crate::api::model::stream::BoxedProviderStream;
@@ -16,7 +17,7 @@ pub(in crate::api::model) struct BufferedStream {
 
 impl BufferedStream {
     pub fn new(stream: BoxedProviderStream, buffer_size: usize, client_close_signal: Arc<AtomicOnceFlag>, _url: &str) -> Self {
-        let (tx, rx) = channel(buffer_size);
+        let (tx, rx) = channel(min(buffer_size, 1024));
         tokio::spawn(Self::buffer_stream(tx, stream, Arc::clone(&client_close_signal)));
         Self {
             stream: ReceiverStream::new(rx),
