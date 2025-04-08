@@ -13,7 +13,7 @@ import ServerConfig, {
     StreamConfig,
     TelegramConfig,
     VideoConfig,
-    VideoDownloadConfig
+    VideoDownloadConfig, WebAuthConfig, WebUiConfig
 } from "../../model/server-config";
 import {useSnackbar} from "notistack";
 import FormView, {FormFieldType} from "../form-view/from-view";
@@ -36,13 +36,17 @@ const CONFIG_API_FIELDS = [
 
 ];
 
+const CONFIG_WEB_UI_FIELDS = [
+    {name: 'enabled', label: 'LABEL.WEB_UI', fieldType: FormFieldType.CHECK},
+    {name: 'path', label: 'LABEL.WEB_UI_PATH', fieldType: FormFieldType.TEXT},
+    {name: 'user_ui_enabled', label: 'LABEL.USER_UI', fieldType: FormFieldType.CHECK},
+];
+
 const CONFIG_FIELDS = [
     {name: 'threads', label: 'LABEL.THREADS', fieldType: FormFieldType.NUMBER, validator: isNumber},
     {name: 'working_dir', label: 'LABEL.WORKING_DIR', fieldType: FormFieldType.TEXT, validator: undefined},
     {name: 'backup_dir', label: 'LABEL.BACKUP_DIR', fieldType: FormFieldType.TEXT, validator: undefined},
     {name: 'update_on_boot', label: 'LABEL.UPDATE_ON_BOOT', fieldType: FormFieldType.CHECK, validator: undefined},
-    {name: 'web_ui_enabled', label: 'LABEL.WEB_UI', fieldType: FormFieldType.CHECK, validator: undefined},
-    {name: 'web_ui_path', label: 'LABEL.WEB_UI_PATH', fieldType: FormFieldType.TEXT, validator: undefined},
 ];
 
 const CONFIG_SCHEDULES_FIELDS = [
@@ -142,6 +146,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
     const [activeTab, setActiveTab] = useState<string>('api');
     const apiConfig = useMemo<ServerApiConfig>(() => config?.api || {} as any, [config]);
     const mainConfig = useMemo<ServerMainConfig>(() => config, [config]);
+    const webUiConfig = useMemo<WebUiConfig>(() => config?.web_ui || {} as any, [config]);
     const messagingConfig = useMemo<MessagingConfig>(() => config?.messaging || {} as any, [config]);
     const telegramConfig = useMemo<TelegramConfig>(() => config?.messaging?.telegram || {} as any, [config]);
     const restConfig = useMemo<RestConfig>(() => config?.messaging?.rest || {} as any, [config]);
@@ -160,6 +165,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
             fields: translateLabels(CONFIG_FIELDS, translate),
             schedules_fields: translateLabels(CONFIG_SCHEDULES_FIELDS, translate),
             log_fields: translateLabels(CONFIG_LOG_FIELDS, translate),
+            web_ui_config_fields: translateLabels(CONFIG_WEB_UI_FIELDS, translate),
             reverse_proxy_fields: translateLabels(CONFIG_REVERSE_PROXY_FIELDS, translate),
             reverse_proxy_stream_fields: translateLabels(CONFIG_REVERSE_PROXY_STREAM_FIELDS, translate),
             reverse_proxy_stream_buffer_fields: translateLabels(CONFIG_REVERSE_PROXY_STREAM_BUFFER_FIELDS, translate),
@@ -210,6 +216,14 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 rate_limit: reverseProxyRateLimitConfig ?? undefined,
             };
 
+            const cfgWebUiConfig: WebUiConfig = {
+                enabled: webUiConfig.enabled ?? false,
+                user_ui_enabled: webUiConfig.user_ui_enabled ?? false,
+                path: webUiConfig.path,
+                auth: webUiConfig.auth ?? undefined,
+
+            }
+
             const cfgVideo = {
                 ...videoConfig,
                 download: videoDownloadConfig
@@ -230,9 +244,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 video: cfgVideo,
                 log: cfgLog,
                 update_on_boot: mainConfig.update_on_boot,
-                web_ui_enabled: mainConfig.web_ui_enabled,
-                web_ui_path: mainConfig.web_ui_path,
-                web_auth: mainConfig.web_auth,
+                web_ui: cfgWebUiConfig,
             };
 
             services.config().saveMainConfig(cfgMain).subscribe({
@@ -243,6 +255,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
     }, [mainConfig, apiConfig, videoConfig, messagingConfig, telegramConfig, restConfig, pushoverConfig,
         videoDownloadConfig, reverseProxyConfig, enqueueSnackbar, services, logConfig,
         reverseProxyRateLimitConfig, reverseProxyCacheConfig, reverseProxyStreamConfig, reverseProxyStreamBufferConfig,
+        webUiConfig,
         translate]);
 
     const handleTabChange = useCallback((tab: string) => {
@@ -264,6 +277,10 @@ export default function MainConfigView(props: MainConfigViewProps) {
             </div>
             <div className={'main-config__content-form main-config__form' + ('main' !== activeTab ? ' hidden' : '')}>
                 <FormView data={mainConfig} fields={configs.fields}></FormView>
+                <label className="main-config__content-form__section-title">{translate('LABEL.WEB_UI')}</label>
+                <FormView data={webUiConfig}
+                          fields={configs.web_ui_config_fields}></FormView>
+
                 <label className="main-config__content-form__section-title">{translate('LABEL.LOG')}</label>
                 <FormView data={logConfig} fields={configs.log_fields}></FormView>
                 <div className={'main-config__content-help'}>

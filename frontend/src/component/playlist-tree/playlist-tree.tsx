@@ -119,7 +119,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 <div className={'tool-button'} data-item={entry.id} onClick={handleClipboardUrl}>
                     {getIconByName('LinkRounded')}
                 </div>
-                <div style={{display: 'none'}} className={'tool-button'} data-item={entry.id} onClick={handlePlayUrl}>
+                <div className={'tool-button'} data-item={entry.id} onClick={handlePlayUrl}>
                     {getIconByName('PlayArrow')}
                 </div>
                 {isVideoFile(entry) &&

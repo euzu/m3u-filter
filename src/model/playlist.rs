@@ -1,5 +1,6 @@
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
@@ -102,6 +103,25 @@ impl From<XtreamCluster> for PlaylistItemType {
             XtreamCluster::Live => Self::Live,
             XtreamCluster::Video => Self::Video,
             XtreamCluster::Series => Self::SeriesInfo,
+        }
+    }
+}
+
+
+impl FromStr for PlaylistItemType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Live" => Ok(PlaylistItemType::Live),
+            "Video" => Ok(PlaylistItemType::Video),
+            "Series" => Ok(PlaylistItemType::Series),
+            "SeriesInfo" => Ok(PlaylistItemType::SeriesInfo),
+            "Catchup" => Ok(PlaylistItemType::Catchup),
+            "LiveUnknown" => Ok(PlaylistItemType::LiveUnknown),
+            "LiveHls" => Ok(PlaylistItemType::LiveHls),
+            "LiveDash" => Ok(PlaylistItemType::LiveDash),
+            _ => Err(format!("Invalid PlaylistItemType: {}", s)),
         }
     }
 }

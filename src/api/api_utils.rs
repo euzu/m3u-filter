@@ -495,7 +495,7 @@ pub fn get_username_from_auth_header(
     token: &str,
     app_state: &Arc<AppState>,
 ) -> Option<String> {
-    if let Some(web_auth_config) = &app_state.config.web_auth {
+    if let Some(web_auth_config) = &app_state.config.web_ui.as_ref().and_then(|c| c.auth.as_ref()) {
         let secret_key: &str = web_auth_config.secret.as_ref();
         if let Ok(token_data) = decode::<Claims>(
             token,

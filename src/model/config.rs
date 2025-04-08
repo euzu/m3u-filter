@@ -1189,7 +1189,7 @@ impl StreamConfig {
         if let Some(buffer) = self.buffer.as_mut() {
             buffer.prepare();
         }
-        if let Some (throttle) = &self.throttle {
+        if let Some(throttle) = &self.throttle {
             self.throttle_kbps = parse_to_kbps(throttle).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err))?;
         }
         Ok(())
@@ -1226,7 +1226,7 @@ pub struct ReverseProxyConfig {
     #[serde(default)]
     pub resource_rewrite_disabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rate_limit:  Option<RateLimitConfig>,
+    pub rate_limit: Option<RateLimitConfig>,
 
 }
 
@@ -1265,6 +1265,44 @@ pub struct CustomStreamResponseConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
+pub struct WebUiConfig {
+    #[serde(default = "default_as_true")]
+    pub enabled: bool,
+    #[serde(default = "default_as_true")]
+    pub user_ui_enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<WebAuthConfig>,
+}
+
+impl WebUiConfig {
+    pub fn prepare(&mut self, config_path: &str) -> Result<(), M3uFilterError> {
+        if !self.enabled {
+            self.auth = None;
+        }
+
+        if let Some(web_ui_path) = self.path.as_ref() {
+            let web_path = web_ui_path.trim().trim_start_matches('/').trim_end_matches('/').to_string();
+            if RESERVED_PATHS.contains(&web_path.to_lowercase().as_str()) {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("web ui path is a reserved path. Do not use {RESERVED_PATHS:?}")));
+            }
+            self.path = Some(web_path);
+        }
+
+        if let Some(web_auth) = &mut self.auth {
+            if web_auth.enabled {
+                web_auth.prepare(config_path)?;
+            } else {
+                self.auth = None;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
     pub threads: u8,
@@ -1291,12 +1329,8 @@ pub struct Config {
     pub connect_timeout_secs: u32,
     #[serde(default)]
     pub update_on_boot: bool,
-    #[serde(default = "default_as_true")]
-    pub web_ui_enabled: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub web_ui_path: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub web_auth: Option<WebAuthConfig>,
+    #[serde(default)]
+    pub web_ui: Option<WebUiConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub messaging: Option<MessagingConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1634,25 +1668,8 @@ impl Config {
     }
 
     fn prepare_web(&mut self) -> Result<(), M3uFilterError> {
-        if !self.web_ui_enabled {
-            self.web_auth = None;
-        }
-
-        if let Some(web_ui_path) = self.web_ui_path.as_ref() {
-            let web_path = web_ui_path.trim().trim_start_matches('/').trim_end_matches('/').to_string();
-            if RESERVED_PATHS.contains(&web_path.to_lowercase().as_str()) {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("web ui path is a reserved path. Do not use {RESERVED_PATHS:?}")));
-            }
-            self.web_ui_path = Some(web_path);
-        }
-
-
-        if let Some(web_auth) = &mut self.web_auth {
-            if web_auth.enabled {
-                web_auth.prepare(&self.t_config_path)?;
-            } else {
-                self.web_auth = None;
-            }
+        if let Some(web_ui_config) = self.web_ui.as_mut() {
+            web_ui_config.prepare(&self.t_config_path)?;
         }
         Ok(())
     }
@@ -1702,15 +1719,19 @@ impl Config {
         }
     }
 
-
     /// # Panics
     ///
     /// Will panic if default server invalid
-    pub async fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
+    pub async fn get_server_info(&self, server_info_name: &str) -> ApiProxyServerInfo {
         let server_info_list = self.t_api_proxy.read().await.as_ref().unwrap().server.clone();
-        let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
         server_info_list.iter().find(|c| c.name.eq(server_info_name)).map_or_else(|| server_info_list.first().unwrap().clone(), Clone::clone)
     }
+
+    pub async fn get_user_server_info(&self, user: &ProxyUserCredentials) -> ApiProxyServerInfo {
+        let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
+        self.get_server_info(server_info_name).await
+    }
+
 }
 
 /// Returns the targets that were specified as parameters.

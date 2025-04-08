@@ -1,0 +1,12 @@
+.video-player {
+  display: flex;
+  justify-content: center;
+  height: 100%;
+  width: auto;
+  background-color: black;
+
+  .video-js {
+    background-color: black;
+    height: 100%;
+  }
+}

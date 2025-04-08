@@ -26,12 +26,17 @@ reverse_proxy:
 log:
   sanitize_sensitive_info: false
   active_clients: true
-web_ui_enabled: true
-web_auth:
-  enabled: false
-  secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
-  issuer: m3u_filter
-  userfile: user.txt
+
+web_ui:
+  enabled: true
+  user_ui_enabled: true
+  path:
+  auth:
+    enabled: true
+    issuer: m3u_filter
+    secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
+    userfile: user.txt
+
 messaging:
   notify_on:
     - error

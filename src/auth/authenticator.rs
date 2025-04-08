@@ -81,7 +81,7 @@ fn validate_request(
     token: &str,
     verify_fn: fn(&str, &[u8]) -> bool,
 ) -> Result<(), ()> {
-    if let Some(web_auth_config) = app_state.config.web_auth.as_ref() {
+    if let Some(web_auth_config) =&app_state.config.web_ui.as_ref().and_then(|c| c.auth.as_ref()) {
         let secret_key = web_auth_config.secret.as_ref();
         if verify_fn(token, secret_key) {
             return Ok(());

@@ -19,15 +19,18 @@
   },
   "dependencies": {
     "file-saver": "2.0.5",
-    "i18next": "24.2.2",
+    "i18next": "24.2.3",
+    "react-i18next": "15.4.1",
     "jwt-decode": "4.0.0",
     "notistack": "3.0.2",
-    "react": "19.0.0",
-    "react-datepicker": "8.1.0",
-    "react-dom": "19.0.0",
-    "react-i18next": "15.4.1",
+    "react": "19.1.0",
+    "react-datepicker": "8.2.1",
+    "react-dom": "19.1.0",
     "react-tag-input-component": "2.0.2",
-    "rxjs": "7.8.1"
+    "rxjs": "7.8.2",
+    "video.js": "8.22.0",
+    "videojs-mpegtsjs": "1.0.0",
+    "mpegts.js": "1.8.0"
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",

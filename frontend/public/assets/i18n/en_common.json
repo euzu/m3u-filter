@@ -23,6 +23,7 @@
     "BACKUP_DIR": "Backup dir",
     "UPDATE_ON_BOOT": "Update on boot",
     "WEB_UI": "Web UI",
+    "USER_UI": "User UI",
     "WEB_UI_PATH": "Web UI Path",
     "SCHEDULES": "Schedules",
     "SANITIZE_SENSITIVE_INFO": "Sanitize sensitive info",

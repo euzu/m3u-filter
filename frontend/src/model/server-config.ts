@@ -215,6 +215,13 @@ export interface ReverseProxyConfig {
     resource_rewrite_disabled: boolean,
 }
 
+export interface WebUiConfig {
+    enabled: boolean,
+    user_ui_enabled: boolean,
+    path?: string,
+    auth?: WebAuthConfig,
+}
+
 export interface ServerMainConfig {
     threads: number;
     api: ServerApiConfig;
@@ -225,9 +232,7 @@ export interface ServerMainConfig {
     video?: VideoConfig;
     log?: LogConfig,
     update_on_boot: boolean,
-    web_ui_enabled: boolean,
-    web_ui_path: string,
-    web_auth?: WebAuthConfig,
+    web_ui?: WebUiConfig,
     reverse_proxy?: ReverseProxyConfig,
 }
 

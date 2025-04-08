@@ -200,7 +200,7 @@ fn exec_scheduler(client: &Arc<reqwest::Client>, cfg: &Arc<Config>, targets: &Ar
 
 fn is_web_auth_enabled(cfg: &Arc<Config>, web_ui_enabled: bool) -> bool {
     if web_ui_enabled {
-        if let Some(web_auth) = &cfg.web_auth {
+        if let Some(web_auth) = &cfg.web_ui.as_ref().and_then(|c| c.auth.as_ref()) {
             return web_auth.enabled;
         }
     }
@@ -270,7 +270,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     let mut infos = Vec::new();
     let host = cfg.api.host.to_string();
     let port = cfg.api.port;
-    let web_ui_enabled = cfg.web_ui_enabled;
+    let web_ui_enabled = cfg.web_ui.as_ref().map_or(false, |c| c.enabled);
     let web_dir_path = match get_web_dir_path(web_ui_enabled, cfg.api.web_root.as_str()) {
         Ok(result) => result,
         Err(err) => return Err(err)
@@ -289,8 +289,8 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         start_hdhomerun(&cfg, &app_state, &mut infos);
     }
 
-    let web_ui_path = cfg.web_ui_path.as_ref().map(|p| format!("/{p}")).unwrap_or_default();
 
+    let web_ui_path = cfg.web_ui.as_ref().and_then(|c| c.path.as_ref()).map(|p| format!("/{p}")).unwrap_or_default();
     infos.push(format!("Server running: http://{}:{}", &cfg.api.host, &cfg.api.port));
     for info in &infos {
         info!("{info}");
@@ -298,8 +298,6 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
 
     // Web Server
     let mut router = axum::Router::new()
-        .layer(create_cors_layer())
-        .layer(create_compression_layer())        // .layer(TraceLayer::new_for_http()) // `Logger::default()`
         .route("/healthcheck", axum::routing::get(healthcheck))
         .route(&format!("{web_ui_path}/status"), axum::routing::get(status));
     if web_ui_enabled {
@@ -328,6 +326,10 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     if web_ui_enabled && web_ui_path.is_empty() {
         router = router.merge(index_register_without_path(&web_dir_path));
     }
+
+    router = router.layer(create_cors_layer())
+        .layer(create_compression_layer());
+    // .layer(TraceLayer::new_for_http()) // `Logger::default()`
 
     // router = router.layer(axum::middleware::from_fn(log_routes));
 

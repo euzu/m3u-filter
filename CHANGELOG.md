@@ -15,6 +15,18 @@ reverse_proxy:
     period_millis: 500
     burst_size: 10
 ```
+- !BREAKING_CHANGE! `web_ui config` restructured and added `user_ui_enabled` attribute
+```yaml
+web_ui:
+  enabled: true
+  user_ui_enabled: true
+  path:
+  auth:
+    enabled: true
+    issuer: m3u_filter
+    secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
+    userfile: user.txt
+```
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

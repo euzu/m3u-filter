@@ -53,4 +53,9 @@ export default class PlaylistService {
     update(targets: string[]): Observable<any> {
         return this.playlistApiService.updateTargets(targets);
     }
+
+    getReverseUrl(item: PlaylistItem): Observable<string> {
+        return this.playlistApiService.getReverseUrl(item);
+    }
+
 }

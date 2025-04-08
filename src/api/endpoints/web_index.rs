@@ -21,7 +21,7 @@ async fn token(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Json(mut req): axum::extract::Json<UserCredential>,
 ) -> impl axum::response::IntoResponse + Send {
-    match &app_state.config.web_auth {
+    match &app_state.config.web_ui.as_ref().and_then(|c| c.auth.as_ref()) {
         None => no_web_auth_token().into_response(),
         Some(web_auth) => {
             if !web_auth.enabled {
@@ -59,7 +59,7 @@ async fn token_refresh(
     AuthBearer(token): AuthBearer,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
-    match &app_state.config.web_auth {
+    match &app_state.config.web_ui.as_ref().and_then(|c| c.auth.as_ref()) {
         None => no_web_auth_token().into_response(),
         Some(web_auth) => {
             if !web_auth.enabled {
@@ -69,11 +69,10 @@ async fn token_refresh(
             let maybe_token_data = verify_token(&token, secret_key);
             if let Some(token_data) = maybe_token_data {
                 let username = token_data.claims.username.clone();
-                let web_auth_cfg = app_state.config.web_auth.as_ref().unwrap();
                 let new_token = if is_admin(Some(token_data)) {
-                    create_jwt_admin(web_auth_cfg, &username)
+                    create_jwt_admin(web_auth, &username)
                 } else {
-                    create_jwt_user(web_auth_cfg, &username)
+                    create_jwt_user(web_auth, &username)
                 };
                 if let Ok(token) = new_token {
                     return axum::Json(HashMap::from([("token", token)])).into_response();
@@ -90,7 +89,7 @@ async fn index(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
     let path: PathBuf = [&app_state.config.api.web_root, "index.html"].iter().collect();
-    if let Some(web_ui_path) = app_state.config.web_ui_path.as_ref() {
+    if let Some(web_ui_path) = &app_state.config.web_ui.as_ref().and_then(|c| c.path.as_ref()) {
         match tokio::fs::read_to_string(&path).await {
             Ok(content) => {
                 let mut new_content = BASE_HREF.replace_all(&content, |caps: &regex::Captures| {
@@ -119,7 +118,7 @@ async fn index_config(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
     let path: PathBuf = [&app_state.config.api.web_root, "config.json"].iter().collect();
-    if let Some(web_ui_path) = app_state.config.web_ui_path.as_ref() {
+    if let Some(web_ui_path) = &app_state.config.web_ui.as_ref().and_then(|c| c.path.as_ref()) {
         match tokio::fs::read_to_string(&path).await {
             Ok(content) => {
                 if let Ok(mut json_data) = serde_json::from_str::<serde_json::Value>(&content) {

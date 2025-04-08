@@ -246,7 +246,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
 
     const renderItem = useCallback((item: PlaylistItem): ReactNode => {
         if (item.xtream_cluster === XtreamCluster.Video) {
-            return <div>
+            return <div onClick={() => onPlay?.(item)} className="playlist-gallery">
                 {JSON.stringify(item)}
                 <div>{item.title}</div>
                 <img loading='lazy'  src={item.logo} alt={'logo'} />

@@ -17,6 +17,7 @@ import {FileDownloadInfo} from "../../model/file-download";
 import useTranslator from "../../hook/use-translator";
 import {EmptyPlaylistCategories, PlaylistCategories, PlaylistItem} from "../../model/playlist";
 import LoadingIndicator from "../loading-indicator/loading-indicator";
+import {SplitPanel} from "../split-panel/split-panel";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface PlaylistBrowserProps {
@@ -121,12 +122,13 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
                 <SourceSelector onDownload={handleSourceDownload} serverConfig={config}/>
             </div>
             <LoadingIndicator loading={progress}/>
-            <PlaylistViewer playlist={playlist} searchChannel={searchChannel}
-                            onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}
-                            onDownload={handleOnDownload}
-                            onWebSearch={handleOnWebSearch}
-                            serverConfig={config}/>
-            <PlaylistVideo channel={videoChannel}/>
+            <SplitPanel top={<PlaylistViewer playlist={playlist} searchChannel={searchChannel}
+                                             onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}
+                                             onDownload={handleOnDownload}
+                                             onWebSearch={handleOnWebSearch}
+                                             serverConfig={config}/>}
+                        bottom={<PlaylistVideo channel={videoChannel}/>}>
+            </SplitPanel>
             <FileDownload></FileDownload>
             <Progress visible={progress}/>
         </div>

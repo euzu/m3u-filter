@@ -1,0 +1,30 @@
+.resizable-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.top-pane,
+.bottom-pane {
+  overflow: auto;
+}
+
+.top-pane {
+}
+
+.bottom-pane {
+  flex: 1;
+}
+
+.divider {
+  height: 6px;
+  background-color: #4e545d;
+  cursor: row-resize;
+  transition: background-color 0.2s;
+}
+
+.divider:hover {
+  background-color: #aaa;
+}
