@@ -37,7 +37,7 @@ impl ActiveClientStream {
         let active_user = app_state.active_users.clone();
         let active_provider = app_state.active_provider.clone();
         let log_active_clients = app_state.config.log.as_ref().is_some_and(|l| l.active_clients);
-        let (client_count, connection_count) = active_user.add_connection(&username).await;
+        let (client_count, connection_count) = active_user.add_connection(username).await;
         if log_active_clients {
             info!("Active clients: {client_count}, active connections {connection_count}");
         }

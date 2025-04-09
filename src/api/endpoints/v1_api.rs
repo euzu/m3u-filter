@@ -15,7 +15,7 @@ use crate::api::model::request::{PlaylistRequest, PlaylistRequestType};
 use crate::auth::access_token::create_access_token;
 use crate::auth::authenticator::{validator_admin};
 use crate::m3u_filter_error::M3uFilterError;
-use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
+use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, TargetUser};
 use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType, TargetType};
 use crate::model::playlist::{XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::PlaylistXtreamCategory;
@@ -31,7 +31,7 @@ fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, fi
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
         Ok(()) => {}
         Err(err) => {
-            error!("Failed to save api_proxy.yml {}", err.to_string());
+            error!("Failed to save api_proxy.yml {err}");
             return Some(err);
         }
     }
@@ -42,7 +42,7 @@ fn intern_save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -
     match config_reader::save_main_config(file_path, backup_dir, cfg) {
         Ok(()) => {}
         Err(err) => {
-            error!("Failed to save config.yml {}", err.to_string());
+            error!("Failed to save config.yml {err}");
             return Some(err);
         }
     }
@@ -77,7 +77,7 @@ async fn save_config_api_proxy_user(
     let mut lock = app_state.config.t_api_proxy.write().await;
     if let Some(api_proxy) =  lock.as_mut() {
         api_proxy.user = users;
-        api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(|c| c.prepare());
+        api_proxy.user.iter_mut().flat_map(|t| &mut t.credentials).for_each(ProxyUserCredentials::prepare);
         if api_proxy.use_user_db {
             if let Err(err) = store_api_user(&app_state.config, &api_proxy.user) {
                 return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": err.to_string()}))).into_response();
@@ -304,7 +304,7 @@ async fn playlist_reverse(
 ) ->  impl axum::response::IntoResponse + Send {
     let access_token = create_access_token(&app_state.config.t_access_token_secret, 5);
     let server_name = app_state.config.web_ui.as_ref().and_then(|web_ui| web_ui.player_server.as_ref()).map_or("default", |server_name| server_name.as_str());
-    let server_info = app_state.config.get_server_info(&server_name).await;
+    let server_info = app_state.config.get_server_info(server_name).await;
     let base_url = server_info.get_base_url();
     format!("{base_url}/token/{access_token}/{target_id}/{}/{}", playlist_item.xtream_cluster.as_stream_type(), playlist_item.virtual_id).into_response()
 }
@@ -315,7 +315,7 @@ async fn config(
     let map_input = |i: &ConfigInput| ServerInputConfig {
         id: i.id,
         name: i.name.clone(),
-        input_type: i.input_type.clone(),
+        input_type: i.input_type,
         url: i.url.clone(),
         username: i.username.clone(),
         password: i.password.clone(),
@@ -393,7 +393,7 @@ pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>, web_ui_
     }
 
     let mut base_router = axum::Router::new();
-    if app_state.config.web_ui.as_ref().map_or(true, |c| c.user_ui_enabled) {
+    if app_state.config.web_ui.as_ref().is_none_or(|c| c.user_ui_enabled) {
         base_router = base_router.merge(user_api_register(app_state));
     }
     base_router.nest(&format!("{web_ui_path}/api/v1"), router)

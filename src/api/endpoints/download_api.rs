@@ -21,7 +21,7 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
             match fs::create_dir_all(&file_download.file_dir) {
                 Ok(()) => {
                     if let Some(file_path_str) = file_download.file_path.to_str() {
-                        info!("Downloading {}", file_path_str);
+                        info!("Downloading {file_path_str}");
                         match File::create(&file_download.file_path) {
                             Ok(mut file) => {
                                 let mut downloaded: u64 = 0;
@@ -39,7 +39,7 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
                                                 }
                                             } else {
                                                 let megabytes = request::bytes_to_megabytes(downloaded);
-                                                info!("Downloaded {}, filesize: {}MB", file_path_str, megabytes);
+                                                info!("Downloaded {file_path_str}, filesize: {megabytes}MB");
                                                 active.write().await.as_mut().unwrap().size = downloaded;
                                                 return Ok(());
                                             }

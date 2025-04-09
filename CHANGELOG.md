@@ -1,5 +1,5 @@
 # Changelog
-# 2.2.6 (2025-03-xx)
+# 2.2.6 (2025-04-xx)
 - !BREAKING CHANGE!  bandwidth `throttle_kbps` attribute for `reverse_proxy.stream` in  `config.yml`
   is now `throttle` and supports units. Allowed units are `KB/s`,`MB/s`,`KiB/s`,`MiB/s`,`kbps`,`mbps`,`Mibps`.
 Default unit is `kbps`.
@@ -28,6 +28,7 @@ web_ui:
     userfile: user.txt
 ```
 - user has now the attribute `ui_enabled` to disable/enable web_ui for user.
+- epg processing optimization, auto guessing/assigning epg id's
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

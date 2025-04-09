@@ -31,6 +31,20 @@ pub fn hex_encode(bytes: &[u8]) -> String {
     })
 }
 
+pub fn hex_decode(hex: &str) -> Result<Vec<u8>, String> {
+    if hex.len() % 2 != 0 {
+        return Err("hex string must have even length".to_string());
+    }
+
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&hex[i..i+2], 16)
+                .map_err(|e| format!("invalid hex at position {i}: {e}"))
+        })
+        .collect()
+}
+
 pub fn hash_string_as_hex(url: &str) -> String {
     hex_encode(&hash_string(url))
 }

@@ -440,7 +440,7 @@ pub fn xtream_write_series_info(
                 let new_record = record.copy_update_timestamp();
                 let _ = target_id_mapping.update(&series_info_id, new_record);
             }
-        };
+        }
     }
 
     Ok(())
@@ -477,7 +477,7 @@ fn xtream_get_info_mapping(config: &Config, target_name: &str, info_id: u32) -> 
     let target_id_mapping_file = get_target_id_mapping_file(&target_path);
     let _file_lock = config.file_locks.read_lock(&target_id_mapping_file);
     BPlusTreeQuery::<u32, VirtualIdRecord>::try_new(&target_id_mapping_file).map_err(|err| {
-        error!("Could not load id mapping for target {target_name}: {}", err);
+        error!("Could not load id mapping for target {target_name}: {err}");
         str_to_io_error(&format!("ID mapping load error for target {target_name}"))
     }).ok().map(|mut tree| tree.query(&info_id))?
 }
@@ -500,7 +500,7 @@ pub fn xtream_load_series_info(
             return match IndexedDocumentDirectAccess::read_indexed_item::<u32, String>(&info_path, &idx_path, &series_id) {
                 Ok(content) => Some(content),
                 Err(err) => {
-                    error!("Failed to read series info for id {series_id} for {target_name}: {}", err);
+                    error!("Failed to read series info for id {series_id} for {target_name}: {err}");
                     None
                 }
             };
@@ -534,14 +534,7 @@ pub fn xtream_load_vod_info(
     if info_path.exists() && idx_path.exists() {
         {
             let _file_lock = config.file_locks.read_lock(&info_path);
-            return match IndexedDocumentDirectAccess::read_indexed_item::<u32, String>(&info_path, &idx_path, &vod_id) {
-                Ok(content) => Some(content),
-                Err(_err) => {
-                    // this is not an error, it means the info is not indexed
-                    // error!("Failed to read vod info for id {vod_id} for {target_name}: {}",err);
-                    None
-                }
-            };
+            return IndexedDocumentDirectAccess::read_indexed_item::<u32, String>(&info_path, &idx_path, &vod_id).ok();
         }
     }
     None
@@ -568,7 +561,7 @@ async fn rewrite_xtream_vod_info<P>(
                     // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
                 }
                 ProxyType::Redirect => {}
-            };
+            }
         }
     }
 
@@ -698,7 +691,7 @@ async fn rewrite_xtream_series_info<P>(
         }
 
         if let Err(err) = target_id_mapping.persist() {
-            error!("{}", err.to_string());
+            error!("{err}");
         }
         drop(file_lock);
         drop(target_id_mapping);

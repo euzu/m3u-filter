@@ -125,10 +125,10 @@ pub fn persist_file(persist_file: Option<PathBuf>, text: &str) {
         let filename = &path_buf.to_str().unwrap_or("?");
         match File::create(&path_buf) {
             Ok(mut file) => match file.write_all(text.as_bytes()) {
-                Ok(()) => debug!("persisted: {}", filename),
-                Err(e) => error!("failed to persist file {}, {}", filename, e)
+                Ok(()) => debug!("persisted: {filename}"),
+                Err(e) => error!("failed to persist file {filename}, {e}")
             },
-            Err(e) => error!("failed to persist file {}, {}", filename, e)
+            Err(e) => error!("failed to persist file {filename}, {e}")
         }
     }
 }

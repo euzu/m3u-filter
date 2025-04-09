@@ -69,7 +69,7 @@ impl M3uPlaylistIterator {
                 PlaylistItemType::Live
                 | PlaylistItemType::Catchup
                 | PlaylistItemType::LiveUnknown
-                | PlaylistItemType::LiveHls => "live",
+                | PlaylistItemType::LiveHls
                 | PlaylistItemType::LiveDash => "live",
                 PlaylistItemType::Video => "movie",
                 PlaylistItemType::Series

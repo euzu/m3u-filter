@@ -466,7 +466,7 @@ impl ConfigTarget {
                             TargetType::M3u => { hdhomerun_needs_m3u = true; }
                             TargetType::Xtream => { hdhomerun_needs_xtream = true; }
                             _ => return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun output option `use_output` only accepts `m3u` or `xtream` for target: {}", self.name),
-                        };
+                        }
                     }
                 }
             }
@@ -605,7 +605,7 @@ pub struct InputAffix {
     pub value: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
 pub enum InputType {
     #[serde(rename = "m3u")]
     #[default]
@@ -832,7 +832,7 @@ impl ConfigInput {
                 InputType::Xtream
             };
 
-            match csv_read_inputs(&self) {
+            match csv_read_inputs(self) {
                 Ok(mut batch_aliases) => {
                     if !batch_aliases.is_empty() {
                         batch_aliases.reverse();
@@ -864,7 +864,7 @@ impl ConfigInput {
     }
 
     pub fn get_user_info(&self) -> Option<InputUserInfo> {
-        InputUserInfo::new(self.input_type.clone(), self.username.as_deref(), self.password.as_deref(), &self.url)
+        InputUserInfo::new(self.input_type, self.username.as_deref(), self.password.as_deref(), &self.url)
     }
 }
 
@@ -1674,7 +1674,7 @@ impl Config {
                     return Err(err);
                 }
             }
-        };
+        }
         Ok(())
     }
 
@@ -1700,7 +1700,7 @@ impl Config {
                     Err(err) => return Err(err)
                 }
             }
-        };
+        }
         Ok(())
     }
 

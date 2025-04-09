@@ -45,7 +45,7 @@ impl TVGuide {
                                             epg_channel_ids.insert(epg_id.to_string());
                                         }
                                         std::collections::hash_map::Entry::Vacant(_entry) => {}
-                                    };
+                                    }
                                 }
                                 if epg_channel_ids.contains(epg_id.as_str()) {
                                     children.push(tag);
@@ -63,7 +63,7 @@ impl TVGuide {
                             tv_attributes.clone_from(&tag.attributes);
                         }
                         _ => {}
-                    };
+                    }
                 };
 
                 parse_tvguide(&mut reader, &mut filter_tags);

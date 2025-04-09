@@ -40,7 +40,7 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
     if web_ui_enabled && (!&web_dir_path.exists() || !&web_dir_path.is_dir()) {
         return Err(std::io::Error::new(ErrorKind::NotFound,
                                        format!("web_root does not exists or is not an directory: {:?}", &web_dir_path)));
-    };
+    }
     Ok(web_dir_path)
 }
 
@@ -270,7 +270,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     let mut infos = Vec::new();
     let host = cfg.api.host.to_string();
     let port = cfg.api.port;
-    let web_ui_enabled = cfg.web_ui.as_ref().map_or(false, |c| c.enabled);
+    let web_ui_enabled = cfg.web_ui.as_ref().is_some_and(|c| c.enabled);
     let web_dir_path = match get_web_dir_path(web_ui_enabled, cfg.api.web_root.as_str()) {
         Ok(result) => result,
         Err(err) => return Err(err)
@@ -318,7 +318,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     let mut rate_limiting = false;
     if let Some(rate_limiter) = app_state.config.reverse_proxy.as_ref().and_then(|r| r.rate_limit.clone()) {
         rate_limiting = rate_limiter.enabled;
-        api_router = add_rate_limiter(api_router, rate_limiter);
+        api_router = add_rate_limiter(api_router, &rate_limiter);
     }
 
     router = router.merge(api_router);
@@ -342,7 +342,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     }
 }
 
-fn add_rate_limiter(router: Router<Arc<AppState>>, rate_limit_cfg: RateLimitConfig) -> Router<Arc<AppState>> {
+fn add_rate_limiter(router: Router<Arc<AppState>>, rate_limit_cfg: &RateLimitConfig) -> Router<Arc<AppState>> {
     if rate_limit_cfg.enabled {
         let governor_conf = Arc::new(tower_governor::governor::GovernorConfigBuilder::default()
             .key_extractor(SmartIpKeyExtractor)

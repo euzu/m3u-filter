@@ -81,14 +81,14 @@ pub fn parse_to_kbps(input: &str) ->  Result<u64, String> {
 
     let speed_str = input.trim();
     for (unit, multiplier) in units {
-        if speed_str.ends_with(unit) {
-            let number_part = speed_str[..speed_str.len() - unit.len()].trim();
+       if let Some(speed_unit) = speed_str.strip_suffix(unit) {
+            let number_part = speed_unit.trim();
             let value = u64::from_str(number_part).map_err(|_| format!("Invalid speed: {number_part}"))?;
             return value.checked_mul(*multiplier).ok_or_else(|| format!("Speed too large: {speed_str}"));
         }
     }
 
-    u64::from_str(&speed_str).map_err(|_| format!("Invalid speed: {speed_str}, supported units are {}", units.iter().map(|p| p.0).collect::<Vec<_>>().join(",")))
+    u64::from_str(speed_str).map_err(|_| format!("Invalid speed: {speed_str}, supported units are {}", units.iter().map(|p| p.0).collect::<Vec<_>>().join(",")))
 }
 
 #[cfg(test)]

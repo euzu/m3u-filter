@@ -31,7 +31,7 @@ impl ActiveUserManager {
     pub async fn connection_permission(&self, username: &str, max_connections: u32, grace_period: bool) -> UserConnectionPermission {
         if let Some(counter) = self.user.read().await.get(username) {
             let current_connections = counter.load(Ordering::SeqCst);
-            let extra_con = if grace_period { 1 } else { 0 };
+            let extra_con = u32::from(grace_period);
             if current_connections < max_connections + extra_con {
                 return UserConnectionPermission::GracePeriod;
             }

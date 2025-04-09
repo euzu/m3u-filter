@@ -340,7 +340,7 @@ impl ApiProxyConfig {
                     println!("{err}");
                     errors.push(err.to_string());
                 }
-            };
+            }
         } else {
             let user_db_path = get_api_user_db_path(cfg);
             if user_db_path.exists() {
@@ -352,7 +352,7 @@ impl ApiProxyConfig {
                             for stored_credential in &stored_user.credentials {
                                 if !target_user.credentials.iter().any(|c| c.username == stored_credential.username) {
                                     target_user.credentials.push(stored_credential.clone());
-                                };
+                                }
                             }
                         } else {
                             self.user.push(stored_user);
@@ -445,7 +445,7 @@ impl ApiProxyConfig {
                 target_user.get_target_name(username, password)
             {
                 return Some((credentials.clone(), target_name.to_string()));
-            };
+            }
         }
         debug!("Could not find any target for user {username}");
         None
@@ -455,7 +455,7 @@ impl ApiProxyConfig {
         for target_user in &self.user {
             if let Some((credentials, target_name)) = target_user.get_target_name_by_token(token) {
                 return Some((credentials.clone(), target_name.to_string()));
-            };
+            }
         }
         None
     }

@@ -233,14 +233,14 @@ async fn kodi_style_rename(
     if let Some(value) = season {
         filename.push(format!("{separator}S{value:02}"));
         file_dir.push(format!("Season{separator}{value}"));
-    };
+    }
 
     if let Some(value) = episode {
         if season.is_none() {
             filename.push(separator.to_string());
         }
         filename.push(format!("E{value:02}"));
-    };
+    }
     if let Some(value) = title {
         let sanitized_value = sanitize_for_filename(
             &trim_whitespace(
@@ -342,7 +342,7 @@ async fn get_tmdb_value(
                         _ => {}
                     }
                 };
-            };
+            }
             entry.insert(None);
             None
         }
@@ -563,7 +563,7 @@ async fn prepare_strm_files(
             let filename = Arc::new(strm_file_name);
             if all_filenames.contains(&filename) {
                 collisions.insert(Arc::clone(&filename));
-            };
+            }
             all_filenames.insert(Arc::clone(&filename));
             result.push(StrmFile {
                 file_name: Arc::clone(&filename),
@@ -681,7 +681,7 @@ pub async fn kodi_write_strm_playlist(
 
     if let Err(err) = write_strm_index_file(cfg, &processed_strm, &strm_index_path).await {
         failed.push(err);
-    };
+    }
 
     if let Err(err) =
         cleanup_strm_output_directory(target_output.cleanup, &root_path, &existing_strm, &processed_strm).await
@@ -730,7 +730,7 @@ async fn ensure_strm_file_directory(failed: &mut Vec<String>, output_path: &Path
         if let Err(e) = create_dir_all(output_path).await {
             let err_msg =
                 format!("Failed to create directory for strm playlist: {output_path:?} {e}");
-            error!("{}", err_msg);
+            error!("{err_msg}");
             failed.push(err_msg);
             return false; // skip creation, could not create directory
         };
@@ -775,7 +775,7 @@ async fn has_strm_file_same_hash(file_path: &PathBuf, content_hash: UUIDType) ->
             Err(err) => {
                 error!("Could not read existing strm file {file_path:?} {err}");
             }
-        };
+        }
     }
     false
 }

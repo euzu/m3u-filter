@@ -35,7 +35,7 @@ pub fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String)
         ItemField::Url => header.url = value,
         ItemField::Input => header.input_name = value,
         ItemField::Type => {}
-    };
+    }
 }
 
 pub struct ValueProvider<'a> {

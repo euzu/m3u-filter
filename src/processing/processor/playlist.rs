@@ -196,7 +196,7 @@ fn map_channel(mut channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
     if !mapping.mapper.is_empty() {
         let header = &channel.header;
         let channel_name = if mapping.match_as_ascii { unidecode(&header.name) } else { header.name.to_string() };
-        if mapping.match_as_ascii && log_enabled!(Level::Trace) { trace!("Decoded {} for matching to {}", &header.name, &channel_name); };
+        if mapping.match_as_ascii && log_enabled!(Level::Trace) { trace!("Decoded {} for matching to {}", &header.name, &channel_name); }
         // let ref_chan = &mut channel;
         let ref_chan = &mut channel;
         let mut mock_processor = MockValueProcessor {};
@@ -213,7 +213,7 @@ fn map_channel(mut channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
                 _ => {
                     apply_pattern!(&m.t_pattern, &provider, &mut processor);
                 }
-            };
+            }
         }
     }
     channel
@@ -348,7 +348,7 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
             }
             let elapsed = start_time.elapsed().as_secs();
             input_stats.insert(input_name.to_string(), create_input_stat(group_count, channel_count, error_list.len(),
-                                                           input.input_type.clone(), input_name, elapsed));
+                                                           input.input_type, input_name, elapsed));
         }
     }
     if source_playlists.is_empty() {
@@ -395,7 +395,7 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
     let thread_num = config.threads;
     let process_parallel = thread_num > 1 && config.sources.len() > 1;
     if process_parallel && log_enabled!(Level::Debug) {
-        debug!("Using {} threads", thread_num);
+        debug!("Using {thread_num} threads");
     }
     let errors = Arc::new(Mutex::<Vec<M3uFilterError>>::new(vec![]));
     let stats = Arc::new(Mutex::<Vec<SourceStats>>::new(vec![]));
@@ -497,7 +497,7 @@ fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
             std::collections::hash_map::Entry::Occupied(o) => {
                 sort_order.get_mut(*o.get()).unwrap().channels.extend(group.channels);
             }
-        };
+        }
     }
     sort_order
 }
@@ -543,7 +543,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
             match channel.header.epg_channel_id.as_ref() {
                 None => {normalized_epg_channel_ids.insert(normalize_channel_name(&channel.header.name), None);},
                 Some(epg_id) => {epg_channel_ids.insert(epg_id.to_string());},
-            };
+            }
         }
         // let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
         //     .filter_map(|c| c.header.epg_channel_id.as_ref()).map(|a| a.as_str()).collect();
@@ -568,10 +568,10 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
                         if c.header.epg_channel_id.is_some() && (c.header.logo.is_empty()  || c.header.logo_small.is_empty()) {
                             if let Some(icon) = epg_icons.get(c.header.epg_channel_id.as_ref().unwrap()) {
                                 if c.header.logo.is_empty() {
-                                    c.header.logo = icon.to_string();
+                                    c.header.logo = (*icon).to_string();
                                 }
                                 if c.header.logo_small.is_empty() {
-                                    c.header.logo = icon.to_string();
+                                    c.header.logo = (*icon).to_string();
                                 }
                             }
                         }
@@ -619,7 +619,7 @@ pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, tar
     }
     if let Ok(stats_msg) = serde_json::to_string(&serde_json::Value::Object(serde_json::map::Map::from_iter([("stats".to_string(), serde_json::to_value(stats).unwrap())]))) {
         // print stats
-        info!("{}", stats_msg);
+        info!("{stats_msg}");
         // send stats
         send_message(&MsgKind::Stats, cfg.messaging.as_ref(), stats_msg.as_str());
     }

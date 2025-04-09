@@ -169,10 +169,7 @@ where
 pub fn get_u64_from_serde_value(value: &Value) -> Option<u64> {
     match value {
         Value::Number(num_val) => num_val.as_u64(),
-        Value::String(str_val) => match str_val.parse::<u64>() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        },
+        Value::String(str_val) => str_val.parse::<u64>().ok(),
         _ => None,
     }
 }

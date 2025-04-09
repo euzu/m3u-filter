@@ -99,7 +99,7 @@ async fn index(
                 let base_href = format!(r#"<head><base href="/{web_ui_path}/">"#);
                 if let Some(pos) = new_content.find("<head>") {
                     new_content.replace_range(pos..pos + 6, &base_href);
-                };
+                }
 
                 return axum::response::Response::builder()
                     .header("Content-Type", mime::TEXT_HTML_UTF_8.as_ref())

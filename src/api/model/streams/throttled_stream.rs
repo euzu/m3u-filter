@@ -16,6 +16,7 @@ pub struct ThrottledStream<S> {
 }
 
 impl<S> ThrottledStream<S> {
+    #[allow(clippy::cast_precision_loss)]
     pub fn new(inner: S, throttle_kbps: usize) -> Self {
         assert!(throttle_kbps > 0, "Rate must be greater than 0");
         let rate_bytes_per_sec = (throttle_kbps as f64) *  1000.0 / 8.0;
@@ -33,6 +34,7 @@ where
 {
     type Item = Result<Bytes, StreamError>;
 
+    #[allow(clippy::cast_precision_loss)]
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = &mut *self;
 

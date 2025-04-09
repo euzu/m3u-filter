@@ -116,7 +116,7 @@ where
         // Initialize the index tree (BPlusTree) - either by deserializing an existing one or creating a new one
         let index_tree = if append_mode && index_path.exists() {
             IndexedDocumentIndex::<K>::load(&index_path).unwrap_or_else(|err| {
-                error!("Failed to load index {:?}: {}", index_path, err);
+                error!("Failed to load index {index_path:?}: {err}");
                 IndexedDocumentIndex::<K>::new()
             })
         } else {

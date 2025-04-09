@@ -126,7 +126,7 @@ pub fn read_api_proxy(config: &Config, api_proxy_file: &str, resolve_env: bool) 
             Ok(mut result) => {
                 match result.prepare(config) {
                     Err(err) => {
-                        exit!("cant read api-proxy-config file: {}", err);
+                        exit!("cant read api-proxy-config file: {err}");
                     }
                     _ => {
                         Some(result)
@@ -134,7 +134,7 @@ pub fn read_api_proxy(config: &Config, api_proxy_file: &str, resolve_env: bool) 
                 }
             }
             Err(err) => {
-                error!("cant read api-proxy-config file: {}", err);
+                error!("cant read api-proxy-config file: {err}");
                 None
             }
         }
@@ -192,26 +192,24 @@ const FIELD_PASSWORD: &str = "password";
 const FIELD_UNKNOWN: &str = "?";
 const DEFAULT_COLUMNS: &[&str] = &[FIELD_URL, FIELD_MAX_CON, FIELD_PRIO, FIELD_NAME, FIELD_USERNAME, FIELD_PASSWORD];
 
-fn csv_assign_mandatory_fields(alias: &mut ConfigInputAlias, input_type: &InputType) {
+fn csv_assign_mandatory_fields(alias: &mut ConfigInputAlias, input_type: InputType) {
     if !alias.url.is_empty() {
         match Url::parse(alias.url.as_str()) {
             Ok(url) => {
                 let (username, password) = get_credentials_from_url(&url);
                 if username.is_none() || password.is_none() {
                     // xtream url
-                    if input_type == &InputType::XtreamBatch {
+                    if input_type == InputType::XtreamBatch {
                         alias.url = url.origin().ascii_serialization().to_string();
-                    } else if input_type == &InputType::M3uBatch {
-                        if alias.username.is_some() && alias.password.is_some() {
-                            alias.url = format!("{}/get_php?username={}&password={}&type=m3u_plus",
-                                                url.origin().ascii_serialization().to_string(),
-                                                alias.username.as_deref().unwrap_or("").to_string(),
-                                                alias.password.as_deref().unwrap_or("").to_string()
-                            )
-                        }
+                    } else if input_type == InputType::M3uBatch && alias.username.is_some() && alias.password.is_some() {
+                        alias.url = format!("{}/get_php?username={}&password={}&type=m3u_plus",
+                                            url.origin().ascii_serialization(),
+                                            alias.username.as_deref().unwrap_or(""),
+                                            alias.password.as_deref().unwrap_or("")
+                        );
                     }
                 } else {
-                    if input_type == &InputType::XtreamBatch {
+                    if input_type == InputType::XtreamBatch {
                         alias.url = url.origin().ascii_serialization().to_string();
                     }
                     // m3u url
@@ -220,12 +218,12 @@ fn csv_assign_mandatory_fields(alias: &mut ConfigInputAlias, input_type: &InputT
                 }
 
                 if alias.name.is_empty() {
-                    let username = alias.username.as_ref().map(|s| s.as_str()).unwrap_or_default();
+                    let username = alias.username.as_deref().unwrap_or_default();
                     let domain: Vec<&str> = url.domain().unwrap_or_default().split('.').collect();
                     if domain.len() > 1 {
                         alias.name = format!("{}_{username}", domain[domain.len() - 2]);
                     } else {
-                        alias.name = format!("{username}");
+                        alias.name = username.to_string();
                     }
                 }
             }
@@ -273,7 +271,7 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
     let mut result = vec![];
     let mut default_columns = vec![];
     default_columns.extend_from_slice(DEFAULT_COLUMNS);
-    for line in reader.lines().into_iter() {
+    for line in reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue
@@ -298,8 +296,8 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
 
         let mut config_input = ConfigInputAlias {
             id: 0,
-            name: "".to_string(),
-            url: "".to_string(),
+            name: String::new(),
+            url: String::new(),
             username: None,
             password: None,
             priority: 0,
@@ -307,13 +305,12 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
         };
 
         let columns: Vec<&str> = line.split(CSV_SEPARATOR).collect();
-        for (&header, &value) in default_columns.iter().zip(columns.iter()).into_iter() {
+        for (&header, &value) in default_columns.iter().zip(columns.iter()) {
             if let Err(err) = csv_assign_config_input_column(&mut config_input, header, value) {
-                error!("Could not parse input line: {} err: {err}", line);
-                continue;
+                error!("Could not parse input line: {line} err: {err}");
             }
         }
-        csv_assign_mandatory_fields(&mut config_input, &input_type);
+        csv_assign_mandatory_fields(&mut config_input, input_type);
         result.push(config_input);
     }
     Ok(result)
@@ -330,7 +327,7 @@ pub fn csv_read_inputs(input: &ConfigInput) -> Result<Vec<ConfigInputAlias>, io:
         };
         match result {
             Ok(content) => {
-                return csv_read_inputs_from_reader(input.input_type.clone(), EnvResolvingReader::new(file_reader(Cursor::new(content))));
+                return csv_read_inputs_from_reader(input.input_type, EnvResolvingReader::new(file_reader(Cursor::new(content))));
             }
             Err(err) => {
                 return Err(err)

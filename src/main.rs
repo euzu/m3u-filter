@@ -122,11 +122,11 @@ fn main() {
 
     let targets = validate_targets(args.target.as_ref(), &cfg.sources).unwrap_or_else(|err| exit!("{}", err));
 
-    info!("Version: {}", VERSION);
+    info!("Version: {VERSION}");
     if let Some(bts) = BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string()) {
         info!("Build time: {bts}");
     }
-    info!("Current time: {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+    info!("Current time: {}", chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S"));
     info!("Working dir: {:?}", &cfg.working_dir);
     info!("Config dir: {:?}", &cfg.t_config_path);
     info!("Config file: {config_file:?}");
@@ -204,7 +204,7 @@ async fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
 async fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     if let Err(err) = api::main_api::start_server(cfg, targets).await {
         exit!("Can't start server: {err}");
-    };
+    }
 }
 
 fn get_log_level(log_level: &str) -> LevelFilter {

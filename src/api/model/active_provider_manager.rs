@@ -38,7 +38,7 @@ impl ProviderConfig {
             url: cfg.url.clone(),
             username: cfg.username.clone(),
             password: cfg.password.clone(),
-            input_type: cfg.input_type.clone(),
+            input_type: cfg.input_type,
             max_connections: cfg.max_connections,
             priority: cfg.priority,
             current_connections: AtomicU16::new(0),
@@ -52,7 +52,7 @@ impl ProviderConfig {
             url: alias.url.clone(),
             username: alias.username.clone(),
             password: alias.password.clone(),
-            input_type: cfg.input_type.clone(),
+            input_type: cfg.input_type,
             max_connections: alias.max_connections,
             priority: alias.priority,
             current_connections: AtomicU16::new(0),
@@ -60,7 +60,7 @@ impl ProviderConfig {
     }
 
     pub fn get_user_info(&self) -> Option<InputUserInfo> {
-        InputUserInfo::new(self.input_type.clone(), self.username.as_deref(), self.password.as_deref(), &self.url)
+        InputUserInfo::new(self.input_type, self.username.as_deref(), self.password.as_deref(), &self.url)
     }
 
     #[inline]
@@ -259,7 +259,8 @@ impl MultiProviderLineup {
             ProviderPriorityGroup::MultiProviderGroup(index, pg) => {
                 let mut idx = index.load(Ordering::SeqCst);
                 let provider_count = pg.len();
-                for _ in idx..provider_count {
+                let start = idx;
+                for _ in start..provider_count {
                     let p = pg.get(idx).unwrap();
                     idx = (idx + 1) % provider_count;
                     let result = p.try_allocate(grace);

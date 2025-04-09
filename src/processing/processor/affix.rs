@@ -22,7 +22,7 @@ fn validate_and_create_affix_processor(affix: Option<&InputAffix>, is_prefix: bo
         if (valid_property!(&affix_def.field.as_str(), AFFIX_FIELDS) && !affix_def.value.is_empty()) {
             return Some(create_affix_processor(affix_def, is_prefix));
         }
-    };
+    }
     None
 }
 

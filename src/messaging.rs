@@ -32,7 +32,7 @@ fn send_http_post_request(msg: &str, messaging: &MessagingConfig) {
                 .await
             {
                 Ok(_) => debug!("Text message sent successfully to rest api"),
-                Err(e) => error!("Text message wasn't sent to rest api because of: {}", e),
+                Err(e) => error!("Text message wasn't sent to rest api because of: {e}"),
             }
         });
     }
@@ -43,8 +43,8 @@ fn send_telegram_message(msg: &str, messaging: &MessagingConfig) {
         for chat_id in &telegram.chat_ids {
             let bot = rustelebot::create_instance(&telegram.bot_token, chat_id);
             match rustelebot::send_message(&bot, msg, None) {
-                Ok(()) => debug!("Text message sent successfully to {}", chat_id),
-                Err(e) => error!("Text message wasn't sent to {} because of: {}", chat_id, e)
+                Ok(()) => debug!("Text message sent successfully to {chat_id}"),
+                Err(e) => error!("Text message wasn't sent to {chat_id} because of: {e}")
             }
         }
     }

@@ -76,6 +76,7 @@ use crate::api::model::streams::throttled_stream::ThrottledStream;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::default_utils::default_grace_period_millis;
 
+#[allow(clippy::missing_panics_doc)]
 pub async fn serve_file(file_path: &Path, mime_type: mime::Mime) -> impl axum::response::IntoResponse + Send {
     if file_path.exists() {
         return match tokio::fs::File::open(file_path).await {
@@ -165,8 +166,7 @@ fn get_stream_alternative_url(stream_url: &str, input: &ConfigInput, alias_input
 
     let modified = stream_url.replace(&input_user_info.base_url, &alt_input_user_info.base_url);
     let modified = modified.replace(&input_user_info.username, &alt_input_user_info.username);
-    let modified = modified.replace(&input_user_info.password, &alt_input_user_info.password);
-    modified
+    modified.replace(&input_user_info.password, &alt_input_user_info.password)
 }
 
 type StreamUrl = String;
@@ -221,11 +221,12 @@ fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Opti
             }
             ProviderAllocation::Available(provider)
             | ProviderAllocation::GracePeriod(provider) => {
-                let (provider, url) = if provider.id != input.id {
-                    (provider.name.to_string(), get_stream_alternative_url(stream_url, input, &provider))
-                } else {
+                let (provider, url) = if provider.id == input.id {
                     (input.name.to_string(), stream_url.to_string())
+                } else {
+                    (provider.name.to_string(), get_stream_alternative_url(stream_url, input, provider))
                 };
+
 
                 if matches!(allocation, ProviderAllocation::Available(_)) {
                     StreamingOption::AvailableStream(Some(provider), url)
@@ -244,7 +245,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                                         req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
                                         item_type: PlaylistItemType, share_stream: bool) -> StreamDetails {
     let (stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt);
-    let config_grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map(|s| s.grace_period_millis).unwrap_or_else(default_grace_period_millis);
+    let config_grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
     let grace_period_millis = if config_grace_period_millis > 0 && matches!(stream_response_params, StreamingOption::GracePeriodStream(_, _)) { config_grace_period_millis } else { 0 };
     match stream_response_params {
         StreamingOption::CustomStream(provider_stream) => {
@@ -262,11 +263,11 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
             let parsed_url = Url::parse(&request_url);
             let ((stream, stream_info), reconnect_flag) = if let Ok(url) = parsed_url {
                 if stream_options.pipe_provider_stream {
-                    (provider_stream::get_provider_pipe_stream(app_state, &url, req_headers, input_headers, item_type).await, None)
+                    (provider_stream::get_provider_pipe_stream(app_state, &url, req_headers, input_headers.as_ref(), item_type).await, None)
                 } else {
-                    let buffer_stream_options = BufferStreamOptions::new(item_type, share_stream, &stream_options);
+                    let buffer_stream_options = BufferStreamOptions::new(item_type, share_stream, stream_options);
                     let reconnect_flag = buffer_stream_options.get_reconnect_flag_clone();
-                    (provider_stream::get_provider_reconnect_buffered_stream(app_state, &url, req_headers, input_headers, buffer_stream_options).await,
+                    (provider_stream::get_provider_reconnect_buffered_stream(app_state, &url, req_headers, input_headers.as_ref(), buffer_stream_options).await,
                      Some(reconnect_flag))
                 }
             } else {
@@ -320,12 +321,12 @@ pub async fn stream_response(app_state: &AppState,
 
     let stream_options = get_stream_options(app_state);
     let stream_details =
-        create_stream_response_details(app_state, &stream_options, &stream_url, req_headers, input, item_type, share_stream).await;
+        create_stream_response_details(app_state, &stream_options, stream_url, req_headers, input, item_type, share_stream).await;
 
     if stream_details.has_stream() {
         // let content_length = get_stream_content_length(provider_response.as_ref());
-        let provider_response = stream_details.stream_info.as_ref().map_or(None, |(h, sc)| Some((h.clone(), sc.clone())));
-        let stream = ActiveClientStream::new(stream_details, app_state, &user).await;
+        let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
+        let stream = ActiveClientStream::new(stream_details, app_state, user).await;
         let stream_resp = if share_stream {
             // Shared Stream response
             let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
@@ -381,7 +382,7 @@ async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &P
         if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url).await {
             let (status_code, header_map) = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)));
             let stream_details = StreamDetails::from_stream(stream);
-            let stream = ActiveClientStream::new(stream_details, app_state, &user).await.boxed();
+            let stream = ActiveClientStream::new(stream_details, app_state, user).await.boxed();
             let mut response = axum::response::Response::builder()
                 .status(status_code);
             for (key, value) in &header_map {

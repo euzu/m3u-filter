@@ -70,6 +70,6 @@ impl HlsCache {
             self.counter.store(1, std::sync::atomic::Ordering::SeqCst);
             return 1;
         }
-        return token;
+        token
     }
 }

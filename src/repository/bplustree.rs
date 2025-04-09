@@ -534,7 +534,7 @@ where
                 error!("Failed to read id tree from file {err}");
                 return None;
             }
-        };
+        }
     }
 }
 //
@@ -671,7 +671,7 @@ where
                     error!("Failed to read id tree from file {err}");
                     return Err(io::Error::new(io::ErrorKind::NotFound, format!("Failed to read id tree from file {err}")));
                 }
-            };
+            }
         }
     }
 }

@@ -56,7 +56,7 @@ pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input:
                                 return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
                             }
                         }
-                    };
+                    }
 
                     if filepath.exists() {
                         Some(filepath)
@@ -72,8 +72,8 @@ pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input:
 
         result.map_or_else(|| {
             let msg = format!("cant read input url: {}", sanitize_sensitive_info(url_str));
-            error!("{}", msg);
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
+            error!("{msg}");
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{msg}")
         }, Ok)
     }
 }
@@ -103,7 +103,7 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
                                 return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
                             }
                         }
-                    };
+                    }
 
                     match get_local_file_content(&filepath) {
                         Ok(content) => Some(content),
@@ -119,8 +119,8 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
         };
         result.map_or_else(|| {
             let msg = format!("cant read input url: {}", sanitize_sensitive_info(url_str));
-            error!("{}", msg);
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{}", msg)
+            error!("{msg}");
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{msg}")
         }, Ok)
     }
 }
@@ -159,7 +159,7 @@ pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, cu
     if log_enabled!(Level::Trace) {
         let he: HashMap<String, String> = headers.iter().map(|(k, v)| (k.to_string(), String::from_utf8_lossy(v.as_bytes()).to_string())).collect();
         if !he.is_empty() {
-            trace!("Request headers {:?}", he);
+            trace!("Request headers {he:?}");
         }
     }
     headers
@@ -245,7 +245,7 @@ async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, u
                                     match decoder.read_to_string(&mut decode_buffer) {
                                         Ok(_) => {}
                                         Err(err) => return Err(str_to_io_error(&format!("failed to decode gzip content {err}")))
-                                    };
+                                    }
                                 }
                                 ENCODING_DEFLATE => {
                                     let mut decoder = ZlibDecoder::new(&bytes[..]);
@@ -255,7 +255,7 @@ async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, u
                                     }
                                 }
                                 _ => {}
-                            };
+                            }
                         }
 
                         if decode_buffer.is_empty() {
@@ -490,7 +490,7 @@ pub fn get_credentials_from_url(url: &Url) -> (Option<String>, Option<String>) {
 }
 
 pub fn get_credentials_from_url_str(url_with_credentials: &str) -> (Option<String>, Option<String>) {
-    if let Ok(url) = Url::parse(&url_with_credentials) {
+    if let Ok(url) = Url::parse(url_with_credentials) {
         get_credentials_from_url(&url)
     } else {
         (None, None)

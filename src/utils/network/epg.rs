@@ -11,7 +11,7 @@ pub async fn get_xmltv(client: Arc<reqwest::Client>, _cfg: &Config, input: &Conf
     match &input.epg_url {
         None => (None, vec![]),
         Some(url) => {
-            debug!("Getting epg file path for url: {}", url);
+            debug!("Getting epg file path for url: {url}");
             let persist_file_path = prepare_file_path(input.persist.as_deref(), working_dir, "")
                 .map(|path| file_utils::add_prefix_to_filename(&path, "epg_", Some("xml")));
 

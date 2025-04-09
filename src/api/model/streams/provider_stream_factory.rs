@@ -174,7 +174,7 @@ fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Opti
 
 fn get_client_stream_request_params(
     req_headers: &HeaderMap,
-    input_headers: Option<HashMap<String, String>>,
+    input_headers: Option<&HashMap<String, String>>,
     options: &BufferStreamOptions) -> (usize, Option<usize>, bool, u32, HeaderMap)
 {
     let stream_buffer_size = if options.is_buffer_enabled() { options.get_stream_buffer_size() } else { 0 };
@@ -186,7 +186,7 @@ fn get_client_stream_request_params(
     req_headers.remove("range");
 
     // We merge configured input headers with the headers from the request.
-    let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
+    let headers = get_request_headers(input_headers, Some(&req_headers));
 
     (stream_buffer_size, req_range_start_bytes, options.is_reconnect_enabled(), options.force_reconnect_secs, headers)
 }
@@ -287,7 +287,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                 }
             }
             Err(err) => {
-                debug!("Server connection failed with {err}")
+                debug!("Server connection failed with {err}");
             }
         }
         if !stream_options.should_continue() {
@@ -317,7 +317,7 @@ async fn get_initial_stream(cfg: &Config, client: Arc<reqwest::Client>, stream_o
                     warn!("The stream could be unavailable. ({status}) {}", sanitize_sensitive_info(stream_options.get_url().as_str()));
                 }
             }
-        };
+        }
         if connect_err > ERR_MAX_RETRY_COUNT {
             break;
         }
@@ -334,7 +334,7 @@ async fn get_initial_stream(cfg: &Config, client: Arc<reqwest::Client>, stream_o
 
 fn create_provider_stream_options(stream_url: &Url,
                                   req_headers: &HeaderMap,
-                                  input_headers: Option<HashMap<String, String>>,
+                                  input_headers: Option<&HashMap<String, String>>,
                                   options: &BufferStreamOptions) -> ProviderStreamOptions {
     let (buffer_size, req_range_start_bytes, reconnect, reconnect_force_secs, headers)
         = get_client_stream_request_params(req_headers, input_headers, options);
@@ -356,7 +356,7 @@ pub async fn create_provider_stream(cfg: &Config,
                                     client: Arc<reqwest::Client>,
                                     stream_url: &Url,
                                     req_headers: &HeaderMap,
-                                    input_headers: Option<HashMap<String, String>>,
+                                    input_headers: Option<&HashMap<String, String>>,
                                     options: BufferStreamOptions) -> Option<ProviderStreamFactoryResponse> {
     let stream_options = create_provider_stream_options(stream_url, req_headers, input_headers, &options);
 

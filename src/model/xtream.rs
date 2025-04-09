@@ -599,7 +599,7 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
         XtreamCluster::Series => {
             document.insert("series_id".to_string(), stream_id_value);
         }
-    };
+    }
 
     let props = pli.additional_properties.as_ref().and_then(|add_props| serde_json::from_str::<Map<String, Value>>(add_props).ok());
 
@@ -627,7 +627,7 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
             append_mandatory_fields(&mut document, SERIES_STREAM_FIELDS);
             append_release_date(&mut document);
         }
-    };
+    }
 
     rewrite_doc_urls(resource_url.as_ref(), &mut document, XTREAM_VOD_REWRITE_URL_PROPS, "");
 
@@ -650,7 +650,7 @@ pub fn rewrite_doc_urls(resource_url: Option<&String>, document: &mut Map<String
                             .collect()));
                 }
                 _ => {}
-            };
+            }
         }
         for &field in fields {
             if let Some(Value::String(value)) = document.get(field) {

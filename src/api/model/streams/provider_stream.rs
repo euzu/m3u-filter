@@ -26,7 +26,7 @@ pub enum CustomVideoStreamType {
 
 fn create_video_stream(video: Option<&Arc<Vec<u8>>>, headers: &[(String, String)], log_message: &str) -> ProviderStreamResponse {
     if let Some(video) = video {
-        trace!("{}", log_message);
+        trace!("{log_message}");
         let mut response_headers: Vec<(String, String)> = headers.iter()
             .filter(|(key, _)| !(key.eq("content-type") || key.eq("content-length") || key.contains("range")))
             .map(|(key, value)| (key.to_string(), value.to_string())).collect();
@@ -76,7 +76,7 @@ pub fn get_header_filter_for_item_type(item_type: PlaylistItemType) -> HeaderFil
 pub async fn get_provider_pipe_stream(app_state: &AppState,
                                       stream_url: &Url,
                                       req_headers: &HeaderMap,
-                                      input_headers: Option<HashMap<String, String>>,
+                                      input_headers: Option<&HashMap<String, String>>,
                                       item_type: PlaylistItemType) -> ProviderStreamResponse {
     let filter_header = get_header_filter_for_item_type(item_type);
     let req_headers = get_headers_from_request(req_headers, &filter_header);
@@ -84,7 +84,7 @@ pub async fn get_provider_pipe_stream(app_state: &AppState,
     // These are the configured headers for this input.
     // The stream url, we need to clone it because of move to async block.
     // We merge configured input headers with the headers from the request.
-    let headers = get_request_headers(input_headers.as_ref(), Some(&req_headers));
+    let headers = get_request_headers(input_headers, Some(&req_headers));
     let client = app_state.http_client.get(stream_url.clone()).headers(headers.clone());
     match client.send().await {
         Ok(response) => {
@@ -114,7 +114,7 @@ pub async fn get_provider_pipe_stream(app_state: &AppState,
 pub async fn get_provider_reconnect_buffered_stream(app_state: &AppState,
                                                     stream_url: &Url,
                                                     req_headers: &HeaderMap,
-                                                    input_headers: Option<HashMap<String, String>>,
+                                                    input_headers: Option<&HashMap<String, String>>,
                                                     options: BufferStreamOptions) -> ProviderStreamResponse {
     match create_provider_stream(&app_state.config, Arc::clone(&app_state.http_client), stream_url, req_headers, input_headers, options).await {
         None => (None, None),

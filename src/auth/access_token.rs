@@ -1,6 +1,6 @@
-use chrono::{Utc};
-use serde::{Serialize, Deserialize};
-use crate::repository::storage::hex_encode;
+use crate::repository::storage::{hex_decode, hex_encode};
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
@@ -8,50 +8,56 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct AccessToken {
-    timestamp: i64,
-    ttl_secs: i64,
-    signature: String,
+    ts: i64,
+    ttl: i64,
+    sig: String,
 }
 
-pub fn create_access_token(secret: &[u8; 32], ttl_secs: i64) -> String {
+pub fn create_access_token(secret: &[u8; 32], ttl_secs: u16) -> String {
     let timestamp = Utc::now().timestamp();
-    let data = format!("{}", timestamp);
-
-    let hash = blake3::keyed_hash(secret, data.as_bytes());
+    let timestamp_bytes = timestamp.to_le_bytes();
+    let ttl_secs_bytes = ttl_secs.to_le_bytes();
+    let hash = blake3::keyed_hash(secret, &timestamp_bytes);
     let signature = hex_encode(hash.as_bytes());
-
-    // token as json
-    let token = AccessToken {
-        timestamp,
-        ttl_secs,
-        signature,
-    };
-
-    // serialize as json
-    serde_json::to_string(&token).unwrap()
+    format!("{}{}{signature}", hex_encode(&timestamp_bytes), hex_encode(&ttl_secs_bytes))
 }
 
 pub fn verify_access_token(token_str: &str, secret: &[u8; 32]) -> bool {
-    // deserialize token
-    let token: AccessToken = serde_json::from_str(token_str).unwrap();
-
-    // Validate time
-    let current_timestamp = Utc::now().timestamp();
-    if current_timestamp - token.timestamp > token.ttl_secs {
+    if token_str.len() < 52 {
         return false;
     }
 
-    // Create HMAC-Hash for the timestamp with blake3
-    let data = token.timestamp.to_string();
-    let expected = blake3::keyed_hash(secret, data.as_bytes());
-    let expected_hash = hex_encode(expected.as_bytes());
-    constant_time_eq(expected_hash.as_bytes(), token.signature.as_bytes())
+    let timestamp_bytes = hex_decode(&token_str[0..16]).unwrap_or_default();
+    if timestamp_bytes.len() != 8 {
+        return false;
+    }
+
+    let timestamp = i64::from_le_bytes(timestamp_bytes.try_into().unwrap_or([0; 8]));
+
+    if timestamp == 0 {
+        return false;
+    }
+
+    let ttl_bytes = hex_decode(&token_str[16..20]).unwrap_or_default();
+    if ttl_bytes.len() != 2 {
+        return false;
+    }
+    let ttl_secs = u16::from_le_bytes(ttl_bytes.try_into().unwrap_or([0; 2]));
+    let signature = hex_decode(&token_str[20..]).unwrap_or_default();
+
+    let current_timestamp = Utc::now().timestamp();
+    if current_timestamp - timestamp > i64::from(ttl_secs) {
+        return false;
+    }
+
+    let expected = blake3::keyed_hash(secret, &timestamp.to_le_bytes());
+    constant_time_eq(expected.as_bytes(), &signature)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
     use crate::auth::access_token::{create_access_token, verify_access_token};
+    use std::thread;
 
     #[test]
     fn test_valid_token() {

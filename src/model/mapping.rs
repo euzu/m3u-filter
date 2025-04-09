@@ -279,9 +279,9 @@ impl MappingValueProcessor<'_> {
 
     fn set_property(&mut self, key: &str, value: &str) {
         if !self.pli.header.set_field(key, value) {
-            error!("Cant set unknown field {} to {}", key, value);
+            error!("Cant set unknown field {key} set to {value}");
         }
-        trace!("Property {} set to {}", key, value);
+        trace!("Property {key} set to {value}");
     }
 
     fn apply_attributes(&mut self, captured_names: &HashMap<&str, &str>) {
@@ -319,7 +319,7 @@ impl MappingValueProcessor<'_> {
                         if let Some(cap_value) = captures.get(cap.as_str()) {
                             captured_tag_values.push(cap_value);
                         } else {
-                            debug!("Cant find any tag match for {}", tag_capture);
+                            debug!("Cant find any tag match for {tag_capture}");
                             return None;
                         }
                     }
@@ -417,7 +417,7 @@ impl ValueProcessor for MappingValueProcessor<'_> {
                         } else {
                             ""
                         };
-                        debug!("match {}: {}", capture_name, capture_value);
+                        debug!("match {capture_name}: {capture_value}");
                         captured_values.insert(capture_name.as_str(), capture_value);
                     }
                 );
@@ -492,7 +492,7 @@ impl MappingDefinition {
                 }
                 Err(err) => return Err(err),
             }
-        };
+        }
         for mapping in &mut self.mapping {
             let template_list = self.templates.as_ref();
             let tag_list = self.tags.as_ref();

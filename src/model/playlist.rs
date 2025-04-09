@@ -121,7 +121,7 @@ impl FromStr for PlaylistItemType {
             "LiveUnknown" => Ok(PlaylistItemType::LiveUnknown),
             "LiveHls" => Ok(PlaylistItemType::LiveHls),
             "LiveDash" => Ok(PlaylistItemType::LiveDash),
-            _ => Err(format!("Invalid PlaylistItemType: {}", s)),
+            _ => Err(format!("Invalid PlaylistItemType: {s}")),
         }
     }
 }
