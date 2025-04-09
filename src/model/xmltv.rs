@@ -19,9 +19,9 @@ pub struct XmlTag {
     pub name: String,
     pub value: Option<String>,
     pub attributes: Option<Arc<HashMap<String, String>>>,
-    pub t_attributes: Option<HashMap<String, String>>,
     pub children: Option<Vec<Arc<XmlTag>>>,
     pub icon: Option<String>,
+    pub normalized_epg_id: Option<String>,
 }
 
 impl XmlTag {

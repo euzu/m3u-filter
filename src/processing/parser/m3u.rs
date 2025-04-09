@@ -1,7 +1,6 @@
 use std::borrow::BorrowMut;
 use crate::model::config::{Config, ConfigInput};
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
-use crate::processing::parser::xmltv::normalize_channel_name;
 use crate::utils::hash_utils::extract_id_from_url;
 use crate::utils::string_utils;
 
@@ -125,15 +124,12 @@ fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, u
         }
 
         if plih.id.is_empty() {
-            let channel_id = normalize_channel_name(&plih.name);
+            plih.epg_channel_id = None;
             if let Some(chanid) = extract_id_from_url(url) {
                 plih.id = chanid;
-            } else {
-                plih.id = channel_id.to_string();
             }
-            plih.epg_channel_id = Some(channel_id);
         } else {
-            plih.epg_channel_id = Some(plih.id.to_lowercase().to_string());
+            plih.epg_channel_id = Some(plih.id.to_string());
         }
     }
 

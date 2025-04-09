@@ -1,13 +1,12 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use serde_json::Value;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result};
+use crate::m3u_filter_error::{create_m3u_filter_error_result, M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::model::xtream::{XtreamCategory, XtreamSeriesInfo, XtreamSeriesInfoEpisode, XtreamStream};
-use crate::processing::parser::xmltv::normalize_channel_name;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::network::xtream::{get_xtream_stream_url_base, ACTION_GET_SERIES_INFO};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 fn map_to_xtream_category(categories: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(categories.to_owned()) {
@@ -101,8 +100,8 @@ pub fn create_xtream_url(xtream_cluster: XtreamCluster, url: &str, username: &st
                          stream: &XtreamStream, live_stream_use_prefix: bool, live_stream_without_extension: bool) -> String {
     if stream.direct_source.is_empty() {
         get_xtream_url(xtream_cluster, url, username, password, stream.get_stream_id(),
-                               stream.container_extension.as_ref().map(std::string::ToString::to_string).as_ref(),
-                               live_stream_use_prefix, live_stream_without_extension)
+                       stream.container_extension.as_ref().map(std::string::ToString::to_string).as_ref(),
+                       live_stream_use_prefix, live_stream_without_extension)
     } else {
         stream.direct_source.to_string()
     }
@@ -139,6 +138,15 @@ pub fn parse_xtream(input: &ConfigInput,
                         let category_name = &group.category_name;
                         let stream_url = create_xtream_url(xtream_cluster, url, username, password, stream, live_stream_use_prefix, live_stream_without_extension);
                         let item_type = PlaylistItemType::from(xtream_cluster);
+                        // EPG Channel id fix, remove empty
+                        stream.epg_channel_id = if let XtreamCluster::Live = xtream_cluster {
+                            stream.epg_channel_id.as_ref()
+                                .filter(|epg_id| !epg_id.trim().is_empty())
+                                .map(|epg_id| epg_id.to_lowercase())
+                                .or(None)
+                        } else {
+                            None
+                        };
                         let item = PlaylistItem {
                             header: PlaylistItemHeader {
                                 id: stream.get_stream_id().to_string(),
@@ -148,7 +156,7 @@ pub fn parse_xtream(input: &ConfigInput,
                                 group: category_name.to_string(),
                                 title: stream.name.to_string(),
                                 url: stream_url.to_string(),
-                                epg_channel_id: Some(normalize_channel_name(stream.epg_channel_id.as_ref().map_or_else(|| &stream.name,  |id| id))),
+                                epg_channel_id: stream.epg_channel_id.clone(),
                                 item_type,
                                 xtream_cluster,
                                 additional_properties: stream.get_additional_properties(),

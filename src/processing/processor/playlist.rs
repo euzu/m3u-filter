@@ -26,7 +26,7 @@ use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor
 use crate::model::stats::{InputStats, PlaylistStats, SourceStats, TargetStats};
 use crate::processing::processor::affix::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
-use crate::processing::parser::xmltv::flatten_tvguide;
+use crate::processing::parser::xmltv::{flatten_tvguide, normalize_channel_name};
 use crate::processing::processor::xtream_series::playlist_resolve_series;
 use crate::processing::processor::xtream_vod::playlist_resolve_vod;
 use crate::repository::playlist_repository::persist_playlist;
@@ -537,22 +537,43 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     // we need to process each input epg.
     for mut fp in processed_fetched_playlists {
         // collect all epg_channel ids
-        let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
-            .filter_map(|c| c.header.epg_channel_id.as_ref()).collect();
-        if epg_channel_ids.is_empty() {
-            debug_if_enabled!("channel ids are empty");
+        let mut epg_channel_ids: HashSet<String> = HashSet::new();
+        let mut normalized_epg_channel_ids: HashMap<String, Option<String>> = HashMap::new();
+        for channel in fp.playlistgroups.iter().flat_map(|g| &g.channels) {
+            match channel.header.epg_channel_id.as_ref() {
+                None => {normalized_epg_channel_ids.insert(normalize_channel_name(&channel.header.name), None);},
+                Some(epg_id) => {epg_channel_ids.insert(epg_id.to_string());},
+            };
+        }
+        // let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
+        //     .filter_map(|c| c.header.epg_channel_id.as_ref()).map(|a| a.as_str()).collect();
+        if epg_channel_ids.is_empty() && normalized_epg_channel_ids.is_empty() {
+            debug!("channel ids are empty");
         } else if let Some(tv_guide) = fp.epg {
-            debug!("found epg information for {}", &target.name);
-            if let Some(epg) = tv_guide.filter(&epg_channel_ids) {
+            debug_if_enabled!("found epg information for {}", &target.name);
+            if let Some(epg) = tv_guide.filter(&mut epg_channel_ids, &mut normalized_epg_channel_ids) {
                 let epg_icons: HashMap<&String, &String> = epg.children.iter()
                     .filter(|tag| tag.icon.is_some() && tag.get_attribute_value(EPG_ATTRIB_ID).is_some())
                     .map(|t| (t.get_attribute_value(EPG_ATTRIB_ID).unwrap(), t.icon.as_ref().unwrap())).collect();
                 fp.playlistgroups.iter_mut()
                     .flat_map(|g| &mut g.channels)
-                    .filter(|c| c.header.epg_channel_id.is_some() && c.header.logo == "")
+                    .filter(|c| c.header.xtream_cluster == XtreamCluster::Live )
+                    .filter(|c| c.header.epg_channel_id.is_none() || c.header.logo.is_empty() || c.header.logo_small.is_empty())
                     .for_each(|c| {
-                        if let Some(icon) = epg_icons.get(c.header.epg_channel_id.as_ref().unwrap()) {
-                            c.header.logo = icon.to_string();
+                        if c.header.epg_channel_id.as_ref().is_none() {
+                            if let Some(Some(epg_id)) = normalized_epg_channel_ids.get(&normalize_channel_name(&c.header.name)) {
+                                c.header.epg_channel_id = Some(epg_id.to_string());
+                            }
+                        }
+                        if c.header.epg_channel_id.is_some() && (c.header.logo.is_empty()  || c.header.logo_small.is_empty()) {
+                            if let Some(icon) = epg_icons.get(c.header.epg_channel_id.as_ref().unwrap()) {
+                                if c.header.logo.is_empty() {
+                                    c.header.logo = icon.to_string();
+                                }
+                                if c.header.logo_small.is_empty() {
+                                    c.header.logo = icon.to_string();
+                                }
+                            }
                         }
                     });
                 new_epg.push(epg);

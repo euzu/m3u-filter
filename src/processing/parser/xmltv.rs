@@ -26,8 +26,8 @@ pub fn normalize_channel_name(name: &str) -> String {
 }
 
 impl TVGuide {
-    pub fn filter(&self, epg_channel_ids: &HashSet<&String>) -> Option<Epg> {
-        if epg_channel_ids.is_empty() {
+    pub fn filter(&self, epg_channel_ids: &mut HashSet<String>, normalized_epg_channel_ids: &mut HashMap<String, Option<String>>) -> Option<Epg> {
+        if epg_channel_ids.is_empty() && normalized_epg_channel_ids.is_empty() {
             return None;
         }
         match CompressedFileReader::new(&self.file) {
@@ -35,21 +35,35 @@ impl TVGuide {
                 let mut children: Vec<XmlTag> = vec![];
                 let mut tv_attributes: Option<Arc<HashMap<String, String>>> = None;
                 let mut filter_tags = |tag: XmlTag| {
-                    if match tag.name.as_str() {
+                    match tag.name.as_str() {
                         EPG_TAG_CHANNEL => {
-                            tag.get_attribute_value(EPG_ATTRIB_ID).is_some_and(|val| epg_channel_ids.contains(val))
+                            if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
+                                if let Some(normalized_epg_id) = tag.normalized_epg_id.as_ref() {
+                                    match normalized_epg_channel_ids.entry(normalized_epg_id.to_string()) {
+                                        std::collections::hash_map::Entry::Occupied(mut entry) => {
+                                            entry.insert(Some(epg_id.to_string()));
+                                            epg_channel_ids.insert(epg_id.to_string());
+                                        }
+                                        std::collections::hash_map::Entry::Vacant(_entry) => {}
+                                    };
+                                }
+                                if epg_channel_ids.contains(epg_id.as_str()) {
+                                    children.push(tag);
+                                }
+                            }
                         }
                         EPG_TAG_PROGRAMME => {
-                            tag.get_attribute_value(EPG_ATTRIB_CHANNEL).is_some_and(|val| epg_channel_ids.contains(val))
-                        },
+                            if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
+                                if epg_channel_ids.contains(epg_id.as_str()) {
+                                    children.push(tag);
+                                }
+                            }
+                        }
                         EPG_TAG_TV => {
                             tv_attributes.clone_from(&tag.attributes);
-                            false
-                        },
-                        _ => false,
-                    } {
-                        children.push(tag);
-                    }
+                        }
+                        _ => {}
+                    };
                 };
 
                 parse_tvguide(&mut reader, &mut filter_tags);
@@ -80,7 +94,7 @@ where
             Ok(Event::Eof) => break,
             Ok(Event::Start(e)) => {
                 let name = String::from_utf8_lossy(e.name().as_ref()).as_ref().to_owned();
-                let (is_tv_tag, is_channel, is_program)  = match name.as_str() {
+                let (is_tv_tag, is_channel, is_program) = match name.as_str() {
                     EPG_TAG_TV => (true, false, false),
                     EPG_TAG_CHANNEL => (false, true, false),
                     EPG_TAG_PROGRAMME => (false, false, true),
@@ -90,7 +104,7 @@ where
                     .filter_map(|a| {
                         let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
                         let mut value = String::from(a.unescape_value().unwrap().as_ref());
-                        if (is_channel &&  key == EPG_ATTRIB_ID) || (is_program &&  key == EPG_ATTRIB_CHANNEL) {
+                        if (is_channel && key == EPG_ATTRIB_ID) || (is_program && key == EPG_ATTRIB_CHANNEL) {
                             value = value.to_lowercase().to_string();
                         }
                         if value.is_empty() {
@@ -99,18 +113,17 @@ where
                             Some((key, value))
                         }
                     }).collect::<HashMap<String, String>>();
-                let attribs = if attributes.is_empty() { None } else { Some(attributes) };
-                let mut tag = XmlTag {
+                let attribs = if attributes.is_empty() { None } else { Some(Arc::new(attributes)) };
+                let tag = XmlTag {
                     name,
                     value: None,
-                    t_attributes: attribs,
-                    attributes: None,
+                    attributes: attribs,
                     children: None,
                     icon: None,
+                    normalized_epg_id: None,
                 };
 
                 if is_tv_tag {
-                    tag.attributes = tag.t_attributes.take().map(|v| Arc::new(v));
                     callback(tag);
                 } else {
                     stack.push(tag);
@@ -120,20 +133,12 @@ where
                 if !stack.is_empty() {
                     if let Some(mut tag) = stack.pop() {
                         if tag.name == EPG_TAG_CHANNEL {
-                           let has_chan_id = tag.get_attribute_value(EPG_ATTRIB_ID).is_some();
-                           if let Some(children) = &mut tag.children {
+                            if let Some(children) = &mut tag.children {
                                 for child in children {
                                     match child.name.as_str() {
                                         EPG_TAG_DISPLAY_NAME => {
-                                            if !has_chan_id {
-                                                if let Some(name) = &child.value {
-                                                    let norm = normalize_channel_name(name);
-                                                    if let Some(attribs) = tag.t_attributes.as_mut() {
-                                                        attribs.insert(EPG_ATTRIB_ID.to_string(), norm);
-                                                    } else {
-                                                        tag.t_attributes = Some(HashMap::from([(EPG_ATTRIB_ID.to_string(), norm)]));
-                                                    }
-                                                }
+                                            if let Some(name) = &child.value {
+                                                tag.normalized_epg_id = Some(normalize_channel_name(name));
                                             }
                                         }
                                         EPG_TAG_ICON => {
@@ -144,18 +149,16 @@ where
                                         _ => {}
                                     }
                                 }
-                           }
+                            }
 
-                           if let Some(chan_id) =  tag.get_attribute_value(EPG_ATTRIB_ID) {
+                            if let Some(chan_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
                                 if !chan_id.is_empty() {
-                                    tag.attributes = tag.t_attributes.take().map(|v| Arc::new(v));
                                     callback(tag);
                                 }
-                           }
+                            }
                         } else if tag.name == EPG_TAG_PROGRAMME {
                             if let Some(chan_id) = tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
                                 if !chan_id.is_empty() {
-                                    tag.attributes = tag.t_attributes.take().map(|v| Arc::new(v));
                                     callback(tag);
                                 }
                             }
@@ -164,9 +167,9 @@ where
                                 let rc_tag = Arc::new(tag);
                                 r.children = Some(
                                     r.children.map_or_else(|| vec![Arc::clone(&rc_tag)], |mut c| {
-                                                          c.push(Arc::clone(&rc_tag));
-                                                          c
-                                                      }));
+                                        c.push(Arc::clone(&rc_tag));
+                                        c
+                                    }));
                                 r
                             }) {
                                 stack.push(old_tag);
@@ -227,6 +230,8 @@ pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
 #[cfg(test)]
 mod tests {
     use crate::model::xmltv::TVGuide;
+    use crate::processing::parser::xmltv::normalize_channel_name;
+    use std::collections::{HashMap, HashSet};
     use std::io;
     use std::path::PathBuf;
 
@@ -235,12 +240,11 @@ mod tests {
         let file_path = PathBuf::from("/tmp/epg.xml.gz");
 
         if file_path.exists() {
-            let tv_guide = TVGuide { file:  file_path};
+            let tv_guide = TVGuide { file: file_path };
 
-            let channel_ids = vec!["channel.1", "channel.2", "channel.3"];
-            let channel_ids =  channel_ids.into_iter().map(|s| s).collect();
-
-            match tv_guide.filter(&channel_ids) {
+            let mut channel_ids = HashSet::from(["channel.1".to_string(), "channel.2".to_string(), "channel.3".to_string()]);
+            let mut nomalized = HashMap::new();
+            match tv_guide.filter(&mut channel_ids, &mut nomalized) {
                 None => assert!(false, "No epg filtered"),
                 Some(epg) => {
                     assert_eq!(epg.children.len(), channel_ids.len() * 2, "Epg size does not match")
@@ -248,5 +252,10 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    #[test]
+    fn normalize() {
+        assert_eq!("satsupersport6", normalize_channel_name("SAT: SUPERSPORT 6 ᴿᴬᵂ"));
     }
 }
