@@ -2,7 +2,6 @@ import ServerConfig from "../../model/server-config";
 import {PlaylistCategories, PlaylistCategory, PlaylistGroup, PlaylistItem, XtreamCluster} from "../../model/playlist";
 import './playlist-gallery.scss';
 import React, {ReactNode, useCallback, useEffect, useState} from "react";
-import {useSnackbar} from "notistack";
 import {getIconByName} from "../../icons/icons";
 import useTranslator from "../../hook/use-translator";
 
@@ -254,7 +253,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
 
         }
         return <div>{JSON.stringify(item)}</div>;
-    }, []);
+    }, [onPlay]);
 
     const renderItems = useCallback((category: PlaylistCategory, group: PlaylistGroup): ReactNode => {
         return <div className="playlist-gallery__channels">
@@ -272,7 +271,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                 </div>
             ))}
         </div>;
-    }, [handleChannelSelect]);
+    }, [handleChannelSelect, onPlay]);
 
     const renderGroups = useCallback((category: PlaylistCategory, groups: PlaylistGroup[]): ReactNode => {
         return <div className="playlist-gallery__groups">

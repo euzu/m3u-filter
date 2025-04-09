@@ -4,7 +4,8 @@ import ServerConfig, {
     CacheConfig,
     LogConfig,
     MessagingConfig,
-    PushoverConfig, RateLimitConfig,
+    PushoverConfig,
+    RateLimitConfig,
     RestConfig,
     ReverseProxyConfig,
     ServerApiConfig,
@@ -13,7 +14,9 @@ import ServerConfig, {
     StreamConfig,
     TelegramConfig,
     VideoConfig,
-    VideoDownloadConfig, WebAuthConfig, WebUiConfig
+    VideoDownloadConfig,
+    WebAuthConfig,
+    WebUiConfig
 } from "../../model/server-config";
 import {useSnackbar} from "notistack";
 import FormView, {FormFieldType} from "../form-view/from-view";
@@ -44,14 +47,20 @@ const CONFIG_API_FIELDS = [
 
 const CONFIG_WEB_UI_FIELDS = [
     {name: 'enabled', label: 'LABEL.WEB_UI', fieldType: FormFieldType.CHECK},
-    {name: 'path', label: 'LABEL.WEB_UI_PATH', fieldType: FormFieldType.TEXT, hint: 'HINT.CONFIG.WEB_UI.PATH' },
+    {name: 'path', label: 'LABEL.WEB_UI_PATH', fieldType: FormFieldType.TEXT, hint: 'HINT.CONFIG.WEB_UI.PATH'},
     {name: 'user_ui_enabled', label: 'LABEL.USER_UI', fieldType: FormFieldType.CHECK},
+    {name: 'player_server', label: 'LABEL.PLAYER_SERVER', fieldType: FormFieldType.SINGLE_SELECT},
 ];
 
 const CONFIG_WEB_AUTH_FIELDS = [
     {name: 'enabled', label: 'LABEL.WEB_AUTH', fieldType: FormFieldType.CHECK},
     {name: 'issuer', label: 'LABEL.ISSUER', fieldType: FormFieldType.TEXT},
-    {name: 'secret', label: 'LABEL.SECRET', fieldType: FormFieldType.TEXT, action: {icon: 'Clear', handler: getRandomHex}},
+    {
+        name: 'secret',
+        label: 'LABEL.SECRET',
+        fieldType: FormFieldType.TEXT,
+        action: {icon: 'Clear', handler: getRandomHex}
+    },
     {name: 'userfile', label: 'LABEL.USERFILE', fieldType: FormFieldType.TEXT},
 ];
 
@@ -68,11 +77,21 @@ const CONFIG_SCHEDULES_FIELDS = [
 
 const CONFIG_LOG_FIELDS = [
     {name: 'sanitize_sensitive_info', label: 'LABEL.SANITIZE_SENSITIVE_INFO', fieldType: FormFieldType.CHECK},
-    {name: 'active_clients', label: 'LABEL.ACTIVE_CLIENTS', hint: 'HINT.CONFIG.LOG.ACTIVE_CLIENTS', fieldType: FormFieldType.CHECK},
+    {
+        name: 'active_clients',
+        label: 'LABEL.ACTIVE_CLIENTS',
+        hint: 'HINT.CONFIG.LOG.ACTIVE_CLIENTS',
+        fieldType: FormFieldType.CHECK
+    },
 ]
 
 const CONFIG_REVERSE_PROXY_FIELDS = [
-    {name: 'resource_rewrite_disabled', label: 'LABEL.RESOURCE_REWRITE_DISABLE', hint: 'HINT.CONFIG.PROXY.RESOURCE_REWRITE_DISABLE', fieldType: FormFieldType.CHECK},
+    {
+        name: 'resource_rewrite_disabled',
+        label: 'LABEL.RESOURCE_REWRITE_DISABLE',
+        hint: 'HINT.CONFIG.PROXY.RESOURCE_REWRITE_DISABLE',
+        fieldType: FormFieldType.CHECK
+    },
 ];
 
 const CONFIG_REVERSE_PROXY_STREAM_FIELDS = [
@@ -175,6 +194,15 @@ export default function MainConfigView(props: MainConfigViewProps) {
     const reverseProxyRateLimitConfig = useMemo<RateLimitConfig>(() => config?.reverse_proxy?.rate_limit || {} as any, [config]);
     const logConfig = useMemo<LogConfig>(() => config?.log || {} as any, [config]);
     const configs = useMemo(() => {
+        CONFIG_WEB_UI_FIELDS.forEach(def => {
+            const serverOptions = config?.api_proxy?.server?.map(serverInfo => ({
+                value: serverInfo.name,
+                label: serverInfo.name
+            }));
+            if (def.name === "player_server") {
+                (def as any).options = serverOptions;
+            }
+        });
         const translations: any = {
             api_fields: translateLabels(CONFIG_API_FIELDS, translate),
             fields: translateLabels(CONFIG_FIELDS, translate),
@@ -196,7 +224,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
             tabs: translateLabels(TABS, translate),
         }
         return translations;
-    }, [translate]);
+    }, [translate, config?.api_proxy?.server]);
 
     const scheduleImage = useMemo(() => <svg className={'main-config__content-help-img'} focusable="false"
                                              aria-hidden="true" viewBox='0 0 120 30'>
@@ -321,7 +349,8 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 <label className="main-config__content-form__section-title">{translate('LABEL.CACHE')}</label>
                 <FormView data={reverseProxyCacheConfig} fields={configs.reverse_proxy_cache_fields}></FormView>
                 <label className="main-config__content-form__section-title">{translate('LABEL.RATE_LIMIT')}</label>
-                <FormView data={reverseProxyRateLimitConfig} fields={configs.reverse_proxy_rate_limit_fields}></FormView>
+                <FormView data={reverseProxyRateLimitConfig}
+                          fields={configs.reverse_proxy_rate_limit_fields}></FormView>
             </div>
             <div className={'main-config__content-form' + ('messaging' !== activeTab ? ' hidden' : '')}>
                 <FormView data={messagingConfig} fields={configs.messaging_fields}></FormView>

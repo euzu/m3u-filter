@@ -51,14 +51,14 @@ export default function TagSelect(props: TagSelectProps) {
                 return {[idx]: !!!selections[idx]} as any;
             };
             const result = getSelections();
-            const newSelections = Object.keys(result).map((key: any) => result[key] ? options[key].value : undefined).filter(Boolean);
+            const newSelections = Object.keys(result)?.map((key: any) => result[key] ? options[key].value : undefined).filter(Boolean);
             onSelect(name, multi ? newSelections : (newSelections.length ? newSelections[0] : undefined));
             return result;
         });
     }, [multi, radio, onSelect, name, options]);
 
     return <div className={'tag-select'}>
-        {options.map((o, idx) =>
+        {options?.map((o, idx) =>
             <span key={uuid + '-' + idx}
                   className={'tag-select__tag' + (selected[idx] ? ' tag-select__tag-selected' : '')}
                   data-idx={idx} onClick={handleTagClick}>{translate(o.label)}</span>

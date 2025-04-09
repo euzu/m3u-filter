@@ -6,6 +6,7 @@ import videojs from "video.js";
 import 'videojs-mpegtsjs';
 import "video.js/dist/video-js.css";
 import { useServices } from '../../provider/service-provider';
+import {PlaylistRequest} from "../../model/playlist-request";
 
 const DEFAULT_OPTIONS: any = {
     autoplay: true,
@@ -36,7 +37,7 @@ const MPEGTS_OPTIONS: any = {
 type Player = videojs.Player | null;
 
 interface VideoPlayerProps {
-    channel: Observable<PlaylistItem>;
+    channel: Observable<[PlaylistItem, PlaylistRequest]>;
     onReady?: (player: any) => void;
 }
 
@@ -77,8 +78,8 @@ export const VideoPlayer = ({ channel, onReady }: VideoPlayerProps) => {
         }
     }, [])
 
-    const handlePlayVideo = useCallback((playlistItem: PlaylistItem) => {
-        services.playlist().getReverseUrl(playlistItem).pipe(first()).subscribe({
+    const handlePlayVideo = useCallback(([playlistItem, playlistRequest] : [playlistItem: PlaylistItem, playlistRequest: PlaylistRequest]) => {
+        services.playlist().getReverseUrl(playlistItem, playlistRequest).pipe(first()).subscribe({
             next: (url: string) => {playVideo(playlistItem, url); },
             error: (error: any) => {playVideo(playlistItem, playlistItem.url); },
         });

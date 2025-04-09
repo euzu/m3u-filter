@@ -12,6 +12,7 @@ use crate::api::endpoints::{download_api};
 use crate::api::model::app_state::AppState;
 use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceConfig, ServerTargetConfig};
 use crate::api::model::request::{PlaylistRequest, PlaylistRequestType};
+use crate::auth::access_token::create_access_token;
 use crate::auth::authenticator::{validator_admin};
 use crate::m3u_filter_error::M3uFilterError;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, TargetUser};
@@ -297,19 +298,15 @@ async fn playlist_content(
 }
 
 async fn playlist_reverse(
+    axum::extract::Path(target_id): axum::extract::Path<u32>,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Json(playlist_item): axum::extract::Json<XtreamPlaylistItem>,
 ) ->  impl axum::response::IntoResponse + Send {
-    // TODO USE web_ui config  server for player
-    if let Some(user) = app_state.config.get_user_credentials("xtr").await {
-        let server_info = app_state.config.get_user_server_info(&user).await;
-        let base_url = server_info.get_base_url();
-        let username = user.username.to_string();
-        let password = user.password.to_string();
-        return format!("{base_url}/{}/{username}/{password}/{}", playlist_item.xtream_cluster.as_stream_type(), playlist_item.virtual_id).into_response();
-    }
-
-    (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid url"}))).into_response()
+    let access_token = create_access_token(&app_state.config.t_access_token_secret, 5);
+    let server_name = app_state.config.web_ui.as_ref().and_then(|web_ui| web_ui.player_server.as_ref()).map_or("default", |server_name| server_name.as_str());
+    let server_info = app_state.config.get_server_info(&server_name).await;
+    let base_url = server_info.get_base_url();
+    format!("{base_url}/token/{access_token}/{target_id}/{}/{}", playlist_item.xtream_cluster.as_stream_type(), playlist_item.virtual_id).into_response()
 }
 
 async fn config(
@@ -386,7 +383,7 @@ pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>, web_ui_
         .route("/config/main", axum::routing::post(save_config_main))
         .route("/config/user", axum::routing::post(save_config_api_proxy_user))
         .route("/config/apiproxy", axum::routing::post(save_config_api_proxy_config))
-        .route("/playlist/reverse", axum::routing::post(playlist_reverse))
+        .route("/playlist/reverse/{target_id}", axum::routing::post(playlist_reverse))
         .route("/playlist/update", axum::routing::post(playlist_update))
         .route("/playlist", axum::routing::post(playlist_content))
         .route("/file/download", axum::routing::post(download_api::queue_download_file))

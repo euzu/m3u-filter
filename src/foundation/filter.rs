@@ -520,7 +520,7 @@ pub fn prepare_templates(
                 if let Some(depends_on) = dependencies.get(&template_name) {
                     let mut templ_value = template_values.get(&template_name).unwrap().to_string();
                     for dep_templ_name in depends_on {
-                        let dep_value = template_values.get(dep_templ_name).unwrap();
+                        let dep_value = template_values.get(dep_templ_name).ok_or_else(|| M3uFilterError::new(M3uFilterErrorKind::Info, format!("Failed to load template {dep_templ_name}")))?;
                         templ_value =
                             templ_value.replace(format!("!{dep_templ_name}!").as_str(), dep_value);
                     }

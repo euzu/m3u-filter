@@ -94,7 +94,8 @@
     "ISSUER": "Issuer",
     "SECRET":  "Secret",
     "USERFILE": "Userfile",
-    "UI_ENABLED": "UI"
+    "UI_ENABLED": "UI",
+    "PLAYER_SERVER": "Player Server"
 },
   "TITLE": {
     "USER_BOUQUET_EDITOR": "User group editor"

@@ -9,7 +9,6 @@ import DatePicker from "../date-picker/date-picker";
 import {genUuid} from "../../utils/uuid";
 import {getIconByName} from "../../icons/icons";
 import useTranslator from "../../hook/use-translator";
-import SvgIcon from "../svg-icon/svg-icon";
 // export const isNumber = (value: string): boolean => {
 //     return !isNaN(value as any);
 // }
@@ -85,7 +84,7 @@ export default function FormView(props: FormViewProps) {
                 return;
             }
         }
-    }, [data]);
+    }, [data, fields]);
 
     const handleInputValueChange = useCallback((evt: any) => {
         const field = evt.target.dataset.field;
@@ -106,13 +105,15 @@ export default function FormView(props: FormViewProps) {
             data[field] = value;
         }
         setFormData((prevData: any) => ({...prevData, [field]: value}));
-    }, [data]);
+    }, [data, fields]);
 
     const handleChange = useCallback((field: string, value: any) => {
         if (data) {
             data[field] = value;
         }
-        setFormData((prevData: any) => ({...prevData, [field]: value}));
+        setTimeout(()=> {
+            setFormData((prevData: any) => ({...prevData, [field]: value}));
+        }, 0);
     }, [data]);
 
     const getFieldInput = useCallback((field: FormField) => {

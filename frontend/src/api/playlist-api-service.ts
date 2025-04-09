@@ -12,7 +12,7 @@ export default interface PlaylistApiService extends ApiService {
 
     updateTargets(targets: string[]): Observable<any>;
 
-    getReverseUrl(item: PlaylistItem): Observable<string>;
+    getReverseUrl(item: PlaylistItem, req: PlaylistRequest): Observable<string>;
 }
 
 export class DefaultPlaylistApiService extends DefaultApiService implements PlaylistApiService {
@@ -28,7 +28,7 @@ export class DefaultPlaylistApiService extends DefaultApiService implements Play
         return this.post(TARGET_UPDATE_API_PATH, targets);
     }
 
-    getReverseUrl(item: PlaylistItem): Observable<string> {
-        return this.post(REVERSE_URL_API_PATH, item);
+    getReverseUrl(item: PlaylistItem, req: PlaylistRequest): Observable<string> {
+        return this.post(REVERSE_URL_API_PATH + '/' + req.sourceId, item);
     }
 }

@@ -221,6 +221,7 @@ export interface WebUiConfig {
     user_ui_enabled: boolean,
     path?: string,
     auth?: WebAuthConfig,
+    player_server?: string,
 }
 
 export interface ServerMainConfig {

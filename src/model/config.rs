@@ -13,6 +13,7 @@ use tokio::sync::RwLock;
 use crate::auth::user::UserCredential;
 use log::{debug, error, warn};
 use path_clean::PathClean;
+use rand::Rng;
 use url::Url;
 
 use crate::foundation::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
@@ -47,6 +48,13 @@ const RESERVED_PATHS: &[&str] = &[
     "player_api.php", "panel_api.php", "xtream", "timeshift", "timeshift.php", "streaming",
     "get.php", "apiget", "m3u", "resource"
 ];
+
+fn generate_secret() -> [u8; 32] {
+    let mut rng = rand::rng();
+    let mut secret = [0u8; 32];
+    rng.fill(&mut secret);
+    secret
+}
 
 #[macro_export]
 macro_rules! valid_property {
@@ -1272,6 +1280,8 @@ pub struct WebUiConfig {
     pub path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth: Option<WebAuthConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_server: Option<String>,
 }
 
 impl WebUiConfig {
@@ -1353,6 +1363,8 @@ pub struct Config {
     pub t_user_connections_exhausted_video: Option<Arc<Vec<u8>>>,
     #[serde(skip)]
     pub t_provider_connections_exhausted_video: Option<Arc<Vec<u8>>>,
+    #[serde(skip)]
+    pub t_access_token_secret: [u8;32],
 }
 
 impl Config {
@@ -1590,6 +1602,7 @@ impl Config {
     }
 
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        self.t_access_token_secret = generate_secret();
         let work_dir = &self.working_dir;
         self.working_dir = file_utils::get_working_path(work_dir);
         self.prepare_custom_stream_response();

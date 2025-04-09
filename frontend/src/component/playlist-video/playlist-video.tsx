@@ -2,9 +2,10 @@ import React, {JSX, useRef} from "react";
 import VideoPlayer from "../video-player/video-player";
 import {PlaylistItem} from "../../model/playlist";
 import {Observable} from "rxjs";
+import {PlaylistRequest} from "../../model/playlist-request";
 
 interface PlaylistVideoProps {
-    channel: Observable<PlaylistItem>;
+    channel: Observable<[PlaylistItem, PlaylistRequest]>;
 }
 
 export default function PlaylistVideo(props: PlaylistVideoProps): JSX.Element {

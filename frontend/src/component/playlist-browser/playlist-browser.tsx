@@ -30,16 +30,18 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
     const services = useServices();
     const [progress, setProgress] = useState<boolean>(false);
     const [playlist, setPlaylist] = useState<PlaylistCategories>(EmptyPlaylistCategories);
+    const [playlistRequest, setPlaylistRequest] = useState<PlaylistRequest>(undefined);
     const clipboardChannel = useMemo<Subject<string>>(() => new Subject<string>(), []);
     const translate = useTranslator();
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
-    const videoChannel = useMemo(() => new Subject<PlaylistItem>(), []);
+    const videoChannel = useMemo(() => new Subject<[PlaylistItem, PlaylistRequest]>(), []);
     const handleSourceDownload = useCallback((req: PlaylistRequest) => {
         setProgress(true);
         services.playlist().getPlaylistCategories(req).pipe(first(), finalize(() => setProgress(false))).subscribe({
             next: (pl: PlaylistCategories) => {
                 enqueueSnackbar(translate("MESSAGES.DOWNLOAD.PLAYLIST.SUCCESS"), {variant: 'success'})
                 setPlaylist(pl);
+                setPlaylistRequest(req);
             },
             error: (err) => {
                 enqueueSnackbar(translate("MESSAGES.DOWNLOAD.PLAYLIST.FAIL"), {variant: 'error'});
@@ -59,9 +61,8 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
     }, []);
 
     const handleOnPlay = useCallback((playlistItem: PlaylistItem): void => {
-        console.log(playlistItem);
-        videoChannel.next(playlistItem);
-    }, [videoChannel]);
+        videoChannel.next([playlistItem, playlistRequest]);
+    }, [videoChannel, playlistRequest]);
 
     const handleOnCopy = useCallback((playlistItem: PlaylistItem): void => {
         clipboardChannel.next(playlistItem.url);
