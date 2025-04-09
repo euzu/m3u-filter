@@ -9,6 +9,8 @@ pub const EPG_TAG_PROGRAMME: &str = "programme";
 pub const EPG_TAG_CHANNEL: &str = "channel";
 pub const EPG_ATTRIB_ID: &str = "id";
 pub const EPG_ATTRIB_CHANNEL: &str = "channel";
+pub const EPG_TAG_DISPLAY_NAME: &str = "display-name";
+pub const EPG_TAG_ICON: &str = "icon";
 
 // https://github.com/XMLTV/xmltv/blob/master/xmltv.dtd
 
@@ -17,7 +19,9 @@ pub struct XmlTag {
     pub name: String,
     pub value: Option<String>,
     pub attributes: Option<Arc<HashMap<String, String>>>,
+    pub t_attributes: Option<HashMap<String, String>>,
     pub children: Option<Vec<Arc<XmlTag>>>,
+    pub icon: Option<String>,
 }
 
 impl XmlTag {

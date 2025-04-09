@@ -37,7 +37,12 @@ RUN ffmpeg -loop 1 -i ./resources/channel_unavailable.jpg -t 10 -r 1 -an \
 RUN ffmpeg -loop 1 -i ./resources/user_connections_exhausted.jpg -t 10 -r 1 -an \
   -vf "scale=1920:1080" \
   -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
-  ./resources/user_connections_exhausted.ts \
+  ./resources/user_connections_exhausted.ts
+  
+RUN ffmpeg -loop 1 -i ./resources/provider_connections_exhausted.jpg -t 10 -r 1 -an \
+  -vf "scale=1920:1080" \
+  -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
+  ./resources/provider_connections_exhausted.ts
 
 # Final container (Scratch)
 FROM scratch as scratch-final

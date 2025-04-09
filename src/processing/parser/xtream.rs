@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use serde_json::Value;
-
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result};
 use crate::model::config::ConfigInput;
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::model::xtream::{XtreamCategory, XtreamSeriesInfo, XtreamSeriesInfoEpisode, XtreamStream};
+use crate::processing::parser::xmltv::normalize_channel_name;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::network::xtream::{get_xtream_stream_url_base, ACTION_GET_SERIES_INFO};
 
@@ -148,7 +148,7 @@ pub fn parse_xtream(input: &ConfigInput,
                                 group: category_name.to_string(),
                                 title: stream.name.to_string(),
                                 url: stream_url.to_string(),
-                                epg_channel_id: stream.epg_channel_id.as_ref().map(|id| id.to_lowercase().to_string()),
+                                epg_channel_id: Some(normalize_channel_name(stream.epg_channel_id.as_ref().map_or_else(|| &stream.name,  |id| id))),
                                 item_type,
                                 xtream_cluster,
                                 additional_properties: stream.get_additional_properties(),
@@ -180,4 +180,3 @@ pub fn parse_xtream(input: &ConfigInput,
         Err(err) => Err(err)
     }
 }
-

@@ -33,6 +33,8 @@ use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::{debug_if_enabled};
 
+use crate::model::xmltv::{EPG_ATTRIB_ID};
+
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli };
     target.filter(&provider)
@@ -536,17 +538,27 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     for mut fp in processed_fetched_playlists {
         // collect all epg_channel ids
         let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
-            .filter_map(|c| c.header.epg_channel_id.clone()).collect();
-
-        new_playlist.append(&mut fp.playlistgroups);
+            .filter_map(|c| c.header.epg_channel_id.as_ref()).collect();
         if epg_channel_ids.is_empty() {
             debug_if_enabled!("channel ids are empty");
         } else if let Some(tv_guide) = fp.epg {
             debug!("found epg information for {}", &target.name);
             if let Some(epg) = tv_guide.filter(&epg_channel_ids) {
+                let epg_icons: HashMap<&String, &String> = epg.children.iter()
+                    .filter(|tag| tag.icon.is_some() && tag.get_attribute_value(EPG_ATTRIB_ID).is_some())
+                    .map(|t| (t.get_attribute_value(EPG_ATTRIB_ID).unwrap(), t.icon.as_ref().unwrap())).collect();
+                fp.playlistgroups.iter_mut()
+                    .flat_map(|g| &mut g.channels)
+                    .filter(|c| c.header.epg_channel_id.is_some() && c.header.logo == "")
+                    .for_each(|c| {
+                        if let Some(icon) = epg_icons.get(c.header.epg_channel_id.as_ref().unwrap()) {
+                            c.header.logo = icon.to_string();
+                        }
+                    });
                 new_epg.push(epg);
             }
         }
+        new_playlist.append(&mut fp.playlistgroups);
     }
 
     if new_playlist.is_empty() {
@@ -599,4 +611,3 @@ pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, tar
     let elapsed = start_time.elapsed().as_secs();
     info!("Update process finished! Took {elapsed} secs.");
 }
-
