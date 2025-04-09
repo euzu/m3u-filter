@@ -5,6 +5,7 @@
   @include common.container_vert_no_padding();
 
   .label-hint {
+    cursor: pointer;
     svg {
       fill: var(--text-color);
       height: 0.7em;
@@ -42,8 +43,18 @@
     &-value {
       display: flex;
       flex: 1 1 auto;
-      align-items: flex-start;
+      align-items: center;
       overflow: hidden;
+      gap: 4px;
+
+      button {
+        border: 1px solid var(--text-button-border-color);
+        font-size: 1.2rem;
+        height: 100%;
+        border-radius: var(--text-button-border-radius);
+        background-color: var(--text-button-background-color);
+        color: var(--text-button-color);
+      }
     }
 
     label {

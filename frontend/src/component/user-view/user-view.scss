@@ -25,6 +25,15 @@
   min-width: 160px;
 }
 
+.checkbox-checked {
+  color: var(--ok-color);
+}
+
+.checkbox-unchecked {
+  color: var(--text-color);
+}
+
+
 .user {
   & {
     min-height: 400px;

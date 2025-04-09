@@ -145,6 +145,7 @@ export interface Credentials {
     exp_date: number,
     max_connections: number,
     status: string,
+    ui_enabled: boolean,
 }
 
 export interface TargetUser {

@@ -27,6 +27,7 @@ web_ui:
     secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
     userfile: user.txt
 ```
+- user has now the attribute `ui_enabled` to disable/enable web_ui for user.
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

@@ -262,7 +262,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                 <div key={channel.id} onClick={handleChannelSelect}
                      data-category={category} data-group={group.id} data-channel={channel.id}
                      className={'playlist-gallery__channels-channel channel-' + channel.xtream_cluster}>
-                    <div className="playlist-gallery__channels-channel-logo">
+                    <div className="playlist-gallery__channels-channel-logo" onClick={() => onPlay?.(channel)}>
                         {getLogo(channel) && <img loading='lazy' alt={"logo"} src={getLogo(channel)}
                                                   onError={(e: any) => (e.target.onerror=null) || (e.target.src="assets/missing-logo.svg")}/>}
                     </div>

@@ -59,6 +59,7 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
     }, []);
 
     const handleOnPlay = useCallback((playlistItem: PlaylistItem): void => {
+        console.log(playlistItem);
         videoChannel.next(playlistItem);
     }, [videoChannel]);
 

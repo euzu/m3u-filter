@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use chrono::{Local, Duration};
 use jsonwebtoken::{Algorithm, DecodingKey, encode, decode, EncodingKey, Header, Validation, TokenData};
+use crate::api::api_utils::get_username_from_auth_header;
 use crate::model::config::WebAuthConfig;
 use crate::api::model::app_state::AppState;
 use crate::auth::auth_bearer::AuthBearer;
@@ -109,6 +110,13 @@ pub async fn validator_user(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
+    if let Some(username) = get_username_from_auth_header(&token, &app_state) {
+        if let Some(user) = app_state.config.get_user_credentials(&username).await {
+            if !user.ui_enabled {
+                return Err(axum::http::StatusCode::FORBIDDEN);
+            }
+        }
+    }
     match validate_request(&app_state, &token, verify_token_user) {
         Ok(()) => Ok(next.run(request).await),
         Err(()) => Err(axum::http::StatusCode::UNAUTHORIZED)

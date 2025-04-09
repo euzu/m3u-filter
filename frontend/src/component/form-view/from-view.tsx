@@ -9,6 +9,7 @@ import DatePicker from "../date-picker/date-picker";
 import {genUuid} from "../../utils/uuid";
 import {getIconByName} from "../../icons/icons";
 import useTranslator from "../../hook/use-translator";
+import SvgIcon from "../svg-icon/svg-icon";
 // export const isNumber = (value: string): boolean => {
 //     return !isNaN(value as any);
 // }
@@ -33,6 +34,7 @@ export type FormField = {
     validator?: (value: any) => boolean,
     options?: { value: string, label: string }[],
     fieldType: FormFieldType
+    action?: {icon: string, handler: () => any}
 };
 
 interface FormViewProps {
@@ -50,7 +52,7 @@ export default function FormView(props: FormViewProps) {
     useEffect(() => {
        if (data) {
            setFormData(data);
-           inputIds.current.forEach((id)=> {
+           inputIds.current.forEach(([id, fieldName])=> {
               let elem: any = document.getElementById(id);
               if (elem) {
                   const field = elem.dataset.field;
@@ -61,6 +63,29 @@ export default function FormView(props: FormViewProps) {
            });
        }
     }, [data])
+
+    const handleFieldAction = useCallback((evt: any) => {
+        const field = evt.target.dataset.field;
+        for (const fieldDef of fields) {
+            if (fieldDef.name === field) {
+                const value = fieldDef.action.handler();
+                if (data) {
+                    data[field] = value;
+                }
+                setFormData((prevData: any) => ({...prevData, [field]: value}));
+                for (const [id, fieldName] of inputIds.current) {
+                    if (fieldName === field) {
+                        let elem: any = document.getElementById(id);
+                        if (elem) {
+                            elem.value = value  ?? '';
+                        }
+                        break;
+                    }
+                }
+                return;
+            }
+        }
+    }, [data]);
 
     const handleInputValueChange = useCallback((evt: any) => {
         const field = evt.target.dataset.field;
@@ -114,7 +139,7 @@ export default function FormView(props: FormViewProps) {
             case FormFieldType.TEXT:
             default: {
                 const input_id = uuid + field.name;
-                inputIds.current.push(input_id);
+                inputIds.current.push([input_id, field.name]);
                 return <input id={input_id} type={'text'} data-field={field.name} onChange={handleInputValueChange}></input>;
             }
         }
@@ -131,6 +156,7 @@ export default function FormView(props: FormViewProps) {
                         </div>
                         <div className={'form-view__col form-view__col-value'}>
                             {getFieldInput(field)}
+                            {field.action ? <button data-field={field.name} onClick={handleFieldAction}>{getIconByName(field.action.icon)}</button> : null}
                         </div>
                     </div>
                 )

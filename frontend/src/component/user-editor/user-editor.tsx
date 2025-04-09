@@ -26,6 +26,7 @@ const COLUMNS = [
     {name: 'max_connections', label: 'LABEL.MAX_CON', fieldType: FormFieldType.NUMBER},
     {name: 'status', label: 'LABEL.STATUS', fieldType: FormFieldType.SINGLE_SELECT, options: STATUS_OPTIONS},
     {name: 'exp_date', label: 'LABEL.EXP_DATE', fieldType: FormFieldType.DATE},
+    {name: 'ui_enabled', label: 'LABEL.UI_ENABLED', fieldType: FormFieldType.CHECK}
 ];
 
 interface UserViewProps {

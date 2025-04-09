@@ -35,6 +35,7 @@ struct StoredProxyUserCredentials {
     pub exp_date: Option<i64>,
     pub max_connections: Option<u32>,
     pub status: Option<ProxyUserStatus>,
+    pub ui_enabled: bool,
 }
 
 impl StoredProxyUserCredentials {
@@ -51,6 +52,7 @@ impl StoredProxyUserCredentials {
             exp_date: proxy.exp_date,
             max_connections: proxy.max_connections,
             status: proxy.status.clone(),
+            ui_enabled: proxy.ui_enabled
         }
     }
 
@@ -66,6 +68,7 @@ impl StoredProxyUserCredentials {
             exp_date: stored.exp_date,
             max_connections: stored.max_connections,
             status: stored.status.clone(),
+            ui_enabled: stored.ui_enabled
         }
     }
 }
@@ -354,6 +357,7 @@ mod tests {
                         exp_date: Some(1672705545),
                         max_connections: Some(1),
                         status: Some(ProxyUserStatus::Active),
+                        ui_enabled: true,
                     },
                     ProxyUserCredentials {
                         username: "Test2".to_string(),
@@ -366,6 +370,7 @@ mod tests {
                         exp_date: Some(1672705545),
                         max_connections: Some(1),
                         status: Some(ProxyUserStatus::Expired),
+                        ui_enabled: true
                     },
                     ProxyUserCredentials {
                         username: "Test3".to_string(),
@@ -378,6 +383,7 @@ mod tests {
                         exp_date: Some(1672705545),
                         max_connections: Some(1),
                         status: Some(ProxyUserStatus::Expired),
+                        ui_enabled: true
                     },
                     ProxyUserCredentials {
                         username: "Test4".to_string(),
@@ -390,6 +396,7 @@ mod tests {
                         exp_date: Some(1672705545),
                         max_connections: Some(1),
                         status: Some(ProxyUserStatus::Expired),
+                        ui_enabled: true
                     }
                 ],
             };

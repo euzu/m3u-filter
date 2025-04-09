@@ -1,3 +1,4 @@
+use crate::utils::default_utils::default_as_true;
 use crate::api::model::app_state::AppState;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::Config;
@@ -134,6 +135,8 @@ pub struct ProxyUserCredentials {
     pub max_connections: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ProxyUserStatus>,
+    #[serde(default =  "default_as_true")]
+    pub ui_enabled: bool,
 }
 
 impl ProxyUserCredentials {

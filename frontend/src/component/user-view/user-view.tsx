@@ -19,6 +19,10 @@ const renderExpDate = (value: any, hidden?: boolean) => {
     return DateUtils.formatDate(value)
 };
 
+const renderBool = (value: any, hidden?: boolean) => {
+   return <span className={'checkbox-' + (value ? 'checked' : 'unchecked') }>{getIconByName(value ? 'CheckMark' : 'Clear' )}</span>;
+};
+
 const renderMaxCon = (value: any, hidden?: boolean) => {
     if (!value) {
         return getIconByName('Unlimited');
@@ -49,6 +53,7 @@ const COLUMNS = [
     {field: 'max_connections', label: 'LABEL.MAX_CON', render: renderMaxCon},
     {field: 'status', label: 'LABEL.STATUS', render: renderStatus},
     {field: 'exp_date', label: 'LABEL.EXP_DATE', render: renderExpDate},
+    {field: 'ui_enabled', label: 'LABEL.UI_ENABLED', render: renderBool},
 ]
 
 COLUMNS.forEach(col => {
@@ -135,6 +140,7 @@ const createNewUser = (targets: TargetUser[]): Credentials => {
             exp_date: exp_date.getTime(),
             max_connections: 1,
             status: "Active",
+            ui_enabled: true,
             // @ts-ignore
             _ref: undefined, // an indicator for new user
     };

@@ -1015,10 +1015,8 @@ pub struct ConfigDto {
     pub log: Option<LogConfig>,
     #[serde(default)]
     pub update_on_boot: bool,
-    #[serde(default = "default_as_true")]
-    pub web_ui_enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub web_auth: Option<WebAuthConfig>,
+    pub web_ui: Option<WebUiConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reverse_proxy: Option<ReverseProxyConfig>,
 }
