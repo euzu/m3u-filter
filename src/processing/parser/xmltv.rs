@@ -179,9 +179,13 @@ where
                 }
             }
             Ok(Event::Text(e)) => {
-                let text = e.unescape().unwrap().trim().to_owned();
-                if !text.is_empty() && !stack.is_empty() {
-                    stack.last_mut().unwrap().value = Some(text);
+                if !stack.is_empty() {
+                    if let Ok(text) = e.unescape() {
+                        let t = text.trim();
+                        if !t.is_empty() {
+                            stack.last_mut().unwrap().value = Some(t.to_string());
+                        }
+                    }
                 }
             }
             _ => {}
@@ -197,7 +201,8 @@ pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
             attributes: None,
             children: vec![],
         };
-        let mut channel_ids: Vec<&String> = vec![];
+        let count = tv_guides.iter().map(|tvg| tvg.children.len()).sum();
+        let mut channel_ids: HashSet<&String> = HashSet::with_capacity(count);
         for guide in tv_guides {
             if epg.attributes.is_none() {
                 epg.attributes.clone_from(&guide.attributes);
@@ -206,7 +211,7 @@ pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
                 if c.name.as_str() == EPG_TAG_CHANNEL {
                     if let Some(chan_id) = c.get_attribute_value(EPG_ATTRIB_ID) {
                         if !channel_ids.contains(&chan_id) {
-                            channel_ids.push(chan_id);
+                            channel_ids.insert(chan_id);
                             epg.children.push(c.clone());
                         }
                     }
