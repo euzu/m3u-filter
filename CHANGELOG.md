@@ -27,7 +27,9 @@ web_ui:
     secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
     userfile: user.txt
 ```
-- user has now the attribute `ui_enabled` to disable/enable web_ui for user.
+- !BREAKING_CHANGE! user has now the attribute `ui_enabled` to disable/enable web_ui for user.
+You need to migrate the user db if you have used `use_user_db:true`. 
+Set it to `false` run old m3u-filter version, then update m3u-filter and set `use_user_db:true`and start.   
 - !BREAKING_CHANGE! multi epg processing/optimization, auto guessing/assigning epg id's
 ```yaml
 epg_url: ['https://localhost.com/epg.xml']
