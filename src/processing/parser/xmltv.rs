@@ -1,6 +1,6 @@
 use crate::model::xmltv::{Epg, TVGuide, XmlTag, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_CHANNEL, EPG_TAG_DISPLAY_NAME, EPG_TAG_ICON, EPG_TAG_PROGRAMME, EPG_TAG_TV};
 use crate::utils::compression::compressed_file_reader::CompressedFileReader;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -94,25 +94,8 @@ where
             Ok(Event::Eof) => break,
             Ok(Event::Start(e)) => {
                 let name = String::from_utf8_lossy(e.name().as_ref()).as_ref().to_owned();
-                let (is_tv_tag, is_channel, is_program) = match name.as_str() {
-                    EPG_TAG_TV => (true, false, false),
-                    EPG_TAG_CHANNEL => (false, true, false),
-                    EPG_TAG_PROGRAMME => (false, false, true),
-                    _ => (false, false, false)
-                };
-                let attributes = e.attributes().filter_map(Result::ok)
-                    .filter_map(|a| {
-                        let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
-                        let mut value = String::from(a.unescape_value().unwrap().as_ref());
-                        if (is_channel && key == EPG_ATTRIB_ID) || (is_program && key == EPG_ATTRIB_CHANNEL) {
-                            value = value.to_lowercase().to_string();
-                        }
-                        if value.is_empty() {
-                            None
-                        } else {
-                            Some((key, value))
-                        }
-                    }).collect::<HashMap<String, String>>();
+                let (is_tv_tag, is_channel, is_program) = get_tag_types(&name);
+                let attributes = collect_tag_attributes(&e, is_channel, is_program);
                 let attribs = if attributes.is_empty() { None } else { Some(Arc::new(attributes)) };
                 let tag = XmlTag {
                     name,
@@ -191,6 +174,33 @@ where
             _ => {}
         }
     }
+}
+
+fn get_tag_types(name: &str) -> (bool, bool, bool) {
+    let (is_tv_tag, is_channel, is_program) = match name {
+        EPG_TAG_TV => (true, false, false),
+        EPG_TAG_CHANNEL => (false, true, false),
+        EPG_TAG_PROGRAMME => (false, false, true),
+        _ => (false, false, false)
+    };
+    (is_tv_tag, is_channel, is_program)
+}
+
+fn collect_tag_attributes(e: &BytesStart, is_channel: bool, is_program: bool) -> HashMap<String, String> {
+    let attributes = e.attributes().filter_map(Result::ok)
+        .filter_map(|a| {
+            let key = String::from_utf8_lossy(a.key.as_ref()).to_string();
+            let mut value = String::from(a.unescape_value().unwrap().as_ref());
+            if (is_channel && key == EPG_ATTRIB_ID) || (is_program && key == EPG_ATTRIB_CHANNEL) {
+                value = value.to_lowercase().to_string();
+            }
+            if value.is_empty() {
+                None
+            } else {
+                Some((key, value))
+            }
+        }).collect::<HashMap<String, String>>();
+    attributes
 }
 
 pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {

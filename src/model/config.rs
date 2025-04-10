@@ -69,7 +69,7 @@ use crate::utils::file::config_reader::csv_read_inputs;
 use crate::utils::network::request::{get_credentials_from_url, get_credentials_from_url_str};
 use crate::utils::string_utils::get_trimmed_string;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
 pub enum TargetType {
     #[serde(rename = "m3u")]
     M3u,

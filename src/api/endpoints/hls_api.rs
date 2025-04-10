@@ -5,7 +5,7 @@ use crate::api::model::streams::provider_stream::{create_custom_video_stream_res
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, TargetType};
 use crate::model::playlist::{PlaylistItemType, XtreamCluster};
-use crate::processing::parser::hls::rewrite_hls;
+use crate::processing::parser::hls::{rewrite_hls, RewriteHlsProps};
 use crate::utils::network::request;
 use crate::utils::network::request::{is_hls_url, replace_url_extension, sanitize_sensitive_info, HLS_EXT};
 use axum::response::IntoResponse;
@@ -33,7 +33,16 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
     match request::download_text_content(Arc::clone(&app_state.http_client), input, &url, None).await {
         Ok(content) => {
             let hls_token = app_state.hls_cache.new_token();
-            let (hls_entry, hls_content) = rewrite_hls(&server_info.get_base_url(), &content, hls_url, virtual_id, hls_token, user, &target_type, input.id);
+            let rewrite_hls_props = RewriteHlsProps {
+                base_url: &server_info.get_base_url(),
+                content: &content,
+                hls_url,
+                virtual_id,
+                token: hls_token,
+                target_type,
+                input_id: input.id,
+            };
+            let (hls_entry, hls_content) = rewrite_hls(user, &rewrite_hls_props);
             app_state.hls_cache.add_entry(hls_entry).await;
             axum::response::Response::builder()
                 .status(axum::http::StatusCode::OK)
@@ -70,7 +79,7 @@ async fn hls_api_stream(
     let input = try_option_bad_request!(app_state.config.get_input_by_id(hls_entry.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
 
     if is_hls_url(hls_url) {
-        return handle_hls_stream_request(&app_state, &user, hls_url, virtual_id, input, hls_entry.target_type.clone()).await.into_response();
+        return handle_hls_stream_request(&app_state, &user, hls_url, virtual_id, input, hls_entry.target_type).await.into_response();
     }
 
     // let (pli_url, input_name) = if hls_entry.target_type == TargetType::Xtream {

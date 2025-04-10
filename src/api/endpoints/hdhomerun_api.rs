@@ -224,7 +224,7 @@ async fn lineup_status() -> impl IntoResponse {
 async fn lineup_json(axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {
     let cfg = Arc::clone(&app_state.app_state.config);
     if let Some((credentials, target)) = cfg.get_target_for_username(&app_state.device.t_username).await {
-        let use_output = target.get_hdhomerun_output().as_ref().and_then(|o| o.use_output.clone());
+        let use_output = target.get_hdhomerun_output().as_ref().and_then(|o| o.use_output);
         let use_all = use_output.is_none();
         let use_m3u = use_output.as_ref() == Some(&TargetType::M3u);
         let use_xtream = use_output.as_ref() == Some(&TargetType::Xtream);

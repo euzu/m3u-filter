@@ -173,9 +173,9 @@ type StreamUrl = String;
 type ProviderName = String;
 
 enum StreamingOption {
-    CustomStream(ProviderStreamResponse),
-    AvailableStream(Option<ProviderName>, StreamUrl),
-    GracePeriodStream(Option<ProviderName>, StreamUrl),
+    Custom(ProviderStreamResponse),
+    Available(Option<ProviderName>, StreamUrl),
+    GracePeriod(Option<ProviderName>, StreamUrl),
 }
 
 pub struct StreamDetails {
@@ -217,7 +217,7 @@ fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Opti
         let stream_response_params = match allocation {
             ProviderAllocation::Exhausted => {
                 let stream = create_provider_connections_exhausted_stream(&app_state.config, &[]);
-                StreamingOption::CustomStream(stream)
+                StreamingOption::Custom(stream)
             }
             ProviderAllocation::Available(provider)
             | ProviderAllocation::GracePeriod(provider) => {
@@ -229,15 +229,15 @@ fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Opti
 
 
                 if matches!(allocation, ProviderAllocation::Available(_)) {
-                    StreamingOption::AvailableStream(Some(provider), url)
+                    StreamingOption::Available(Some(provider), url)
                 } else {
-                    StreamingOption::GracePeriodStream(Some(provider), url)
+                    StreamingOption::GracePeriod(Some(provider), url)
                 }
             }
         };
         (stream_response_params, Some(input.headers.clone()))
     } else {
-        (StreamingOption::AvailableStream(None, stream_url.to_string()), None)
+        (StreamingOption::Available(None, stream_url.to_string()), None)
     }
 }
 
@@ -246,9 +246,9 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                                         item_type: PlaylistItemType, share_stream: bool) -> StreamDetails {
     let (stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt);
     let config_grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
-    let grace_period_millis = if config_grace_period_millis > 0 && matches!(stream_response_params, StreamingOption::GracePeriodStream(_, _)) { config_grace_period_millis } else { 0 };
+    let grace_period_millis = if config_grace_period_millis > 0 && matches!(stream_response_params, StreamingOption::GracePeriod(_, _)) { config_grace_period_millis } else { 0 };
     match stream_response_params {
-        StreamingOption::CustomStream(provider_stream) => {
+        StreamingOption::Custom(provider_stream) => {
             let (stream, stream_info) = provider_stream;
             StreamDetails {
                 stream,
@@ -258,8 +258,8 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 reconnect_flag: None,
             }
         }
-        StreamingOption::AvailableStream(provider_name, request_url)
-        | StreamingOption::GracePeriodStream(provider_name, request_url) => {
+        StreamingOption::Available(provider_name, request_url)
+        | StreamingOption::GracePeriod(provider_name, request_url) => {
             let parsed_url = Url::parse(&request_url);
             let ((stream, stream_info), reconnect_flag) = if let Ok(url) = parsed_url {
                 if stream_options.pipe_provider_stream {
@@ -303,6 +303,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
     }
 }
 
+/// # Panics
 pub async fn stream_response(app_state: &AppState,
                              stream_url: &str,
                              req_headers: &HeaderMap,
@@ -350,8 +351,7 @@ pub async fn stream_response(app_state: &AppState,
                 response = response.header(key, value);
             }
 
-            let throttle_kbps = get_stream_throttle(app_state);
-
+            let throttle_kbps = usize::try_from(get_stream_throttle(app_state)).unwrap_or_default();
             let body_stream = if throttle_kbps > 0 && matches!(item_type, PlaylistItemType::Video | PlaylistItemType::Series  | PlaylistItemType::SeriesInfo) {
                 axum::body::Body::from_stream(ThrottledStream::new(stream.boxed(), throttle_kbps as usize))
             } else {
@@ -425,6 +425,7 @@ fn get_add_cache_content(res_url: &str, cache: &Arc<Option<Mutex<LRUResourceCach
     add_cache_content
 }
 
+/// # Panics
 pub async fn resource_response(app_state: &AppState, resource_url: &str, req_headers: &HeaderMap, input: Option<&ConfigInput>) -> impl axum::response::IntoResponse + Send {
     if resource_url.is_empty() {
         return axum::http::StatusCode::NO_CONTENT.into_response();
@@ -483,6 +484,7 @@ pub fn separate_number_and_remainder(input: &str) -> (String, Option<String>) {
     })
 }
 
+/// # Panics
 pub fn empty_json_list_response() -> impl axum::response::IntoResponse + Send {
     axum::response::Response::builder()
         .status(StatusCode::OK)
@@ -509,6 +511,7 @@ pub fn get_username_from_auth_header(
     None
 }
 
+/// # Panics
 pub fn redirect(url: &str) -> impl IntoResponse {
     axum::response::Response::builder()
         .status(StatusCode::FOUND)
