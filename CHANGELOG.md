@@ -30,14 +30,17 @@ web_ui:
 - !BREAKING_CHANGE! user has now the attribute `ui_enabled` to disable/enable web_ui for user.
 You need to migrate the user db if you have used `use_user_db:true`. 
 Set it to `false` run old m3u-filter version, then update m3u-filter and set `use_user_db:true`and start.   
-- !BREAKING_CHANGE! multi epg processing/optimization, auto guessing/assigning epg id's
+- multi epg processing/optimization, auto guessing/assigning epg id's
 ```yaml
-epg_url: ['https://localhost.com/epg.xml']
+# single epg
+epg_url: 'https://localhost.com/epg.xml'
 ```
 ```yaml
+# multi local file  epg
 epg_url: ['file:///${env:M3U_FILTER_HOME}/epg.xml', 'file:///${env:M3U_FILTER_HOME}/epg2.xml']
 ```
 ```yaml
+# multi url  epg
 epg_url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
 ```
 

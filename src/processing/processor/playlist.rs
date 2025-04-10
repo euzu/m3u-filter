@@ -1,5 +1,3 @@
-extern crate unidecode;
-
 use crate::Config;
 use crate::model::config::{ConfigInput, ConfigRename};
 use crate::utils::network::epg;
@@ -15,8 +13,7 @@ use std::thread;
 
 use log::{debug, error, info, log_enabled, trace, warn, Level};
 use std::time::Instant;
-use unidecode::unidecode;
-
+use deunicode::deunicode;
 use crate::foundation::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, get_errors_notify_message, notify_err};
 use crate::messaging::{send_message, MsgKind};
@@ -62,8 +59,8 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
 }
 
 fn playlistgroup_comparator(a: &PlaylistGroup, b: &PlaylistGroup, group_sort: &ConfigSortGroup, match_as_ascii: bool) -> Ordering {
-    let value_a = if match_as_ascii { unidecode(&a.title) } else { a.title.to_string() };
-    let value_b = if match_as_ascii { unidecode(&b.title) } else { b.title.to_string() };
+    let value_a = if match_as_ascii { deunicode(&a.title) } else { a.title.to_string() };
+    let value_b = if match_as_ascii { deunicode(&b.title) } else { b.title.to_string() };
     let ordering = value_a.partial_cmp(&value_b).unwrap();
     match group_sort.order {
         Asc => ordering,
@@ -74,8 +71,8 @@ fn playlistgroup_comparator(a: &PlaylistGroup, b: &PlaylistGroup, group_sort: &C
 fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &ConfigSortChannel, match_as_ascii: bool) -> Ordering {
     let raw_value_a = get_field_value(a, &channel_sort.field);
     let raw_value_b = get_field_value(b, &channel_sort.field);
-    let value_a = if match_as_ascii { unidecode(&raw_value_a) } else { raw_value_a };
-    let value_b = if match_as_ascii { unidecode(&raw_value_b) } else { raw_value_b };
+    let value_a = if match_as_ascii { deunicode(&raw_value_a) } else { raw_value_a };
+    let value_b = if match_as_ascii { deunicode(&raw_value_b) } else { raw_value_b };
     channel_sort.sequence.as_ref().map_or_else(|| {
         let ordering = value_a.partial_cmp(&value_b).unwrap();
         match channel_sort.order {
@@ -122,7 +119,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
             for channel_sort in channel_sorts {
                 let regexp = channel_sort.re.as_ref().unwrap();
                 for group in new_playlist.iter_mut() {
-                    let group_title = if match_as_ascii { unidecode(&group.title) } else { group.title.to_string() };
+                    let group_title = if match_as_ascii { deunicode(&group.title) } else { group.title.to_string() };
                     if regexp.is_match(group_title.as_str()) {
                         group.channels.sort_by(|chan1, chan2| playlistitem_comparator(chan1, chan2, channel_sort, match_as_ascii));
                     }
@@ -196,7 +193,7 @@ macro_rules! apply_pattern {
 fn map_channel(mut channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
     if !mapping.mapper.is_empty() {
         let header = &channel.header;
-        let channel_name = if mapping.match_as_ascii { unidecode(&header.name) } else { header.name.to_string() };
+        let channel_name = if mapping.match_as_ascii { deunicode(&header.name) } else { header.name.to_string() };
         if mapping.match_as_ascii && log_enabled!(Level::Trace) { trace!("Decoded {} for matching to {}", &header.name, &channel_name); }
         // let ref_chan = &mut channel;
         let ref_chan = &mut channel;
@@ -542,8 +539,16 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
         let mut normalized_epg_channel_ids: HashMap<Cow<str>, Option<Cow<str>>> = HashMap::new();
         for channel in fp.playlistgroups.iter().flat_map(|g| &g.channels) {
             match channel.header.epg_channel_id.as_ref() {
-                None => {normalized_epg_channel_ids.insert(Cow::Owned(normalize_channel_name(&channel.header.name)), None);},
-                Some(epg_id) => {epg_channel_ids.insert(Cow::Owned(epg_id.to_string()));},
+                None => {
+                    normalized_epg_channel_ids.insert(Cow::Owned(normalize_channel_name(&channel.header.name)), None);
+                },
+                Some(epg_id) => {
+                    if epg_id.is_empty() {
+                        normalized_epg_channel_ids.insert(Cow::Owned(normalize_channel_name(&channel.header.name)), None);
+                    } else {
+                        epg_channel_ids.insert(Cow::Owned(epg_id.to_string()));
+                    }
+                },
             }
         }
         // let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)

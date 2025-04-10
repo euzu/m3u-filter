@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use quick_xml::{Error, Writer};
@@ -21,10 +21,11 @@ pub struct XmlTag {
     pub attributes: Option<Arc<HashMap<String, String>>>,
     pub children: Option<Vec<Arc<XmlTag>>>,
     pub icon: Option<String>,
-    pub normalized_epg_id: Option<String>,
+    pub normalized_epg_ids: HashSet<String>,
 }
 
 impl XmlTag {
+
     pub fn get_attribute_value(&self, attr_name: &str) -> Option<&String> {
         self.attributes.as_ref().and_then(|attr| attr.get(attr_name))
     }

@@ -756,6 +756,13 @@ impl ConfigInputAlias {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum EpgUrl {
+  Single(String),
+  Multi(Vec<String>)
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigInput {
@@ -768,7 +775,7 @@ pub struct ConfigInput {
     pub headers: HashMap<String, String>,
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub epg_url: Option<Vec<String>>,
+    pub epg_url: Option<EpgUrl>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -808,11 +815,19 @@ impl ConfigInput {
         check_input_credentials!(self, self.input_type);
         self.persist = get_trimmed_string(&self.persist);
 
-        self.epg_url = self.epg_url.take().map(|list| {
-            list.into_iter()
-                .map(|url| url.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect()
+        self.epg_url = self.epg_url.take().map(|epg_url| {
+            match epg_url {
+                EpgUrl::Single(url) => if  url.trim().is_empty() {
+                    EpgUrl::Multi(vec![])
+                } else {
+                    EpgUrl::Single(url.trim().to_string())
+                },
+                EpgUrl::Multi(urls) =>
+                    EpgUrl::Multi(urls.into_iter()
+                        .map(|url| url.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect())
+            }
         });
 
         if let Some(aliases) = self.aliases.as_mut() {

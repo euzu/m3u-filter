@@ -36,7 +36,7 @@ pest = "2.7"
 pest_derive = "2.7"
 enum-iterator = "2"
 openssl = { version = "*", features = ["vendored"] } #https://docs.rs/openssl/0.10.34/openssl/#vendored
-unidecode = "0"
+deunicode = "1.6.1"
 mime = "0.3"
 log = "0.4"
 env_logger = "0.11"

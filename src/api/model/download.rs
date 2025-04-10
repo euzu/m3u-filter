@@ -3,8 +3,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tokio::sync::{RwLock, Mutex};
 use std::sync::Arc;
+use deunicode::deunicode;
 use serde::{Deserialize, Serialize};
-use unidecode::unidecode;
 
 use crate::model::config::VideoDownloadConfig;
 use crate::repository::storage::hash_string_as_hex;
@@ -74,7 +74,7 @@ impl FileDownload {
         match reqwest::Url::parse(req_url) {
             Ok(url) => {
                 let filename_re = download_cfg.t_re_filename.as_ref().unwrap();
-                let tmp_filename = filename_re.replace_all(&unidecode(req_filename)
+                let tmp_filename = filename_re.replace_all(&deunicode(req_filename)
                     .replace(' ', "_"), "")
                     .replace("__", "_")
                     .replace("_-_", "-");

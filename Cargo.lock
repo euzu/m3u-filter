@@ -640,6 +640,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "deunicode"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc55fe0d1f6c107595572ec8b107c0999bb1a2e0b75e37429a4fb0d6474a0e7d"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1532,6 +1538,7 @@ dependencies = [
  "chrono",
  "clap",
  "cron",
+ "deunicode",
  "enum-iterator",
  "env_logger",
  "filetime",
@@ -1564,7 +1571,6 @@ dependencies = [
  "tower",
  "tower-http",
  "tower_governor",
- "unidecode",
  "url",
  "vergen",
  "winapi",
@@ -2913,12 +2919,6 @@ name = "unicode-ident"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5f39404a5da50712a4c1eecf25e90dd62b613502b7e925fd4e4d19b5c96512"
-
-[[package]]
-name = "unidecode"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "402bb19d8e03f1d1a7450e2bd613980869438e0666331be3e073089124aa1adc"
 
 [[package]]
 name = "unsafe-libyaml"

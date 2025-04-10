@@ -7,14 +7,15 @@ use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
-use unidecode::unidecode;
+use deunicode::deunicode;
 
 static NORMALIZE_CHANNEL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9\-]").unwrap());
 
+// TODO into config
 const TERMS_TO_REMOVE: &[&str] = &["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"];
 
 pub fn normalize_channel_name(name: &str) -> String {
-    let normalized = unidecode(name).to_lowercase();
+    let normalized = deunicode(name).to_lowercase();
 
     // Remove all non-alphanumeric characters (except dashes and underscores).
     let cleaned_name = NORMALIZE_CHANNEL.replace_all(&normalized, "");
@@ -40,7 +41,8 @@ impl TVGuide {
         })
     }
 
-    fn process_epg_file(epg_channel_ids: &mut HashSet<Cow<str>>, normalized_epg_channel_ids: &mut HashMap<Cow<str>, Option<Cow<str>>>, processed_epg_channel_ids: &mut HashSet<String>, epg_file: &Path) -> Option<Epg> {
+    fn process_epg_file(epg_channel_ids: &mut HashSet<Cow<str>>, normalized_epg_channel_ids: &mut HashMap<Cow<str>, Option<Cow<str>>>,
+                        processed_epg_channel_ids: &mut HashSet<String>, epg_file: &Path) -> Option<Epg> {
         match CompressedFileReader::new(epg_file) {
             Ok(mut reader) => {
                 let mut children: Vec<XmlTag> = vec![];
@@ -51,7 +53,7 @@ impl TVGuide {
                             if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
                                 if !processed_epg_channel_ids.contains(epg_id) {
                                     let id: Cow<str> = Cow::Owned(epg_id.to_string());
-                                    if let Some(normalized_epg_id) = tag.normalized_epg_id.as_ref() {
+                                    for normalized_epg_id in &tag.normalized_epg_ids {
                                         let key = Cow::Owned(normalized_epg_id.to_string());
                                         match normalized_epg_channel_ids.entry(key) {
                                             std::collections::hash_map::Entry::Occupied(mut entry) => {
@@ -111,8 +113,7 @@ impl TVGuide {
         }
         let mut processed_epg_ids: HashSet<String> = HashSet::new();
         let epgs: Vec<Epg> = self.file_paths.iter()
-            .map(|path| Self::process_epg_file(epg_channel_ids, normalized_epg_channel_ids, &mut processed_epg_ids, path))
-            .flatten()
+            .filter_map(|path| Self::process_epg_file(epg_channel_ids, normalized_epg_channel_ids, &mut processed_epg_ids, path))
             .collect();
         if epgs.len() == 1 {
             epgs.into_iter().next()
@@ -144,7 +145,7 @@ where
                     attributes: attribs,
                     children: None,
                     icon: None,
-                    normalized_epg_id: None,
+                    normalized_epg_ids: HashSet::new(),
                 };
 
                 if is_tv_tag {
@@ -162,7 +163,7 @@ where
                                     match child.name.as_str() {
                                         EPG_TAG_DISPLAY_NAME => {
                                             if let Some(name) = &child.value {
-                                                tag.normalized_epg_id = Some(normalize_channel_name(name));
+                                                tag.normalized_epg_ids.insert(normalize_channel_name(name));
                                             }
                                         }
                                         EPG_TAG_ICON => {
@@ -309,5 +310,8 @@ mod tests {
     #[test]
     fn normalize() {
         assert_eq!("satsupersport6", normalize_channel_name("SAT: SUPERSPORT 6 ᴿᴬᵂ"));
+        assert_eq!("odisea", normalize_channel_name("4K: ODISEA ᴿᴬᵂ"));
+        assert_eq!("odisea", normalize_channel_name("4K: ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ"));
+
     }
 }
