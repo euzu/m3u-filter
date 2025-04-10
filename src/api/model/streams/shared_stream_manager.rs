@@ -85,12 +85,11 @@ impl SharedStreamState {
         S: Stream<Item=Result<Bytes, E>> + Unpin + 'static + std::marker::Send,
         E: std::fmt::Debug + std::marker::Send
     {
-        let starving_size = self.buf_size-4;
-        let sleep_duration = Duration::from_millis(10);
-        let sleep_duration_starve = Duration::from_millis(100);
         let mut source_stream = Box::pin(bytes_stream);
         let subscriber = Arc::clone(&self.subscribers);
         let streaming_url = stream_url.to_string();
+
+        let mut tick = tokio::time::interval(Duration::from_millis(5));
 
         //Spawn a task to forward items from the source stream to the broadcast channel
         tokio::spawn(async move {
@@ -105,13 +104,13 @@ impl SharedStreamState {
 
                     let start_time = Instant::now();
                     loop {
-                        if subscriber.read().await.iter().any(|sender| sender.capacity() >= starving_size) {
+                        if subscriber.read().await.iter().any(|sender| sender.capacity() > 0) {
                             break;
                         }
-                        tokio::time::sleep(sleep_duration_starve).await;
                         if start_time.elapsed().as_secs() > 5 {
                             break;
                         }
+                        tick.tick().await;
                     }
 
                     let mut subs =  subscriber.write().await;
@@ -127,7 +126,7 @@ impl SharedStreamState {
                         }
                     });
                 }
-                tokio::time::sleep(sleep_duration).await;
+                tick.tick().await;
             }
             debug_if_enabled!("Shared stream exhausted. Closing shared provider stream {}", sanitize_sensitive_info(&streaming_url));
             shared_streams.unregister(&streaming_url).await;
