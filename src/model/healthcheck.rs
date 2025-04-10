@@ -21,8 +21,8 @@ pub struct StatusCheck {
     pub memory: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache: Option<String>,
-    pub active_clients: usize,
-    pub active_client_connections: usize,
+    pub active_users: usize,
+    pub active_user_connections: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_provider_connections: Option<BTreeMap<String, u16>>,
 }

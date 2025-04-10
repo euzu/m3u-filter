@@ -74,7 +74,7 @@ async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
             Some(lock.lock().await.get_size_text())
         }
     };
-    let (active_clients, active_client_connections) = {
+    let (active_users, active_user_connections) = {
         let active_user = &app_state.active_users;
         (active_user.active_users().await, active_user.active_connections().await)
     };
@@ -87,8 +87,8 @@ async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
         build_time: get_build_time(),
         server_time: get_server_time(),
         memory: get_memory_usage(),
-        active_clients,
-        active_client_connections,
+        active_users,
+        active_user_connections,
         active_provider_connections,
         cache,
     }

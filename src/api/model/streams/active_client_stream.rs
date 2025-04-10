@@ -37,11 +37,8 @@ impl ActiveClientStream {
         let active_user = app_state.active_users.clone();
         let active_provider = app_state.active_provider.clone();
         let log_active_clients = app_state.config.log.as_ref().is_some_and(|l| l.active_clients);
-        let (client_count, connection_count) = active_user.add_connection(username).await;
-        if log_active_clients {
-            info!("Active clients: {client_count}, active connections {connection_count}");
-        }
-
+        let (user_count, user_connection_count) = active_user.add_connection(username).await;
+        Self::log_active_user(log_active_clients, user_count, user_connection_count);
         let user_grace_period = user.connection_permission(app_state).await == UserConnectionPermission::GracePeriod;
 
         let grace_stop_flag = Self::stream_grace_period(&stream_details, &active_provider, user_grace_period, user, &active_user);
@@ -112,6 +109,12 @@ impl ActiveClientStream {
         }
         None
     }
+
+    fn log_active_user(log_active_clients: bool, user_count: usize, user_connection_count: usize) {
+        if log_active_clients {
+            info!("Active Users: {user_count}, Active User Connections: {user_connection_count}");
+        }
+    }
 }
 impl Stream for ActiveClientStream {
     type Item = Result<Bytes, StreamError>;
@@ -156,10 +159,8 @@ impl Drop for ActiveClientStream {
         tokio::task::block_in_place(move || {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
-                let (client_count, connection_count) = active_user.remove_connection(&username).await;
-                if log_active_clients {
-                    info!("Active clients: {client_count}, active connections {connection_count}");
-                }
+                let (user_count, user_connection_count) = active_user.remove_connection(&username).await;
+                Self::log_active_user(log_active_clients, user_count, user_connection_count);
                 if let Some(input) = input_name {
                     active_provider.release_connection(&input);
                 }
