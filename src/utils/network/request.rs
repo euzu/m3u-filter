@@ -20,7 +20,7 @@ use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::ConfigInput;
 use crate::model::stats::format_elapsed_time;
-use crate::repository::storage::get_input_storage_path;
+use crate::repository::storage::{get_input_storage_path, short_hash};
 use crate::repository::xtream_repository::FILE_EPG;
 use crate::utils::compression::compression_utils::{is_deflate, is_gzip, ENCODING_DEFLATE, ENCODING_GZIP};
 use crate::utils::debug_if_enabled;
@@ -292,7 +292,7 @@ pub async fn download_text_content_as_file(client: Arc<reqwest::Client>, input: 
         } else {
             let file_path = persist_filepath.map_or_else(|| match get_input_storage_path(&input.name, working_dir) {
                 Ok(download_path) => {
-                    Ok(download_path.join(FILE_EPG))
+                    Ok(download_path.join(format!("{}_{FILE_EPG}", short_hash(url_str))))
                 }
                 Err(err) => Err(err)
             }, Ok);

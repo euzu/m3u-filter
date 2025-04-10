@@ -6,6 +6,7 @@ use crate::utils::network::epg;
 use crate::utils::network::m3u;
 use crate::utils::network::xtream;
 use core::cmp::Ordering;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc};
@@ -537,12 +538,12 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     // we need to process each input epg.
     for mut fp in processed_fetched_playlists {
         // collect all epg_channel ids
-        let mut epg_channel_ids: HashSet<String> = HashSet::new();
-        let mut normalized_epg_channel_ids: HashMap<String, Option<String>> = HashMap::new();
+        let mut epg_channel_ids: HashSet<Cow<str>> = HashSet::new();
+        let mut normalized_epg_channel_ids: HashMap<Cow<str>, Option<Cow<str>>> = HashMap::new();
         for channel in fp.playlistgroups.iter().flat_map(|g| &g.channels) {
             match channel.header.epg_channel_id.as_ref() {
-                None => {normalized_epg_channel_ids.insert(normalize_channel_name(&channel.header.name), None);},
-                Some(epg_id) => {epg_channel_ids.insert(epg_id.to_string());},
+                None => {normalized_epg_channel_ids.insert(Cow::Owned(normalize_channel_name(&channel.header.name)), None);},
+                Some(epg_id) => {epg_channel_ids.insert(Cow::Owned(epg_id.to_string()));},
             }
         }
         // let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
@@ -561,7 +562,8 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
                     .filter(|c| c.header.epg_channel_id.is_none() || c.header.logo.is_empty() || c.header.logo_small.is_empty())
                     .for_each(|c| {
                         if c.header.epg_channel_id.as_ref().is_none() {
-                            if let Some(Some(epg_id)) = normalized_epg_channel_ids.get(&normalize_channel_name(&c.header.name)) {
+                            let normalized = normalize_channel_name(&c.header.name);
+                            if let Some(Some(epg_id)) = normalized_epg_channel_ids.get(&Cow::Borrowed(normalized.as_str())) {
                                 c.header.epg_channel_id = Some(epg_id.to_string());
                             }
                         }

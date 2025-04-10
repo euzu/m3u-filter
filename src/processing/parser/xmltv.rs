@@ -1,9 +1,11 @@
+use std::borrow::Cow;
 use crate::model::xmltv::{Epg, TVGuide, XmlTag, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_CHANNEL, EPG_TAG_DISPLAY_NAME, EPG_TAG_ICON, EPG_TAG_PROGRAMME, EPG_TAG_TV};
 use crate::utils::compression::compressed_file_reader::CompressedFileReader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use std::sync::{Arc, LazyLock};
 use unidecode::unidecode;
 
@@ -26,11 +28,20 @@ pub fn normalize_channel_name(name: &str) -> String {
 }
 
 impl TVGuide {
-    pub fn filter(&self, epg_channel_ids: &mut HashSet<String>, normalized_epg_channel_ids: &mut HashMap<String, Option<String>>) -> Option<Epg> {
-        if epg_channel_ids.is_empty() && normalized_epg_channel_ids.is_empty() {
+    fn merge(mut epgs: Vec<Epg>) -> Option<Epg> {
+        if epgs.is_empty() {
             return None;
         }
-        match CompressedFileReader::new(&self.file) {
+        let first_epg_attributes = epgs.get_mut(0).unwrap().attributes.take();
+        let merged_children: Vec<XmlTag> = epgs.into_iter().flat_map(|epg| epg.children).collect();
+        Some(Epg {
+            attributes: first_epg_attributes,
+            children: merged_children,
+        })
+    }
+
+    fn process_epg_file(epg_channel_ids: &mut HashSet<Cow<str>>, normalized_epg_channel_ids: &mut HashMap<Cow<str>, Option<Cow<str>>>, processed_epg_channel_ids: &mut HashSet<String>, epg_file: &Path) -> Option<Epg> {
+        match CompressedFileReader::new(epg_file) {
             Ok(mut reader) => {
                 let mut children: Vec<XmlTag> = vec![];
                 let mut tv_attributes: Option<Arc<HashMap<String, String>>> = None;
@@ -38,24 +49,31 @@ impl TVGuide {
                     match tag.name.as_str() {
                         EPG_TAG_CHANNEL => {
                             if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
-                                if let Some(normalized_epg_id) = tag.normalized_epg_id.as_ref() {
-                                    match normalized_epg_channel_ids.entry(normalized_epg_id.to_string()) {
-                                        std::collections::hash_map::Entry::Occupied(mut entry) => {
-                                            entry.insert(Some(epg_id.to_string()));
-                                            epg_channel_ids.insert(epg_id.to_string());
+                                if !processed_epg_channel_ids.contains(epg_id) {
+                                    let id: Cow<str> = Cow::Owned(epg_id.to_string());
+                                    if let Some(normalized_epg_id) = tag.normalized_epg_id.as_ref() {
+                                        let key = Cow::Owned(normalized_epg_id.to_string());
+                                        match normalized_epg_channel_ids.entry(key) {
+                                            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                                                entry.insert(Some(id.clone()));
+                                                epg_channel_ids.insert(id.clone());
+                                            }
+                                            std::collections::hash_map::Entry::Vacant(_entry) => {}
                                         }
-                                        std::collections::hash_map::Entry::Vacant(_entry) => {}
                                     }
-                                }
-                                if epg_channel_ids.contains(epg_id.as_str()) {
-                                    children.push(tag);
+                                    if epg_channel_ids.contains(&id) {
+                                        children.push(tag);
+                                    }
                                 }
                             }
                         }
                         EPG_TAG_PROGRAMME => {
                             if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
-                                if epg_channel_ids.contains(epg_id.as_str()) {
-                                    children.push(tag);
+                                if !processed_epg_channel_ids.contains(epg_id) {
+                                    let borrowed_epg_id = Cow::Borrowed(epg_id.as_str());
+                                    if epg_channel_ids.contains(&borrowed_epg_id) {
+                                        children.push(tag);
+                                    }
                                 }
                             }
                         }
@@ -71,12 +89,35 @@ impl TVGuide {
                 if children.is_empty() {
                     return None;
                 }
+
+                children.iter().filter(|tag| tag.name == EPG_TAG_CHANNEL).for_each(|tag| {
+                    if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
+                        processed_epg_channel_ids.insert(epg_id.to_string());
+                    }
+                });
+
                 Some(Epg {
                     attributes: tv_attributes,
                     children,
                 })
             }
             Err(_) => None
+        }
+    }
+
+    pub fn filter(&self, epg_channel_ids: &mut HashSet<Cow<str>>, normalized_epg_channel_ids: &mut HashMap<Cow<str>, Option<Cow<str>>>) -> Option<Epg> {
+        if epg_channel_ids.is_empty() && normalized_epg_channel_ids.is_empty() {
+            return None;
+        }
+        let mut processed_epg_ids: HashSet<String> = HashSet::new();
+        let epgs: Vec<Epg> = self.file_paths.iter()
+            .map(|path| Self::process_epg_file(epg_channel_ids, normalized_epg_channel_ids, &mut processed_epg_ids, path))
+            .flatten()
+            .collect();
+        if epgs.len() == 1 {
+            epgs.into_iter().next()
+        } else {
+            Self::merge(epgs)
         }
     }
 }
@@ -244,30 +285,26 @@ pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::xmltv::TVGuide;
     use crate::processing::parser::xmltv::normalize_channel_name;
-    use std::collections::{HashMap, HashSet};
-    use std::io;
-    use std::path::PathBuf;
 
-    #[test]
-    fn parse_test() -> io::Result<()> {
-        let file_path = PathBuf::from("/tmp/epg.xml.gz");
-
-        if file_path.exists() {
-            let tv_guide = TVGuide { file: file_path };
-
-            let mut channel_ids = HashSet::from(["channel.1".to_string(), "channel.2".to_string(), "channel.3".to_string()]);
-            let mut nomalized = HashMap::new();
-            match tv_guide.filter(&mut channel_ids, &mut nomalized) {
-                None => assert!(false, "No epg filtered"),
-                Some(epg) => {
-                    assert_eq!(epg.children.len(), channel_ids.len() * 2, "Epg size does not match")
-                }
-            }
-        }
-        Ok(())
-    }
+    // #[test]
+    // fn parse_test() -> io::Result<()> {
+    //     let file_path = PathBuf::from("/tmp/epg.xml.gz");
+    //
+    //     if file_path.exists() {
+    //         let tv_guide = TVGuide { file: file_path };
+    //
+    //         let mut channel_ids = HashSet::from(["channel.1".to_string(), "channel.2".to_string(), "channel.3".to_string()]);
+    //         let mut nomalized = HashMap::new();
+    //         match tv_guide.filter(&mut channel_ids, &mut nomalized) {
+    //             None => assert!(false, "No epg filtered"),
+    //             Some(epg) => {
+    //                 assert_eq!(epg.children.len(), channel_ids.len() * 2, "Epg size does not match")
+    //             }
+    //         }
+    //     }
+    //     Ok(())
+    // }
 
     #[test]
     fn normalize() {

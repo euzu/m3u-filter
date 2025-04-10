@@ -768,7 +768,7 @@ pub struct ConfigInput {
     pub headers: HashMap<String, String>,
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub epg_url: Option<String>,
+    pub epg_url: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -808,6 +808,12 @@ impl ConfigInput {
         check_input_credentials!(self, self.input_type);
         self.persist = get_trimmed_string(&self.persist);
 
+        self.epg_url = self.epg_url.take().map(|list| {
+            list.into_iter()
+                .map(|url| url.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        });
 
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;

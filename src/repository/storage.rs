@@ -22,6 +22,11 @@ pub fn hash_string(text: &str) -> UUIDType {
     hash_bytes(text.as_bytes())
 }
 
+pub fn short_hash(text: &str) -> String {
+    let hash = blake3::hash(text.as_bytes());
+    hex_encode(&hash.as_bytes()[..8])
+}
+
 
 #[inline]
 pub fn hex_encode(bytes: &[u8]) -> String {

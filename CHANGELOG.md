@@ -28,7 +28,16 @@ web_ui:
     userfile: user.txt
 ```
 - user has now the attribute `ui_enabled` to disable/enable web_ui for user.
-- epg processing optimization, auto guessing/assigning epg id's
+- !BREAKING_CHANGE! multi epg processing/optimization, auto guessing/assigning epg id's
+```yaml
+epg_url: ['https://localhost.com/epg.xml']
+```
+```yaml
+epg_url: ['file:///${env:M3U_FILTER_HOME}/epg.xml', 'file:///${env:M3U_FILTER_HOME}/epg2.xml']
+```
+```yaml
+epg_url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
+```
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

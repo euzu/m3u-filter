@@ -271,26 +271,30 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
     let mut result = vec![];
     let mut default_columns = vec![];
     default_columns.extend_from_slice(DEFAULT_COLUMNS);
+    let mut header_defined = false;
     for line in reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue
         }
         if line.starts_with(HEADER_PREFIX) {
-            default_columns = line[1..].split(CSV_SEPARATOR).map(|s| {
-                match s {
-                    FIELD_URL => FIELD_URL,
-                    FIELD_MAX_CON => FIELD_MAX_CON,
-                    FIELD_PRIO => FIELD_PRIO,
-                    FIELD_NAME => FIELD_NAME,
-                    FIELD_USERNAME => FIELD_USERNAME,
-                    FIELD_PASSWORD => FIELD_PASSWORD,
-                    _ => {
-                        error!("Field {s} is unsupported for csv input");
-                        FIELD_UNKNOWN
+            if  !header_defined {
+                header_defined = true;
+                default_columns = line[1..].split(CSV_SEPARATOR).map(|s| {
+                    match s {
+                        FIELD_URL => FIELD_URL,
+                        FIELD_MAX_CON => FIELD_MAX_CON,
+                        FIELD_PRIO => FIELD_PRIO,
+                        FIELD_NAME => FIELD_NAME,
+                        FIELD_USERNAME => FIELD_USERNAME,
+                        FIELD_PASSWORD => FIELD_PASSWORD,
+                        _ => {
+                            error!("Field {s} is unsupported for csv input");
+                            FIELD_UNKNOWN
+                        }
                     }
-                }
-            }).collect();
+                }).collect();
+            }
             continue;
         }
 

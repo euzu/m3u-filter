@@ -68,5 +68,5 @@ impl Epg {
 
 #[derive(Debug, Clone)]
 pub struct TVGuide {
-    pub file: PathBuf,
+    pub file_paths: Vec<PathBuf>,
 }
