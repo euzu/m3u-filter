@@ -1,5 +1,5 @@
 use crate::Config;
-use crate::model::config::{ConfigInput, ConfigRename};
+use crate::model::config::{ConfigInput, ConfigRename, EpgConfig, EpgNormalizeConfig};
 use crate::utils::network::epg;
 use crate::utils::network::m3u;
 use crate::utils::network::xtream;
@@ -14,6 +14,7 @@ use std::thread;
 use log::{debug, error, info, log_enabled, trace, warn, Level};
 use std::time::Instant;
 use deunicode::deunicode;
+use rphonetic::{Encoder, Metaphone};
 use crate::foundation::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, get_errors_notify_message, notify_err};
 use crate::messaging::{send_message, MsgKind};
@@ -502,30 +503,26 @@ fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
 
 pub struct EpgIdCache<'a > {
     pub channel: HashSet<Cow<'a, str>>,
-    pub normalized: HashMap<Cow<'a, str>, Option<Cow<'a, str>>>,
+    pub normalized: HashMap<Cow<'a, str>, (String, Option<Cow<'a, str>>)>,
+    pub normalized_phonetic: HashMap<Cow<'a, str>, String>,
     pub processed: HashSet<String>,
-    pub strip: Vec<&'a str>,
+    pub normalize_config: EpgNormalizeConfig,
 }
 
-
-const TERMS_TO_REMOVE: &[&str] = &["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"];
-
-impl<'a> EpgIdCache<'a> {
-    pub fn new(strip: Option<&'a Vec<String>>) -> Self {
-        let str_refs: Vec<&'a str> = match strip {
-            Some(vec) => vec.iter().map(std::string::String::as_str).collect(),
-            None => TERMS_TO_REMOVE.to_vec(),
-        };
+impl EpgIdCache<'_> {
+    pub fn new(epg_config: Option<&EpgConfig>) -> Self {
+        let normalize_config = epg_config.map_or_else(EpgNormalizeConfig::default, |epg_config| epg_config.t_normalize.clone());
         EpgIdCache {
             channel: HashSet::new(),
             normalized: HashMap::new(),
+            normalized_phonetic: HashMap::new(),
             processed: HashSet::new(),
-            strip: str_refs,
+            normalize_config,
         }
     }
 
     pub fn normalize(&self, name: &str) -> String {
-        normalize_channel_name(name, &self.strip)
+        normalize_channel_name(name, &self.normalize_config)
     }
 }
 
@@ -560,23 +557,40 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
 
+    let metaphone = Metaphone::default();
+
     // each fetched playlist can have its own epgl url.
     // we need to process each input epg.
     for mut fp in processed_fetched_playlists {
         // collect all epg_channel ids
-        let mut id_cache = EpgIdCache::new(fp.input.epg_strip.as_ref());
+        let mut id_cache = EpgIdCache::new(fp.input.epg.as_ref());
+        let normalize_enabled = id_cache.normalize_config.enabled;
+        let fuzzy_matching = id_cache.normalize_config.fuzzy_matching;
         for channel in fp.playlistgroups.iter().flat_map(|g| &g.channels) {
-            match channel.header.epg_channel_id.as_ref() {
-                None => {
-                    id_cache.normalized.insert(Cow::Owned(id_cache.normalize(&channel.header.name)), None);
-                },
-                Some(epg_id) => {
-                    if epg_id.is_empty() {
-                        id_cache.normalized.insert(Cow::Owned(id_cache.normalize(&channel.header.name)), None);
-                    } else {
-                        id_cache.channel.insert(Cow::Owned(epg_id.to_string()));
-                    }
-                },
+            let epg_id = channel.header.epg_channel_id.as_deref();
+            let name = &channel.header.name;
+
+            if let Some(id) = epg_id {
+                if !id.is_empty() {
+                    id_cache.channel.insert(Cow::Owned(id.to_string()));
+                }
+            }
+
+            // hen fuzzy_matching we need to put the normalized name even if there is an epg_id, because the epg_id
+            // could not match to the epg file. And then we try to guess it based on normalized name
+            let needs_normalization = normalize_enabled && (fuzzy_matching || epg_id.is_none_or(str::is_empty));
+
+            if needs_normalization {
+                let normalized_name = id_cache.normalize(name);
+                let normalized_key = Cow::Owned(normalized_name.clone());
+
+                let phonetic_code = if fuzzy_matching {
+                    metaphone.encode(&normalized_name)
+                } else {
+                    String::new()
+                };
+
+                id_cache.normalized.insert(normalized_key, (phonetic_code, None));
             }
         }
         // let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
@@ -594,9 +608,9 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
                     .filter(|c| c.header.xtream_cluster == XtreamCluster::Live )
                     .filter(|c| c.header.epg_channel_id.is_none() || c.header.logo.is_empty() || c.header.logo_small.is_empty())
                     .for_each(|c| {
-                        if c.header.epg_channel_id.as_ref().is_none() {
+                        if c.header.epg_channel_id.as_ref().is_none() || !id_cache.processed.contains(c.header.epg_channel_id.as_ref().unwrap()) {
                             let normalized = id_cache.normalize(&c.header.name);
-                            if let Some(Some(epg_id)) = id_cache.normalized.get(&Cow::Borrowed(normalized.as_str())) {
+                            if let Some((_, Some(epg_id))) = id_cache.normalized.get(&Cow::Borrowed(normalized.as_str())) {
                                 c.header.epg_channel_id = Some(epg_id.to_string());
                             }
                         }
@@ -666,4 +680,20 @@ pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, tar
     }
     let elapsed = start_time.elapsed().as_secs();
     info!("Update process finished! Took {elapsed} secs.");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test() {
+        let data = [("yessport5", "heyessport5gold"), ("yessport5", "heyesport5gold")];
+
+        data.iter().for_each(|(first, second)|
+        println!("jaro_winkler {} = {} => {}", first, second, strsim::jaro_winkler(first, second)));
+        // println!("jaro {}", strsim::jaro(data.0, data.1));
+        // println!("levenhstein {}", strsim::levenshtein(data.0, data.1));
+        // println!("damerau_levenshtein {:?}", strsim::damerau_levenshtein(data.0, data.1));
+        // println!("osa distance {:?}", strsim::osa_distance(data.0, data.1));
+        // println!("sorensen dice {:?}", strsim::sorensen_dice(data.0, data.1));
+    }
 }

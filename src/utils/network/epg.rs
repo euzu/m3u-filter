@@ -1,13 +1,13 @@
-use std::path::PathBuf;
-use std::sync::Arc;
-use log::debug;
 use crate::m3u_filter_error::M3uFilterError;
-use crate::model::config::{Config, ConfigInput, EpgUrl};
+use crate::model::config::{Config, ConfigInput};
 use crate::model::xmltv::TVGuide;
-use crate::repository::storage::{short_hash};
+use crate::repository::storage::short_hash;
+use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::prepare_file_path;
 use crate::utils::network::request;
-use crate::utils::file::file_utils;
+use log::debug;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 
 async fn download_epg_file(url: &str, client: &Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str) -> Result<PathBuf, M3uFilterError> {
@@ -20,17 +20,14 @@ async fn download_epg_file(url: &str, client: &Arc<reqwest::Client>, input: &Con
 }
 
 pub async fn get_xmltv(client: Arc<reqwest::Client>, _cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Option<TVGuide>, Vec<M3uFilterError>) {
-    match &input.epg_url {
+    match &input.epg {
         None => (None, vec![]),
-        Some(urls) => {
+        Some(epg_config) => {
             let mut errors = vec![];
             let mut file_paths = vec![];
 
-            for url in match urls {
-                EpgUrl::Single(value) => vec![value.to_string()],
-                EpgUrl::Multi(value) => value.clone(),
-            } {
-                match download_epg_file(&url, &client, input, working_dir).await {
+            for url in &epg_config.t_urls {
+                match download_epg_file(url, &client, input, working_dir).await {
                     Ok(file_path) => {
                         file_paths.push(file_path);
                     }

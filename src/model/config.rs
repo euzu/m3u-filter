@@ -14,6 +14,7 @@ use crate::auth::user::UserCredential;
 use log::{debug, error, warn};
 use path_clean::PathClean;
 use rand::Rng;
+use regex::Regex;
 use url::Url;
 
 use crate::foundation::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
@@ -763,6 +764,138 @@ pub enum EpgUrl {
   Multi(Vec<String>)
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum EpgCountryPrefix {
+    #[default]
+    Ignore,
+    Suffix(String),
+    Prefix(String),
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EpgNormalizeConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    pub normalize_regex:  Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip: Option<Vec<String>>,
+    #[serde(default)]
+    pub country_prefix: EpgCountryPrefix,
+    #[serde(default)]
+    pub fuzzy_matching: bool,
+    #[serde(default)]
+    pub match_threshold: u16,
+    #[serde(skip)]
+    pub t_strip: Vec<String>,
+    #[serde(skip)]
+    pub t_normalize_regex: Option<Regex>,
+    #[serde(skip)]
+    pub t_country_prefix_separator: Vec<char>,
+    #[serde(skip)]
+    pub t_match_threshold: f64,
+}
+
+impl EpgNormalizeConfig {
+    /// # Panics
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        if !self.enabled {
+            return Ok(())
+        }
+        if self.match_threshold < 70 {
+            warn!("match_threshold is less than 70%, setting to 70%");
+            self.match_threshold = 70;
+        } else if self.match_threshold > 100 {
+            warn!("match_threshold is more than 100%, setting to 80%");
+            self.match_threshold = 100;
+        }
+        self.t_match_threshold = f64::from(self.match_threshold) / 100.0;
+
+        self.t_normalize_regex =match self.normalize_regex.as_ref() {
+            None =>  Some(Regex::new(r"[^a-zA-Z0-9\-]").unwrap()),
+            Some(regstr) => {
+                let re = regex::Regex::new(regstr.as_str());
+                if re.is_err() {
+                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
+                }
+                Some(re.unwrap())
+            }
+        };
+
+        if self.strip.is_none() {
+            self.t_strip =  ["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"].iter().map(std::string::ToString::to_string).collect();
+        }
+        Ok(())
+    }
+}
+
+impl Default for EpgNormalizeConfig {
+    fn default() -> Self {
+        let mut instance = EpgNormalizeConfig {
+            enabled: false,
+            normalize_regex: None,
+            strip: None,
+            country_prefix: EpgCountryPrefix::default(),
+            fuzzy_matching: false,
+            match_threshold: 0,
+            t_strip: Vec::default(),
+            t_normalize_regex: None,
+            t_country_prefix_separator: Vec::default(),
+            t_match_threshold: 0.0,
+        };
+        let _= instance.prepare();
+        instance
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EpgConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<EpgUrl>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub normalize: Option<EpgNormalizeConfig>,
+    #[serde(skip)]
+    pub t_urls: Vec<String>,
+    #[serde(skip)]
+    pub t_normalize: EpgNormalizeConfig,
+}
+
+impl EpgConfig {
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        self.t_urls = self.url.take().map_or_else(Vec::new, |epg_url| {
+            match epg_url {
+                EpgUrl::Single(url) => if  url.trim().is_empty() {
+                    vec![]
+                } else {
+                    vec![url.trim().to_string()]
+                },
+                EpgUrl::Multi(urls) =>
+                    urls.into_iter()
+                        .map(|url| url.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect()
+            }
+        });
+
+        self.t_normalize = match self.normalize.as_mut() {
+            None => {
+                let mut normalize: EpgNormalizeConfig = EpgNormalizeConfig::default();
+                normalize.prepare()?;
+                normalize
+            }
+            Some(normalize_cfg) => {
+                let mut normalize: EpgNormalizeConfig = normalize_cfg.clone();
+                normalize.prepare()?;
+                normalize
+            }
+        };
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigInput {
@@ -775,9 +908,7 @@ pub struct ConfigInput {
     pub headers: HashMap<String, String>,
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub epg_url: Option<EpgUrl>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub epg_strip: Option<Vec<String>>,
+    pub epg: Option<EpgConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -817,20 +948,9 @@ impl ConfigInput {
         check_input_credentials!(self, self.input_type);
         self.persist = get_trimmed_string(&self.persist);
 
-        self.epg_url = self.epg_url.take().map(|epg_url| {
-            match epg_url {
-                EpgUrl::Single(url) => if  url.trim().is_empty() {
-                    EpgUrl::Multi(vec![])
-                } else {
-                    EpgUrl::Single(url.trim().to_string())
-                },
-                EpgUrl::Multi(urls) =>
-                    EpgUrl::Multi(urls.into_iter()
-                        .map(|url| url.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect())
-            }
-        });
+        if let Some(epg) = self.epg.as_mut() {
+            let _ = epg.prepare();
+        }
 
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;

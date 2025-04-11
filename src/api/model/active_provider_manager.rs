@@ -528,7 +528,7 @@ mod tests {
             id,
             name: name.to_string(),
             url: "http://example.com".to_string(),
-            epg_url: None,
+            epg: Default::default(),
             username: None,
             password: None,
             persist: None,
