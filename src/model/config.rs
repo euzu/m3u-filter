@@ -792,8 +792,6 @@ pub struct EpgNormalizeConfig {
     #[serde(skip)]
     pub t_normalize_regex: Option<Regex>,
     #[serde(skip)]
-    pub t_country_prefix_separator: Vec<char>,
-    #[serde(skip)]
     pub t_match_threshold: f64,
 }
 
@@ -841,7 +839,6 @@ impl Default for EpgNormalizeConfig {
             match_threshold: 0,
             t_strip: Vec::default(),
             t_normalize_regex: None,
-            t_country_prefix_separator: Vec::default(),
             t_match_threshold: 0.0,
         };
         let _= instance.prepare();
