@@ -43,6 +43,8 @@ epg_url: ['file:///${env:M3U_FILTER_HOME}/epg.xml', 'file:///${env:M3U_FILTER_HO
 # multi url  epg
 epg_url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
 ```
+- added `epg_strip` to input for auto epg matching, if not given `["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]` is default
+When no matching epg_id is found, the display name is used to match a channel name. The given strings are stripped to get a better match.   
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

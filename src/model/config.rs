@@ -777,6 +777,8 @@ pub struct ConfigInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub epg_url: Option<EpgUrl>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epg_strip: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,

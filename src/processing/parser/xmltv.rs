@@ -8,20 +8,18 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
 use deunicode::deunicode;
+use crate::processing::processor::playlist::EpgIdCache;
 
 static NORMALIZE_CHANNEL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9\-]").unwrap());
 
-// TODO into config
-const TERMS_TO_REMOVE: &[&str] = &["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"];
-
-pub fn normalize_channel_name(name: &str) -> String {
+pub fn normalize_channel_name(name: &str, terms_to_remove: &[&str]) -> String {
     let normalized = deunicode(name).to_lowercase();
 
     // Remove all non-alphanumeric characters (except dashes and underscores).
     let cleaned_name = NORMALIZE_CHANNEL.replace_all(&normalized, "");
 
     // Remove terms like resolution
-    let result = TERMS_TO_REMOVE.iter().fold(cleaned_name.to_string(), |acc, term| {
+    let result = terms_to_remove.iter().fold(cleaned_name.to_string(), |acc, term| {
         acc.replace(*term, "")
     });
 
@@ -41,8 +39,8 @@ impl TVGuide {
         })
     }
 
-    fn process_epg_file(epg_channel_ids: &mut HashSet<Cow<str>>, normalized_epg_channel_ids: &mut HashMap<Cow<str>, Option<Cow<str>>>,
-                        processed_epg_channel_ids: &mut HashSet<String>, epg_file: &Path) -> Option<Epg> {
+    fn process_epg_file(id_cache: &mut EpgIdCache, epg_file: &Path) -> Option<Epg> {
+        let strip = id_cache.strip.clone();
         match CompressedFileReader::new(epg_file) {
             Ok(mut reader) => {
                 let mut children: Vec<XmlTag> = vec![];
@@ -51,19 +49,19 @@ impl TVGuide {
                     match tag.name.as_str() {
                         EPG_TAG_CHANNEL => {
                             if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
-                                if !processed_epg_channel_ids.contains(epg_id) {
+                                if !id_cache.processed.contains(epg_id) {
                                     let id: Cow<str> = Cow::Owned(epg_id.to_string());
                                     for normalized_epg_id in &tag.normalized_epg_ids {
                                         let key = Cow::Owned(normalized_epg_id.to_string());
-                                        match normalized_epg_channel_ids.entry(key) {
+                                        match id_cache.normalized.entry(key) {
                                             std::collections::hash_map::Entry::Occupied(mut entry) => {
                                                 entry.insert(Some(id.clone()));
-                                                epg_channel_ids.insert(id.clone());
+                                                id_cache.channel.insert(id.clone());
                                             }
                                             std::collections::hash_map::Entry::Vacant(_entry) => {}
                                         }
                                     }
-                                    if epg_channel_ids.contains(&id) {
+                                    if id_cache.channel.contains(&id) {
                                         children.push(tag);
                                     }
                                 }
@@ -71,9 +69,9 @@ impl TVGuide {
                         }
                         EPG_TAG_PROGRAMME => {
                             if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
-                                if !processed_epg_channel_ids.contains(epg_id) {
+                                if !id_cache.processed.contains(epg_id) {
                                     let borrowed_epg_id = Cow::Borrowed(epg_id.as_str());
-                                    if epg_channel_ids.contains(&borrowed_epg_id) {
+                                    if id_cache.channel.contains(&borrowed_epg_id) {
                                         children.push(tag);
                                     }
                                 }
@@ -86,7 +84,7 @@ impl TVGuide {
                     }
                 };
 
-                parse_tvguide(&mut reader, &mut filter_tags);
+                parse_tvguide(&mut reader, &mut filter_tags, &strip);
 
                 if children.is_empty() {
                     return None;
@@ -94,7 +92,7 @@ impl TVGuide {
 
                 children.iter().filter(|tag| tag.name == EPG_TAG_CHANNEL).for_each(|tag| {
                     if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
-                        processed_epg_channel_ids.insert(epg_id.to_string());
+                        id_cache.processed.insert(epg_id.to_string());
                     }
                 });
 
@@ -107,13 +105,12 @@ impl TVGuide {
         }
     }
 
-    pub fn filter(&self, epg_channel_ids: &mut HashSet<Cow<str>>, normalized_epg_channel_ids: &mut HashMap<Cow<str>, Option<Cow<str>>>) -> Option<Epg> {
-        if epg_channel_ids.is_empty() && normalized_epg_channel_ids.is_empty() {
+    pub fn filter(&self, id_cache: &mut EpgIdCache) -> Option<Epg> {
+        if id_cache.channel.is_empty() && id_cache.normalized.is_empty() {
             return None;
         }
-        let mut processed_epg_ids: HashSet<String> = HashSet::new();
         let epgs: Vec<Epg> = self.file_paths.iter()
-            .filter_map(|path| Self::process_epg_file(epg_channel_ids, normalized_epg_channel_ids, &mut processed_epg_ids, path))
+            .filter_map(|path| Self::process_epg_file(id_cache, path))
             .collect();
         if epgs.len() == 1 {
             epgs.into_iter().next()
@@ -123,7 +120,7 @@ impl TVGuide {
     }
 }
 
-pub fn parse_tvguide<R, F>(content: R, callback: &mut F)
+pub fn parse_tvguide<R, F>(content: R, callback: &mut F, strip: &[&str])
 where
     R: std::io::BufRead,
     F: FnMut(XmlTag),
@@ -163,7 +160,7 @@ where
                                     match child.name.as_str() {
                                         EPG_TAG_DISPLAY_NAME => {
                                             if let Some(name) = &child.value {
-                                                tag.normalized_epg_ids.insert(normalize_channel_name(name));
+                                                tag.normalized_epg_ids.insert(normalize_channel_name(name, strip));
                                             }
                                         }
                                         EPG_TAG_ICON => {
