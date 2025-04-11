@@ -31,20 +31,37 @@ web_ui:
 You need to migrate the user db if you have used `use_user_db:true`. 
 Set it to `false` run old m3u-filter version, then update m3u-filter and set `use_user_db:true`and start.   
 - multi epg processing/optimization, auto guessing/assigning epg id's
+
+```yaml
+epg:
+  url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
+  normalize:
+    enabled: true
+    fuzzy_matching: true
+    match_threshold: 80
+    country_prefix: !suffix "."
+    strip :  ["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]
+    normalize_regex: '[^a-zA-Z0-9\-]'
+```
+`country_prefix` can be `ignore`, `suffix`, `prefix`. For `suffix` and `prefix` you need to define a concat string.
+`strip :  ["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]`  this is the defualt
+`normalize_regex: [^a-zA-Z0-9\-]`   is the default
+
 ```yaml
 # single epg
-epg_url: 'https://localhost.com/epg.xml'
+url: 'https://localhost.com/epg.xml'
 ```
 ```yaml
 # multi local file  epg
-epg_url: ['file:///${env:M3U_FILTER_HOME}/epg.xml', 'file:///${env:M3U_FILTER_HOME}/epg2.xml']
+url: ['file:///${env:M3U_FILTER_HOME}/epg.xml', 'file:///${env:M3U_FILTER_HOME}/epg2.xml']
 ```
 ```yaml
 # multi url  epg
-epg_url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
+url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
 ```
-- added `epg_strip` to input for auto epg matching, if not given `["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]` is default
-When no matching epg_id is found, the display name is used to match a channel name. The given strings are stripped to get a better match.   
+- added `estrip` to input for auto epg matching, if not given `["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]` is default
+  When no matching epg_id is found, the display name is used to match a channel name. The given strings are stripped to get a better match.
+
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search
