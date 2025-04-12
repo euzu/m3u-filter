@@ -133,7 +133,6 @@ impl TVGuide {
         matched
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     fn find_best_fuzzy_match(id_cache: &mut EpgIdCache, tag: &XmlTag) -> (bool, Option<String>) {
         let early_exit_flag = Arc::new(AtomicBool::new(false)); // Flag für den frühen Abbruch
         let data: Mutex<(u16, Option<Cow<str>>)> = Mutex::new((0, None));
@@ -151,6 +150,8 @@ impl TVGuide {
                     let code = id_cache.phonetic(&code_key);
                     if &code == phonetic_code {
                         let match_jw = strsim::jaro_winkler(norm_key, normalized_epg_id);
+                        #[allow(clippy::cast_possible_truncation)]
+                        #[allow(clippy::cast_sign_loss)]
                         let mjw = min(100, match_jw as u16 * 100);
                         if mjw >= match_threshold {
                             let mut lock = data.lock().unwrap();
