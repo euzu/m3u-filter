@@ -82,6 +82,7 @@ impl ProviderConfig {
     pub fn try_allocate(&self, grace: bool) -> ProviderAllocation {
         let connections = self.current_connections.load(Ordering::SeqCst);
         if self.max_connections == 0 {
+            self.current_connections.fetch_add(1, Ordering::SeqCst);
             return ProviderAllocation::Available(self);
         }
         if (!grace && connections < self.max_connections) || (grace && connections <= self.max_connections)  {
