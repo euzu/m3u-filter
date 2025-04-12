@@ -57,6 +57,7 @@ filetime = "0.2"
 zeroize = "1.8"
 strsim = "0.11"
 rphonetic = "3"
+rayon = "1.10"
 #[cfg(target_os = "macos")]
 libc = "0"
 #[cfg(target_os = "windows")]

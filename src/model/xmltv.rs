@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
 use quick_xml::{Error, Writer};
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 
@@ -18,13 +17,24 @@ pub const EPG_TAG_ICON: &str = "icon";
 pub struct XmlTag {
     pub name: String,
     pub value: Option<String>,
-    pub attributes: Option<Arc<HashMap<String, String>>>,
-    pub children: Option<Vec<Arc<XmlTag>>>,
+    pub attributes: Option<HashMap<String, String>>,
+    pub children: Option<Vec<XmlTag>>,
     pub icon: Option<String>,
     pub normalized_epg_ids: HashSet<String>,
 }
 
 impl XmlTag {
+
+    pub(crate) fn new(name: String, attribs: Option<HashMap<String, String>>) -> Self {
+        Self {
+            name,
+            value: None,
+            attributes: attribs,
+            children: None,
+            icon: None,
+            normalized_epg_ids: HashSet::new(),
+        }
+    }
 
     pub fn get_attribute_value(&self, attr_name: &str) -> Option<&String> {
         self.attributes.as_ref().and_then(|attr| attr.get(attr_name))
@@ -49,7 +59,7 @@ impl XmlTag {
 
 #[derive(Debug, Clone)]
 pub struct Epg {
-    pub attributes: Option<Arc<HashMap<String, String>>>,
+    pub attributes: Option<HashMap<String, String>>,
     pub children: Vec<XmlTag>,
 }
 

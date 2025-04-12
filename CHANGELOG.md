@@ -35,15 +35,18 @@ Set it to `false` run old m3u-filter version, then update m3u-filter and set `us
 ```yaml
 epg:
   url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
-  normalize:
+  smart_assign:
     enabled: true
     fuzzy_matching: true
     match_threshold: 80
-    country_prefix: !suffix "."
+    best_match_threshold: 99
+    name_prefix: !suffix "."
     strip :  ["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]
     normalize_regex: '[^a-zA-Z0-9\-]'
 ```
-`country_prefix` can be `ignore`, `suffix`, `prefix`. For `suffix` and `prefix` you need to define a concat string.
+`match_threshold`is optional and if not set 80.
+`best_match_threshold` is optional and if not set 99. 
+`name_prefix` can be `ignore`, `suffix`, `prefix`. For `suffix` and `prefix` you need to define a concat string.
 `strip :  ["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]`  this is the defualt
 `normalize_regex: [^a-zA-Z0-9\-]`   is the default
 

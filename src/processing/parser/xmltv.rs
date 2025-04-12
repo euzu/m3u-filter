@@ -1,48 +1,37 @@
-use crate::model::config::{EpgCountryPrefix, EpgNormalizeConfig};
+use crate::model::config::{EpgNamePrefix, EpgSmartMatchConfig};
 use crate::model::xmltv::{Epg, TVGuide, XmlTag, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_CHANNEL, EPG_TAG_DISPLAY_NAME, EPG_TAG_ICON, EPG_TAG_PROGRAMME, EPG_TAG_TV};
 use crate::processing::processor::playlist::EpgIdCache;
 use crate::utils::compression::compressed_file_reader::CompressedFileReader;
 use deunicode::deunicode;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::borrow::Cow;
+use std::cmp::min;
 use std::collections::{HashMap, HashSet};
+use std::mem;
 use std::path::Path;
-use std::sync::{Arc, LazyLock};
-use rphonetic::{Encoder, Metaphone};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
-static COUNTRY_CODE: LazyLock<HashSet<&'static str>> = LazyLock::new(|| vec![
-    "af", "al", "dz", "ad", "ao", "ag", "ar", "am", "au", "at", "az", "bs", "bh", "bd", "bb", "by",
-    "be", "bz", "bj", "bt", "bo", "ba", "bw", "br", "bn", "bg", "bf", "bi", "cv", "kh", "cm", "ca",
-    "cf", "td", "cl", "cn", "co", "km", "cg", "cr", "hr", "cu", "cy", "cz", "cd", "dk", "dj", "dm",
-    "do", "tl", "ec", "eg", "sv", "gq", "er", "ee", "sz", "et", "fj", "fi", "fr", "ga", "gm", "ge",
-    "de", "gh", "gr", "gd", "gt", "gn", "gw", "gy", "ht", "hn", "hu", "is", "in", "id", "ir", "iq",
-    "ie", "il", "it", "ci", "jm", "jp", "jo", "kz", "ke", "ki", "kp", "kr", "kw", "kg", "la", "lv",
-    "lb", "ls", "lr", "ly", "li", "lt", "lu", "mg", "mw", "my", "mv", "ml", "mt", "mh", "mr", "mu",
-    "mx", "fm", "md", "mc", "mn", "me", "ma", "mz", "mm", "na", "nr", "np", "nl", "nz", "ni", "ne",
-    "ng", "mk", "no", "om", "pk", "pw", "pa", "pg", "py", "pe", "ph", "pl", "pt", "qa", "ro", "ru",
-    "rw", "kn", "lc", "vc", "ws", "sm", "st", "sa", "sn", "rs", "sc", "sl", "sg", "sk", "si", "sb",
-    "so", "za", "ss", "es", "lk", "sd", "sr", "se", "ch", "sy", "tw", "tj", "tz", "th", "tg", "to",
-    "tt", "tn", "tr", "tm", "tv", "ug", "ua", "ae", "gb", "us", "uy", "uz", "vu", "va", "ve", "vn",
-    "ye", "zm", "zw",
-].into_iter().collect::<HashSet<&str>>());
-
-fn split_country_prefix(s: &str) -> (Option<String>, &str) {
-    if s.len() < 5 ||  !s[2..3].chars().any(|c| !c.is_alphabetic()) {
-        return (None, s);
+fn split_by_first_match<'a>(input: &'a str, delimiters: &[char]) -> (Option<&'a str>, &'a str) {
+    for delim in delimiters {
+        if let Some(index) = input.find(*delim) {
+            let (left, right) = input.split_at(index);
+            let right = &right[delim.len_utf8()..].trim();
+            if !right.is_empty() {
+                return (Some(left.trim()), right.trim());
+            }
+        }
     }
-    let first_code = &s[0..2];
-    if !COUNTRY_CODE.contains(first_code) {
-        return (None, s);
-    }
-    (Some(first_code.to_string()), &s[3..])
+    (None, input)
 }
 
-fn country_prefix(name: String, normalize_config: &EpgNormalizeConfig) -> (String, Option<String>) {
-    if normalize_config.country_prefix != EpgCountryPrefix::Ignore {
-        let (prefix, suffix) = split_country_prefix(&name);
+fn name_prefix<'a>(name: &'a str, smart_config: &EpgSmartMatchConfig) -> (&'a str, Option<&'a str>) {
+    if smart_config.name_prefix != EpgNamePrefix::Ignore {
+        let (prefix, suffix) = split_by_first_match(name, &smart_config.t_name_prefix_separator.clone());
         if prefix.is_some() {
-            return (suffix.to_string(), prefix);
+            return (suffix, prefix);
         }
     }
     (name, None)
@@ -57,11 +46,11 @@ fn combine(join: &str, left: &str, right: &str) -> String {
 }
 
 /// # Panics
-pub fn normalize_channel_name(name: &str, normalize_config: &EpgNormalizeConfig) -> String {
-    let normalized = deunicode(name).to_lowercase();
-    let (channel_name, suffix) = country_prefix(normalized, normalize_config);
+pub fn normalize_channel_name(name: &str, normalize_config: &EpgSmartMatchConfig) -> String {
+    let normalized = deunicode(name.trim()).to_lowercase();
+    let (channel_name, suffix) = name_prefix(&normalized, normalize_config);
     // Remove all non-alphanumeric characters (except dashes and underscores).
-    let cleaned_name = normalize_config.t_normalize_regex.as_ref().unwrap().replace_all(&channel_name, "");
+    let cleaned_name = normalize_config.t_normalize_regex.as_ref().unwrap().replace_all(channel_name, "");
     // Remove terms like resolution
     let cleaned_name = normalize_config.t_strip.iter().fold(cleaned_name.to_string(), |acc, term| {
         acc.replace(term, "")
@@ -69,10 +58,10 @@ pub fn normalize_channel_name(name: &str, normalize_config: &EpgNormalizeConfig)
     match suffix {
         None => cleaned_name,
         Some(sfx) => {
-            match &normalize_config.country_prefix {
-                EpgCountryPrefix::Ignore => cleaned_name,
-                EpgCountryPrefix::Suffix(sep) => combine(sep, &cleaned_name, &sfx),
-                EpgCountryPrefix::Prefix(sep) => combine(sep, &sfx, &cleaned_name),
+            match &normalize_config.name_prefix {
+                EpgNamePrefix::Ignore => cleaned_name,
+                EpgNamePrefix::Suffix(sep) => combine(sep, &cleaned_name, sfx),
+                EpgNamePrefix::Prefix(sep) => combine(sep, sfx, &cleaned_name),
             }
         }
     }
@@ -91,70 +80,115 @@ impl TVGuide {
         })
     }
 
+    fn prepare_tag(id_cache: &mut EpgIdCache, tag: &mut XmlTag, smart_match: bool) {
+        if let Some(children) = &mut tag.children {
+            for child in children {
+                match child.name.as_str() {
+                    EPG_TAG_DISPLAY_NAME => {
+                        if smart_match {
+                            if let Some(name) = &child.value {
+                                tag.normalized_epg_ids.insert(normalize_channel_name(name, &id_cache.smart_match_config));
+                            }
+                        }
+                    }
+                    EPG_TAG_ICON => {
+                        if let Some(src) = child.get_attribute_value("src") {
+                            tag.icon = Some(src.to_string());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn try_fuzzy_matching(id_cache: &mut EpgIdCache, epg_id: &str, tag: &XmlTag, fuzzy_matching: bool) -> bool {
+        let id: Cow<str> = Cow::Owned(epg_id.to_string());
+        let mut matched = {
+            let mut match_found = false;
+            for normalized_epg_id in &tag.normalized_epg_ids {
+                let key = Cow::Owned(normalized_epg_id.to_string());
+                id_cache.normalized.entry(key).and_modify(|entry| {
+                    entry.1 = Some(id.clone());
+                    id_cache.channel.insert(id.clone());
+                    match_found = true;
+                });
+            }
+            match_found
+        };
+
+        if !matched && fuzzy_matching {
+            let (fuzzy_matched, matched_normalized_epg_id) = Self::find_best_fuzzy_match(id_cache, tag);
+            matched = fuzzy_matched;
+            if matched {
+                let key = Cow::Owned(matched_normalized_epg_id.unwrap().to_string());
+                id_cache.normalized.entry(key).and_modify(|entry| {
+                    entry.1 = Some(id.clone());
+                    id_cache.channel.insert(id.clone());
+                    matched = true;
+                });
+            }
+        }
+
+        matched
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn find_best_fuzzy_match(id_cache: &mut EpgIdCache, tag: &XmlTag) -> (bool, Option<String>) {
+        let early_exit_flag = Arc::new(AtomicBool::new(false)); // Flag für den frühen Abbruch
+        let data: Mutex<(u16, Option<Cow<str>>)> = Mutex::new((0, None));
+
+        let match_threshold = id_cache.smart_match_config.match_threshold;
+        let best_match_threshold = id_cache.smart_match_config.best_match_threshold;
+
+        id_cache.normalized.par_iter().for_each(|(norm_key, (phonetic_code_opt, _))| {
+            if early_exit_flag.load(Ordering::SeqCst) {
+                return;
+            }
+            if let Some(phonetic_code) = phonetic_code_opt {
+                for normalized_epg_id in &tag.normalized_epg_ids {
+                    let code_key: Cow<str> = Cow::Owned(normalized_epg_id.to_string());
+                    let code = id_cache.phonetic(&code_key);
+                    if &code == phonetic_code {
+                        let match_jw = strsim::jaro_winkler(norm_key, normalized_epg_id);
+                        let mjw = min(100, match_jw as u16 * 100);
+                        if mjw >= match_threshold {
+                            let mut lock = data.lock().unwrap();
+                            if lock.0 < mjw {
+                                *lock = (mjw, Some(Cow::Borrowed(norm_key)));
+                            }
+                            if mjw > best_match_threshold {
+                                early_exit_flag.store(true, Ordering::SeqCst);
+                                return; // (true, matched_normalized_epg_id.map(|s| s.to_string()));
+                            }
+                        }
+                    }
+                }
+            }
+            // is there an early exit strategy ???
+        });
+        if early_exit_flag.load(Ordering::SeqCst) {
+            let result = data.lock().unwrap().1.take();
+            return (true, result.as_ref().map(std::string::ToString::to_string));
+        }
+        (false, None)
+    }
+
     fn process_epg_file(id_cache: &mut EpgIdCache, epg_file: &Path) -> Option<Epg> {
         match CompressedFileReader::new(epg_file) {
             Ok(mut reader) => {
                 let mut children: Vec<XmlTag> = vec![];
-                let mut tv_attributes: Option<Arc<HashMap<String, String>>> = None;
-                let metaphone = Metaphone::default();
-                let normalization = id_cache.normalize_config.enabled;
-                let fuzzy_matching = id_cache.normalize_config.fuzzy_matching;
-                let mut filter_tags = |tag: XmlTag| {
+                let mut tv_attributes: Option<HashMap<String, String>> = None;
+                let smart_match = id_cache.smart_match_config.enabled;
+                let fuzzy_matching = smart_match && id_cache.smart_match_config.fuzzy_matching;
+                let mut filter_tags = |mut tag: XmlTag| {
                     match tag.name.as_str() {
                         EPG_TAG_CHANNEL => {
+                            Self::prepare_tag(id_cache, &mut tag, smart_match);
                             if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
                                 if !id_cache.processed.contains(epg_id) {
-                                    if normalization {
-                                        let mut matched = false;
-                                        let id: Cow<str> = Cow::Owned(epg_id.to_string());
-                                        for normalized_epg_id in &tag.normalized_epg_ids {
-                                            let key = Cow::Owned(normalized_epg_id.to_string());
-                                            match id_cache.normalized.entry(key) {
-                                                std::collections::hash_map::Entry::Occupied(mut entry) => {
-                                                    entry.get_mut().1 = Some(id.clone());
-                                                    id_cache.channel.insert(id.clone());
-                                                    matched = true;
-                                                    break;
-                                                }
-                                                std::collections::hash_map::Entry::Vacant(_entry) => {}
-                                            }
-                                        }
-
-                                        if !matched && fuzzy_matching {
-                                            let mut matched_normalized_epg_id: Option<Cow<str>> = None;
-                                            let mut threshold = 0.0;
-
-                                            'outer: for (norm_key, (phonetic_code, _)) in &id_cache.normalized {
-                                                for normalized_epg_id in &tag.normalized_epg_ids {
-                                                    let code = metaphone.encode(normalized_epg_id);
-                                                    if &code == phonetic_code {
-                                                        let match_jw = strsim::jaro_winkler(norm_key, normalized_epg_id);
-                                                        if match_jw >= id_cache.normalize_config.t_match_threshold {
-                                                            threshold = if threshold > match_jw { threshold } else {
-                                                                matched_normalized_epg_id = Some(Cow::Borrowed(norm_key));
-                                                                match_jw
-                                                            };
-                                                            if threshold > 99.9 {
-                                                                break 'outer;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                // is there an early exit strategy ???
-                                            }
-                                            if matched {
-                                                match id_cache.normalized.entry(Cow::Owned(matched_normalized_epg_id.unwrap().to_string())) {
-                                                    std::collections::hash_map::Entry::Occupied(mut entry) => {
-                                                        entry.get_mut().1 = Some(id.clone());
-                                                        id_cache.channel.insert(id.clone());
-                                                        matched = true;
-                                                    }
-                                                    std::collections::hash_map::Entry::Vacant(_entry) => {}
-                                                }
-                                            }
-                                        }
-
-                                        if matched {
+                                    if smart_match {
+                                        if Self::try_fuzzy_matching(id_cache, epg_id, &tag, fuzzy_matching) {
                                             children.push(tag);
                                         }
                                     } else {
@@ -177,13 +211,13 @@ impl TVGuide {
                             }
                         }
                         EPG_TAG_TV => {
-                            tv_attributes.clone_from(&tag.attributes);
+                            tv_attributes = tag.attributes.take();
                         }
                         _ => {}
                     }
                 };
 
-                parse_tvguide(&mut reader, &mut filter_tags, &id_cache.normalize_config);
+                parse_tvguide(&mut reader, &mut filter_tags);
 
                 if children.is_empty() {
                     return None;
@@ -219,7 +253,74 @@ impl TVGuide {
     }
 }
 
-pub fn parse_tvguide<R, F>(content: R, callback: &mut F, epg_normalize_config: &EpgNormalizeConfig)
+
+fn handle_tag_start<F>(callback: &mut F, stack: &mut Vec<XmlTag>, e: &BytesStart)
+where
+    F: FnMut(XmlTag),
+{
+    let name = String::from_utf8_lossy(e.name().as_ref()).as_ref().to_owned();
+    let (is_tv_tag, is_channel, is_program) = get_tag_types(&name);
+    let attributes = collect_tag_attributes(e, is_channel, is_program);
+    let attribs = if attributes.is_empty() { None } else { Some(attributes) };
+    let tag = XmlTag::new(name, attribs);
+
+    if is_tv_tag {
+        callback(tag);
+    } else {
+        stack.push(tag);
+    }
+}
+
+
+fn handle_tag_end<F>(callback: &mut F, stack: &mut Vec<XmlTag>)
+where
+    F: FnMut(XmlTag),
+{
+    if !stack.is_empty() {
+        if let Some(tag) = stack.pop() {
+            if tag.name == EPG_TAG_CHANNEL {
+                if let Some(chan_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
+                    if !chan_id.is_empty() {
+                        callback(tag);
+                    }
+                }
+            } else if tag.name == EPG_TAG_PROGRAMME {
+                if let Some(chan_id) = tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
+                    if !chan_id.is_empty() {
+                        callback(tag);
+                    }
+                }
+            } else if !stack.is_empty() {
+                if let Some(old_tag) = stack.pop().map(|mut r| {
+                    r.children = Some(match r.children.take() {
+                        None => vec![tag],
+                        Some(mut tags) => {
+                            tags.push(tag);
+                            tags
+                        }
+                    });
+                    r
+                }) {
+                    stack.push(old_tag);
+                }
+            }
+        }
+    }
+}
+
+
+fn handle_text_tag(stack: &mut [XmlTag], e: &BytesText) {
+    if !stack.is_empty() {
+        if let Ok(text) = e.unescape() {
+            let t = text.trim();
+            if !t.is_empty() {
+                stack.last_mut().unwrap().value = Some(t.to_string());
+            }
+        }
+    }
+}
+
+pub fn parse_tvguide<R, F>(content: R, callback: &mut F)
 where
     R: std::io::BufRead,
     F: FnMut(XmlTag),
@@ -227,91 +328,12 @@ where
     let mut stack: Vec<XmlTag> = vec![];
     let mut reader = Reader::from_reader(content);
     let mut buf = Vec::<u8>::new();
-    let normalize_enabled = epg_normalize_config.enabled;
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Eof) => break,
-            Ok(Event::Start(e)) => {
-                let name = String::from_utf8_lossy(e.name().as_ref()).as_ref().to_owned();
-                let (is_tv_tag, is_channel, is_program) = get_tag_types(&name);
-                let attributes = collect_tag_attributes(&e, is_channel, is_program);
-                let attribs = if attributes.is_empty() { None } else { Some(Arc::new(attributes)) };
-                let tag = XmlTag {
-                    name,
-                    value: None,
-                    attributes: attribs,
-                    children: None,
-                    icon: None,
-                    normalized_epg_ids: HashSet::new(),
-                };
-
-                if is_tv_tag {
-                    callback(tag);
-                } else {
-                    stack.push(tag);
-                }
-            }
-            Ok(Event::End(_e)) => {
-                if !stack.is_empty() {
-                    if let Some(mut tag) = stack.pop() {
-                        if tag.name == EPG_TAG_CHANNEL {
-                            if let Some(children) = &mut tag.children {
-                                for child in children {
-                                    match child.name.as_str() {
-                                        EPG_TAG_DISPLAY_NAME => {
-                                            if normalize_enabled {
-                                                if  let Some(name) = &child.value {
-                                                    tag.normalized_epg_ids.insert(normalize_channel_name(name, epg_normalize_config));
-                                                }
-                                            }
-                                        }
-                                        EPG_TAG_ICON => {
-                                            if let Some(src) = child.get_attribute_value("src") {
-                                                tag.icon = Some(src.to_string());
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
-
-                            if let Some(chan_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
-                                if !chan_id.is_empty() {
-                                    callback(tag);
-                                }
-                            }
-                        } else if tag.name == EPG_TAG_PROGRAMME {
-                            if let Some(chan_id) = tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
-                                if !chan_id.is_empty() {
-                                    callback(tag);
-                                }
-                            }
-                        } else if !stack.is_empty() {
-                            if let Some(old_tag) = stack.pop().map(|mut r| {
-                                let rc_tag = Arc::new(tag);
-                                r.children = Some(
-                                    r.children.map_or_else(|| vec![Arc::clone(&rc_tag)], |mut c| {
-                                        c.push(Arc::clone(&rc_tag));
-                                        c
-                                    }));
-                                r
-                            }) {
-                                stack.push(old_tag);
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(Event::Text(e)) => {
-                if !stack.is_empty() {
-                    if let Ok(text) = e.unescape() {
-                        let t = text.trim();
-                        if !t.is_empty() {
-                            stack.last_mut().unwrap().value = Some(t.to_string());
-                        }
-                    }
-                }
-            }
+            Ok(Event::Start(e)) => handle_tag_start(callback, &mut stack, &e),
+            Ok(Event::End(_e)) => handle_tag_end(callback, &mut stack),
+            Ok(Event::Text(e)) => handle_text_tag(&mut stack, &e),
             _ => {}
         }
     }
@@ -348,22 +370,19 @@ pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
     if tv_guides.is_empty() {
         None
     } else {
-        let mut epg = Epg {
-            attributes: None,
-            children: vec![],
-        };
+        let epg_children = Mutex::new(Vec::new());
+        let epg_attributes = tv_guides.first().and_then(|t| t.attributes.clone());
         let count = tv_guides.iter().map(|tvg| tvg.children.len()).sum();
-        let mut channel_ids: HashSet<&String> = HashSet::with_capacity(count);
-        for guide in tv_guides {
-            if epg.attributes.is_none() {
-                epg.attributes.clone_from(&guide.attributes);
-            }
+        let channel_ids: RwLock<HashSet<&String>> = RwLock::new(HashSet::with_capacity(count));
+        tv_guides.par_iter().for_each(|guide| {
+            let mut children = vec![];
             guide.children.iter().for_each(|c| {
                 if c.name.as_str() == EPG_TAG_CHANNEL {
                     if let Some(chan_id) = c.get_attribute_value(EPG_ATTRIB_ID) {
-                        if !channel_ids.contains(&chan_id) {
-                            channel_ids.insert(chan_id);
-                            epg.children.push(c.clone());
+                        let channel_id_exists = channel_ids.read().unwrap().contains(&chan_id);
+                        if !channel_id_exists {
+                            channel_ids.write().unwrap().insert(chan_id);
+                            children.push(c.clone());
                         }
                     }
                 }
@@ -371,13 +390,19 @@ pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
             guide.children.iter().for_each(|c| {
                 if c.name.as_str() == EPG_TAG_PROGRAMME {
                     if let Some(chan_id) = c.get_attribute_value(EPG_TAG_CHANNEL) {
-                        if channel_ids.contains(&chan_id) {
-                            epg.children.push(c.clone());
+                        if channel_ids.read().unwrap().contains(&chan_id) {
+                            children.push(c.clone());
                         }
                     }
                 }
             });
-        }
+
+            epg_children.lock().unwrap().extend(children);
+        });
+        let epg = Epg {
+            attributes: epg_attributes,
+            children: mem::take(&mut *epg_children.lock().unwrap()),
+        };
         Some(epg)
     }
 }
@@ -385,7 +410,7 @@ pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::config::{EpgCountryPrefix, EpgNormalizeConfig};
+    use crate::model::config::{EpgNamePrefix, EpgSmartMatchConfig};
     use crate::processing::parser::xmltv::normalize_channel_name;
 
     // #[test]
@@ -409,36 +434,40 @@ mod tests {
 
     #[test]
     fn normalize() {
-        let mut epg_normalize_cfg = EpgNormalizeConfig::default();
-        epg_normalize_cfg.country_prefix = EpgCountryPrefix::Suffix(".".to_string());
-        println!("{:?}", epg_normalize_cfg);
-        assert_eq!("supersport6.ru", normalize_channel_name("RU: SUPERSPORT 6 ᴿᴬᵂ", &epg_normalize_cfg));
-        assert_eq!("satodisea", normalize_channel_name("SAT: ODISEA ᴿᴬᵂ", &epg_normalize_cfg));
-        assert_eq!("odisea", normalize_channel_name("4K: ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg));
-        assert_eq!("odisea", normalize_channel_name("ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg));
-        assert_eq!("buodisea", normalize_channel_name("BU | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg));
-        assert_eq!("odisea.bg", normalize_channel_name("BG | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg));
+        let mut epg_smart_cfg = EpgSmartMatchConfig::default();
+        epg_smart_cfg.enabled = true;
+        epg_smart_cfg.name_prefix = EpgNamePrefix::Suffix(".".to_string());
+        let _ = epg_smart_cfg.prepare();
+        println!("{:?}", epg_smart_cfg);
+        assert_eq!("supersport6.ru", normalize_channel_name("RU: SUPERSPORT 6 ᴿᴬᵂ", &epg_smart_cfg));
+        assert_eq!("odisea.sat", normalize_channel_name("SAT: ODISEA ᴿᴬᵂ", &epg_smart_cfg));
+        assert_eq!("odisea.4k", normalize_channel_name("4K: ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg));
+        assert_eq!("odisea", normalize_channel_name("ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg));
+        assert_eq!("odisea.bu", normalize_channel_name("BU | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg));
+        assert_eq!("odisea.bg", normalize_channel_name("BG | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg));
     }
 
     use rphonetic::{Encoder, Metaphone};
     #[test]
     fn test_metaphone() {
         let metaphone = Metaphone::default();
-        let mut epg_normalize_cfg = EpgNormalizeConfig::default();
-        epg_normalize_cfg.country_prefix = EpgCountryPrefix::Suffix(".".to_string());
-        println!("{:?}", epg_normalize_cfg);
+        let mut epg_smart_cfg = EpgSmartMatchConfig::default();
+        epg_smart_cfg.enabled = true;
+        epg_smart_cfg.name_prefix = EpgNamePrefix::Suffix(".".to_string());
+        let _ = epg_smart_cfg.prepare();
+        println!("{:?}", epg_smart_cfg);
         // assert_eq!("supersport6.ru", metaphone.encode(&normalize_channel_name("RU: SUPERSPORT 6 ᴿᴬᵂ", &epg_normalize_cfg)));
-        // assert_eq!("satodisea", metaphone.encode(&normalize_channel_name("SAT: ODISEA ᴿᴬᵂ", &epg_normalize_cfg)));
+        // assert_eq!("odisea.sat", metaphone.encode(&normalize_channel_name("SAT: ODISEA ᴿᴬᵂ", &epg_normalize_cfg)));
         // assert_eq!("odisea", metaphone.encode(&normalize_channel_name("4K: ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
         // assert_eq!("odisea", metaphone.encode(&normalize_channel_name("ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
-        // assert_eq!("buodisea", metaphone.encode(&normalize_channel_name("BU | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
+        // assert_eq!("odisea.bu", metaphone.encode(&normalize_channel_name("BU | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
         // assert_eq!("odisea.bg", metaphone.encode(&normalize_channel_name("BG | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
 
-        println!("{}", metaphone.encode(&normalize_channel_name("RU: SUPERSPORT 6 ᴿᴬᵂ", &epg_normalize_cfg)));
-        println!("{}", metaphone.encode(&normalize_channel_name("SAT: ODISEA ᴿᴬᵂ", &epg_normalize_cfg)));
-        println!("{}", metaphone.encode(&normalize_channel_name("4K: ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
-        println!("{}", metaphone.encode(&normalize_channel_name("ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
-        println!("{}", metaphone.encode(&normalize_channel_name("BU | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
-        println!("{}", metaphone.encode(&normalize_channel_name("BG | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_normalize_cfg)));
+        println!("{}", metaphone.encode(&normalize_channel_name("RU: SUPERSPORT 6 ᴿᴬᵂ", &epg_smart_cfg)));
+        println!("{}", metaphone.encode(&normalize_channel_name("SAT: ODISEA ᴿᴬᵂ", &epg_smart_cfg)));
+        println!("{}", metaphone.encode(&normalize_channel_name("4K: ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg)));
+        println!("{}", metaphone.encode(&normalize_channel_name("ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg)));
+        println!("{}", metaphone.encode(&normalize_channel_name("BU | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg)));
+        println!("{}", metaphone.encode(&normalize_channel_name("BG | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg)));
     }
 }

@@ -1,5 +1,5 @@
 use crate::Config;
-use crate::model::config::{ConfigInput, ConfigRename, EpgConfig, EpgNormalizeConfig};
+use crate::model::config::{ConfigInput, ConfigRename, EpgConfig, EpgSmartMatchConfig};
 use crate::utils::network::epg;
 use crate::utils::network::m3u;
 use crate::utils::network::xtream;
@@ -32,7 +32,7 @@ use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
 use crate::utils::{debug_if_enabled};
 
-use crate::model::xmltv::{EPG_ATTRIB_ID};
+use crate::model::xmltv::{Epg, XmlTag, EPG_ATTRIB_ID};
 
 fn is_valid(pli: &PlaylistItem, target: &ConfigTarget) -> bool {
     let provider = ValueProvider { pli };
@@ -501,28 +501,120 @@ fn flatten_groups(playlistgroups: Vec<PlaylistGroup>) -> Vec<PlaylistGroup> {
     sort_order
 }
 
+type PhoneticCodeAndMaybeEpgId<'a> = (Option<Cow<'a, str>>, Option<Cow<'a, str>>);
 pub struct EpgIdCache<'a > {
     pub channel: HashSet<Cow<'a, str>>,
-    pub normalized: HashMap<Cow<'a, str>, (String, Option<Cow<'a, str>>)>,
-    pub normalized_phonetic: HashMap<Cow<'a, str>, String>,
+    pub normalized: HashMap<Cow<'a, str>, PhoneticCodeAndMaybeEpgId<'a>>,
+    pub normalized_phonetic: HashMap<Cow<'a, str>, Cow<'a, str>>,
     pub processed: HashSet<String>,
-    pub normalize_config: EpgNormalizeConfig,
+    pub smart_match_config: EpgSmartMatchConfig,
+    pub metaphone: Metaphone,
 }
 
 impl EpgIdCache<'_> {
     pub fn new(epg_config: Option<&EpgConfig>) -> Self {
-        let normalize_config = epg_config.map_or_else(EpgNormalizeConfig::default, |epg_config| epg_config.t_normalize.clone());
+        let normalize_config = epg_config.map_or_else(EpgSmartMatchConfig::default, |epg_config| epg_config.t_smart_match.clone());
         EpgIdCache {
             channel: HashSet::new(),
             normalized: HashMap::new(),
             normalized_phonetic: HashMap::new(),
             processed: HashSet::new(),
-            normalize_config,
+            smart_match_config: normalize_config,
+            metaphone: Metaphone::default(),
         }
     }
 
+    pub fn normalize_and_store(&mut self, name: &str) {
+        let normalized_name = self.normalize(name);
+        let normalized_key: Cow<str> = Cow::Owned(normalized_name.clone());
+
+        let phonetic_code = if self.smart_match_config.fuzzy_matching {
+            let code: Cow<str> = Cow::Owned(self.metaphone.encode(&normalized_name));
+            self.normalized_phonetic.insert(normalized_key.clone(), code.clone());
+            Some(code)
+        } else {
+            None
+        };
+
+        self.normalized.insert(normalized_key, (phonetic_code, None));
+    }
+
     pub fn normalize(&self, name: &str) -> String {
-        normalize_channel_name(name, &self.normalize_config)
+        normalize_channel_name(name, &self.smart_match_config)
+    }
+
+    pub fn phonetic(&self, name: &str) -> Cow<str> {
+        self.normalized_phonetic.get(&Cow::Owned(name.to_string())).map_or_else(|| Cow::Owned(self.metaphone.encode(name)), std::clone::Clone::clone)
+        // match self.normalized_phonetic.entry(name.clone()) {
+        //     Entry::Occupied(entry) => {
+        //         entry.get().clone()
+        //     }
+        //     Entry::Vacant(entry) => {
+        //
+        //         let code: Cow<str> = Cow::Owned(self.metaphone.encode(&name));
+        //         // entry.insert(code.clone());
+        //         code
+        //     }
+        // }
+    }
+}
+
+fn prepare_epg_id_cache(fp: &mut FetchedPlaylist, id_cache: &mut EpgIdCache, normalize_enabled: bool, fuzzy_matching: bool) {
+    for channel in fp.playlistgroups.iter().flat_map(|g| &g.channels) {
+        let epg_id = channel.header.epg_channel_id.as_deref();
+        let name = &channel.header.name;
+
+        // insert epg_id to known channel epg_ids
+        if let Some(id) = epg_id {
+            if !id.is_empty() {
+                id_cache.channel.insert(Cow::Owned(id.to_string()));
+            }
+        }
+
+        // for fuzzy_matching we need to put the normalized name even if there is an epg_id, because the epg_id
+        // could not match to the epg file. And then we try to guess it based on normalized name
+        let needs_normalization = normalize_enabled && (fuzzy_matching || epg_id.is_none_or(str::is_empty));
+
+        if needs_normalization {
+            id_cache.normalize_and_store(name);
+        }
+    }
+}
+
+fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache: &mut EpgIdCache) {
+    if let Some(tv_guide) = &fp.epg {
+        if let Some(epg) = tv_guide.filter(id_cache) {
+
+            let icon_tags : HashMap<&String, &XmlTag> = epg.children.iter()
+                .filter(|tag| tag.icon.is_some() && tag.get_attribute_value(EPG_ATTRIB_ID).is_some())
+                .map(|t| (t.get_attribute_value(EPG_ATTRIB_ID).unwrap(), t)).collect();
+            fp.playlistgroups.iter_mut()
+                .flat_map(|g| &mut g.channels)
+                .filter(|c| c.header.xtream_cluster == XtreamCluster::Live)
+                .filter(|c| c.header.epg_channel_id.is_none() || c.header.logo.is_empty() || c.header.logo_small.is_empty())
+                .for_each(|c| {
+                    // if the channel has no epg_id  or the epg_id is not present in xmltv/tvguide then we need to match one from existing tvguide
+                    if c.header.epg_channel_id.is_none() || !id_cache.processed.contains(c.header.epg_channel_id.as_ref().unwrap()) {
+                        let normalized = id_cache.normalize(&c.header.name);
+                        if let Some((_, Some(epg_id))) = id_cache.normalized.get(&Cow::Borrowed(normalized.as_str())) {
+                            c.header.epg_channel_id = Some(epg_id.to_string());
+                        }
+                    }
+                    if c.header.epg_channel_id.is_some() && (c.header.logo.is_empty() || c.header.logo_small.is_empty()) {
+                        if let Some(icon_tag) = icon_tags.get(c.header.epg_channel_id.as_ref().unwrap()) {
+                            if let Some(icon) = icon_tag.icon.as_ref() {
+                                if c.header.logo.is_empty() {
+                                    c.header.logo = (*icon).to_string();
+                                }
+                                if c.header.logo_small.is_empty() {
+                                    c.header.logo = (*icon).to_string();
+                                }
+                            }
+                        }
+                    }
+                });
+            new_epg.push(epg);
+        }
     }
 }
 
@@ -557,76 +649,21 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
 
-    let metaphone = Metaphone::default();
-
     // each fetched playlist can have its own epgl url.
     // we need to process each input epg.
     for mut fp in processed_fetched_playlists {
         // collect all epg_channel ids
         let mut id_cache = EpgIdCache::new(fp.input.epg.as_ref());
-        let normalize_enabled = id_cache.normalize_config.enabled;
-        let fuzzy_matching = id_cache.normalize_config.fuzzy_matching;
-        for channel in fp.playlistgroups.iter().flat_map(|g| &g.channels) {
-            let epg_id = channel.header.epg_channel_id.as_deref();
-            let name = &channel.header.name;
-
-            if let Some(id) = epg_id {
-                if !id.is_empty() {
-                    id_cache.channel.insert(Cow::Owned(id.to_string()));
-                }
-            }
-
-            // hen fuzzy_matching we need to put the normalized name even if there is an epg_id, because the epg_id
-            // could not match to the epg file. And then we try to guess it based on normalized name
-            let needs_normalization = normalize_enabled && (fuzzy_matching || epg_id.is_none_or(str::is_empty));
-
-            if needs_normalization {
-                let normalized_name = id_cache.normalize(name);
-                let normalized_key = Cow::Owned(normalized_name.clone());
-
-                let phonetic_code = if fuzzy_matching {
-                    metaphone.encode(&normalized_name)
-                } else {
-                    String::new()
-                };
-
-                id_cache.normalized.insert(normalized_key, (phonetic_code, None));
-            }
-        }
+        let normalize_enabled = id_cache.smart_match_config.enabled;
+        let fuzzy_matching = id_cache.smart_match_config.fuzzy_matching;
+        prepare_epg_id_cache(&mut fp, &mut id_cache, normalize_enabled, fuzzy_matching);
         // let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
         //     .filter_map(|c| c.header.epg_channel_id.as_ref()).map(|a| a.as_str()).collect();
         if id_cache.channel.is_empty() && id_cache.normalized.is_empty() {
             debug!("channel ids are empty");
-        } else if let Some(tv_guide) = fp.epg {
+        } else {
             debug_if_enabled!("found epg information for {}", &target.name);
-            if let Some(epg) = tv_guide.filter(&mut id_cache) {
-                let epg_icons: HashMap<&String, &String> = epg.children.iter()
-                    .filter(|tag| tag.icon.is_some() && tag.get_attribute_value(EPG_ATTRIB_ID).is_some())
-                    .map(|t| (t.get_attribute_value(EPG_ATTRIB_ID).unwrap(), t.icon.as_ref().unwrap())).collect();
-                fp.playlistgroups.iter_mut()
-                    .flat_map(|g| &mut g.channels)
-                    .filter(|c| c.header.xtream_cluster == XtreamCluster::Live )
-                    .filter(|c| c.header.epg_channel_id.is_none() || c.header.logo.is_empty() || c.header.logo_small.is_empty())
-                    .for_each(|c| {
-                        if c.header.epg_channel_id.as_ref().is_none() || !id_cache.processed.contains(c.header.epg_channel_id.as_ref().unwrap()) {
-                            let normalized = id_cache.normalize(&c.header.name);
-                            if let Some((_, Some(epg_id))) = id_cache.normalized.get(&Cow::Borrowed(normalized.as_str())) {
-                                c.header.epg_channel_id = Some(epg_id.to_string());
-                            }
-                        }
-                        if c.header.epg_channel_id.is_some() && (c.header.logo.is_empty()  || c.header.logo_small.is_empty()) {
-                            if let Some(icon) = epg_icons.get(c.header.epg_channel_id.as_ref().unwrap()) {
-                                if c.header.logo.is_empty() {
-                                    c.header.logo = (*icon).to_string();
-                                }
-                                if c.header.logo_small.is_empty() {
-                                    c.header.logo = (*icon).to_string();
-                                }
-                            }
-                        }
-                    });
-                new_epg.push(epg);
-            }
+            assign_channel_epg(&mut new_epg, &mut fp, &mut id_cache);
         }
         new_playlist.append(&mut fp.playlistgroups);
     }

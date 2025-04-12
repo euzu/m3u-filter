@@ -766,7 +766,7 @@ pub enum EpgUrl {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum EpgCountryPrefix {
+pub enum EpgNamePrefix {
     #[default]
     Ignore,
     Suffix(String),
@@ -775,42 +775,56 @@ pub enum EpgCountryPrefix {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct EpgNormalizeConfig {
+pub struct EpgSmartMatchConfig {
     #[serde(default)]
     pub enabled: bool,
     pub normalize_regex:  Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strip: Option<Vec<String>>,
     #[serde(default)]
-    pub country_prefix: EpgCountryPrefix,
+    pub name_prefix: EpgNamePrefix,
+    #[serde(skip)]
+    pub name_prefix_separator: Option<Vec<char>>,
     #[serde(default)]
     pub fuzzy_matching: bool,
     #[serde(default)]
     pub match_threshold: u16,
+    #[serde(default)]
+    pub best_match_threshold: u16,
     #[serde(skip)]
     pub t_strip: Vec<String>,
     #[serde(skip)]
     pub t_normalize_regex: Option<Regex>,
     #[serde(skip)]
-    pub t_match_threshold: f64,
+    pub t_name_prefix_separator: Vec<char>,
+
 }
 
-impl EpgNormalizeConfig {
+impl EpgSmartMatchConfig {
     /// # Panics
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if !self.enabled {
             return Ok(())
         }
-        if self.match_threshold < 70 {
-            warn!("match_threshold is less than 70%, setting to 70%");
-            self.match_threshold = 70;
+
+        self.t_name_prefix_separator = match &self.name_prefix_separator {
+            None => vec![':', '|', '-'],
+            Some(list) => list.clone(),
+        };
+
+        if self.match_threshold < 10 {
+            warn!("match_threshold is less than 10%, setting to 10%");
+            self.match_threshold = 10;
         } else if self.match_threshold > 100 {
             warn!("match_threshold is more than 100%, setting to 80%");
             self.match_threshold = 100;
         }
-        self.t_match_threshold = f64::from(self.match_threshold) / 100.0;
 
-        self.t_normalize_regex =match self.normalize_regex.as_ref() {
+        if self.best_match_threshold == 0 || self.best_match_threshold > 100 || self.best_match_threshold < self.match_threshold {
+            self.best_match_threshold = 99;
+        }
+
+        self.t_normalize_regex = match self.normalize_regex.as_ref() {
             None =>  Some(Regex::new(r"[^a-zA-Z0-9\-]").unwrap()),
             Some(regstr) => {
                 let re = regex::Regex::new(regstr.as_str());
@@ -828,18 +842,20 @@ impl EpgNormalizeConfig {
     }
 }
 
-impl Default for EpgNormalizeConfig {
+impl Default for EpgSmartMatchConfig {
     fn default() -> Self {
-        let mut instance = EpgNormalizeConfig {
+        let mut instance = EpgSmartMatchConfig {
             enabled: false,
             normalize_regex: None,
             strip: None,
-            country_prefix: EpgCountryPrefix::default(),
+            name_prefix: EpgNamePrefix::default(),
+            name_prefix_separator: None,
             fuzzy_matching: false,
             match_threshold: 0,
+            best_match_threshold: 0,
             t_strip: Vec::default(),
             t_normalize_regex: None,
-            t_match_threshold: 0.0,
+            t_name_prefix_separator: Vec::default(),
         };
         let _= instance.prepare();
         instance
@@ -852,11 +868,11 @@ pub struct EpgConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<EpgUrl>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub normalize: Option<EpgNormalizeConfig>,
+    pub smart_match: Option<EpgSmartMatchConfig>,
     #[serde(skip)]
     pub t_urls: Vec<String>,
     #[serde(skip)]
-    pub t_normalize: EpgNormalizeConfig,
+    pub t_smart_match: EpgSmartMatchConfig,
 }
 
 impl EpgConfig {
@@ -876,14 +892,14 @@ impl EpgConfig {
             }
         });
 
-        self.t_normalize = match self.normalize.as_mut() {
+        self.t_smart_match = match self.smart_match.as_mut() {
             None => {
-                let mut normalize: EpgNormalizeConfig = EpgNormalizeConfig::default();
+                let mut normalize: EpgSmartMatchConfig = EpgSmartMatchConfig::default();
                 normalize.prepare()?;
                 normalize
             }
             Some(normalize_cfg) => {
-                let mut normalize: EpgNormalizeConfig = normalize_cfg.clone();
+                let mut normalize: EpgSmartMatchConfig = normalize_cfg.clone();
                 normalize.prepare()?;
                 normalize
             }
