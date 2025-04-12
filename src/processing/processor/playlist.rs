@@ -581,10 +581,9 @@ fn prepare_epg_id_cache(fp: &mut FetchedPlaylist, id_cache: &mut EpgIdCache, nor
     }
 }
 
-fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache: &mut EpgIdCache) {
+fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, smart_match_enabled: bool, id_cache: &mut EpgIdCache) {
     if let Some(tv_guide) = &fp.epg {
         if let Some(epg) = tv_guide.filter(id_cache) {
-
             let icon_tags : HashMap<&String, &XmlTag> = epg.children.iter()
                 .filter(|tag| tag.icon.is_some() && tag.get_attribute_value(EPG_ATTRIB_ID).is_some())
                 .map(|t| (t.get_attribute_value(EPG_ATTRIB_ID).unwrap(), t)).collect();
@@ -593,11 +592,13 @@ fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache
                 .filter(|c| c.header.xtream_cluster == XtreamCluster::Live)
                 .filter(|c| c.header.epg_channel_id.is_none() || c.header.logo.is_empty() || c.header.logo_small.is_empty())
                 .for_each(|c| {
-                    // if the channel has no epg_id  or the epg_id is not present in xmltv/tvguide then we need to match one from existing tvguide
-                    if c.header.epg_channel_id.is_none() || !id_cache.processed.contains(c.header.epg_channel_id.as_ref().unwrap()) {
-                        let normalized = id_cache.normalize(&c.header.name);
-                        if let Some((_, Some(epg_id))) = id_cache.normalized.get(&Cow::Borrowed(normalized.as_str())) {
-                            c.header.epg_channel_id = Some(epg_id.to_string());
+                    if smart_match_enabled {
+                        // if the channel has no epg_id  or the epg_id is not present in xmltv/tvguide then we need to match one from existing tvguide
+                        if c.header.epg_channel_id.is_none() || !id_cache.processed.contains(c.header.epg_channel_id.as_ref().unwrap()) {
+                            let normalized = id_cache.normalize(&c.header.name);
+                            if let Some((_, Some(epg_id))) = id_cache.normalized.get(&Cow::Borrowed(normalized.as_str())) {
+                                c.header.epg_channel_id = Some(epg_id.to_string());
+                            }
                         }
                     }
                     if c.header.epg_channel_id.is_some() && (c.header.logo.is_empty() || c.header.logo_small.is_empty()) {
@@ -654,16 +655,16 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     for mut fp in processed_fetched_playlists {
         // collect all epg_channel ids
         let mut id_cache = EpgIdCache::new(fp.input.epg.as_ref());
-        let normalize_enabled = id_cache.smart_match_config.enabled;
-        let fuzzy_matching = id_cache.smart_match_config.fuzzy_matching;
-        prepare_epg_id_cache(&mut fp, &mut id_cache, normalize_enabled, fuzzy_matching);
+        let smart_match_enabled = id_cache.smart_match_config.enabled;
+        let fuzzy_matching = smart_match_enabled && id_cache.smart_match_config.fuzzy_matching;
+        prepare_epg_id_cache(&mut fp, &mut id_cache, smart_match_enabled, fuzzy_matching);
         // let epg_channel_ids: HashSet<_> = fp.playlistgroups.iter().flat_map(|g| &g.channels)
         //     .filter_map(|c| c.header.epg_channel_id.as_ref()).map(|a| a.as_str()).collect();
         if id_cache.channel.is_empty() && id_cache.normalized.is_empty() {
             debug!("channel ids are empty");
         } else {
             debug_if_enabled!("found epg information for {}", &target.name);
-            assign_channel_epg(&mut new_epg, &mut fp, &mut id_cache);
+            assign_channel_epg(&mut new_epg, &mut fp, smart_match_enabled, &mut id_cache);
         }
         new_playlist.append(&mut fp.playlistgroups);
     }
