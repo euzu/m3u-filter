@@ -289,9 +289,6 @@ impl MappingValueProcessor<'_> {
         let attr_re = &mapper.t_attre.as_ref().unwrap();
         let attributes = &mapper.attributes;
         for (key, value) in attributes {
-            if key == "chno" {
-                println!("chno: {}", value);
-            }
             if value.contains('<') { // possible replacement
                 let replaced = attr_re.replace_all(value, |captures: &regex::Captures| {
                     let capture_name = &captures[1];

@@ -131,11 +131,20 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
 }
 
 fn channel_no_playlist(new_playlist: &mut [PlaylistGroup]) {
+    let assigned_chnos: HashSet<u32> = new_playlist.iter().flat_map(|g| &g.channels)
+        .filter(|c| !c.header.chno.is_empty())
+        .map(|c|c.header.chno.as_str()).map(str::parse::<u32>)
+        .flatten().collect();
     let mut chno = 1;
     for group in new_playlist {
         for chan in &mut group.channels {
-            chan.header.chno = chno.to_string();
-            chno += 1;
+            if chan.header.chno.is_empty() {
+                while assigned_chnos.contains(&chno) {
+                    chno += 1;
+                }
+                chan.header.chno = chno.to_string();
+                chno += 1;
+            }
         }
     }
 }
