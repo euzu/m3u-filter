@@ -51,18 +51,18 @@ cp -r "${RESOURCES_DIR}" "${DOCKER_DIR}/"
 
 cd "${DOCKER_DIR}"
 echo "Building Docker images for version ${VERSION}"
-SCRATCH_IMAGE_NAME=m3u-filter-beta
+BETA_IMAGE_NAME=m3u-filter-beta
 
-# Build scratch image and tag as "latest"
-docker build -f Dockerfile-manual -t ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" --target scratch-final .
-docker tag ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
+# Build alpine image and tag as "latest"
+docker build -f Dockerfile-manual -t ghcr.io/euzu/${BETA_IMAGE_NAME}:"${VERSION}" --target alpine-final .
+docker tag ghcr.io/euzu/${BETA_IMAGE_NAME}:"${VERSION}" ghcr.io/euzu/${BETA_IMAGE_NAME}:latest
 
 echo "Logging into GitHub Container Registry..."
 docker login ghcr.io -u euzu -p "${GHCR_IO_TOKEN}"
 
-# Push scratch
-docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}"
-docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
+# Push alipne
+docker push ghcr.io/euzu/${BETA_IMAGE_NAME}:"${VERSION}"
+docker push ghcr.io/euzu/${BETA_IMAGE_NAME}:latest
 
 # Clean up
 echo "Cleaning up build artifacts..."
@@ -70,4 +70,4 @@ rm -rf "${DOCKER_DIR}/web"
 rm -f "${DOCKER_DIR}/m3u-filter"
 rm -rf "${DOCKER_DIR}/resources"
 
-echo "Docker images ghcr.io/euzu/${SCRATCH_IMAGE_NAME}${VERSION} have been successfully built, tagged, and pushed."
+echo "Docker images ghcr.io/euzu/${BETA_IMAGE_NAME}${VERSION} have been successfully built, tagged, and pushed."

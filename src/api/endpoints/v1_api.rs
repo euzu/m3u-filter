@@ -208,22 +208,21 @@ where
     for item in iter {
         let group_key = get_group(&item);
         groups.entry(group_key)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(item);
     }
 
-    let result = groups
+    groups
         .into_iter()
         .enumerate()
         .map(|(index, (key, value))| PlaylistResponseGroup {
+            #[allow(clippy::cast_possible_truncation)]
             id: index as u32,
             title: key.to_string(),
             channels: serde_json::to_value(value).unwrap_or(Value::Null),
             xtream_cluster: cluster,
         })
-        .collect();
-
-    result
+        .collect()
 }
 
 fn group_playlist_items_by_cluster(params: Option<(FileReadGuard,
@@ -327,11 +326,11 @@ async fn get_playlist_for_target(cfg_target: Option<&ConfigTarget>, cfg: &Arc<Co
             // let series_categories = get_categories_content(xtream_repository::xtream_get_collection_path(cfg, target_name, xtream_repository::COL_CAT_SERIES)).await;
 
             let live_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Live).await
-                .map(|(_guard, iter)| group_playlist_items(XtreamCluster::Live, iter.map(|(v,_)|v), |item| item.group.clone()));
+                .map(|(_guard, iter)| group_playlist_items(XtreamCluster::Live, iter.map(|(v, _)| v), |item| item.group.clone()));
             let vod_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Video).await
-                .map(|(_guard, iter)| group_playlist_items(XtreamCluster::Video, iter.map(|(v,_)|v), |item| item.group.clone()));
+                .map(|(_guard, iter)| group_playlist_items(XtreamCluster::Video, iter.map(|(v, _)| v), |item| item.group.clone()));
             let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series).await
-                .map(|(_guard, iter)| group_playlist_items(XtreamCluster::Series, iter.map(|(v,_)|v), |item| item.group.clone()));
+                .map(|(_guard, iter)| group_playlist_items(XtreamCluster::Series, iter.map(|(v, _)| v), |item| item.group.clone()));
 
             let response = PlaylistResponse {
                 live: live_channels,
