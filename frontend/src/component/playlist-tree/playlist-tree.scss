@@ -39,10 +39,11 @@
         accent-color: var(--checkbox-checked-background-color);
       }
 
-      &__count {
-        margin-left: 10px;
-        color: var(--tree-count-color);
-      }
+    }
+
+    &__count {
+      margin-left: 10px;
+      color: var(--tree-count-color);
     }
 
     &__childs {

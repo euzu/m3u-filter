@@ -149,7 +149,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                     'ExpandMore' : 'ChevronRight')}</div>
                 <div className={'tree-group__header-content'}>
                     {group.name}
-                    <div className={'tree-group__count'}> ({group.channels?.length})</div>
+                    <div className={'tree-group__count'}>({group.channels?.length})</div>
                 </div>
             </div>
             {expanded.current[group.id] && (

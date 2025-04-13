@@ -150,6 +150,10 @@ $category-size: 96px;
     box-sizing: border-box;
     border-radius: var(--border-radius);
 
+    &-count {
+      margin-left: 10px;
+    }
+
     &-channel,
     &-group {
       border: 1px solid var(--border-color);

@@ -279,6 +279,7 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                 <div key={group.id} onClick={handleGroupSelect}
                      data-category={category} data-group={group.id} className={'playlist-gallery__groups-group'}>
                     {group.name}
+                    <span className={'playlist-gallery__groups-count'}>{(group.channels?.length ?? 0)}</span>
                 </div>
             ))}
         </div>;
