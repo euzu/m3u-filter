@@ -2,26 +2,26 @@ import {Observable} from "rxjs";
 import PlaylistApiService, {DefaultPlaylistApiService} from "../api/playlist-api-service";
 import {first} from "rxjs/operators";
 import {PlaylistRequest} from "../model/playlist-request";
-import {PlaylistCategories, PlaylistGroup, PlaylistItem, PlaylistResponse} from "../model/playlist";
+import {PlaylistCategories, PlaylistGroup, PlaylistItem} from "../model/playlist";
 
-const mergeCategory = (groups: PlaylistGroup[], channels: PlaylistItem[]) => {
-    if (groups?.length  && channels?.length) {
-        let unknown: PlaylistGroup = {
-            id: 0,
-            name: "Unknown",
-            channels: [],
-        };
-        const groupMap = groups.reduce((acc: any, group: PlaylistGroup) => {
-            acc[group.name] = group;
-            group.channels = group.channels ?? [];
-            return acc;
-        }, {});
-        channels.forEach(channel =>  {
-            let group = groupMap[channel.group] ?? unknown;
-            group.channels.push(channel);
-        });
-    }
-}
+// const mergeCategory = (groups: PlaylistGroup[], channels: PlaylistItem[]) => {
+//     if (groups?.length  && channels?.length) {
+//         let unknown: PlaylistGroup = {
+//             id: 0,
+//             name: "Unknown",
+//             channels: [],
+//         };
+//         const groupMap = groups.reduce((acc: any, group: PlaylistGroup) => {
+//             acc[group.name] = group;
+//             group.channels = group.channels ?? [];
+//             return acc;
+//         }, {});
+//         channels.forEach(channel =>  {
+//             let group = groupMap[channel.group] ?? unknown;
+//             group.channels.push(channel);
+//         });
+//     }
+// }
 
 export default class PlaylistService {
 
@@ -31,16 +31,17 @@ export default class PlaylistService {
     getPlaylistCategories(req: PlaylistRequest): Observable<PlaylistCategories> {
         return new Observable((obs) =>
             this.playlistApiService.getPlaylist(req).pipe(first()).subscribe({
-                next: (pl: PlaylistResponse) => {
+                next: (pl: PlaylistCategories) => {
                     if (pl) {
-                        ['live', 'vod', 'series'].forEach(key => mergeCategory((pl.categories as any)?.[key], (pl.channels as any)?.[key]));
                         let cnt = 0;
-                        let categories = pl.categories;
-                        [categories.live, categories.vod, categories.series].filter(Boolean).flat().forEach(g => {
+                        [pl?.live, pl?.vod, pl?.series].filter(Boolean).flat().forEach((g: PlaylistGroup) => {
                             g.id = ++cnt;
-                            g.channels?.forEach(c => c.id = ++cnt);
-                        })
-                        obs.next(categories);
+                            g.name = g.name ?? (g as any).title;
+                            g?.channels?.forEach(c => {
+                                c.id = ++cnt;
+                            });
+                        });
+                        obs.next(pl);
                     } else {
                         obs.error("Could not download playlist");
                     }

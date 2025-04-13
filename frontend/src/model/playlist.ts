@@ -60,22 +60,10 @@ export interface PlaylistCategories {
     series: PlaylistGroup[],
 }
 
-
-export interface PlaylistChannels {
-    live: PlaylistItem[],
-    vod: PlaylistItem[],
-    series: PlaylistItem[],
-}
-
 export enum PlaylistCategory {
     LIVE = 'live',
     VOD = 'vod',
     SERIES = 'series'
-}
-
-export interface PlaylistResponse {
-    categories: PlaylistCategories,
-    channels: PlaylistChannels,
 }
 
 export const EmptyPlaylistCategories: PlaylistCategories = {live: [], vod: [], series: []}

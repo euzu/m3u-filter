@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use bytes::Bytes;
 use futures::{stream, Stream, StreamExt};
+use serde::Serialize;
 use crate::repository::storage::hex_encode;
 use crate::utils::file::file_utils::file_reader;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, str_to_io_error, info_err, create_m3u_filter_error, create_m3u_filter_error_result, notify_err};
@@ -933,9 +934,10 @@ pub async fn iter_raw_xtream_playlist(config: &Arc<Config>, target: &ConfigTarge
     }
 }
 
-pub fn playlist_iter_to_stream<I>(channels: Option<(FileReadGuard, I)>) -> impl Stream<Item=Result<Bytes, String>>
+pub fn playlist_iter_to_stream<I, P>(channels: Option<(FileReadGuard, I)>) -> impl Stream<Item=Result<Bytes, String>>
 where
-    I: Iterator<Item=(XtreamPlaylistItem, bool)> + 'static,
+    I: Iterator<Item=(P, bool)> + 'static,
+    P: Serialize
 {
     match channels {
         Some((_, chans)) => {

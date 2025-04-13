@@ -290,13 +290,13 @@ export default function PlaylistGallery(props: PlaylistGalleryProps) {
                         className={'playlist-gallery__category'}>{getIconByName(icon)}</div>;
         };
         let nodes = [];
-        if (categories.live?.length) {
+        if (categories?.live?.length) {
             nodes.push(newNode('LABEL.LIVE', 'live', 'Live'));
         }
-        if (categories.vod?.length) {
+        if (categories?.vod?.length) {
             nodes.push(newNode('LABEL.VOD', 'vod', 'VOD'));
         }
-        if (categories.series?.length) {
+        if (categories?.series?.length) {
             nodes.push(newNode('LABEL.SERIES', 'series', 'Series'));
         }
         if (nodes.length) {

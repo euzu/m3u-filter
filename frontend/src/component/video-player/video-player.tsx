@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {useCallback, useEffect, useRef} from 'react';
 import './video-player.scss';
-import {first, Observable, Subscription } from "rxjs";
-import { PlaylistItem, PlaylistItemType } from "../../model/playlist";
+import {first, Observable, Subscription} from "rxjs";
+import {PlaylistItem, PlaylistItemType} from "../../model/playlist";
 import videojs from "video.js";
 import 'videojs-mpegtsjs';
 import "video.js/dist/video-js.css";
-import { useServices } from '../../provider/service-provider';
-import {PlaylistRequest} from "../../model/playlist-request";
+import {useServices} from '../../provider/service-provider';
+import {PlaylistRequest, PlaylistRequestType} from "../../model/playlist-request";
 
 const DEFAULT_OPTIONS: any = {
     autoplay: true,
@@ -41,7 +41,7 @@ interface VideoPlayerProps {
     onReady?: (player: any) => void;
 }
 
-export const VideoPlayer = ({ channel, onReady }: VideoPlayerProps) => {
+export const VideoPlayer = ({channel, onReady}: VideoPlayerProps) => {
     const services = useServices();
     const videoRef = useRef<HTMLDivElement | null>(null);
     const playerRef = useRef<Player>(null);
@@ -62,7 +62,10 @@ export const VideoPlayer = ({ channel, onReady }: VideoPlayerProps) => {
                 type: isLive ? 'video/mp2t' : 'video/mp4',
             }],
             poster: playlistItem.logo ?? playlistItem.logo_small,
-            mpegtsjs: isLive ? { ...MPEGTS_OPTIONS, mediaDataSource: { ...MPEGTS_OPTIONS.mediaDataSource, url } } : undefined,
+            mpegtsjs: isLive ? {
+                ...MPEGTS_OPTIONS,
+                mediaDataSource: {...MPEGTS_OPTIONS.mediaDataSource, url}
+            } : undefined,
         };
 
         try {
@@ -78,11 +81,26 @@ export const VideoPlayer = ({ channel, onReady }: VideoPlayerProps) => {
         }
     }, [])
 
-    const handlePlayVideo = useCallback(([playlistItem, playlistRequest] : [playlistItem: PlaylistItem, playlistRequest: PlaylistRequest]) => {
-        services.playlist().getReverseUrl(playlistItem, playlistRequest).pipe(first()).subscribe({
-            next: (url: string) => {playVideo(playlistItem, url); },
-            error: (error: any) => {playVideo(playlistItem, playlistItem.url); },
-        });
+    const handlePlayVideo = useCallback(([playlistItem, playlistRequest]: [playlistItem: PlaylistItem, playlistRequest: PlaylistRequest]) => {
+        switch (playlistRequest.rtype) {
+            case PlaylistRequestType.TARGET:
+                services.playlist().getReverseUrl(playlistItem, playlistRequest).pipe(first()).subscribe({
+                    next: (url: string) => {
+                        switch (playlistRequest.rtype) {
+                        }
+                        playVideo(playlistItem, url);
+                    },
+                    error: (error: any) => {
+                        playVideo(playlistItem, playlistItem.url);
+                    },
+                });
+                break;
+            case PlaylistRequestType.INPUT:
+            case PlaylistRequestType.XTREAM:
+            case PlaylistRequestType.M3U:
+                playVideo(playlistItem, playlistItem.url);
+                break;
+        }
     }, [services, playVideo]);
 
     useEffect(() => {
@@ -135,7 +153,7 @@ export const VideoPlayer = ({ channel, onReady }: VideoPlayerProps) => {
 
     return (
         <div data-vjs-player className="video-player">
-            <div ref={videoRef} />
+            <div ref={videoRef}/>
         </div>
     );
 }
