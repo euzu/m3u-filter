@@ -1,3 +1,4 @@
+use crate::api::model::active_user_manager::UserConnectionGuard;
 use crate::api::api_utils::StreamDetails;
 use crate::api::model::active_provider_manager::ActiveProviderManager;
 use crate::api::model::active_user_manager::ActiveUserManager;
@@ -20,11 +21,10 @@ const USER_EXHAUSTED_FLAG: u8 = 2;
 #[repr(align(64))]
 pub(in crate::api) struct ActiveClientStream {
     inner: BoxedProviderStream,
-    username: String,
     input_name: Option<String>,
-    active_user: Arc<ActiveUserManager>,
+    #[allow(unused)]
+    user_connection_guard: UserConnectionGuard,
     active_provider: Arc<ActiveProviderManager>,
-    log_active_clients: bool,
     send_custom_stream_flag: Option<Arc<AtomicU8>>,
     custom_video: (Option<ChunkedBuffer>, Option<ChunkedBuffer>),
 }
@@ -35,20 +35,16 @@ impl ActiveClientStream {
                             user: &ProxyUserCredentials) -> Self {
         let username = user.username.as_str();
         let active_user = app_state.active_users.clone();
+        let user_connection_guard = active_user.add_connection(username).await;
         let active_provider = app_state.active_provider.clone();
-        let log_active_clients = app_state.config.log.as_ref().is_some_and(|l| l.active_clients);
-        let (user_count, user_connection_count) = active_user.add_connection(username).await;
-        Self::log_active_user(log_active_clients, user_count, user_connection_count);
         let user_grace_period = user.connection_permission(app_state).await == UserConnectionPermission::GracePeriod;
 
         let grace_stop_flag = Self::stream_grace_period(&stream_details, &active_provider, user_grace_period, user, &active_user);
 
         Self {
             inner: stream_details.stream.take().unwrap(),
-            active_user,
+            user_connection_guard,
             active_provider,
-            log_active_clients,
-            username: username.to_string(),
             input_name: stream_details.input_name,
             send_custom_stream_flag: grace_stop_flag,
             custom_video: (
@@ -110,11 +106,6 @@ impl ActiveClientStream {
         None
     }
 
-    fn log_active_user(log_active_clients: bool, user_count: usize, user_connection_count: usize) {
-        if log_active_clients {
-            info!("Active Users: {user_count}, Active User Connections: {user_connection_count}");
-        }
-    }
 }
 impl Stream for ActiveClientStream {
     type Item = Result<Bytes, StreamError>;
@@ -151,16 +142,11 @@ impl Stream for ActiveClientStream {
 
 impl Drop for ActiveClientStream {
     fn drop(&mut self) {
-        let username = self.username.clone();
         let input_name = self.input_name.clone();
-        let log_active_clients = self.log_active_clients;
-        let active_user = Arc::clone(&self.active_user);
         let active_provider = Arc::clone(&self.active_provider);
         tokio::task::block_in_place(move || {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
-                let (user_count, user_connection_count) = active_user.remove_connection(&username).await;
-                Self::log_active_user(log_active_clients, user_count, user_connection_count);
                 if let Some(input) = input_name {
                     active_provider.release_connection(&input);
                 }

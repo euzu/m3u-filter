@@ -1,23 +1,40 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use log::{trace};
+use log::{info, trace};
 use tokio::sync::RwLock;
 use crate::model::api_proxy::UserConnectionPermission;
 
+pub struct UserConnectionGuard {
+    manager: Arc<ActiveUserManager>,
+    username: String,
+}
+impl Drop for UserConnectionGuard {
+    fn drop(&mut self) {
+        let manager = self.manager.clone();
+        let username = self.username.clone();
+        tokio::spawn(async move {
+            manager.remove_connection(&username).await;
+        });
+    }
+}
+
 pub struct ActiveUserManager {
-    pub user: RwLock<HashMap<String, AtomicU32>>,
+    log_active_clients: bool,
+    pub user: Arc<RwLock<HashMap<String, AtomicU32>>>,
 }
 
 impl Default for ActiveUserManager {
     fn default() -> Self {
-        Self::new()
+        Self::new(false)
     }
 }
 
 impl ActiveUserManager {
-    pub fn new() -> Self {
+    pub fn new(log_active_clients: bool) -> Self {
         Self {
-            user: RwLock::new(HashMap::new()),
+            log_active_clients,
+            user: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -51,7 +68,7 @@ impl ActiveUserManager {
         self.user.read().await.values().map(|c| c.load(Ordering::SeqCst) as usize).sum()
     }
 
-    pub async fn add_connection(&self, username: &str) -> (usize, usize) {
+    pub async fn add_connection(&self, username: &str) -> UserConnectionGuard {
         let mut lock = self.user.write().await;
         if let Some(counter) = lock.get(username) {
             counter.fetch_add(1, Ordering::SeqCst);
@@ -59,10 +76,23 @@ impl ActiveUserManager {
             lock.insert(username.to_string(), AtomicU32::new(1));
         }
         drop(lock);
-        (self.active_users().await, self.active_connections().await)
+
+        self.log_active_user().await;
+
+        UserConnectionGuard {
+            manager: Arc::new(self.clone_inner()),
+            username: username.to_string(),
+        }
     }
 
-    pub async fn remove_connection(&self, username: &str) -> (usize, usize) {
+    fn clone_inner(&self) -> Self {
+        Self {
+            log_active_clients: self.log_active_clients,
+            user: Arc::clone(&self.user),
+        }
+    }
+
+    async fn remove_connection(&self, username: &str) {
         let mut lock = self.user.write().await;
         if let Some(counter) = lock.get(username) {
             let new_count = counter.fetch_sub(1, Ordering::SeqCst) - 1;
@@ -71,7 +101,16 @@ impl ActiveUserManager {
             }
         }
         drop(lock);
-        (self.active_users().await, self.active_connections().await)
+
+        self.log_active_user().await;
+    }
+
+    async fn log_active_user(&self) {
+        if self.log_active_clients {
+            let user_count = self.active_users().await;
+            let user_connection_count = self.active_connections().await;
+            info!("Active Users: {user_count}, Active User Connections: {user_connection_count}");
+        }
     }
 }
 
