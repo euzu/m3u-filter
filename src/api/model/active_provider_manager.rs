@@ -490,7 +490,7 @@ mod tests {
     use super::*;
     use crate::Arc;
     use std::thread;
-
+    use crate::model::config::InputFetchMethod;
 
     macro_rules! should_available {
         ($lineup:expr, $provider_id:expr) => {
@@ -542,6 +542,7 @@ mod tests {
             aliases: None,
             headers: Default::default(),
             options: None,
+            method: InputFetchMethod::default(),
         }
     }
 

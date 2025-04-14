@@ -18,7 +18,7 @@ use url::Url;
 
 use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::ConfigInput;
+use crate::model::config::{ConfigInput, InputFetchMethod};
 use crate::model::stats::format_elapsed_time;
 use crate::repository::storage::{get_input_storage_path, short_hash};
 use crate::repository::xtream_repository::FILE_EPG;
@@ -126,10 +126,22 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
 }
 
 pub fn get_client_request(client: &Arc<reqwest::Client>,
+                          method: InputFetchMethod,
                           headers: Option<&HashMap<String, String>>,
                           url: &Url,
                           custom_headers: Option<&HashMap<String, Vec<u8>>>) -> reqwest::RequestBuilder {
-    let request = client.get(url.clone());
+    let request = match method {
+        InputFetchMethod::GET => client.get(url.clone()),
+        InputFetchMethod::POST => {
+            // let base_url = url[..url::Position::BeforePath].to_string() + url.path();
+            let mut params = HashMap::new();
+            for (key, value) in url.query_pairs() {
+                params.insert(key.to_string(), value.to_string());
+            }
+            // we could cut the params but we leave them as query and add them as form.
+            client.post(url.clone()).form(&params)
+        },
+    };
     let headers = get_request_headers(headers, custom_headers);
     request.headers(headers)
 }
@@ -187,7 +199,7 @@ pub fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
 
 async fn get_remote_content_as_file(client: Arc<reqwest::Client>, input: &ConfigInput, url: &Url, file_path: &Path) -> Result<PathBuf, std::io::Error> {
     let start_time = Instant::now();
-    let request = get_client_request(&client, Some(&input.headers), url, None);
+    let request = get_client_request(&client, input.method, Some(&input.headers), url, None);
     match request.send().await {
         Ok(response) => {
             if response.status().is_success() {
@@ -220,7 +232,7 @@ async fn get_remote_content_as_file(client: Arc<reqwest::Client>, input: &Config
 
 async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, url: &Url) -> Result<String, Error> {
     let start_time = Instant::now();
-    let request = get_client_request(&client, Some(&input.headers), url, None);
+    let request = get_client_request(&client, input.method, Some(&input.headers), url, None);
     match request.send().await {
         Ok(response) => {
             let is_success = response.status().is_success();
@@ -259,12 +271,16 @@ async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, u
                         }
 
                         if decode_buffer.is_empty() {
-                            match String::from_utf8(bytes.to_vec()) {
+                            let content_bytes = bytes.to_vec();
+                            match String::from_utf8(content_bytes) {
                                 Ok(decoded_content) => {
                                     debug_if_enabled!("Request took:{} {}", format_elapsed_time(start_time.elapsed().as_secs()), sanitize_sensitive_info(url.as_str()));
                                     Ok(decoded_content)
                                 }
-                                Err(err) => Err(str_to_io_error(&format!("failed to plain text content {err}")))
+                                Err(err) => {
+                                    println!("{err:?}");
+                                    Err(str_to_io_error(&format!("failed to plain text content {err}")))
+                                }
                             }
                         } else {
                             debug_if_enabled!("Request took:{},  {}", format_elapsed_time(start_time.elapsed().as_secs()), sanitize_sensitive_info(url.as_str()));
@@ -499,6 +515,10 @@ pub fn get_credentials_from_url_str(url_with_credentials: &str) -> (Option<Strin
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::fmt::Debug;
+    use reqwest::{Client, Error, RequestBuilder, Response};
+    use url::Url;
     use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info};
 
     #[test]

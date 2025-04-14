@@ -651,6 +651,41 @@ impl FromStr for InputType {
     }
 }
 
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
+pub enum InputFetchMethod {
+    #[default]
+    GET,
+    POST,
+}
+
+impl InputFetchMethod {
+    const GET_METHOD: &'static str = "GET";
+    const POST_METHOD: &'static str = "POST";
+}
+
+impl Display for InputFetchMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::GET => Self::GET_METHOD,
+            Self::POST => Self::POST_METHOD,
+        })
+    }
+}
+
+impl FromStr for InputFetchMethod {
+    type Err = M3uFilterError;
+
+    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+        if s.eq(Self::GET_METHOD) {
+            Ok(Self::GET)
+        } else if s.eq(Self::POST_METHOD) {
+            Ok(Self::POST)
+        } else {
+            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown Fetch Method: {}", s)
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigInputOptions {
@@ -942,6 +977,8 @@ pub struct ConfigInput {
     pub priority: i16,
     #[serde(default)]
     pub max_connections: u16,
+    #[serde(default)]
+    pub method: InputFetchMethod,
 }
 
 impl ConfigInput {

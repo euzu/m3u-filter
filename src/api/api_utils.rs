@@ -11,7 +11,7 @@ use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::auth::authenticator::Claims;
 use crate::model::api_proxy::ProxyUserCredentials;
-use crate::model::config::{ConfigInput, ConfigTarget};
+use crate::model::config::{ConfigInput, ConfigTarget, InputFetchMethod};
 use crate::model::playlist::PlaylistItemType;
 use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::file::file_utils::create_new_file_for_write;
@@ -441,7 +441,7 @@ pub async fn resource_response(app_state: &AppState, resource_url: &str, req_hea
     }
     trace_if_enabled!("Try to fetch resource {}", sanitize_sensitive_info(resource_url));
     if let Ok(url) = Url::parse(resource_url) {
-        let client = request::get_client_request(&app_state.http_client, input.map(|i| &i.headers), &url, Some(&req_headers));
+        let client = request::get_client_request(&app_state.http_client, input.map_or(InputFetchMethod::GET, |i| i.method), input.map(|i| &i.headers), &url, Some(&req_headers));
         match client.send().await {
             Ok(response) => {
                 let status = response.status();
