@@ -46,21 +46,21 @@ RUN ffmpeg -loop 1 -i ./resources/provider_connections_exhausted.jpg -t 10 -r 1 
 
 # Final container (Scratch)
 FROM scratch as scratch-final
-WORKDIR /
+WORKDIR /app
 COPY --from=rust-build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=rust-build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter /m3u-filter
-COPY --from=node-build /app/build /web
-COPY --from=resource-build /src/resources /resources
+COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter ./m3u-filter
+COPY --from=node-build /app/build ./web
+COPY --from=resource-build /src/resources ./resources
 ENTRYPOINT ["/m3u-filter"]
-CMD ["-s", "-p", "/config"]
+CMD ["-s", "-p", "/app/config"]
 
 # Final container (Alpine)
 FROM alpine:latest as alpine-final
 RUN apk add --no-cache bash curl ca-certificates tini
 WORKDIR /app
-COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter m3u-filter
-COPY --from=node-build /app/build web
-COPY --from=resource-build /src/resources /resources
+COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter ./m3u-filter
+COPY --from=node-build /app/build ./web
+COPY --from=resource-build /src/resources ./resources
 ENTRYPOINT ["/sbin/tini", "--", "/app/m3u-filter"]
 CMD ["-s", "-p", "/app/config"]

@@ -119,9 +119,9 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 <div className={'tool-button'} data-item={entry.id} onClick={handleClipboardUrl}>
                     {getIconByName('LinkRounded')}
                 </div>
-                <div className={'tool-button'} data-item={entry.id} onClick={handlePlayUrl}>
+                {onPlay && <div className={'tool-button'} data-item={entry.id} onClick={handlePlayUrl}>
                     {getIconByName('PlayArrow')}
-                </div>
+                </div>}
                 {isVideoFile(entry) &&
                     <>
                         <div className={'tool-button'} data-item={entry.id} onClick={handleDownloadUrl}>
@@ -139,7 +139,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 <div className={'tree-group__channel-nr'}>{index + 1}</div>
                 {entry.name}</div>
         </div>
-    }, [handleClipboardUrl, handlePlayUrl, handleDownloadUrl, isVideoFile, handleWebSearch, serverConfig]);
+    }, [onPlay, handleClipboardUrl, handlePlayUrl, handleDownloadUrl, isVideoFile, handleWebSearch, serverConfig]);
 
     const renderGroup = useCallback((group: PlaylistGroup): React.ReactNode => {
         return <div className={'tree-group'} key={group.id}>

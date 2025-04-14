@@ -1,6 +1,7 @@
 # Changelog
 # 2.2.6 (2025-04-xx)
-- !BREAKING CHANGE!  bandwidth `throttle_kbps` attribute for `reverse_proxy.stream` in  `config.yml`
+- !BREAKING_CHANGE! all docker images have now m3u-filter under `/app` 
+- !BREAKING CHANGE! bandwidth `throttle_kbps` attribute for `reverse_proxy.stream` in  `config.yml`
   is now `throttle` and supports units. Allowed units are `KB/s`,`MB/s`,`KiB/s`,`MiB/s`,`kbps`,`mbps`,`Mibps`.
 Default unit is `kbps`.
 - `grace_period_millis` default set to 0 milliseconds.
@@ -35,12 +36,13 @@ Set it to `false` run old m3u-filter version, then update m3u-filter and set `us
 ```yaml
 epg:
   url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
-  smart_assign:
+  smart_match:
     enabled: true
     fuzzy_matching: true
     match_threshold: 80
     best_match_threshold: 99
     name_prefix: !suffix "."
+    name_prefix_separator: [':', '|', '-']
     strip :  ["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]
     normalize_regex: '[^a-zA-Z0-9\-]'
 ```

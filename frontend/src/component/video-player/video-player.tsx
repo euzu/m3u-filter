@@ -8,15 +8,18 @@ import "video.js/dist/video-js.css";
 import {useServices} from '../../provider/service-provider';
 import {PlaylistRequest, PlaylistRequestType} from "../../model/playlist-request";
 
-const DEFAULT_OPTIONS: any = {
+const VIDEOJS_OPTIONS: any = {
     autoplay: true,
     controls: true,
-    responsive: true,
+    responsive: false,
     fluid: true,
-    fill: true,
+    preload: "none",
+}
+
+const DEFAULT_OPTIONS: any = {
+    ...VIDEOJS_OPTIONS,
     sources: [],
     poster: undefined,
-    preload: "none",
 };
 
 const MPEGTS_OPTIONS: any = {
@@ -33,8 +36,43 @@ const MPEGTS_OPTIONS: any = {
     }
 };
 
+const HLS_OPTIONS: any = {
+    html5: {
+        vhs: {
+            cors: true,
+            overrideNative: true
+        },
+        nativeAudioTracks: false,
+        nativeVideoTracks: false
+    }
+};
+
 // @ts-ignore
 type Player = videojs.Player | null;
+
+const getVideoOptions = (playlistItem: PlaylistItem, url: string): { mimeType: string, options: any } => {
+    switch (playlistItem.item_type) {
+        case PlaylistItemType.Video:
+        case PlaylistItemType.Series:
+            return {mimeType: 'video/mp4', options: {}};
+        case PlaylistItemType.SeriesInfo:
+            return {mimeType: 'application/json', options: {}};
+        case PlaylistItemType.Live:
+            return {
+                mimeType: 'video/mp2t', options: {
+                    mpegtsjs: {
+                        ...MPEGTS_OPTIONS,
+                        mediaDataSource: {...MPEGTS_OPTIONS.mediaDataSource, url}
+                    }
+                }
+            };
+        case PlaylistItemType.Catchup:
+        case PlaylistItemType.LiveUnknown:
+        case PlaylistItemType.LiveHls:
+            return {mimeType: 'application/x-mpegURL', options: HLS_OPTIONS};
+    }
+    return {mimeType: 'application/octet-stream', options: {}};
+}
 
 interface VideoPlayerProps {
     channel: Observable<[PlaylistItem, PlaylistRequest]>;
@@ -47,25 +85,16 @@ export const VideoPlayer = ({channel, onReady}: VideoPlayerProps) => {
     const playerRef = useRef<Player>(null);
 
     const playVideo = useCallback((playlistItem: PlaylistItem, url: string) => {
-        const isLive = [
-            PlaylistItemType.Live,
-            PlaylistItemType.LiveHls,
-            PlaylistItemType.LiveUnknown,
-            PlaylistItemType.Catchup
-        ].includes(playlistItem.item_type);
-
+        let options = getVideoOptions(playlistItem, url);
         // TODO mimetype
         const playerOptions = {
             ...DEFAULT_OPTIONS,
             sources: [{
                 src: url,
-                type: isLive ? 'video/mp2t' : 'video/mp4',
+                type: options.mimeType,
             }],
             poster: playlistItem.logo ?? playlistItem.logo_small,
-            mpegtsjs: isLive ? {
-                ...MPEGTS_OPTIONS,
-                mediaDataSource: {...MPEGTS_OPTIONS.mediaDataSource, url}
-            } : undefined,
+            ...options.options
         };
 
         try {
@@ -84,16 +113,18 @@ export const VideoPlayer = ({channel, onReady}: VideoPlayerProps) => {
     const handlePlayVideo = useCallback(([playlistItem, playlistRequest]: [playlistItem: PlaylistItem, playlistRequest: PlaylistRequest]) => {
         switch (playlistRequest.rtype) {
             case PlaylistRequestType.TARGET:
-                services.playlist().getReverseUrl(playlistItem, playlistRequest).pipe(first()).subscribe({
-                    next: (url: string) => {
-                        switch (playlistRequest.rtype) {
-                        }
-                        playVideo(playlistItem, url);
-                    },
-                    error: (error: any) => {
-                        playVideo(playlistItem, playlistItem.url);
-                    },
-                });
+                if (playlistItem.item_type === PlaylistItemType.LiveHls) {
+                    playVideo(playlistItem, playlistItem.url);
+                } else {
+                    services.playlist().getReverseUrl(playlistItem, playlistRequest).pipe(first()).subscribe({
+                        next: (url: string) => {
+                            playVideo(playlistItem, url);
+                        },
+                        error: (error: any) => {
+                            playVideo(playlistItem, playlistItem.url);
+                        },
+                    });
+                }
                 break;
             case PlaylistRequestType.INPUT:
             case PlaylistRequestType.XTREAM:
@@ -114,7 +145,10 @@ export const VideoPlayer = ({channel, onReady}: VideoPlayerProps) => {
         if (!playerRef.current && videoRef.current) {
             const videoElement = document.createElement("video-js");
             videoElement.classList.add("vjs-big-play-centered");
-            videoElement.setAttribute('controls', 'true');
+            videoElement.setAttribute('controls', VIDEOJS_OPTIONS.controls ?? 'false');
+            videoElement.setAttribute('autoplay', VIDEOJS_OPTIONS.autoplay ?? 'false');
+            videoElement.setAttribute('responsive', VIDEOJS_OPTIONS.responsive ?? 'false');
+            //videoElement.setAttribute('fluid', VIDEOJS_OPTIONS.fluid ?? 'false');
             videoRef.current.appendChild(videoElement);
 
             const player = videojs(videoElement, {}, () => {
@@ -152,8 +186,7 @@ export const VideoPlayer = ({channel, onReady}: VideoPlayerProps) => {
     }, []);
 
     return (
-        <div data-vjs-player className="video-player">
-            <div ref={videoRef}/>
+        <div ref={videoRef} data-vjs-player className="video-player">
         </div>
     );
 }

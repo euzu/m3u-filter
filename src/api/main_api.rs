@@ -329,7 +329,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
 
     router = router.layer(create_cors_layer())
         .layer(create_compression_layer());
-    // .layer(TraceLayer::new_for_http()) // `Logger::default()`
+    //router = router.layer(tower_http::trace::TraceLayer::new_for_http()); // `Logger::default()`
 
     // router = router.layer(axum::middleware::from_fn(log_routes));
 

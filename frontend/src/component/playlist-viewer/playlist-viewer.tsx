@@ -1,19 +1,20 @@
-import React, {forwardRef, useImperativeHandle, useMemo, useEffect, useState, useCallback, useRef} from "react";
+import React, {useMemo, useEffect, useState, useCallback, ReactNode} from "react";
 import './playlist-viewer.scss';
 import PlaylistTree, {PlaylistTreeState} from "../playlist-tree/playlist-tree";
-import {Observable, noop, tap, finalize} from "rxjs";
+import {Observable, noop, finalize} from "rxjs";
 import ServerConfig from "../../model/server-config";
 import PlaylistGallery from "../playlist-gallery/playlist-gallery";
 import {getIconByName} from "../../icons/icons";
 import {
     EmptyPlaylistCategories,
     PlaylistCategories,
-    PlaylistCategory,
     PlaylistGroup,
     PlaylistItem
 } from "../../model/playlist";
 import {useSnackbar} from "notistack";
 import {first} from "rxjs/operators";
+import PlaylistVideo from "../playlist-video/playlist-video";
+import {PlaylistRequest} from "../../model/playlist-request";
 
 function textMatch(text: string, searchRequest: SearchRequest): boolean {
     if (searchRequest.regexp) {
@@ -72,10 +73,22 @@ function filterMatchingGroups(playlistCategories: PlaylistCategories, searchRequ
     })
 }
 
+type PlaylistViewType = 'tree' | 'gallery' | 'player';
+
+const getToggleIcon = (view: PlaylistViewType): ReactNode => {
+    switch (view) {
+        case 'gallery': return getIconByName('Live');
+        case 'player': return getIconByName('TreeView');
+        default: return getIconByName('Gallery');
+    }
+}
+
+
 export interface SearchRequest  {
     filter: string,
     regexp: boolean
 }
+
 
 
 export interface IPlaylistViewer {
@@ -86,6 +99,7 @@ interface PlaylistViewerProps {
     serverConfig: ServerConfig;
     playlist: PlaylistCategories;
     searchChannel: Observable<SearchRequest>;
+    videoChannel: Observable<[PlaylistItem, PlaylistRequest]>;
     onProgress: (value: boolean) => void;
     onCopy: (playlistItem: PlaylistItem) => void;
     onPlay?: (playlistItem: PlaylistItem) => void;
@@ -94,11 +108,11 @@ interface PlaylistViewerProps {
 }
 
 export default function PlaylistViewer(props:  PlaylistViewerProps) {
-    const {serverConfig, playlist, searchChannel,
+    const {serverConfig, playlist, searchChannel, videoChannel,
         onProgress, onCopy, onPlay, onDownload, onWebSearch} = props;
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [data, setData] = useState<PlaylistCategories>(EmptyPlaylistCategories);
-    const [galleryView, setGalleryView] = useState<boolean>(localStorage.getItem("galleryView") === '1');
+    const [galleryView, setGalleryView] = useState<PlaylistViewType>((localStorage.getItem("galleryView") as any) ?? 'tree');
     const checked = useMemo((): PlaylistTreeState => ({}), []);
 
     useEffect(() => {
@@ -138,30 +152,44 @@ export default function PlaylistViewer(props:  PlaylistViewerProps) {
     }, [searchChannel, playlist, enqueueSnackbar, onProgress]);
 
     const renderContent = () => {
-        if (galleryView) {
-            return <PlaylistGallery data={data} onCopy={onCopy} onPlay={onPlay}
-                                    onDownload={onDownload}
-                                    onWebSearch={onWebSearch}
-                                    serverConfig={serverConfig}/>
+        switch (galleryView) {
+            case 'gallery' :
+                return <PlaylistGallery data={data} onCopy={onCopy} onPlay={undefined}
+                                        onDownload={onDownload}
+                                        onWebSearch={onWebSearch}
+                                        serverConfig={serverConfig}/>
+            case 'player' :
+                return <PlaylistVideo data={data} channel={videoChannel} onPlay={onPlay}/>
+            default:
+                return <PlaylistTree data={data} state={checked}
+                                     onCopy={onCopy} onPlay={undefined}
+                                     onDownload={onDownload}
+                                     onWebSearch={onWebSearch}
+                                     serverConfig={serverConfig}/>
         }
-        return <PlaylistTree data={data} state={checked}
-                             onCopy={onCopy} onPlay={onPlay}
-                             onDownload={onDownload}
-                             onWebSearch={onWebSearch}
-                             serverConfig={serverConfig}/>
     }
 
     const toggleView = useCallback(() => {
-        setGalleryView(data => {
-            localStorage.setItem("galleryView", data ? '0' : '1');
-            return !data;
+        const getNext = (data: string) => {
+            switch (data) {
+                case 'tree': return 'gallery';
+                case 'gallery': return 'player';
+                case 'player': return 'tree';
+            }
+            return 'gallery';
+        };
+
+        setGalleryView((data: any) => {
+            let view: any = getNext(data);
+            localStorage.setItem("galleryView", view);
+            return view;
         });
     }, []);
 
     return <div className={'playlist-viewer'}>
         <div className={'playlist-viewer__header'}>
             <div className={'tool-button'} onClick={toggleView}>
-                {getIconByName('Gallery')}
+                {getToggleIcon(galleryView)}
             </div>
         </div>
         <div className={'playlist-viewer__content'}>

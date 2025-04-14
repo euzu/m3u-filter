@@ -1,13 +1,12 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import './playlist-browser.scss';
 import SourceSelector from "..//source-selector/source-selector";
-import PlaylistViewer, { SearchRequest} from "../playlist-viewer/playlist-viewer";
+import PlaylistViewer, {SearchRequest} from "../playlist-viewer/playlist-viewer";
 import {useSnackbar} from 'notistack';
 import {useServices} from "../../provider/service-provider";
 import Progress from '..//progress/progress';
 import PlaylistFilter from "../playlist-filter/playlist-filter";
 import {finalize, first, noop, Subject} from "rxjs";
-import PlaylistVideo from "../playlist-video/playlist-video";
 import ClipboardViewer from "../clipboard-viewer/clipboard-viewer";
 import Sidebar from "../sidebar/sidebar";
 import {PlaylistRequest} from "../../model/playlist-request";
@@ -17,7 +16,6 @@ import {FileDownloadInfo} from "../../model/file-download";
 import useTranslator from "../../hook/use-translator";
 import {EmptyPlaylistCategories, PlaylistCategories, PlaylistItem} from "../../model/playlist";
 import LoadingIndicator from "../loading-indicator/loading-indicator";
-import {SplitPanel} from "../split-panel/split-panel";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface PlaylistBrowserProps {
@@ -124,13 +122,12 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
                 <SourceSelector onDownload={handleSourceDownload} serverConfig={config}/>
             </div>
             <LoadingIndicator loading={progress}/>
-            <SplitPanel top={<PlaylistViewer playlist={playlist} searchChannel={searchChannel}
-                                             onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}
-                                             onDownload={handleOnDownload}
-                                             onWebSearch={handleOnWebSearch}
-                                             serverConfig={config}/>}
-                        bottom={<PlaylistVideo channel={videoChannel}/>}>
-            </SplitPanel>
+            <PlaylistViewer playlist={playlist} searchChannel={searchChannel}
+                            onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}
+                            onDownload={handleOnDownload}
+                            onWebSearch={handleOnWebSearch}
+                            videoChannel={videoChannel}
+                            serverConfig={config}/>
             <FileDownload></FileDownload>
             <Progress visible={progress}/>
         </div>
