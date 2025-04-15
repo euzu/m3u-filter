@@ -31,12 +31,12 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
     let url = replace_url_extension(hls_url, HLS_EXT);
     let server_info = app_state.config.get_user_server_info(user).await;
     match request::download_text_content(Arc::clone(&app_state.http_client), input, &url, None).await {
-        Ok(content) => {
+        Ok((content, response_url)) => {
             let hls_token = app_state.hls_cache.new_token();
             let rewrite_hls_props = RewriteHlsProps {
                 base_url: &server_info.get_base_url(),
                 content: &content,
-                hls_url,
+                hls_url: response_url,
                 virtual_id,
                 token: hls_token,
                 target_type,

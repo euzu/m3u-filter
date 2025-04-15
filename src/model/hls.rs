@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use tokio::time::Instant;
 use crate::model::config::TargetType;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HlsEntry {
     pub ts: Instant,
     pub token: u32,

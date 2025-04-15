@@ -53,7 +53,10 @@ pub fn get_xtream_player_api_info_url(input: &ConfigInput, cluster: XtreamCluste
 
 
 pub async fn get_xtream_stream_info_content(client: Arc<reqwest::Client>, info_url: &str, input: &ConfigInput) -> Result<String, Error> {
-    request::download_text_content(client, input, info_url, None).await
+    match request::download_text_content(client, input, info_url, None).await {
+        Ok((content, _response_url)) => Ok(content),
+        Err(err) => Err(err)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
