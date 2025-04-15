@@ -313,7 +313,7 @@ nobody: $argon2id$v=$argon2id$v=19$m=19456,t=2,p=1$Y2FROE83ZDQ1c2VaYmJ4VU9YdHpuZ
 
 The password can be generated with
 ```shell
-./m3u-filter  -p /op/m3u-filter/config --genpwd`
+./m3u-filter --genpwd`
 ```
 
 or with docker

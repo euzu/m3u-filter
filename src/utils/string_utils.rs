@@ -44,7 +44,13 @@ pub fn get_trimmed_string(value: &Option<String>) -> Option<String> {
 
 pub fn replace_after_last_slash(input: &str, replacement: &str) -> String {
     match input.rsplitn(2, '/').collect::<Vec<&str>>().as_slice() {
-        [_after, before] => format!("{before}/{replacement}"),
+        [_after, before] => {
+            if replacement.starts_with("/") {
+                format!("{before}{replacement}")
+            } else {
+                format!("{before}/{replacement}")
+            }
+        },
         [_only] => replacement.to_string(), // if there is no slash, replace complete
         _ => input.to_string(), // fallback, should never happen
     }
