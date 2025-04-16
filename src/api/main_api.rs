@@ -9,7 +9,6 @@ use crate::api::model::active_provider_manager::ActiveProviderManager;
 use crate::api::model::active_user_manager::ActiveUserManager;
 use crate::api::model::app_state::{AppState, HdHomerunAppState};
 use crate::api::model::download::DownloadQueue;
-use crate::api::model::hls_cache::HlsCache;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
 use crate::model::config::{validate_targets, Config, ProcessTargets, RateLimitConfig, ScheduleConfig};
@@ -138,7 +137,6 @@ fn create_shared_data(cfg: &Arc<Config>) -> AppState {
         http_client: Arc::new(client),
         downloads: Arc::new(DownloadQueue::new()),
         cache,
-        hls_cache: HlsCache::garbage_collected(),
         shared_stream_manager: Arc::new(SharedStreamManager::new()),
         active_users,
         active_provider,

@@ -36,7 +36,7 @@ GET {{local}}/player_api.php?username={{username}}&password={{password}}
 GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_live_categories
 
 ### xtream live_streams
-GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_live_streams&category_id=7
+GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_live_streams
 
 ### xtream vod_categories
 GET {{local}}/player_api.php?username={{username}}&password={{password}}&action=get_vod_categories

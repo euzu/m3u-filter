@@ -3,7 +3,7 @@ use crate::api::api_utils::try_option_bad_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::model::api_proxy::ProxyUserCredentials;
-use crate::model::config::{ConfigInput, TargetType};
+use crate::model::config::{ConfigInput};
 use crate::model::playlist::{PlaylistItemType, XtreamCluster};
 use crate::processing::parser::hls::{rewrite_hls, RewriteHlsProps};
 use crate::utils::network::request;
@@ -12,44 +12,45 @@ use axum::response::IntoResponse;
 use log::{debug, error};
 use serde::Deserialize;
 use std::sync::Arc;
+use crate::utils::crypto_utils;
 
 #[derive(Debug, Deserialize)]
 struct HlsApiPathParams {
-    token: u32,
     username: String,
     password: String,
+    input_id: u16,
     stream_id: u32,
-    chunk: u32,
+    token: String,
+}
+
+fn hls_response(hls_content: String) -> impl IntoResponse + Send {
+        axum::response::Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "application/x-mpegURL")
+            .body(hls_content)
+            .unwrap()
+            .into_response()
 }
 
 pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
                                                       user: &ProxyUserCredentials,
                                                       hls_url: &str,
                                                       virtual_id: u32,
-                                                      input: &ConfigInput,
-                                                      target_type: TargetType) -> impl axum::response::IntoResponse + Send {
+                                                      input: &ConfigInput) -> impl IntoResponse + Send {
     let url = replace_url_extension(hls_url, HLS_EXT);
     let server_info = app_state.config.get_user_server_info(user).await;
+
     match request::download_text_content(Arc::clone(&app_state.http_client), input, &url, None).await {
         Ok((content, response_url)) => {
-            let hls_token = app_state.hls_cache.new_token();
             let rewrite_hls_props = RewriteHlsProps {
                 base_url: &server_info.get_base_url(),
                 content: &content,
                 hls_url: response_url,
                 virtual_id,
-                token: hls_token,
-                target_type,
                 input_id: input.id,
             };
-            let (hls_entry, hls_content) = rewrite_hls(user, &rewrite_hls_props);
-            app_state.hls_cache.add_entry(hls_entry).await;
-            axum::response::Response::builder()
-                .status(axum::http::StatusCode::OK)
-                .header(axum::http::header::CONTENT_TYPE, "application/x-mpegurl")
-                .body(hls_content)
-                .unwrap()
-                .into_response()
+            let hls_content = rewrite_hls(user, &rewrite_hls_props);
+            hls_response(hls_content).into_response()
         }
         Err(err) => {
             error!("Failed to download m3u8 {}", sanitize_sensitive_info(err.to_string().as_str()));
@@ -73,29 +74,32 @@ async fn hls_api_stream(
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
-    let Some(hls_entry) = app_state.hls_cache.get_entry(params.token).await else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
-    let Some(hls_url) = hls_entry.get_chunk_url(params.chunk) else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
+    let Ok(hls_url) = crypto_utils::decrypt_text(&params.token) else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
+
     let target_name = &target.name;
     let virtual_id = params.stream_id;
-    let input = try_option_bad_request!(app_state.config.get_input_by_id(hls_entry.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
+    let input = try_option_bad_request!(app_state.config.get_input_by_id(params.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
 
-    if is_hls_url(hls_url) {
-        return handle_hls_stream_request(&app_state, &user, hls_url, virtual_id, input, hls_entry.target_type).await.into_response();
+    if is_hls_url(&hls_url) {
+        return handle_hls_stream_request(&app_state, &user, &hls_url, virtual_id, input).await.into_response();
     }
 
-    // let (pli_url, input_name) = if hls_entry.target_type == TargetType::Xtream {
-    //     let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
-    //     (pli.url, pli.input_name)
-    // } else {
-    //     let pli = try_result_bad_request!(m3u_repository::m3u_get_item_for_stream_id(virtual_id, &app_state.config, target).await, true, format!("Failed to read xtream item for stream id {}", virtual_id));
-    //     (pli.url, pli.input_name)
-    // };
-    stream_response(&app_state, hls_url, &req_headers, Some(input), PlaylistItemType::LiveHls, target, &user).await.into_response()
+    stream_response(&app_state, &hls_url, &req_headers, Some(input), PlaylistItemType::LiveHls, target, &user).await.into_response()
 }
 
 pub fn hls_api_register() -> axum::Router<Arc<AppState>> {
     axum::Router::new()
-       .route("/hls/{token}/{username}/{password}/{stream_id}/{chunk}", axum::routing::get(hls_api_stream))
+        .route("/hls/{username}/{password}/{input_id}/{stream_id}/{token}", axum::routing::get(hls_api_stream))
     //cfg.service(web::resource("/hls/{token}/{stream}").route(web::get().to(xtream_player_api_hls_stream)));
     //cfg.service(web::resource("/play/{token}/{type}").route(web::get().to(xtream_player_api_play_stream)));
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_hls_api_register() {
+
+    }
+
 }

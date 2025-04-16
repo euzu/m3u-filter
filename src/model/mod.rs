@@ -8,4 +8,3 @@ pub mod xtream;
 pub mod healthcheck;
 pub mod playlist_categories;
 pub mod hdhomerun_config;
-pub mod hls;

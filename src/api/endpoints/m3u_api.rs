@@ -105,7 +105,7 @@ async fn m3u_api_stream(
     if is_hls_request {
         let target_name = &target.name;
         let hls_input = try_option_bad_request!(input, true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
-        return handle_hls_stream_request(&app_state, &user, &m3u_item.url, m3u_item.virtual_id, hls_input, TargetType::M3u).await.into_response();
+        return handle_hls_stream_request(&app_state, &user, &m3u_item.url, m3u_item.virtual_id, hls_input).await.into_response();
     }
 
     stream_response(&app_state, m3u_item.url.as_str(), &req_headers, input, m3u_item.item_type, target, &user).await.into_response()

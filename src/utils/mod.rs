@@ -8,6 +8,8 @@ pub mod compression;
 pub(crate) mod file;
 pub(crate) mod network;
 pub mod bincode_utils;
+pub mod time_utils;
+pub mod crypto_utils;
 
 #[macro_export]
 macro_rules! debug_if_enabled {

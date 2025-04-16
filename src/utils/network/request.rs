@@ -238,7 +238,9 @@ async fn get_remote_content(client: Arc<reqwest::Client>, input: &ConfigInput, u
             let is_success = response.status().is_success();
             if is_success {
                 let response_url = response.url().to_string();
-                let header_value = response.headers().get(CONTENT_ENCODING);
+                let headers = response.headers();
+                debug!("{headers:?}");
+                let header_value = headers.get(CONTENT_ENCODING);
                 let mut encoding = header_value.and_then(|encoding_header| encoding_header.to_str().map_or(None, |value| Some(value.to_string())));
                 match response.bytes().await {
                     Ok(bytes) => {
@@ -439,7 +441,7 @@ pub fn classify_content_type(headers: &[(String, String)]) -> MimeCategory {
         })
         .map_or(MimeCategory::Unknown, |v| match v.to_lowercase().as_str() {
             v if v.starts_with("video/") || v == "application/octet-stream" => MimeCategory::Video,
-            "application/vnd.apple.mpegurl" | "application/x-mpegurl" => MimeCategory::M3U8,
+            v if v.contains("mpegurl") => MimeCategory::M3U8,
             v if v.starts_with("image/") => MimeCategory::Image,
             v if v.starts_with("application/json") || v.ends_with("+json") => MimeCategory::Json,
             v if v.starts_with("application/xml") || v.ends_with("+xml") || v == "text/xml" => MimeCategory::Xml,

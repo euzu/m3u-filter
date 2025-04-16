@@ -780,10 +780,10 @@ mod tests {
         data: String,
     }
 
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use crate::utils::time_utils::current_time_secs;
 
     fn generate_random_string(length: usize) -> String {
-        let mut rng = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let mut rng = current_time_secs();
         let charset = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
         let mut random_string = String::with_capacity(length);

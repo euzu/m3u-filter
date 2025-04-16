@@ -32,6 +32,7 @@ web_ui:
 You need to migrate the user db if you have used `use_user_db:true`. 
 Set it to `false` run old m3u-filter version, then update m3u-filter and set `use_user_db:true`and start.   
 - multi epg processing/optimization, auto guessing/assigning epg id's
+- fixed hls redirect url issue
 
 ```yaml
 epg:

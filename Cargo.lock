@@ -1580,6 +1580,7 @@ name = "m3u-filter"
 version = "2.2.5"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "bincode",
  "blake3",
  "bytes",
