@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::fs;
+use std::{env, fs};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -279,4 +279,9 @@ pub fn make_absolute_path(path: &str, working_dir: &str) -> String {
         }
     }
     path.to_string()
+}
+
+pub fn resolve_relative_path(relative: &str) -> std::io::Result<PathBuf> {
+    let current_dir = env::current_dir()?;
+    Ok(current_dir.join(relative))
 }

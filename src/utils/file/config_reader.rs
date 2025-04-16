@@ -3,9 +3,9 @@ use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputAlias, InputType};
 use crate::model::mapping::Mappings;
 use crate::utils::file::env_resolving_reader::EnvResolvingReader;
-use crate::utils::file::file_utils::file_reader;
+use crate::utils::file::file_utils::{file_reader, resolve_relative_path};
 use crate::utils::file::{file_utils, multi_file_reader};
-use crate::utils::network::request::{get_credentials_from_url, get_local_file_content, sanitize_sensitive_info};
+use crate::utils::network::request::{get_credentials_from_url, get_local_file_content};
 use crate::utils::sys_utils::exit;
 use chrono::Local;
 use log::{debug, error, info, warn};
@@ -13,7 +13,7 @@ use regex::Regex;
 use serde::Serialize;
 use std::env;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Cursor, Read};
+use std::io::{self, BufRead, BufReader, Cursor, Error, Read};
 use std::path::PathBuf;
 use std::sync::{LazyLock};
 use url::Url;
@@ -323,23 +323,34 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
 
 pub fn csv_read_inputs(input: &ConfigInput) -> Result<Vec<ConfigInputAlias>, io::Error> {
     let file_uri = input.url.to_string();
-    if let Ok(url) = file_uri.parse::<url::Url>() {
-        let result = if url.scheme() == "file" {
-            url.to_file_path().map_or_else(|()| Err(str_to_io_error(&format!("Unknown file {}", sanitize_sensitive_info(&file_uri)))), |file_path| get_local_file_content(&file_path))
-        } else {
-            return Err(str_to_io_error(&format!("Only file:// is supported {}", input.url)))
-        };
-        match result {
-            Ok(content) => {
-                return csv_read_inputs_from_reader(input.input_type, EnvResolvingReader::new(file_reader(Cursor::new(content))));
-            }
-            Err(err) => {
-                return Err(err)
-            }
+    let file_path = match get_csv_file_path(&file_uri) {
+        Ok(value) => value,
+        Err(value) => return Err(value),
+    };
+    match get_local_file_content(&file_path) {
+        Ok(content) => {
+            csv_read_inputs_from_reader(input.input_type, EnvResolvingReader::new(file_reader(Cursor::new(content))))
+        }
+        Err(err) => {
+            Err(err)
         }
     }
+}
 
-    Err(str_to_io_error(&format!("Could not open {file_uri}")))
+fn get_csv_file_path(file_uri: &String) -> Result<PathBuf, Error> {
+    if file_uri.contains("://") {
+        if let Ok(url) = file_uri.parse::<url::Url>() {
+            if url.scheme() == "file" {
+                match url.to_file_path() {
+                    Ok(path) => return Ok(path),
+                    Err(_) => return Err(str_to_io_error(&format!("Could not open {file_uri}"))),
+                }
+            }
+        }
+        Err(str_to_io_error(&format!("Only file:// is supported {file_uri}")))
+    } else {
+        resolve_relative_path(&file_uri)
+    }
 }
 
 #[cfg(test)]
