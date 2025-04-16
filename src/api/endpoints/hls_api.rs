@@ -43,6 +43,7 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
     match request::download_text_content(Arc::clone(&app_state.http_client), input, &url, None).await {
         Ok((content, response_url)) => {
             let rewrite_hls_props = RewriteHlsProps {
+                secret: &app_state.config.t_encrypt_secret,
                 base_url: &server_info.get_base_url(),
                 content: &content,
                 hls_url: response_url,
@@ -74,7 +75,7 @@ async fn hls_api_stream(
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
-    let Ok(hls_url) = crypto_utils::decrypt_text(&params.token) else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
+    let Ok(hls_url) = crypto_utils::decrypt_text(&app_state.config.t_encrypt_secret, &params.token) else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
 
     let target_name = &target.name;
     let virtual_id = params.stream_id;

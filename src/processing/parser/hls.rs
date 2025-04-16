@@ -6,6 +6,7 @@ pub const HLS_PREFIX: &str = "hls";
 
 
 pub struct RewriteHlsProps<'a> {
+    pub secret: &'a [u8;16],
     pub base_url: &'a str,
     pub content: &'a str,
     pub hls_url: String,
@@ -30,6 +31,8 @@ fn rewrite_hls_url(input: &str, replacement: &str) -> String {
     }
 }
 
+// TODO # line can have URI parts whcih shuld rewritten too
+
 pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> String {
     let username = &user.username;
     let password = &user.password;
@@ -38,9 +41,9 @@ pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> Stri
         if line.starts_with('#') {
             result.push(line.to_string());
         } else if let Ok(token) = if line.starts_with("http") {
-            encrypt_text(line)
+            encrypt_text(props.secret, line)
         } else {
-            encrypt_text(&rewrite_hls_url(&props.hls_url, line))
+            encrypt_text(props.secret, &rewrite_hls_url(&props.hls_url, line))
         } {
             result.push(format!("{}/{HLS_PREFIX}/{username}/{password}/{}/{}/{token}", props.base_url, props.input_id, props.virtual_id));
         }

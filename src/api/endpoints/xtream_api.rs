@@ -223,8 +223,8 @@ async fn xtream_player_api_stream(
         //     debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
         //     return redirect(redirect_url).into_response();
         // }
-        if pli.item_type == PlaylistItemType::LiveDash {
-            let redirect_url = &replace_url_extension(&pli.url, DASH_EXT);
+        if is_hls_request  || pli.item_type == PlaylistItemType::LiveDash {
+            let redirect_url = if is_hls_request { &replace_url_extension(&pli.url, HLS_EXT)  } else { &replace_url_extension(&pli.url, DASH_EXT) };
             debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
             return redirect(redirect_url).into_response();
         }

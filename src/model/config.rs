@@ -1558,6 +1558,8 @@ pub struct Config {
     pub t_provider_connections_exhausted_video: Option<Arc<Vec<u8>>>,
     #[serde(skip)]
     pub t_access_token_secret: [u8;32],
+    #[serde(skip)]
+    pub t_encrypt_secret: [u8;16],
 }
 
 impl Config {
@@ -1796,6 +1798,7 @@ impl Config {
 
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         self.t_access_token_secret = generate_secret();
+        self.t_encrypt_secret =  <&[u8] as TryInto<[u8;16]>>::try_into(&generate_secret()[0..16]).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
         let work_dir = &self.working_dir;
         self.working_dir = file_utils::get_working_path(work_dir);
         self.prepare_custom_stream_response();
