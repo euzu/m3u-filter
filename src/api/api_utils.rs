@@ -6,11 +6,11 @@ use crate::api::model::stream_error::StreamError;
 use crate::api::model::streams::active_client_stream::ActiveClientStream;
 use crate::api::model::streams::persist_pipe_stream::PersistPipeStream;
 use crate::api::model::streams::provider_stream;
-use crate::api::model::streams::provider_stream::create_provider_connections_exhausted_stream;
+use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, create_provider_connections_exhausted_stream, CustomVideoStreamType};
 use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::auth::authenticator::Claims;
-use crate::model::api_proxy::ProxyUserCredentials;
+use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::{ConfigInput, ConfigTarget, InputFetchMethod};
 use crate::model::playlist::PlaylistItemType;
 use crate::tools::lru_cache::LRUResourceCache;
@@ -243,10 +243,14 @@ fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Opti
 
 async fn create_stream_response_details(app_state: &AppState, stream_options: &StreamOptions, stream_url: &str,
                                         req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
-                                        item_type: PlaylistItemType, share_stream: bool) -> StreamDetails {
+                                        item_type: PlaylistItemType, share_stream: bool,
+                                        connection_permission: UserConnectionPermission) -> StreamDetails {
     let (stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt);
     let config_grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
-    let grace_period_millis = if config_grace_period_millis > 0 && matches!(stream_response_params, StreamingOption::GracePeriod(_, _)) { config_grace_period_millis } else { 0 };
+    let grace_period_millis = if config_grace_period_millis > 0 &&
+        (matches!(stream_response_params, StreamingOption::GracePeriod(_, _)) // provider grace period
+        || connection_permission == UserConnectionPermission::GracePeriod // user grace period
+        ) { config_grace_period_millis } else { 0 };
     match stream_response_params {
         StreamingOption::Custom(provider_stream) => {
             let (stream, stream_info) = provider_stream;
@@ -310,24 +314,29 @@ pub async fn stream_response(app_state: &AppState,
                              input: Option<&ConfigInput>,
                              item_type: PlaylistItemType,
                              target: &ConfigTarget,
-                             user: &ProxyUserCredentials) -> impl axum::response::IntoResponse + Send {
+                             user: &ProxyUserCredentials,
+                             connection_permission: UserConnectionPermission) -> impl axum::response::IntoResponse + Send {
     if log_enabled!(log::Level::Trace) { trace!("Try to open stream {}", sanitize_sensitive_info(stream_url)); }
+
+    if connection_permission == UserConnectionPermission::Exhausted {
+        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+    }
 
     let share_stream = is_stream_share_enabled(item_type, target);
     if share_stream {
-        if let Some(value) = shared_stream_response(app_state, stream_url, user).await {
+        if let Some(value) = shared_stream_response(app_state, stream_url, user, connection_permission.clone()).await {
             return value.into_response();
         }
     }
 
     let stream_options = get_stream_options(app_state);
     let stream_details =
-        create_stream_response_details(app_state, &stream_options, stream_url, req_headers, input, item_type, share_stream).await;
+        create_stream_response_details(app_state, &stream_options, stream_url, req_headers, input, item_type, share_stream, connection_permission.clone()).await;
 
     if stream_details.has_stream() {
         // let content_length = get_stream_content_length(provider_response.as_ref());
         let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
-        let stream = ActiveClientStream::new(stream_details, app_state, user).await;
+        let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
         let stream_resp = if share_stream {
             // Shared Stream response
             let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
@@ -376,13 +385,13 @@ fn get_stream_throttle(app_state: &AppState) -> u64 {
         .map(|stream| stream.throttle_kbps).unwrap_or_default()
 }
 
-async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &ProxyUserCredentials) -> Option<impl IntoResponse> {
+async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &ProxyUserCredentials, connect_permission: UserConnectionPermission) -> Option<impl IntoResponse> {
     if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
         debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
         if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url).await {
             let (status_code, header_map) = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)));
             let stream_details = StreamDetails::from_stream(stream);
-            let stream = ActiveClientStream::new(stream_details, app_state, user).await.boxed();
+            let stream = ActiveClientStream::new(stream_details, app_state, user, connect_permission).await.boxed();
             let mut response = axum::response::Response::builder()
                 .status(status_code);
             for (key, value) in &header_map {

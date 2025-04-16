@@ -2,7 +2,7 @@ use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, red
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
-use crate::model::api_proxy::ProxyType;
+use crate::model::api_proxy::{ProxyType, UserConnectionPermission};
 use crate::model::config::TargetType;
 use crate::model::playlist::{FieldGetAccessor, PlaylistItemType, XtreamCluster};
 use crate::repository::m3u_playlist_iterator::{M3U_RESOURCE_PATH, M3U_STREAM_PATH};
@@ -72,7 +72,8 @@ async fn m3u_api_stream(
     if user.permission_denied(&app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
-    if user.connections_exhausted(&app_state).await {
+    let connection_permission = user.connection_permission(&app_state).await;
+    if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
@@ -108,7 +109,7 @@ async fn m3u_api_stream(
         return handle_hls_stream_request(&app_state, &user, &m3u_item.url, m3u_item.virtual_id, hls_input).await.into_response();
     }
 
-    stream_response(&app_state, m3u_item.url.as_str(), &req_headers, input, m3u_item.item_type, target, &user).await.into_response()
+    stream_response(&app_state, m3u_item.url.as_str(), &req_headers, input, m3u_item.item_type, target, &user, connection_permission).await.into_response()
 }
 
 async fn m3u_api_resource(

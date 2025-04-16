@@ -12,7 +12,6 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs;
 use std::str::FromStr;
-use std::sync::Arc;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub enum UserConnectionPermission {
@@ -131,8 +130,8 @@ pub struct ProxyUserCredentials {
     pub created_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exp_date: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_connections: Option<u32>,
+    #[serde(default)]
+    pub max_connections: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ProxyUserStatus>,
     #[serde(default =  "default_as_true")]
@@ -201,24 +200,14 @@ impl ProxyUserCredentials {
         !self.has_permissions(app_state)
     }
 
-
     pub async fn connection_permission(&self, app_state: &AppState) -> UserConnectionPermission {
-        if app_state.config.user_access_control {
+        if self.max_connections > 0 && app_state.config.user_access_control {
             // we allow requests with max connection reached, but we should block streaming after grace period
-            if let Some(&max_connections) = self.max_connections.as_ref() {
-                if max_connections > 0 {
-                    return app_state.get_connection_permission(&self.username, max_connections).await;
-                }
-            }
+            return app_state.get_connection_permission(&self.username, self.max_connections).await;
         }
         UserConnectionPermission::Allowed
     }
 
-
-    #[inline]
-    pub async fn connections_exhausted(&self, app_state: &Arc<AppState>) -> bool {
-        self.connection_permission(app_state).await == UserConnectionPermission::Exhausted
-    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

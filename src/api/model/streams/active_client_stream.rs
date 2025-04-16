@@ -9,7 +9,7 @@ use crate::api::model::streams::chunked_buffer::ChunkedBuffer;
 use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
 use bytes::Bytes;
 use futures::Stream;
-use log::info;
+use log::{error, info};
 use std::pin::Pin;
 use std::sync::atomic::AtomicU8;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ pub(in crate::api) struct ActiveClientStream {
     inner: BoxedProviderStream,
     input_name: Option<String>,
     #[allow(unused)]
-    user_connection_guard: UserConnectionGuard,
+    user_connection_guard: Option<UserConnectionGuard>,
     active_provider: Arc<ActiveProviderManager>,
     send_custom_stream_flag: Option<Arc<AtomicU8>>,
     custom_video: (Option<ChunkedBuffer>, Option<ChunkedBuffer>),
@@ -32,15 +32,17 @@ pub(in crate::api) struct ActiveClientStream {
 impl ActiveClientStream {
     pub(crate) async fn new(mut stream_details: StreamDetails,
                             app_state: &AppState,
-                            user: &ProxyUserCredentials) -> Self {
-        let username = user.username.as_str();
+                            user: &ProxyUserCredentials,
+                            connection_permission: UserConnectionPermission) -> Self {
         let active_user = app_state.active_users.clone();
-        let user_connection_guard = active_user.add_connection(username).await;
         let active_provider = app_state.active_provider.clone();
-        let user_grace_period = user.connection_permission(app_state).await == UserConnectionPermission::GracePeriod;
-
-        let grace_stop_flag = Self::stream_grace_period(&stream_details, &active_provider, user_grace_period, user, &active_user);
-
+        if connection_permission == UserConnectionPermission::Exhausted {
+            error!("Something is wrong it should not come here")
+        }
+        let grant_user_grace_period = connection_permission == UserConnectionPermission::GracePeriod;
+        let username = user.username.as_str();
+        let user_connection_guard = Some(active_user.add_connection(username).await);
+        let grace_stop_flag = Self::stream_grace_period(&stream_details, &active_provider, grant_user_grace_period, user, &active_user);
         Self {
             inner: stream_details.stream.take().unwrap(),
             user_connection_guard,
@@ -53,6 +55,7 @@ impl ActiveClientStream {
             ),
         }
     }
+
     fn stream_grace_period(stream_details: &StreamDetails, active_provider: &Arc<ActiveProviderManager>,
                            user_grace_period: bool, user: &ProxyUserCredentials, active_user: &Arc<ActiveUserManager>) -> Option<Arc<AtomicU8>> {
         let provider_grace_check = if stream_details.has_grace_period() && stream_details.input_name.is_some() {
@@ -63,7 +66,7 @@ impl ActiveClientStream {
         } else {
             None
         };
-        let user_max_connections = user.max_connections.unwrap_or_default();
+        let user_max_connections = user.max_connections;
         let user_grace_check = if user_grace_period && user_max_connections > 0 {
             let user_name = user.username.clone();
             let user_manager = Arc::clone(active_user);

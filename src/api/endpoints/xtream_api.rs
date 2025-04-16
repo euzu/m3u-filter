@@ -12,7 +12,7 @@ use crate::api::model::xtream::XtreamAuthorizationResponse;
 use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
@@ -192,7 +192,8 @@ async fn xtream_player_api_stream(
     if user.permission_denied(app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
-    if user.connections_exhausted(app_state).await {
+    let connection_permission = user.connection_permission(&app_state).await;
+    if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
@@ -218,11 +219,6 @@ async fn xtream_player_api_stream(
             return redirect(&stream_url).into_response();
         }
 
-        // if pli.item_type == PlaylistItemType::LiveHls {
-        //    let redirect_url = &replace_extension(&pli.url, HLS_EXT);
-        //     debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
-        //     return redirect(redirect_url).into_response();
-        // }
         if is_hls_request  || pli.item_type == PlaylistItemType::LiveDash {
             let redirect_url = if is_hls_request { &replace_url_extension(&pli.url, HLS_EXT)  } else { &replace_url_extension(&pli.url, DASH_EXT) };
             debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
@@ -253,7 +249,7 @@ async fn xtream_player_api_stream(
         stream_req.context));
 
     trace_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
-    stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user).await.into_response()
+    stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user, connection_permission).await.into_response()
 }
 
 async fn xtream_player_api_stream_with_token(
@@ -286,7 +282,7 @@ async fn xtream_player_api_stream_with_token(
             epg_timeshift: None,
             created_at: None,
             exp_date: None,
-            max_connections: None,
+            max_connections: 0,
             status: None,
             ui_enabled: false,
         };
@@ -311,7 +307,7 @@ async fn xtream_player_api_stream_with_token(
         stream_req.context));
 
         trace_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
-        stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user).await.into_response()
+        stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user, UserConnectionPermission::Allowed).await.into_response()
     } else {
         axum::http::StatusCode::BAD_REQUEST.into_response()
     }

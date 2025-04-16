@@ -2,7 +2,7 @@ use crate::api::api_utils::stream_response;
 use crate::api::api_utils::try_option_bad_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
-use crate::model::api_proxy::ProxyUserCredentials;
+use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::{ConfigInput};
 use crate::model::playlist::{PlaylistItemType, XtreamCluster};
 use crate::processing::parser::hls::{rewrite_hls, RewriteHlsProps};
@@ -71,7 +71,8 @@ async fn hls_api_stream(
     if user.permission_denied(&app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
-    if user.connections_exhausted(&app_state).await {
+    let connection_permission = user.connection_permission(&app_state).await;
+    if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
@@ -85,7 +86,7 @@ async fn hls_api_stream(
         return handle_hls_stream_request(&app_state, &user, &hls_url, virtual_id, input).await.into_response();
     }
 
-    stream_response(&app_state, &hls_url, &req_headers, Some(input), PlaylistItemType::LiveHls, target, &user).await.into_response()
+    stream_response(&app_state, &hls_url, &req_headers, Some(input), PlaylistItemType::LiveHls, target, &user, connection_permission).await.into_response()
 }
 
 pub fn hls_api_register() -> axum::Router<Arc<AppState>> {

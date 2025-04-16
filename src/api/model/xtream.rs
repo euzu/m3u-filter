@@ -64,7 +64,7 @@ impl XtreamAuthorizationResponse {
                 (user.created_at.as_ref().map_or(created_default, |d| *d),
                  exp_date,
                  user.status.as_ref().map_or("0", |s| if *s == ProxyUserStatus::Trial { "1" } else { "0" }).to_string(),
-                 user.max_connections.as_ref().map_or("1".to_string(), |s| format!("{s}")),
+                 format!("{}", user.max_connections),
                  user_status
                 )
             } else {

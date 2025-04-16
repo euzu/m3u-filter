@@ -50,7 +50,7 @@ impl StoredProxyUserCredentials {
             epg_timeshift: proxy.epg_timeshift.clone(),
             created_at: proxy.created_at,
             exp_date: proxy.exp_date,
-            max_connections: proxy.max_connections,
+            max_connections: if proxy.max_connections > 0 { Some(proxy.max_connections) } else { None },
             status: proxy.status.clone(),
             ui_enabled: proxy.ui_enabled
         }
@@ -66,7 +66,7 @@ impl StoredProxyUserCredentials {
             epg_timeshift: stored.epg_timeshift.clone(),
             created_at: stored.created_at,
             exp_date: stored.exp_date,
-            max_connections: stored.max_connections,
+            max_connections: stored.max_connections.unwrap_or_default(),
             status: stored.status.clone(),
             ui_enabled: stored.ui_enabled
         }
