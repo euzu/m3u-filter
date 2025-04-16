@@ -241,6 +241,7 @@ fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Opti
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn create_stream_response_details(app_state: &AppState, stream_options: &StreamOptions, stream_url: &str,
                                         req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
                                         item_type: PlaylistItemType, share_stream: bool,
@@ -308,6 +309,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
 }
 
 /// # Panics
+#[allow(clippy::too_many_arguments)]
 pub async fn stream_response(app_state: &AppState,
                              stream_url: &str,
                              req_headers: &HeaderMap,

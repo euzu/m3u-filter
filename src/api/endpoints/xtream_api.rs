@@ -192,7 +192,7 @@ async fn xtream_player_api_stream(
     if user.permission_denied(app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
-    let connection_permission = user.connection_permission(&app_state).await;
+    let connection_permission = user.connection_permission(app_state).await;
     if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }

@@ -37,7 +37,7 @@ impl ActiveClientStream {
         let active_user = app_state.active_users.clone();
         let active_provider = app_state.active_provider.clone();
         if connection_permission == UserConnectionPermission::Exhausted {
-            error!("Something is wrong it should not come here")
+            error!("Something is wrong this should not happen");
         }
         let grant_user_grace_period = connection_permission == UserConnectionPermission::GracePeriod;
         let username = user.username.as_str();
