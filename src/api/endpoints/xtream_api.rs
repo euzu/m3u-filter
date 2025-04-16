@@ -43,6 +43,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
+const ACTION_GET_ACCOUNT_INFO: &str = "get_account_info";
 const ACTION_GET_EPG: &str = "get_epg";
 const ACTION_GET_SHORT_EPG: &str = "get_short_epg";
 const ACTION_GET_CATCHUP_TABLE: &str = "get_simple_data_table";
@@ -745,6 +746,9 @@ async fn xtream_player_api(
         };
 
         match action {
+            ACTION_GET_ACCOUNT_INFO => {
+                return axum::response::Json(get_user_info(&user, app_state).await).into_response();
+            }
             ACTION_GET_SERIES_INFO => {
                 skip_json_response_if_flag_set!(skip_series, xtream_get_stream_info_response(app_state, &user, target, api_req.series_id.trim(), XtreamCluster::Series).await);
             }

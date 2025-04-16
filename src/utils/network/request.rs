@@ -520,10 +520,6 @@ pub fn get_credentials_from_url_str(url_with_credentials: &str) -> (Option<Strin
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::fmt::Debug;
-    use reqwest::{Client, Error, RequestBuilder, Response};
-    use url::Url;
     use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info};
 
     #[test]

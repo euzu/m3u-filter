@@ -720,4 +720,41 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_filter_7() {
+        let flt = r#"NOT (Name ~ ".*24/7.*")"#;
+        match get_filter(flt, None) {
+            Ok(filter) => {
+                assert_eq!(format!("{filter}"), flt);
+                let channels = vec![
+                    create_mock_pli("24/7: Cars", "FR Channels"),
+                    create_mock_pli("24/7: Cars", "US Channels"),
+                    create_mock_pli("Entertainment", "US Channels"),
+                ];
+                let mut processor = MockValueProcessor {};
+                let filtered: Vec<&PlaylistItem> = channels
+                    .iter()
+                    .filter(|&chan| {
+                        let provider = ValueProvider {
+                            pli: chan,
+                        };
+                        filter.filter(&provider, &mut processor)
+                    })
+                    .collect();
+                assert_eq!(filtered.len(), 1);
+                assert_eq!(
+                    filtered.iter().any(|&chan| {
+                        let group = chan.header.group.to_string();
+                        let name = chan.header.name.to_string();
+                        name.eq("Entertainment") && group.eq("US Channels")
+                    }),
+                    true
+                );
+            }
+            Err(e) => {
+                panic!("{}", e)
+            }
+        }
+    }
 }
