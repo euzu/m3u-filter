@@ -38,6 +38,13 @@ impl ActiveUserManager {
         }
     }
 
+    fn clone_inner(&self) -> Self {
+        Self {
+            log_active_clients: self.log_active_clients,
+            user: Arc::clone(&self.user),
+        }
+    }
+
     pub async fn user_connections(&self, username: &str) -> u32 {
         if let Some(counter) = self.user.read().await.get(username) {
             return counter.load(Ordering::SeqCst);
@@ -82,13 +89,6 @@ impl ActiveUserManager {
         UserConnectionGuard {
             manager: Arc::new(self.clone_inner()),
             username: username.to_string(),
-        }
-    }
-
-    fn clone_inner(&self) -> Self {
-        Self {
-            log_active_clients: self.log_active_clients,
-            user: Arc::clone(&self.user),
         }
     }
 

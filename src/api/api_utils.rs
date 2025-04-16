@@ -1,4 +1,4 @@
-use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConfig};
+use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConfig, ProviderConnectionGuard};
 use crate::api::model::app_state::AppState;
 use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::request::UserApiRequest;
@@ -160,7 +160,7 @@ fn get_stream_options(app_state: &AppState) -> StreamOptions {
 //     content_length
 // }
 
-fn get_stream_alternative_url(stream_url: &str, input: &ConfigInput, alias_input: &ProviderConfig) -> String {
+fn get_stream_alternative_url(stream_url: &str, input: &ConfigInput, alias_input: &Arc<ProviderConfig>) -> String {
     let Some(input_user_info) = input.get_user_info() else { return stream_url.to_owned() };
     let Some(alt_input_user_info) = alias_input.get_user_info() else { return stream_url.to_owned() };
 
@@ -184,6 +184,7 @@ pub struct StreamDetails {
     pub input_name: Option<String>,
     pub grace_period_millis: u64,
     pub reconnect_flag: Option<Arc<AtomicOnceFlag>>,
+    pub provider_connection_guard: Option<ProviderConnectionGuard>,
 }
 
 impl StreamDetails {
@@ -194,6 +195,7 @@ impl StreamDetails {
             input_name: None,
             grace_period_millis: default_grace_period_millis(),
             reconnect_flag: None,
+            provider_connection_guard: None,
         }
     }
     #[inline]
@@ -210,34 +212,33 @@ impl StreamDetails {
 /**
 * If successfully a provider connection is used, do not forget to release if unsuccessfully
 */
-fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Option<&ConfigInput>)
-                         -> (StreamingOption, Option<HashMap<String, String>>) {
+async fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Option<&ConfigInput>)
+                         -> (Option<ProviderConnectionGuard>, StreamingOption, Option<HashMap<String, String>>) {
     if let Some(input) = input_opt {
-        let allocation = app_state.active_provider.acquire_connection(&input.name);
-        let stream_response_params = match allocation {
+        let provider_connection_guard = app_state.active_provider.acquire_connection(&input.name).await;
+        let stream_response_params = match &*provider_connection_guard {
             ProviderAllocation::Exhausted => {
                 let stream = create_provider_connections_exhausted_stream(&app_state.config, &[]);
                 StreamingOption::Custom(stream)
             }
-            ProviderAllocation::Available(provider)
-            | ProviderAllocation::GracePeriod(provider) => {
+            ProviderAllocation::Available(ref provider)
+            | ProviderAllocation::GracePeriod(ref provider) => {
                 let (provider, url) = if provider.id == input.id {
                     (input.name.to_string(), stream_url.to_string())
                 } else {
                     (provider.name.to_string(), get_stream_alternative_url(stream_url, input, provider))
                 };
 
-
-                if matches!(allocation, ProviderAllocation::Available(_)) {
+                if matches!(&*provider_connection_guard, ProviderAllocation::Available(_)) {
                     StreamingOption::Available(Some(provider), url)
                 } else {
                     StreamingOption::GracePeriod(Some(provider), url)
                 }
             }
         };
-        (stream_response_params, Some(input.headers.clone()))
+        (Some(provider_connection_guard), stream_response_params, Some(input.headers.clone()))
     } else {
-        (StreamingOption::Available(None, stream_url.to_string()), None)
+        (None, StreamingOption::Available(None, stream_url.to_string()), None)
     }
 }
 
@@ -246,7 +247,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                                         req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
                                         item_type: PlaylistItemType, share_stream: bool,
                                         connection_permission: UserConnectionPermission) -> StreamDetails {
-    let (stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt);
+    let (mut provider_connection_guard, stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt).await;
     let config_grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
     let grace_period_millis = if config_grace_period_millis > 0 &&
         (matches!(stream_response_params, StreamingOption::GracePeriod(_, _)) // provider grace period
@@ -261,6 +262,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 input_name: None,
                 grace_period_millis,
                 reconnect_flag: None,
+                provider_connection_guard,
             }
         }
         StreamingOption::Available(provider_name, request_url)
@@ -281,9 +283,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
 
             // if we have no stream we should release the provider
             if stream.is_none() {
-                if let Some(alt_input_name) = &provider_name {
-                    app_state.active_provider.release_connection(alt_input_name);
-                }
+                drop(provider_connection_guard.take());
             }
 
             if log_enabled!(log::Level::Debug) {
@@ -303,6 +303,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 input_name: provider_name,
                 grace_period_millis,
                 reconnect_flag,
+                provider_connection_guard,
             }
         }
     }
@@ -332,7 +333,7 @@ pub async fn stream_response(app_state: &AppState,
     }
 
     let stream_options = get_stream_options(app_state);
-    let stream_details =
+    let mut stream_details =
         create_stream_response_details(app_state, &stream_options, stream_url, req_headers, input, item_type, share_stream, connection_permission.clone()).await;
 
     if stream_details.has_stream() {
@@ -374,7 +375,7 @@ pub async fn stream_response(app_state: &AppState,
 
         return stream_resp.into_response();
     }
-
+    drop(stream_details.provider_connection_guard.take());
     error!("Cant open stream {}", sanitize_sensitive_info(stream_url));
     axum::http::StatusCode::BAD_REQUEST.into_response()
 }

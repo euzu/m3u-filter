@@ -1,13 +1,43 @@
 use crate::model::config::{Config, ConfigInput, ConfigInputAlias, InputType, InputUserInfo};
-use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ops::Deref;
+use std::sync::{Arc};
 use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
+use tokio::sync::RwLock;
+
+pub struct ProviderConnectionGuard {
+    manager: Arc<ActiveProviderManager>,
+    allocation: ProviderAllocation,
+}
+
+impl Deref for ProviderConnectionGuard {
+    type Target = ProviderAllocation;
+    fn deref(&self) -> &Self::Target {
+        &self.allocation
+    }
+}
+
+impl Drop for ProviderConnectionGuard {
+    fn drop(&mut self) {
+        match &self.allocation {
+            ProviderAllocation::Exhausted => {}
+            ProviderAllocation::Available(config)|
+            ProviderAllocation::GracePeriod(config) => {
+                let manager = self.manager.clone();
+                let provider_config = Arc::clone(config);
+                tokio::spawn(async move {
+                    manager.release_connection(&provider_config.name).await;
+                });
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
-pub enum ProviderAllocation<'a> {
+pub enum ProviderAllocation {
     Exhausted,
-    Available(&'a ProviderConfig),
-    GracePeriod(&'a ProviderConfig),
+    Available(Arc<ProviderConfig>),
+    GracePeriod(Arc<ProviderConfig>),
 }
 
 /// This struct represents an individual provider configuration with fields like:
@@ -79,17 +109,17 @@ impl ProviderConfig {
     //     !self.is_exhausted()
     // }
 
-    pub fn try_allocate(&self, grace: bool) -> ProviderAllocation {
+    fn try_allocate(&self, grace: bool) -> u8 {
         let connections = self.current_connections.load(Ordering::SeqCst);
         if self.max_connections == 0 {
             self.current_connections.fetch_add(1, Ordering::SeqCst);
-            return ProviderAllocation::Available(self);
+            return 1;
         }
         if (!grace && connections < self.max_connections) || (grace && connections <= self.max_connections)  {
             self.current_connections.fetch_add(1, Ordering::SeqCst);
-            return if connections < self.max_connections { ProviderAllocation::Available(self) } else { ProviderAllocation::GracePeriod(self) };
+            return if connections < self.max_connections { 1 } else { 2 };
         }
-        ProviderAllocation::Exhausted
+        3
     }
 
     pub fn release(&self) {
@@ -101,6 +131,35 @@ impl ProviderConfig {
 
     pub fn get_connection(&self) -> u16 {
         self.current_connections.load(Ordering::SeqCst)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ProviderConfigWrapper {
+  inner: Arc<ProviderConfig>
+}
+
+
+impl ProviderConfigWrapper {
+    pub fn new(cfg: ProviderConfig) -> Self {
+        Self {
+            inner: Arc::new(cfg)
+        }
+    }
+
+    pub fn try_allocate(&self, grace: bool) -> ProviderAllocation {
+        match self.inner.try_allocate(grace) {
+            1 => ProviderAllocation::Available(Arc::clone(&self.inner)),
+            2 => ProviderAllocation::GracePeriod(Arc::clone(&self.inner)),
+            _ => ProviderAllocation::Exhausted,
+        }
+    }
+}
+impl Deref for ProviderConfigWrapper {
+    type Target = ProviderConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
@@ -133,13 +192,13 @@ impl ProviderLineup {
 /// Handles a single provider and ensures safe allocation/release of connections.
 #[derive(Debug)]
 struct SingleProviderLineup {
-    provider: ProviderConfig,
+    provider: ProviderConfigWrapper,
 }
 
 impl SingleProviderLineup {
     fn new(cfg: &ConfigInput) -> Self {
         Self {
-            provider: ProviderConfig::new(cfg),
+            provider: ProviderConfigWrapper::new(ProviderConfig::new(cfg)),
         }
     }
 
@@ -161,8 +220,8 @@ impl SingleProviderLineup {
 /// `MultiProviderGroup(AtomicUsize, Vec<ProviderConfig>)`: A list of providers with a priority index.
 #[derive(Debug)]
 enum ProviderPriorityGroup {
-    SingleProviderGroup(ProviderConfig),
-    MultiProviderGroup(AtomicUsize, Vec<ProviderConfig>),
+    SingleProviderGroup(ProviderConfigWrapper),
+    MultiProviderGroup(AtomicUsize, Vec<ProviderConfigWrapper>),
 }
 
 impl ProviderPriorityGroup {
@@ -192,10 +251,10 @@ struct MultiProviderLineup {
 
 impl MultiProviderLineup {
     pub fn new(input: &ConfigInput) -> Self {
-        let mut inputs = vec![ProviderConfig::new(input)];
+        let mut inputs = vec![ProviderConfigWrapper::new(ProviderConfig::new(input))];
         if let Some(aliases) = &input.aliases {
             for alias in aliases {
-                inputs.push(ProviderConfig::new_alias(input, alias));
+                inputs.push(ProviderConfigWrapper::new(ProviderConfig::new_alias(input, alias)));
             }
         }
         let mut providers = HashMap::new();
@@ -205,7 +264,7 @@ impl MultiProviderLineup {
                 .or_insert_with(Vec::new)
                 .push(provider);
         }
-        let mut values: Vec<(i16, Vec<ProviderConfig>)> = providers.into_iter().collect();
+        let mut values: Vec<(i16, Vec<ProviderConfigWrapper>)> = providers.into_iter().collect();
         values.sort_by(|(p1, _), (p2, _)| p1.cmp(p2));
         let providers: Vec<ProviderPriorityGroup> = values.into_iter().map(|(_, mut group)| {
             if group.len() > 1 {
@@ -371,33 +430,39 @@ impl MultiProviderLineup {
 }
 
 pub struct ActiveProviderManager {
-    providers: Vec<ProviderLineup>,
+    providers: Arc<RwLock<Vec<ProviderLineup>>>,
 }
 
 impl ActiveProviderManager {
-    pub fn new(cfg: &Config) -> Self {
+    pub async fn new(cfg: &Config) -> Self {
         let mut this = Self {
-            providers: Vec::new(),
+            providers: Arc::new(RwLock::new(Vec::new())),
         };
         for source in &cfg.sources {
             for input in &source.inputs {
-                this.add_provider(input);
+                this.add_provider(input).await;
             }
         }
         this
     }
 
-    pub fn add_provider(&mut self, input: &ConfigInput) {
+    fn clone_inner(&self) -> Self {
+        Self {
+            providers: Arc::clone(&self.providers),
+        }
+    }
+
+    pub async fn add_provider(&mut self, input: &ConfigInput) {
         let lineup = if input.aliases.as_ref().is_some_and(|a| !a.is_empty()) {
             ProviderLineup::Multi(MultiProviderLineup::new(input))
         } else {
             ProviderLineup::Single(SingleProviderLineup::new(input))
         };
-        self.providers.push(lineup);
+        self.providers.write().await.push(lineup);
     }
 
-    fn get_provider_config(&self, name: &str) -> Option<(&ProviderLineup, &ProviderConfig)> {
-        for lineup in &self.providers {
+    fn get_provider_config<'a>(name: &str, providers: &'a Vec<ProviderLineup>) -> Option<(&'a ProviderLineup, &'a ProviderConfig)> {
+        for lineup in providers {
             match lineup {
                 ProviderLineup::Single(single) => {
                     if single.provider.name == name {
@@ -425,29 +490,37 @@ impl ActiveProviderManager {
         None
     }
 
-    pub fn acquire_connection(&self, input_name: &str) -> ProviderAllocation {
-        match self.get_provider_config(input_name) {
+    pub async fn acquire_connection(&self, input_name: &str) -> ProviderConnectionGuard {
+        let providers = self.providers.read().await;
+        let allocation = match Self::get_provider_config(input_name, &providers) {
             None => ProviderAllocation::Exhausted,
             Some((lineup, _config)) => lineup.acquire()
+        };
+
+        ProviderConnectionGuard {
+            manager: Arc::new(self.clone_inner()),
+            allocation,
         }
     }
 
     // we need the provider_name to exactly release this provider
-    pub fn release_connection(&self, provider_name: &str) {
-        if let Some((lineup, _config)) = self.get_provider_config(provider_name) {
+    pub async fn release_connection(&self, provider_name: &str) {
+        let providers = self.providers.read().await;
+        if let Some((lineup, _config)) = Self::get_provider_config(provider_name, &providers) {
             lineup.release(provider_name);
         }
     }
 
-    pub fn active_connections(&self) -> Option<HashMap<String, u16>> {
-        let result = RefCell::new(HashMap::<String, u16>::new());
-        let add_provider = |provider: &ProviderConfig| {
+    pub async fn active_connections(&self) -> Option<HashMap<String, u16>> {
+        let mut result = HashMap::<String, u16>::new();
+        let mut add_provider = |provider: &ProviderConfig| {
             let count = provider.current_connections.load(Ordering::SeqCst);
             if count > 0 {
-                result.borrow_mut().insert(provider.name.to_string(), count);
+                result.insert(provider.name.to_string(), count);
             }
         };
-        for lineup in &self.providers {
+        let providers = self.providers.read().await;
+        for lineup in &*providers {
             match lineup {
                 ProviderLineup::Single(provider_lineup) => {
                     add_provider(&provider_lineup.provider);
@@ -468,16 +541,16 @@ impl ActiveProviderManager {
                 }
             }
         }
-        let status = result.take();
-        if status.is_empty() {
+        if result.is_empty() {
             None
         } else {
-            Some(status)
+            Some(result)
         }
     }
 
-    pub fn is_over_limit(&self, provider_name: &str) -> bool {
-        if let Some((_, config)) = self.get_provider_config(provider_name) {
+    pub async fn is_over_limit(&self, provider_name: &str) -> bool {
+        let providers = self.providers.read().await;
+        if let Some((_, config)) = Self::get_provider_config(provider_name, &providers) {
             config.is_over_limit()
         } else {
             false

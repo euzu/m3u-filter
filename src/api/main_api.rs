@@ -78,7 +78,7 @@ async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
         (active_user.active_users().await, active_user.active_connections().await)
     };
 
-    let active_provider_connections = app_state.active_provider.active_connections().map(|c| c.into_iter().collect::<BTreeMap<_, _>>());
+    let active_provider_connections = app_state.active_provider.active_connections().await.map(|c| c.into_iter().collect::<BTreeMap<_, _>>());
 
     StatusCheck {
         status: "ok".to_string(),
@@ -97,7 +97,8 @@ async fn healthcheck() -> impl axum::response::IntoResponse {
     axum::Json(create_healthcheck())
 }
 
-async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> impl axum::response::IntoResponse {
+#[axum::debug_handler]
+async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> axum::response::Response {
     let status = create_status_check(&app_state).await;
     match serde_json::to_string_pretty(&status) {
         Ok(pretty_json) => axum::response::Response::builder().status(axum::http::StatusCode::OK)
@@ -106,7 +107,7 @@ async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppSta
     }
 }
 
-fn create_shared_data(cfg: &Arc<Config>) -> AppState {
+async fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let lru_cache = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()).and_then(|c| if c.enabled {
         Some(Mutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))
     } else { None });
@@ -122,7 +123,7 @@ fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     });
 
     let active_users = Arc::new(ActiveUserManager::new(cfg.log.as_ref().is_some_and(|l| l.active_clients)));
-    let active_provider = Arc::new(ActiveProviderManager::new(cfg));
+    let active_provider = Arc::new(ActiveProviderManager::new(cfg).await);
 
     let client = if cfg.connect_timeout_secs > 0 {
         Client::builder()
@@ -276,7 +277,8 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     if web_ui_enabled {
         infos.push(format!("Web root: {:?}", &web_dir_path));
     }
-    let app_state = Arc::new(create_shared_data(&cfg));
+    let app_shared_data = create_shared_data(&cfg).await;
+    let app_state = Arc::new(app_shared_data);
     let shared_data = Arc::clone(&app_state);
 
     exec_scheduler(&Arc::clone(&shared_data.http_client), &cfg, &targets);

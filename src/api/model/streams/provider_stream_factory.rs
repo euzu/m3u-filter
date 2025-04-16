@@ -313,6 +313,10 @@ async fn get_initial_stream(cfg: &Config, client: Arc<reqwest::Client>, stream_o
                 }
             }
             Err(status) => {
+                if status == StatusCode::FORBIDDEN || status == StatusCode::SERVICE_UNAVAILABLE || status == StatusCode::UNAUTHORIZED {
+                    warn!("The stream could be unavailable. ({status}) {}", sanitize_sensitive_info(stream_options.get_url().as_str()));
+                    break;
+                }
                 if connect_err > ERR_MAX_RETRY_COUNT {
                     warn!("The stream could be unavailable. ({status}) {}", sanitize_sensitive_info(stream_options.get_url().as_str()));
                 }

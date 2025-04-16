@@ -1,6 +1,6 @@
 use crate::api::model::active_user_manager::UserConnectionGuard;
 use crate::api::api_utils::StreamDetails;
-use crate::api::model::active_provider_manager::ActiveProviderManager;
+use crate::api::model::active_provider_manager::{ActiveProviderManager, ProviderConnectionGuard};
 use crate::api::model::active_user_manager::ActiveUserManager;
 use crate::api::model::app_state::AppState;
 use crate::api::model::stream::BoxedProviderStream;
@@ -21,12 +21,12 @@ const USER_EXHAUSTED_FLAG: u8 = 2;
 #[repr(align(64))]
 pub(in crate::api) struct ActiveClientStream {
     inner: BoxedProviderStream,
-    input_name: Option<String>,
     #[allow(unused)]
     user_connection_guard: Option<UserConnectionGuard>,
-    active_provider: Arc<ActiveProviderManager>,
     send_custom_stream_flag: Option<Arc<AtomicU8>>,
     custom_video: (Option<ChunkedBuffer>, Option<ChunkedBuffer>),
+    #[allow(dead_code)]
+    provider_connection_guard: Option<ProviderConnectionGuard>,
 }
 
 impl ActiveClientStream {
@@ -46,13 +46,12 @@ impl ActiveClientStream {
         Self {
             inner: stream_details.stream.take().unwrap(),
             user_connection_guard,
-            active_provider,
-            input_name: stream_details.input_name,
             send_custom_stream_flag: grace_stop_flag,
             custom_video: (
                 app_state.config.t_provider_connections_exhausted_video.as_ref().map(|a| ChunkedBuffer::new(Arc::clone(a))),
                 app_state.config.t_user_connections_exhausted_video.as_ref().map(|a| ChunkedBuffer::new(Arc::clone(a))),
             ),
+            provider_connection_guard: stream_details.provider_connection_guard,
         }
     }
 
@@ -94,7 +93,7 @@ impl ActiveClientStream {
                     }
                 }
                 if let Some((provider_name, provider_manager, reconnect_flag)) = provider_grace_check {
-                    if provider_manager.is_over_limit(&provider_name) {
+                    if provider_manager.is_over_limit(&provider_name).await {
                         info!("Provider connections exhausted for active clients: {provider_name}");
                         stop_stream_flag.store(PROVIDER_EXHAUSTED_FLAG, std::sync::atomic::Ordering::SeqCst);
                         if let Some(connect_flag) = reconnect_flag {
@@ -114,46 +113,36 @@ impl Stream for ActiveClientStream {
     type Item = Result<Bytes, StreamError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
-        if let Some(send_custom_stream_flag) = &self.send_custom_stream_flag {
-            let send_custom_stream = send_custom_stream_flag.load(std::sync::atomic::Ordering::SeqCst);
-            if send_custom_stream > 0 {
-                let custom_video = if send_custom_stream == PROVIDER_EXHAUSTED_FLAG {
-                    self.custom_video.0.as_mut()
-                } else {
-                    self.custom_video.1.as_mut()
-                };
-                return match custom_video {
-                    None => {
-                        Poll::Ready(None)
-                    }
-                    Some(video) => {
-                        match video.next_chunk() {
-                            None => {
-                                Poll::Ready(None)
-                            }
-                            Some(bytes) => {
-                                Poll::Ready(Some(Ok(bytes)))
-                            }
+        let send_custom_stream = if let Some(send_custom_stream_flag) = &self.send_custom_stream_flag {
+            send_custom_stream_flag.load(std::sync::atomic::Ordering::SeqCst)
+        } else {
+            0
+        };
+        if send_custom_stream > 0 {
+            if self.provider_connection_guard.is_some() {
+                drop(self.provider_connection_guard.take());
+            }
+            let custom_video = if send_custom_stream == PROVIDER_EXHAUSTED_FLAG {
+                self.custom_video.0.as_mut()
+            } else {
+                self.custom_video.1.as_mut()
+            };
+            return match custom_video {
+                None => {
+                    Poll::Ready(None)
+                }
+                Some(video) => {
+                    match video.next_chunk() {
+                        None => {
+                            Poll::Ready(None)
+                        }
+                        Some(bytes) => {
+                            Poll::Ready(Some(Ok(bytes)))
                         }
                     }
-                };
-            }
+                }
+            };
         }
         Pin::new(&mut self.inner).poll_next(cx)
-    }
-}
-
-impl Drop for ActiveClientStream {
-    fn drop(&mut self) {
-        let input_name = self.input_name.clone();
-        let active_provider = Arc::clone(&self.active_provider);
-        tokio::task::block_in_place(move || {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(async {
-                if let Some(input) = input_name {
-                    active_provider.release_connection(&input);
-                }
-            });
-        });
     }
 }

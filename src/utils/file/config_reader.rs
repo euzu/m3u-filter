@@ -323,10 +323,7 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
 
 pub fn csv_read_inputs(input: &ConfigInput) -> Result<Vec<ConfigInputAlias>, io::Error> {
     let file_uri = input.url.to_string();
-    let file_path = match get_csv_file_path(&file_uri) {
-        Ok(value) => value,
-        Err(value) => return Err(value),
-    };
+    let file_path = get_csv_file_path(&file_uri)?;
     match get_local_file_content(&file_path) {
         Ok(content) => {
             csv_read_inputs_from_reader(input.input_type, EnvResolvingReader::new(file_reader(Cursor::new(content))))
@@ -343,13 +340,13 @@ fn get_csv_file_path(file_uri: &String) -> Result<PathBuf, Error> {
             if url.scheme() == "file" {
                 match url.to_file_path() {
                     Ok(path) => return Ok(path),
-                    Err(_) => return Err(str_to_io_error(&format!("Could not open {file_uri}"))),
+                    Err(()) => return Err(str_to_io_error(&format!("Could not open {file_uri}"))),
                 }
             }
         }
         Err(str_to_io_error(&format!("Only file:// is supported {file_uri}")))
     } else {
-        resolve_relative_path(&file_uri)
+        resolve_relative_path(file_uri)
     }
 }
 
