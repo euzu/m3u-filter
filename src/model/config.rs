@@ -1120,7 +1120,7 @@ pub struct LogConfig {
     #[serde(default = "default_as_true")]
     pub sanitize_sensitive_info: bool,
     #[serde(default)]
-    pub active_clients: bool,
+    pub log_active_user: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub log_level: Option<String>,
 }

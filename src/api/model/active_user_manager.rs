@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use jsonwebtoken::get_current_timestamp;
 use log::{info, trace};
 use tokio::sync::RwLock;
 use crate::model::api_proxy::UserConnectionPermission;
+
+// TODO this should be bound to grace_period, because grace_period can be more than 2 secs
+const GRACE_TIME_CHECK: u64 = 2;
 
 pub struct UserConnectionGuard {
     manager: Arc<ActiveUserManager>,
@@ -19,9 +22,25 @@ impl Drop for UserConnectionGuard {
     }
 }
 
+struct UserConnectionData {
+    connections: u32,
+    granted_grace: u32,
+    grace_ts: u64,
+}
+
+impl UserConnectionData {
+    fn new() -> Self {
+        Self {
+            connections: 1,
+            granted_grace: 0,
+            grace_ts: 0,
+        }
+    }
+}
+
 pub struct ActiveUserManager {
-    log_active_clients: bool,
-    pub user: Arc<RwLock<HashMap<String, AtomicU32>>>,
+    log_active_user: bool,
+    user: Arc<RwLock<HashMap<String, UserConnectionData>>>,
 }
 
 impl Default for ActiveUserManager {
@@ -31,38 +50,45 @@ impl Default for ActiveUserManager {
 }
 
 impl ActiveUserManager {
-    pub fn new(log_active_clients: bool) -> Self {
+    pub fn new(log_active_user: bool) -> Self {
         Self {
-            log_active_clients,
+            log_active_user,
             user: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     fn clone_inner(&self) -> Self {
         Self {
-            log_active_clients: self.log_active_clients,
+            log_active_user: self.log_active_user,
             user: Arc::clone(&self.user),
         }
     }
 
     pub async fn user_connections(&self, username: &str) -> u32 {
-        if let Some(counter) = self.user.read().await.get(username) {
-            return counter.load(Ordering::SeqCst);
+        if let Some(connection_data) = self.user.read().await.get(username) {
+            return connection_data.connections;
         }
         0
     }
 
     pub async fn connection_permission(&self, username: &str, max_connections: u32, grace_period: bool) -> UserConnectionPermission {
-        if let Some(counter) = self.user.read().await.get(username) {
-            let current_connections = counter.load(Ordering::SeqCst);
+        if let Some(connection_data) = self.user.write().await.get_mut(username) {
+            let current_connections = connection_data.connections;
+            if connection_data.granted_grace > 0 && (get_current_timestamp() - connection_data.grace_ts) > GRACE_TIME_CHECK  {
+                trace!("User access denied, grace exhausted, too many connections: {username}");
+                return UserConnectionPermission::Exhausted;
+            }
             let extra_con = u32::from(grace_period);
             if current_connections < max_connections + extra_con {
+                connection_data.granted_grace += 1;
+                connection_data.grace_ts = get_current_timestamp();
                 return UserConnectionPermission::GracePeriod;
             }
             if current_connections >= max_connections {
                 trace!("User access denied, too many connections: {username}");
                 return UserConnectionPermission::Exhausted;
             }
+            connection_data.granted_grace = 0;
         }
         UserConnectionPermission::Allowed
     }
@@ -72,15 +98,15 @@ impl ActiveUserManager {
     }
 
     pub async fn active_connections(&self) -> usize {
-        self.user.read().await.values().map(|c| c.load(Ordering::SeqCst) as usize).sum()
+        self.user.read().await.values().map(|c| c.connections as usize).sum()
     }
 
     pub async fn add_connection(&self, username: &str) -> UserConnectionGuard {
         let mut lock = self.user.write().await;
-        if let Some(counter) = lock.get(username) {
-            counter.fetch_add(1, Ordering::SeqCst);
+        if let Some(connection_data) = lock.get_mut(username) {
+            connection_data.connections += 1;
         } else {
-            lock.insert(username.to_string(), AtomicU32::new(1));
+            lock.insert(username.to_string(), UserConnectionData::new());
         }
         drop(lock);
 
@@ -94,9 +120,9 @@ impl ActiveUserManager {
 
     async fn remove_connection(&self, username: &str) {
         let mut lock = self.user.write().await;
-        if let Some(counter) = lock.get(username) {
-            let new_count = counter.fetch_sub(1, Ordering::SeqCst) - 1;
-            if new_count == 0 {
+        if let Some(connection_data) = lock.get_mut(username) {
+            connection_data.connections -= 1;
+            if connection_data.connections == 0 {
                 lock.remove(username);
             }
         }
@@ -106,7 +132,7 @@ impl ActiveUserManager {
     }
 
     async fn log_active_user(&self) {
-        if self.log_active_clients {
+        if self.log_active_user {
             let user_count = self.active_users().await;
             let user_connection_count = self.active_connections().await;
             info!("Active Users: {user_count}, Active User Connections: {user_connection_count}");

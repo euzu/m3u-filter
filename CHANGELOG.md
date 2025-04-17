@@ -70,6 +70,7 @@ url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.p
   When no matching epg_id is found, the display name is used to match a channel name. The given strings are stripped to get a better match.
 - fixed chno assignment issue
 - Added `method` attribute to input config. It can be set to `GET` or `POST`.  
+- !BREAKING_CHANGE!  `log` config `active_clients` renamed to `log_active_user` 
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

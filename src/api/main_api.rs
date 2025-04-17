@@ -122,7 +122,7 @@ async fn create_shared_data(cfg: &Arc<Config>) -> AppState {
         }
     });
 
-    let active_users = Arc::new(ActiveUserManager::new(cfg.log.as_ref().is_some_and(|l| l.active_clients)));
+    let active_users = Arc::new(ActiveUserManager::new(cfg.log.as_ref().is_some_and(|l| l.log_active_user)));
     let active_provider = Arc::new(ActiveProviderManager::new(cfg).await);
 
     let client = if cfg.connect_timeout_secs > 0 {
