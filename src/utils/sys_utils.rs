@@ -6,6 +6,7 @@ macro_rules! exit {
     }};
 }
 pub use exit;
+use crate::utils::constants::CONSTANTS;
 
 #[cfg(target_os = "linux")]
 fn get_memory_usage_linux() -> std::io::Result<u64> {
@@ -19,8 +20,7 @@ fn get_memory_usage_linux() -> std::io::Result<u64> {
     let mut contents = String::new();
     reader.read_to_string(&mut contents)?;
 
-    let re = regex::Regex::new(r"VmRSS:\s+(\d+) kB").unwrap();
-    if let Some(captures) = re.captures(&contents) {
+    if let Some(captures) = CONSTANTS.memory_usage.captures(&contents) {
         let memory_kb: u64 = captures[1].parse().unwrap();
         Ok(memory_kb * 1024)
     } else {

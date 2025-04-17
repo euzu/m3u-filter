@@ -66,6 +66,7 @@ macro_rules! valid_property {
 pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 use crate::model::hdhomerun_config::HdHomeRunConfig;
+use crate::utils::constants::CONSTANTS;
 use crate::utils::file::config_reader::csv_read_inputs;
 use crate::utils::network::request::{get_credentials_from_url, get_credentials_from_url_str};
 use crate::utils::string_utils::get_trimmed_string;
@@ -860,7 +861,7 @@ impl EpgSmartMatchConfig {
         }
 
         self.t_normalize_regex = match self.normalize_regex.as_ref() {
-            None =>  Some(Regex::new(r"[^a-zA-Z0-9\-]").unwrap()),
+            None =>  Some(CONSTANTS.epg_normalize.clone()),
             Some(regstr) => {
                 let re = regex::Regex::new(regstr.as_str());
                 if re.is_err() {
@@ -1143,10 +1144,6 @@ pub struct VideoDownloadConfig {
     pub episode_pattern: Option<String>,
     #[serde(default, skip_serializing, skip_deserializing)]
     pub t_re_episode_pattern: Option<regex::Regex>,
-    #[serde(default, skip_serializing, skip_deserializing)]
-    pub t_re_filename: Option<regex::Regex>,
-    #[serde(default, skip_serializing, skip_deserializing)]
-    pub t_re_remove_filename_ending: Option<regex::Regex>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -1186,8 +1183,6 @@ impl VideoConfig {
                         }
                     }
                 }
-                downl.t_re_filename = Some(regex::Regex::new(r"[^A-Za-z0-9_.-]").unwrap());
-                downl.t_re_remove_filename_ending = Some(regex::Regex::new(r"[_.\s-]$").unwrap());
             }
         }
         Ok(())

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::model::config::VideoDownloadConfig;
 use crate::repository::storage::hash_string_as_hex;
-use crate::utils::constants::FILENAME_TRIM_PATTERNS;
+use crate::utils::constants::{CONSTANTS, FILENAME_TRIM_PATTERNS};
 
 /// File-Download information.
 #[derive(Clone)]
@@ -52,8 +52,7 @@ fn get_download_directory(download_cfg: &VideoDownloadConfig, filestem: &str) ->
                 }
             }
         }
-        let re_ending = download_cfg.t_re_remove_filename_ending.as_ref().unwrap();
-        let dir_name = re_ending.replace(stem, "");
+        let dir_name = CONSTANTS.remove_filename_ending.replace(stem, "");
         let file_dir: PathBuf = [download_cfg.directory.as_ref().unwrap(), dir_name.as_ref()].iter().collect();
         file_dir
     } else {
@@ -72,8 +71,7 @@ impl FileDownload {
     pub fn new(req_url: &str, req_filename: &str, download_cfg: &VideoDownloadConfig) -> Option<Self> {
         match reqwest::Url::parse(req_url) {
             Ok(url) => {
-                let filename_re = download_cfg.t_re_filename.as_ref().unwrap();
-                let tmp_filename = filename_re.replace_all(&deunicode(req_filename)
+                let tmp_filename = CONSTANTS.filename.replace_all(&deunicode(req_filename)
                     .replace(' ', "_"), "")
                     .replace("__", "_")
                     .replace("_-_", "-");

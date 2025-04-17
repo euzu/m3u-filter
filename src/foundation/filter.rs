@@ -11,6 +11,7 @@ use crate::model::config::ItemField;
 use crate::model::playlist::{PlaylistItem, PlaylistItemType};
 use crate::tools::directed_graph::DirectedGraph;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err};
+use crate::utils::constants::CONSTANTS;
 use crate::utils::sys_utils::exit;
 
 pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
@@ -472,10 +473,9 @@ fn build_dependency_graph(
     templates: &Vec<PatternTemplate>,
 ) -> Result<DirectedGraph<String>, M3uFilterError> {
     let mut graph = DirectedGraph::<String>::new();
-    let re_template = regex::Regex::new("!(.*?)!").unwrap();
     for template in templates {
         graph.add_node(&template.name);
-        re_template
+        CONSTANTS.template_var
             .captures_iter(&template.value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
@@ -552,6 +552,7 @@ mod tests {
 
     use crate::foundation::filter::{get_filter, MockValueProcessor, ValueProvider};
     use crate::model::playlist::{PlaylistItem, PlaylistItemHeader};
+    use crate::utils::constants::CONSTANTS;
 
     fn create_mock_pli(name: &str, group: &str) -> PlaylistItem {
         PlaylistItem {
@@ -711,8 +712,7 @@ mod tests {
 
         match get_filter(flt, None) {
             Ok(filter) => {
-                let re = Regex::new(r"\s+").unwrap();
-                let result = re.replace_all(&flt, " ");
+                let result = CONSTANTS.space.replace_all(&flt, " ");
                 assert_eq!(format!("{filter}"), result.trim());
             }
             Err(e) => {

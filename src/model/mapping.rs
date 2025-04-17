@@ -14,6 +14,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::valid_property;
 use crate::model::config::{ItemField, AFFIX_FIELDS, COUNTER_FIELDS, MAPPER_ATTRIBUTE_FIELDS};
 use crate::model::playlist::{FieldGetAccessor, FieldSetAccessor, PlaylistItem};
+use crate::utils::constants::CONSTANTS;
 use crate::utils::string_utils::Capitalize;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -197,10 +198,6 @@ pub struct Mapper {
     pub t_pattern: Option<Filter>,
     #[serde(skip_serializing, skip_deserializing)]
     t_tags: Vec<MappingTag>,
-    #[serde(skip_serializing, skip_deserializing)]
-    t_tagre: Option<Regex>,
-    #[serde(skip_serializing, skip_deserializing)]
-    t_attre: Option<Regex>,
 }
 
 impl Mapper {
@@ -258,8 +255,6 @@ impl Mapper {
                     _ => self.t_filter = None
                 }
                 self.t_tags = tags.map_or_else(std::vec::Vec::new, std::clone::Clone::clone);
-                self.t_tagre = Some(Regex::new("<tag:(.*?)>").unwrap());
-                self.t_attre = Some(Regex::new("<(.*?)>").unwrap());
                 Ok(())
             }
             Err(err) => Err(err)
@@ -286,11 +281,10 @@ impl MappingValueProcessor<'_> {
 
     fn apply_attributes(&mut self, captured_names: &HashMap<&str, &str>) {
         let mapper = self.mapper;
-        let attr_re = &mapper.t_attre.as_ref().unwrap();
         let attributes = &mapper.attributes;
         for (key, value) in attributes {
             if value.contains('<') { // possible replacement
-                let replaced = attr_re.replace_all(value, |captures: &regex::Captures| {
+                let replaced = CONSTANTS.template_attribute.replace_all(value, |captures: &regex::Captures| {
                     let capture_name = &captures[1];
                     (*captured_names.get(&capture_name).unwrap_or(&&captures[0])).to_string()
                 });
@@ -303,7 +297,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_tags(&mut self, value: &str, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
-        let tag_captures = self.mapper.t_tagre.as_ref().unwrap().captures_iter(value)
+        let tag_captures = CONSTANTS.template_tag.captures_iter(value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| caps.as_str())
