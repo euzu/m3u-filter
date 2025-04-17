@@ -1,9 +1,7 @@
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::utils::crypto_utils::encrypt_text;
 use std::str;
-
-pub const HLS_PREFIX: &str = "hls";
-
+use crate::utils::constants::{CONSTANTS, HLS_PREFIX};
 
 pub struct RewriteHlsProps<'a> {
     pub secret: &'a [u8;16],
@@ -31,7 +29,15 @@ fn rewrite_hls_url(input: &str, replacement: &str) -> String {
     }
 }
 
-// TODO # line can have URI parts whcih shuld rewritten too
+fn rewrite_uri_attrib(line: &str, props: &RewriteHlsProps) -> String {
+    if let Some(caps) = CONSTANTS.re_memory_usage.captures(line) {
+        let uri = &caps[1];
+        if let Ok(encrypted_uri) = encrypt_text(props.secret, &rewrite_hls_url(&props.hls_url, uri)) {
+            return CONSTANTS.re_hls_uri.replace(line, format!(r#"URI="{encrypted_uri}""#)).to_string();
+        }
+    }
+    line.to_string()
+}
 
 pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> String {
     let username = &user.username;
@@ -39,8 +45,7 @@ pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> Stri
     let mut result = Vec::new();
     for line in props.content.lines() {
         if line.starts_with('#') {
-
-            result.push(line.to_string());
+            result.push(rewrite_uri_attrib(line, props));
         } else if let Ok(token) = if line.starts_with("http") {
             encrypt_text(props.secret, line)
         } else {

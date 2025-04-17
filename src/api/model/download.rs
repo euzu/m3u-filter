@@ -52,7 +52,7 @@ fn get_download_directory(download_cfg: &VideoDownloadConfig, filestem: &str) ->
                 }
             }
         }
-        let dir_name = CONSTANTS.remove_filename_ending.replace(stem, "");
+        let dir_name = CONSTANTS.re_remove_filename_ending.replace(stem, "");
         let file_dir: PathBuf = [download_cfg.directory.as_ref().unwrap(), dir_name.as_ref()].iter().collect();
         file_dir
     } else {
@@ -71,7 +71,7 @@ impl FileDownload {
     pub fn new(req_url: &str, req_filename: &str, download_cfg: &VideoDownloadConfig) -> Option<Self> {
         match reqwest::Url::parse(req_url) {
             Ok(url) => {
-                let tmp_filename = CONSTANTS.filename.replace_all(&deunicode(req_filename)
+                let tmp_filename = CONSTANTS.re_filename.replace_all(&deunicode(req_filename)
                     .replace(' ', "_"), "")
                     .replace("__", "_")
                     .replace("_-_", "-");

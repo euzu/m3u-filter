@@ -20,7 +20,7 @@ fn get_memory_usage_linux() -> std::io::Result<u64> {
     let mut contents = String::new();
     reader.read_to_string(&mut contents)?;
 
-    if let Some(captures) = CONSTANTS.memory_usage.captures(&contents) {
+    if let Some(captures) = CONSTANTS.re_memory_usage.captures(&contents) {
         let memory_kb: u64 = captures[1].parse().unwrap();
         Ok(memory_kb * 1024)
     } else {

@@ -172,7 +172,7 @@ pub fn resolve_env_var(value: &str) -> String {
     if value.is_empty() {
         return String::new();
     }
-    CONSTANTS.env.replace_all(value, |caps: &regex::Captures| {
+    CONSTANTS.re_env_var.replace_all(value, |caps: &regex::Captures| {
         let var_name = &caps["var"];
         env::var(var_name).unwrap_or_else(|_| format!("${{env:{var_name}}}"))
     }).to_string()

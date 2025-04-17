@@ -475,7 +475,7 @@ fn build_dependency_graph(
     let mut graph = DirectedGraph::<String>::new();
     for template in templates {
         graph.add_node(&template.name);
-        CONSTANTS.template_var
+        CONSTANTS.re_template_var
             .captures_iter(&template.value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
@@ -712,7 +712,7 @@ mod tests {
 
         match get_filter(flt, None) {
             Ok(filter) => {
-                let result = CONSTANTS.space.replace_all(&flt, " ");
+                let result = CONSTANTS.re_whitespace.replace_all(&flt, " ");
                 assert_eq!(format!("{filter}"), result.trim());
             }
             Err(e) => {

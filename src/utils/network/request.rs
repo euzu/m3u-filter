@@ -371,11 +371,11 @@ pub fn set_sanitize_sensitive_info(value: bool) {
 pub fn sanitize_sensitive_info(query: &str) -> String {
     if CONSTANTS.sanitize.load(Ordering::SeqCst) {
         // Replace with "***"
-        let masked_query = CONSTANTS.username.replace_all(query, "$1***");
-        let masked_query = CONSTANTS.password.replace_all(&masked_query, "$1***");
-        let masked_query = CONSTANTS.token.replace_all(&masked_query, "$1***");
-        let masked_query = CONSTANTS.stream_url.replace_all(&masked_query, "$1***/$2/***");
-        let masked_query = CONSTANTS.url.replace_all(&masked_query, "$1***/$2");
+        let masked_query = CONSTANTS.re_username.replace_all(query, "$1***");
+        let masked_query = CONSTANTS.re_password.replace_all(&masked_query, "$1***");
+        let masked_query = CONSTANTS.re_token.replace_all(&masked_query, "$1***");
+        let masked_query = CONSTANTS.re_stream_url.replace_all(&masked_query, "$1***/$2/***");
+        let masked_query = CONSTANTS.re_url.replace_all(&masked_query, "$1***/$2");
         masked_query.to_string()
     } else {
         query.to_string()

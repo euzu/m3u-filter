@@ -90,7 +90,7 @@ async fn index(
     if let Some(web_ui_path) = &app_state.config.web_ui.as_ref().and_then(|c| c.path.as_ref()) {
         match tokio::fs::read_to_string(&path).await {
             Ok(content) => {
-                let mut new_content = CONSTANTS.base_href.replace_all(&content, |caps: &regex::Captures| {
+                let mut new_content = CONSTANTS.re_base_href.replace_all(&content, |caps: &regex::Captures| {
                     format!(r#"{}="/{web_ui_path}/{}""#, &caps[1], &caps[2])
                 }).to_string();
 

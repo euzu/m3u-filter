@@ -861,7 +861,7 @@ impl EpgSmartMatchConfig {
         }
 
         self.t_normalize_regex = match self.normalize_regex.as_ref() {
-            None =>  Some(CONSTANTS.epg_normalize.clone()),
+            None =>  Some(CONSTANTS.re_epg_normalize.clone()),
             Some(regstr) => {
                 let re = regex::Regex::new(regstr.as_str());
                 if re.is_err() {

@@ -19,6 +19,8 @@ pub const ENCODING_DEFLATE: &str = "deflate";
 pub const HLS_EXT: &str = ".m3u8";
 pub const DASH_EXT: &str = ".mpd";
 
+pub const HLS_PREFIX: &str = "hls";
+
 pub const HLS_EXT_QUERY: &str = ".m3u8?";
 pub const HLS_EXT_FRAGMENT: &str = ".m3u8#";
 pub const DASH_EXT_QUERY: &str = ".mpd?";
@@ -39,21 +41,22 @@ pub struct KodiStyle {
 }
 
 pub struct Constants {
-    pub username: Regex,
-    pub password: Regex,
-    pub token: Regex,
-    pub stream_url: Regex,
-    pub url: Regex,
-    pub base_href: Regex,
-    pub env: Regex,
-    pub memory_usage: Regex,
-    pub epg_normalize: Regex,
-    pub template_var: Regex,
-    pub template_tag: Regex,
-    pub template_attribute: Regex,
-    pub filename: Regex,
-    pub remove_filename_ending: Regex,
-    pub space: Regex,
+    pub re_username: Regex,
+    pub re_password: Regex,
+    pub re_token: Regex,
+    pub re_stream_url: Regex,
+    pub re_url: Regex,
+    pub re_base_href: Regex,
+    pub re_env_var: Regex,
+    pub re_memory_usage: Regex,
+    pub re_epg_normalize: Regex,
+    pub re_template_var: Regex,
+    pub re_template_tag: Regex,
+    pub re_template_attribute: Regex,
+    pub re_filename: Regex,
+    pub re_remove_filename_ending: Regex,
+    pub re_whitespace: Regex,
+    pub re_hls_uri: Regex,
     pub sanitize: AtomicBool,
     pub kodi_style: KodiStyle,
     pub country_codes: HashSet<&'static str>,
@@ -61,21 +64,22 @@ pub struct Constants {
 
 pub static CONSTANTS: LazyLock<Constants> = LazyLock::new(||
     Constants {
-        username: Regex::new(r"(username=)[^&]*").unwrap(),
-        password: Regex::new(r"(password=)[^&]*").unwrap(),
-        token: Regex::new(r"(token=)[^&]*").unwrap(),
-        stream_url: Regex::new(r"(.*://).*/(live|video|movie|series|m3u-stream|resource)/\w+/\w+").unwrap(),
-        url: Regex::new(r"(.*://).*?/(.*)").unwrap(),
-        base_href: Regex::new(r#"(href|src)="/([^"]*)""#).unwrap(),
-        env: Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap(),
-        memory_usage: Regex::new(r"VmRSS:\s+(\d+) kB").unwrap(),
-        epg_normalize: Regex::new(r"[^a-zA-Z0-9\-]").unwrap(),
-        template_var: Regex::new("!(.*?)!").unwrap(),
-        template_tag: Regex::new("<tag:(.*?)>").unwrap(),
-        template_attribute: Regex::new("<(.*?)>").unwrap(),
-        filename: Regex::new(r"[^A-Za-z0-9_.-]").unwrap(),
-        remove_filename_ending: Regex::new(r"[_.\s-]$").unwrap(),
-        space: Regex::new(r"\s+").unwrap(),
+        re_username: Regex::new(r"(username=)[^&]*").unwrap(),
+        re_password: Regex::new(r"(password=)[^&]*").unwrap(),
+        re_token: Regex::new(r"(token=)[^&]*").unwrap(),
+        re_stream_url: Regex::new(r"(.*://).*/(live|video|movie|series|m3u-stream|resource)/\w+/\w+").unwrap(),
+        re_url: Regex::new(r"(.*://).*?/(.*)").unwrap(),
+        re_base_href: Regex::new(r#"(href|src)="/([^"]*)""#).unwrap(),
+        re_env_var: Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap(),
+        re_memory_usage: Regex::new(r"VmRSS:\s+(\d+) kB").unwrap(),
+        re_epg_normalize: Regex::new(r"[^a-zA-Z0-9\-]").unwrap(),
+        re_template_var: Regex::new("!(.*?)!").unwrap(),
+        re_template_tag: Regex::new("<tag:(.*?)>").unwrap(),
+        re_template_attribute: Regex::new("<(.*?)>").unwrap(),
+        re_filename: Regex::new(r"[^A-Za-z0-9_.-]").unwrap(),
+        re_remove_filename_ending: Regex::new(r"[_.\s-]$").unwrap(),
+        re_whitespace: Regex::new(r"\s+").unwrap(),
+        re_hls_uri: Regex::new(r#"URI="([^"]+)""#).unwrap(),
 
         sanitize: AtomicBool::new(true),
         kodi_style: KodiStyle {

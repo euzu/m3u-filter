@@ -284,7 +284,7 @@ impl MappingValueProcessor<'_> {
         let attributes = &mapper.attributes;
         for (key, value) in attributes {
             if value.contains('<') { // possible replacement
-                let replaced = CONSTANTS.template_attribute.replace_all(value, |captures: &regex::Captures| {
+                let replaced = CONSTANTS.re_template_attribute.replace_all(value, |captures: &regex::Captures| {
                     let capture_name = &captures[1];
                     (*captured_names.get(&capture_name).unwrap_or(&&captures[0])).to_string()
                 });
@@ -297,7 +297,7 @@ impl MappingValueProcessor<'_> {
 
     fn apply_tags(&mut self, value: &str, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
-        let tag_captures = CONSTANTS.template_tag.captures_iter(value)
+        let tag_captures = CONSTANTS.re_template_tag.captures_iter(value)
             .filter(|caps| caps.len() > 1)
             .filter_map(|caps| caps.get(1))
             .map(|caps| caps.as_str())
