@@ -89,7 +89,7 @@ pub async fn get_provider_pipe_stream(app_state: &AppState,
     match client.send().await {
         Ok(response) => {
             let response_headers = get_response_headers(response.headers());
-            // TODO hls handling
+            // TODO hls handling if response gives us a m3u8 file, check content type
             let status = response.status();
             if status.is_success() {
                 (Some(Box::pin(response.bytes_stream().map_err(|err| StreamError::reqwest(&err)))), Some((response_headers, status)))

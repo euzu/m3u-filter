@@ -98,7 +98,7 @@ async fn m3u_api_stream(
     if user.proxy == ProxyType::Redirect || is_dash_request {
         let redirect_url = if is_hls_request { &replace_url_extension(&m3u_item.url, HLS_EXT) } else { &m3u_item.url };
         let redirect_url = if is_dash_request { &replace_url_extension(redirect_url, DASH_EXT) } else { redirect_url };
-        // TODO alias processing
+        // TODO alias processing, redirect to different aliases
         debug_if_enabled!("Redirecting m3u stream request to {}", sanitize_sensitive_info(redirect_url));
         return redirect(redirect_url.as_str()).into_response();
     }

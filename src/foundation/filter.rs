@@ -548,8 +548,6 @@ pub fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternTemplate
 
 #[cfg(test)]
 mod tests {
-    use regex::Regex;
-
     use crate::foundation::filter::{get_filter, MockValueProcessor, ValueProvider};
     use crate::model::playlist::{PlaylistItem, PlaylistItemHeader};
     use crate::utils::constants::CONSTANTS;

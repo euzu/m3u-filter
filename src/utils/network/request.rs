@@ -488,9 +488,18 @@ pub fn get_credentials_from_url_str(url_with_credentials: &str) -> (Option<Strin
     }
 }
 
+pub fn get_base_url_from_str(url: &str) -> Option<String> {
+    if let Ok(url) = Url::parse(url) {
+        Some(url.origin().ascii_serialization())
+    } else {
+        None
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
-    use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info};
+    use crate::utils::network::request::{get_base_url_from_str, replace_url_extension, sanitize_sensitive_info};
 
     #[test]
     fn test_url_mask() {
@@ -513,5 +522,12 @@ mod tests {
         for (test, expect) in &tests {
             assert_eq!(replace_url_extension(test, ".mp4"), *expect);
         }
+    }
+
+    #[test]
+    fn tes_base_url() {
+        let url = "http://my.provider.com:8080/xmltv?username=hello";
+        let expected = "http://my.provider.com:8080";
+        assert_eq!(get_base_url_from_str(url).unwrap(), expected);
     }
 }

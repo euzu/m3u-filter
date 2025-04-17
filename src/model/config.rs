@@ -24,7 +24,7 @@ use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16, default_grace_period_millis};
+use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16, default_grace_period_millis, default_grace_period_timeout_secs};
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
@@ -68,7 +68,7 @@ use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_
 use crate::model::hdhomerun_config::HdHomeRunConfig;
 use crate::utils::constants::CONSTANTS;
 use crate::utils::file::config_reader::csv_read_inputs;
-use crate::utils::network::request::{get_credentials_from_url, get_credentials_from_url_str};
+use crate::utils::network::request::{get_base_url_from_str, get_credentials_from_url, get_credentials_from_url_str};
 use crate::utils::string_utils::get_trimmed_string;
 
 #[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
@@ -607,7 +607,17 @@ pub struct InputAffix {
     pub value: String,
 }
 
-#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    Sequence,
+    PartialEq,
+    Eq,
+    Default
+)]
 pub enum InputType {
     #[serde(rename = "m3u")]
     #[default]
@@ -652,7 +662,17 @@ impl FromStr for InputType {
     }
 }
 
-#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    Sequence,
+    PartialEq,
+    Eq,
+    Default
+)]
 pub enum InputFetchMethod {
     #[default]
     GET,
@@ -796,8 +816,8 @@ impl ConfigInputAlias {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum EpgUrl {
-  Single(String),
-  Multi(Vec<String>)
+    Single(String),
+    Multi(Vec<String>),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Default)]
@@ -814,7 +834,7 @@ pub enum EpgNamePrefix {
 pub struct EpgSmartMatchConfig {
     #[serde(default)]
     pub enabled: bool,
-    pub normalize_regex:  Option<String>,
+    pub normalize_regex: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strip: Option<Vec<String>>,
     #[serde(default)]
@@ -840,7 +860,7 @@ impl EpgSmartMatchConfig {
     /// # Panics
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if !self.enabled {
-            return Ok(())
+            return Ok(());
         }
 
         self.t_name_prefix_separator = match &self.name_prefix_separator {
@@ -861,7 +881,7 @@ impl EpgSmartMatchConfig {
         }
 
         self.t_normalize_regex = match self.normalize_regex.as_ref() {
-            None =>  Some(CONSTANTS.re_epg_normalize.clone()),
+            None => Some(CONSTANTS.re_epg_normalize.clone()),
             Some(regstr) => {
                 let re = regex::Regex::new(regstr.as_str());
                 if re.is_err() {
@@ -872,7 +892,7 @@ impl EpgSmartMatchConfig {
         };
 
         if self.strip.is_none() {
-            self.t_strip =  ["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"].iter().map(std::string::ToString::to_string).collect();
+            self.t_strip = ["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"].iter().map(std::string::ToString::to_string).collect();
         }
         Ok(())
     }
@@ -893,7 +913,7 @@ impl Default for EpgSmartMatchConfig {
             t_normalize_regex: None,
             t_name_prefix_separator: Vec::default(),
         };
-        let _= instance.prepare();
+        let _ = instance.prepare();
         instance
     }
 }
@@ -901,6 +921,8 @@ impl Default for EpgSmartMatchConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EpgConfig {
+    #[serde(default)]
+    pub auto_epg: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<EpgUrl>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -915,7 +937,7 @@ impl EpgConfig {
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         self.t_urls = self.url.take().map_or_else(Vec::new, |epg_url| {
             match epg_url {
-                EpgUrl::Single(url) => if  url.trim().is_empty() {
+                EpgUrl::Single(url) => if url.trim().is_empty() {
                     vec![]
                 } else {
                     vec![url.trim().to_string()]
@@ -1001,6 +1023,25 @@ impl ConfigInput {
 
         if let Some(epg) = self.epg.as_mut() {
             let _ = epg.prepare();
+            if epg.auto_epg {
+                let (username, password) = if self.username.is_none() || self.password.is_none() {
+                    get_credentials_from_url_str(&self.url)
+                } else {
+                    (self.username.clone(), self.password.clone())
+                };
+
+                if username.is_none() || password.is_none() {
+                    warn!("auto_epg is enabled for input {}, but no credentials could be extracted", self.name);
+                } else if let Some(base_url) = get_base_url_from_str(&self.url) {
+                    let provider_epg_url = format!("{base_url}/xmltv.php?username={}&password={}", username.unwrap_or_default(), password.unwrap_or_default());
+                    if !epg.t_urls.contains(&provider_epg_url) {
+                        debug!("Added provider epg url {provider_epg_url} for input {}", self.name);
+                        epg.t_urls.push(provider_epg_url);
+                    }
+                } else {
+                    warn!("auto_epg is enabled for input {}, but url could not be parsed {}", self.name, self.url);
+                }
+            }
         }
 
         if let Some(aliases) = self.aliases.as_mut() {
@@ -1372,6 +1413,8 @@ pub struct StreamConfig {
     pub throttle: Option<String>,
     #[serde(default = "default_grace_period_millis")]
     pub grace_period_millis: u64,
+    #[serde(default = "default_grace_period_timeout_secs")]
+    pub grace_period_timeout_secs: u64,
     #[serde(default)]
     pub forced_retry_interval_secs: u32,
     #[serde(default, skip)]
@@ -1552,9 +1595,9 @@ pub struct Config {
     #[serde(skip)]
     pub t_provider_connections_exhausted_video: Option<Arc<Vec<u8>>>,
     #[serde(skip)]
-    pub t_access_token_secret: [u8;32],
+    pub t_access_token_secret: [u8; 32],
     #[serde(skip)]
-    pub t_encrypt_secret: [u8;16],
+    pub t_encrypt_secret: [u8; 16],
 }
 
 impl Config {
@@ -1793,7 +1836,7 @@ impl Config {
 
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         self.t_access_token_secret = generate_secret();
-        self.t_encrypt_secret =  <&[u8] as TryInto<[u8;16]>>::try_into(&generate_secret()[0..16]).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+        self.t_encrypt_secret = <&[u8] as TryInto<[u8; 16]>>::try_into(&generate_secret()[0..16]).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
         let work_dir = &self.working_dir;
         self.working_dir = file_utils::get_working_path(work_dir);
         self.prepare_custom_stream_response();
@@ -1933,7 +1976,6 @@ impl Config {
         let server_info_name = user.server.as_ref().map_or("default", |server_name| server_name.as_str());
         self.get_server_info(server_info_name).await
     }
-
 }
 
 /// Returns the targets that were specified as parameters.

@@ -1,13 +1,14 @@
 use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials, ProxyUserStatus};
 use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
+use crate::utils::constants::CONSTANTS;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct XtreamUserInfoResponse {
     pub password: String,
     pub username: String,
     pub active_cons: String,
-    pub allowed_output_formats: Vec<String>, //["ts"],
+    pub allowed_output_formats: Vec<String>,
     pub auth: u16, // 0 | 1
     pub created_at: i64, //1623429679,
     pub exp_date: i64, //1628755200,
@@ -71,7 +72,7 @@ impl XtreamAuthorizationResponse {
                 (created_default,
                  expired_default,
                  "0".to_string(),
-                 "1".to_string(),
+                 if user.max_connections == 0 { "1".to_string() } else { user.max_connections.to_string() },
                  &ProxyUserStatus::Active,
                 )
             };
@@ -79,7 +80,7 @@ impl XtreamAuthorizationResponse {
         Self {
             user_info: XtreamUserInfoResponse {
                 active_cons: format!("{active_connections}"),
-                allowed_output_formats: Vec::from(["ts".to_string()]),
+                allowed_output_formats: CONSTANTS.allowed_output_formats.clone(),
                 auth: 1,
                 created_at,
                 exp_date,

@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use jsonwebtoken::get_current_timestamp;
-use log::{info, trace};
+use log::{debug, info};
 use tokio::sync::RwLock;
 use crate::model::api_proxy::UserConnectionPermission;
-
-// TODO this should be bound to grace_period, because grace_period can be more than 2 secs
-const GRACE_TIME_CHECK: u64 = 2;
 
 pub struct UserConnectionGuard {
     manager: Arc<ActiveUserManager>,
@@ -71,21 +68,25 @@ impl ActiveUserManager {
         0
     }
 
-    pub async fn connection_permission(&self, username: &str, max_connections: u32, grace_period: bool) -> UserConnectionPermission {
+    pub async fn connection_permission(&self, username: &str, max_connections: u32, grace_period: bool, grace_period_timeout_secs: u64) -> UserConnectionPermission {
         if let Some(connection_data) = self.user.write().await.get_mut(username) {
             let current_connections = connection_data.connections;
-            if connection_data.granted_grace > 0 && (get_current_timestamp() - connection_data.grace_ts) > GRACE_TIME_CHECK  {
-                trace!("User access denied, grace exhausted, too many connections: {username}");
-                return UserConnectionPermission::Exhausted;
+            if connection_data.granted_grace > 0 {
+                if (get_current_timestamp() - connection_data.grace_ts) <= grace_period_timeout_secs {
+                    debug!("User access denied, grace exhausted, too many connections: {username}");
+                    return UserConnectionPermission::Exhausted;
+                }
+                connection_data.granted_grace = 0;
             }
             let extra_con = u32::from(grace_period);
             if current_connections < max_connections + extra_con {
                 connection_data.granted_grace += 1;
                 connection_data.grace_ts = get_current_timestamp();
+                debug!("Granted grace period for user access: {username}");
                 return UserConnectionPermission::GracePeriod;
             }
             if current_connections >= max_connections {
-                trace!("User access denied, too many connections: {username}");
+                debug!("User access denied, too many connections: {username}");
                 return UserConnectionPermission::Exhausted;
             }
             connection_data.granted_grace = 0;
@@ -122,6 +123,7 @@ impl ActiveUserManager {
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {
             connection_data.connections -= 1;
+            connection_data.granted_grace = 0;
             if connection_data.connections == 0 {
                 lock.remove(username);
             }

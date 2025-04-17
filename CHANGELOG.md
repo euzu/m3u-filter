@@ -71,6 +71,8 @@ url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.p
 - fixed chno assignment issue
 - Added `method` attribute to input config. It can be set to `GET` or `POST`.  
 - !BREAKING_CHANGE!  `log` config `active_clients` renamed to `log_active_user` 
+- added `default_grace_period_timeout_secs` to `reverse_proxy.stream` config. When grace_period granted, 
+until the `default_grace_period_timeout_secs` elapses no grace_period is granted again.
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

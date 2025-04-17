@@ -114,7 +114,7 @@ impl SharedStreamState {
                     }
 
                     let mut subs =  subscriber.write().await;
-                    // TODO use drain_filter
+                    // TODO use drain_filter when stable
                     (*subs).retain(|sender| {
                         match sender.try_send(data.clone()) {
                             Ok(()) => true,

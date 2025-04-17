@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::collections::HashSet;
+use std::string::ToString;
 use std::sync::atomic::AtomicBool;
 use std::sync::LazyLock;
 
@@ -60,6 +61,7 @@ pub struct Constants {
     pub sanitize: AtomicBool,
     pub kodi_style: KodiStyle,
     pub country_codes: HashSet<&'static str>,
+    pub allowed_output_formats: Vec<String>,
 }
 
 pub static CONSTANTS: LazyLock<Constants> = LazyLock::new(||
@@ -89,6 +91,8 @@ pub static CONSTANTS: LazyLock<Constants> = LazyLock::new(||
             whitespace: Regex::new(r"\s+").unwrap(),
             alphanumeric: Regex::new(r"[^\w\s]").unwrap(),
         },
+
+        allowed_output_formats: Vec::from(["m3u8".to_string(), "ts".to_string()]),
         country_codes: vec![
             "af", "al", "dz", "ad", "ao", "ag", "ar", "am", "au", "at", "az", "bs", "bh", "bd", "bb", "by",
             "be", "bz", "bj", "bt", "bo", "ba", "bw", "br", "bn", "bg", "bf", "bi", "cv", "kh", "cm", "ca",

@@ -351,7 +351,7 @@ mod tests {
                         epg_timeshift: None,
                         created_at: None,
                         exp_date: Some(1672705545),
-                        max_connections: Some(1),
+                        max_connections: 1,
                         status: Some(ProxyUserStatus::Active),
                         ui_enabled: true,
                     },
@@ -364,7 +364,7 @@ mod tests {
                         epg_timeshift: None,
                         created_at: None,
                         exp_date: Some(1672705545),
-                        max_connections: Some(1),
+                        max_connections: 1,
                         status: Some(ProxyUserStatus::Expired),
                         ui_enabled: true
                     },
@@ -377,7 +377,7 @@ mod tests {
                         epg_timeshift: None,
                         created_at: None,
                         exp_date: Some(1672705545),
-                        max_connections: Some(1),
+                        max_connections: 1,
                         status: Some(ProxyUserStatus::Expired),
                         ui_enabled: true
                     },
@@ -390,7 +390,7 @@ mod tests {
                         epg_timeshift: None,
                         created_at: None,
                         exp_date: Some(1672705545),
-                        max_connections: Some(1),
+                        max_connections: 1,
                         status: Some(ProxyUserStatus::Expired),
                         ui_enabled: true
                     }
