@@ -280,9 +280,9 @@ async fn config(
 
     let mut result = match config_reader::read_config(app_state.config.t_config_path.as_str(),
                                                       app_state.config.t_config_file_path.as_str(),
-                                                      app_state.config.t_sources_file_path.as_str()) {
+                                                      app_state.config.t_sources_file_path.as_str(), false) {
         Ok(mut cfg) => {
-            let _ = cfg.prepare();
+            let _ = cfg.prepare(false);
             map_config(&cfg)
         }
         Err(_) => map_config(&app_state.config)

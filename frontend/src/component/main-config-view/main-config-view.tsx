@@ -98,6 +98,8 @@ const CONFIG_REVERSE_PROXY_STREAM_FIELDS = [
     {name: 'retry', label: 'LABEL.RECONNECT', fieldType: FormFieldType.CHECK},
     {name: 'throttle', label: 'LABEL.THROTTLE', hint: 'HINT.CONFIG.PROXY.THROTTLE', fieldType: FormFieldType.TEXT},
     {name: 'grace_period_millis', label: 'LABEL.GRACE_PERIOD', fieldType: FormFieldType.NUMBER},
+    {name: 'grace_period_timeout_secs', label: 'LABEL.GRACE_PERIOD_TIMEOUT', fieldType: FormFieldType.NUMBER},
+
 ];
 
 const CONFIG_REVERSE_PROXY_STREAM_BUFFER_FIELDS = [
@@ -247,6 +249,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 retry: reverseProxyStreamConfig.retry,
                 throttle: reverseProxyStreamConfig.throttle,
                 grace_period_millis: reverseProxyStreamConfig.grace_period_millis,
+                grace_period_timeout_secs: reverseProxyStreamConfig.grace_period_timeout_secs,
                 buffer: {
                     enabled: reverseProxyStreamBufferConfig.enabled,
                     size: reverseProxyStreamBufferConfig.size ?? undefined,

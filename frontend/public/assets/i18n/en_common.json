@@ -32,6 +32,7 @@
     "RECONNECT": "Reconnect",
     "THROTTLE": "Throttle",
     "GRACE_PERIOD": "Grace period ms",
+    "GRACE_PERIOD_TIMEOUT": "Grace period timeout sec",
     "BUFFER_ENABLED": "Buffer Enabled",
     "BUFFER_SIZE": "Buffer Size",
     "ENABLED": "Enabled",

@@ -1,6 +1,27 @@
+use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err, str_to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
+use crate::model::config::{Config, ConfigInput, ConfigTarget, XtreamTargetOutput};
+use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
+use crate::model::xtream::{rewrite_doc_urls, PlaylistXtreamCategory, XtreamMappingOptions, XtreamSeriesEpisode};
 use crate::model::xtream_const;
+use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
+use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
+use crate::repository::playlist_repository::get_target_id_mapping;
+use crate::repository::storage::hex_encode;
+use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path};
+use crate::repository::storage_const;
+use crate::repository::target_id_mapping::VirtualIdRecord;
+use crate::repository::xtream_playlist_iterator::XtreamPlaylistJsonIterator;
+use crate::utils::bincode_utils::bincode_deserialize;
 use crate::utils::file::file_lock_manager::FileReadGuard;
+use crate::utils::file::file_utils::file_reader;
+use crate::utils::file::file_utils::open_readonly_file;
+use crate::utils::hash_utils::generate_playlist_uuid;
+use crate::utils::json_utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
+use bytes::Bytes;
+use futures::{stream, Stream, StreamExt};
 use log::error;
+use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::fs;
@@ -8,27 +29,6 @@ use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use bytes::Bytes;
-use futures::{stream, Stream, StreamExt};
-use serde::Serialize;
-use crate::repository::storage::hex_encode;
-use crate::utils::file::file_utils::file_reader;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, str_to_io_error, info_err, create_m3u_filter_error, create_m3u_filter_error_result, notify_err};
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigInput, ConfigTarget, XtreamTargetOutput};
-use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::{rewrite_doc_urls, PlaylistXtreamCategory, XtreamMappingOptions, XtreamSeriesEpisode};
-use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
-use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
-use crate::repository::playlist_repository::get_target_id_mapping;
-use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_file, get_target_storage_path};
-use crate::repository::storage_const;
-use crate::repository::target_id_mapping::{VirtualIdRecord};
-use crate::utils::file::file_utils::open_readonly_file;
-use crate::utils::hash_utils::generate_playlist_uuid;
-use crate::utils::json_utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
-use crate::utils::bincode_utils::{bincode_deserialize};
-use crate::repository::xtream_playlist_iterator::XtreamPlaylistJsonIterator;
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
@@ -485,7 +485,7 @@ pub fn xtream_load_series_info(
     }
     None
 }
- fn xtream_get_vod_info_mapping(
+fn xtream_get_vod_info_mapping(
     config: &Config,
     target_name: &str,
     vod_id: u32,
@@ -519,6 +519,7 @@ pub fn xtream_load_vod_info(
 
 async fn rewrite_xtream_vod_info<P>(
     config: &Config,
+    target: &ConfigTarget,
     xtream_output: &XtreamTargetOutput,
     pli: &P,
     user: &ProxyUserCredentials,
@@ -531,11 +532,13 @@ async fn rewrite_xtream_vod_info<P>(
         if let Some(Value::Object(info_data)) = doc.get_mut(xtream_const::XC_TAG_INFO_DATA) {
             match user.proxy {
                 ProxyType::Reverse => {
-                    let server_info = config.get_user_server_info(user).await;
-                    let url = server_info.get_base_url();
-                    let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
-                    rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, xtream_const::XC_INFO_RESOURCE_PREFIX);
-                    // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
+                    if !target.is_force_redirect(pli.get_item_type()) {
+                        let server_info = config.get_user_server_info(user).await;
+                        let url = server_info.get_base_url();
+                        let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
+                        rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, xtream_const::XC_INFO_RESOURCE_PREFIX);
+                        // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
+                    }
                 }
                 ProxyType::Redirect => {}
             }
@@ -549,7 +552,7 @@ async fn rewrite_xtream_vod_info<P>(
         movie_data.insert(xtream_const::XC_TAG_STREAM_ID.to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
         movie_data.insert(xtream_const::XC_TAG_CATEGORY_ID.to_string(), Value::Number(serde_json::value::Number::from(category_id)));
         movie_data.insert(xtream_const::XC_TAG_CATEGORY_IDS.to_string(), Value::Array(vec![Value::Number(serde_json::value::Number::from(category_id))]));
-        let options = XtreamMappingOptions::from_target_options(xtream_output, config);
+        let options = XtreamMappingOptions::from_target_options(target, xtream_output, config);
         if options.skip_video_direct_source {
             movie_data.insert(xtream_const::XC_TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
         } else {
@@ -566,6 +569,7 @@ async fn rewrite_xtream_vod_info<P>(
 
 pub async fn rewrite_xtream_vod_info_content<P>(
     config: &Config,
+    target: &ConfigTarget,
     xtream_output: &XtreamTargetOutput,
     pli: &P,
     user: &ProxyUserCredentials,
@@ -574,7 +578,7 @@ pub async fn rewrite_xtream_vod_info_content<P>(
     P: PlaylistEntry,
 {
     let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
-    rewrite_xtream_vod_info(config, xtream_output, pli, user, &mut doc).await
+    rewrite_xtream_vod_info(config, target, xtream_output, pli, user, &mut doc).await
 }
 
 pub async fn write_and_get_xtream_vod_info<P>(
@@ -589,7 +593,7 @@ pub async fn write_and_get_xtream_vod_info<P>(
 {
     let mut doc = serde_json::from_str::<Map<String, Value>>(content).map_err(|_| str_to_io_error("Failed to parse JSON content"))?;
     xtream_write_vod_info(config, target.name.as_str(), pli.get_virtual_id(), content).await.ok();
-    rewrite_xtream_vod_info(config, xtream_output, pli, user, &mut doc).await
+    rewrite_xtream_vod_info(config, target, xtream_output, pli, user, &mut doc).await
 }
 
 async fn rewrite_xtream_series_info<P>(
@@ -607,9 +611,13 @@ async fn rewrite_xtream_series_info<P>(
     let resource_url = if config.is_reverse_proxy_resource_rewrite_enabled() {
         match user.proxy {
             ProxyType::Reverse => {
-                let server_info = config.get_user_server_info(user).await;
-                let url = server_info.get_base_url();
-                Some(format!("{url}/resource/series/{}/{}/{}", user.username, user.password, pli.get_virtual_id()))
+                if target.is_force_redirect(pli.get_item_type()) {
+                    None
+                } else {
+                    let server_info = config.get_user_server_info(user).await;
+                    let url = server_info.get_base_url();
+                    Some(format!("{url}/resource/series/{}/{}/{}", user.username, user.password, pli.get_virtual_id()))
+                }
             }
             ProxyType::Redirect => None,
         }
@@ -638,7 +646,7 @@ async fn rewrite_xtream_series_info<P>(
     let virtual_id = pli.get_virtual_id();
     {
         let (mut target_id_mapping, file_lock) = get_target_id_mapping(config, &target_path).await;
-        let options = XtreamMappingOptions::from_target_options(xtream_output, config);
+        let options = XtreamMappingOptions::from_target_options(target, xtream_output, config);
 
         let provider_url = pli.get_provider_url();
         for episode_list in episodes.values_mut().filter_map(Value::as_array_mut) {
@@ -893,7 +901,7 @@ pub async fn xtream_update_input_series_episodes_record_from_wal_file(
     }
 }
 
-pub async fn iter_raw_xtream_playlist(config: &Arc<Config>, target: &ConfigTarget, cluster: XtreamCluster)  -> Option<(FileReadGuard, impl Iterator<Item = (XtreamPlaylistItem, bool)>)> {
+pub async fn iter_raw_xtream_playlist(config: &Arc<Config>, target: &ConfigTarget, cluster: XtreamCluster) -> Option<(FileReadGuard, impl Iterator<Item=(XtreamPlaylistItem, bool)>)> {
     if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
         let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
         if !xtream_path.exists() || !idx_path.exists() {
@@ -913,7 +921,7 @@ pub async fn iter_raw_xtream_playlist(config: &Arc<Config>, target: &ConfigTarge
 pub fn playlist_iter_to_stream<I, P>(channels: Option<(FileReadGuard, I)>) -> impl Stream<Item=Result<Bytes, String>>
 where
     I: Iterator<Item=(P, bool)> + 'static,
-    P: Serialize
+    P: Serialize,
 {
     match channels {
         Some((_, chans)) => {
@@ -940,9 +948,9 @@ where
 
 pub(crate) async fn xtream_get_playlist_categories(config: &Config, target_name: &str, cluster: XtreamCluster) -> Option<Vec<PlaylistXtreamCategory>> {
     let path = xtream_get_collection_path(config, target_name, match cluster {
-        XtreamCluster::Live =>  storage_const::COL_CAT_LIVE,
-        XtreamCluster::Video =>  storage_const::COL_CAT_VOD,
-        XtreamCluster::Series =>  storage_const::COL_CAT_SERIES,
+        XtreamCluster::Live => storage_const::COL_CAT_LIVE,
+        XtreamCluster::Video => storage_const::COL_CAT_VOD,
+        XtreamCluster::Series => storage_const::COL_CAT_SERIES,
     });
     if let Ok((Some(file_path), _content)) = path {
         if let Ok(content) = tokio::fs::read_to_string(&file_path).await {

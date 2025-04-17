@@ -196,6 +196,7 @@ export interface StreamConfig {
     buffer?: StreamBufferConfig,
     throttle?: number,
     grace_period_millis?: number,
+    grace_period_timeout_secs?: number,
 }
 
 export interface CacheConfig {

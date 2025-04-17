@@ -25,13 +25,13 @@ use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
+use crate::model::serde_utils::{deserialize_option_force_redirect, serialize_option_force_redirect};
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16, default_grace_period_millis, default_grace_period_timeout_secs};
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
 use crate::utils::size_utils::{parse_size_base_2, parse_to_kbps};
 use crate::utils::sys_utils::exit;
-use crate::model::serde_utils::{serialize_option_force_redirect, deserialize_option_force_redirect};
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15";
 
@@ -68,6 +68,7 @@ macro_rules! valid_property {
 pub use valid_property;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 use crate::model::hdhomerun_config::HdHomeRunConfig;
+use crate::model::playlist::{PlaylistItemType, XtreamCluster};
 use crate::utils::constants::CONSTANTS;
 use crate::utils::file::config_reader::csv_read_inputs;
 use crate::utils::network::request::{get_base_url_from_str, get_credentials_from_url, get_credentials_from_url_str};
@@ -317,7 +318,11 @@ pub struct ConfigTargetOptions {
     pub share_live_streams: bool,
     #[serde(default)]
     pub remove_duplicates: bool,
-    #[serde(default,  serialize_with = "serialize_option_force_redirect", deserialize_with = "deserialize_option_force_redirect")]
+    #[serde(
+        default,
+        serialize_with = "serialize_option_force_redirect",
+        deserialize_with = "deserialize_option_force_redirect"
+    )]
     pub force_redirect: Option<ForceRedirect>,
 }
 
@@ -390,8 +395,18 @@ bitflags! {
     #[derive(Debug, Clone)]
    pub struct ForceRedirect: u16 {
         const Live   = 0b0000_0001;
-        const Vod    = 0b0000_0010;
+        const Vod  = 0b0000_0010;
         const Series = 0b0000_0100;
+    }
+}
+
+impl ForceRedirect {
+    pub fn force_redirect(&self, item_type: PlaylistItemType) -> bool {
+        XtreamCluster::try_from(item_type).ok().is_some_and(|cluster| match cluster {
+            XtreamCluster::Live => self.contains(ForceRedirect::Live),
+            XtreamCluster::Video => self.contains(ForceRedirect::Vod),
+            XtreamCluster::Series => self.contains(ForceRedirect::Series),
+        })
     }
 }
 
@@ -584,6 +599,13 @@ impl ConfigTarget {
         }
         false
     }
+
+    pub fn is_force_redirect(&self, item_type: PlaylistItemType) -> bool {
+        self.options
+            .as_ref()
+            .and_then(|options| options.force_redirect.as_ref())
+            .is_some_and(|flags| flags.force_redirect(item_type))
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -595,8 +617,8 @@ pub struct ConfigSource {
 
 impl ConfigSource {
     #[allow(clippy::cast_possible_truncation)]
-    pub fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
-        handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16))));
+    pub fn prepare(&mut self, index: u16, include_computed: bool) -> Result<u16, M3uFilterError> {
+        handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16), include_computed)));
         Ok(index + (self.inputs.len() as u16))
     }
 
@@ -947,35 +969,36 @@ pub struct EpgConfig {
 }
 
 impl EpgConfig {
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
-        self.t_urls = self.url.take().map_or_else(Vec::new, |epg_url| {
-            match epg_url {
-                EpgUrl::Single(url) => if url.trim().is_empty() {
-                    vec![]
-                } else {
-                    vec![url.trim().to_string()]
-                },
-                EpgUrl::Multi(urls) =>
-                    urls.into_iter()
-                        .map(|url| url.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect()
-            }
-        });
+    pub fn prepare(&mut self, include_computed: bool) -> Result<(), M3uFilterError> {
+        if include_computed {
+            self.t_urls = self.url.take().map_or_else(Vec::new, |epg_url| {
+                match epg_url {
+                    EpgUrl::Single(url) => if url.trim().is_empty() {
+                        vec![]
+                    } else {
+                        vec![url.trim().to_string()]
+                    },
+                    EpgUrl::Multi(urls) =>
+                        urls.into_iter()
+                            .map(|url| url.trim().to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect()
+                }
+            });
 
-        self.t_smart_match = match self.smart_match.as_mut() {
-            None => {
-                let mut normalize: EpgSmartMatchConfig = EpgSmartMatchConfig::default();
-                normalize.prepare()?;
-                normalize
-            }
-            Some(normalize_cfg) => {
-                let mut normalize: EpgSmartMatchConfig = normalize_cfg.clone();
-                normalize.prepare()?;
-                normalize
-            }
-        };
-
+            self.t_smart_match = match self.smart_match.as_mut() {
+                None => {
+                    let mut normalize: EpgSmartMatchConfig = EpgSmartMatchConfig::default();
+                    normalize.prepare()?;
+                    normalize
+                }
+                Some(normalize_cfg) => {
+                    let mut normalize: EpgSmartMatchConfig = normalize_cfg.clone();
+                    normalize.prepare()?;
+                    normalize
+                }
+            };
+        }
         Ok(())
     }
 }
@@ -1019,7 +1042,7 @@ pub struct ConfigInput {
 
 impl ConfigInput {
     #[allow(clippy::cast_possible_truncation)]
-    pub fn prepare(&mut self, index: u16) -> Result<u16, M3uFilterError> {
+    pub fn prepare(&mut self, index: u16, include_computed: bool) -> Result<u16, M3uFilterError> {
         self.id = index;
         self.check_url()?;
         self.prepare_batch()?;
@@ -1035,8 +1058,8 @@ impl ConfigInput {
         self.persist = get_trimmed_string(&self.persist);
 
         if let Some(epg) = self.epg.as_mut() {
-            let _ = epg.prepare();
-            if epg.auto_epg {
+            let _ = epg.prepare(include_computed);
+            if include_computed && epg.auto_epg {
                 let (username, password) = if self.username.is_none() || self.password.is_none() {
                     get_credentials_from_url_str(&self.url)
                 } else {
@@ -1847,12 +1870,17 @@ impl Config {
         Ok(())
     }
 
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
-        self.t_access_token_secret = generate_secret();
-        self.t_encrypt_secret = <&[u8] as TryInto<[u8; 16]>>::try_into(&generate_secret()[0..16]).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+    /**
+    *  if `include_computed` set to true for `app_state`
+    */
+    pub fn prepare(&mut self, include_computed: bool) -> Result<(), M3uFilterError> {
         let work_dir = &self.working_dir;
         self.working_dir = file_utils::get_working_path(work_dir);
-        self.prepare_custom_stream_response();
+        if include_computed {
+            self.t_access_token_secret = generate_secret();
+            self.t_encrypt_secret = <&[u8] as TryInto<[u8; 16]>>::try_into(&generate_secret()[0..16]).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+            self.prepare_custom_stream_response();
+        }
         self.prepare_directories();
         if let Some(reverse_proxy) = self.reverse_proxy.as_mut() {
             reverse_proxy.prepare(&self.working_dir)?;
@@ -1861,7 +1889,7 @@ impl Config {
         self.api.prepare();
         self.prepare_api_web_root();
         self.prepare_templates()?;
-        self.prepare_sources()?;
+        self.prepare_sources(include_computed)?;
         let target_names = self.check_unique_target_names()?;
         self.check_scheduled_targets(&target_names)?;
         self.check_unique_input_names()?;
@@ -1892,12 +1920,12 @@ impl Config {
         Ok(())
     }
 
-    fn prepare_sources(&mut self) -> Result<(), M3uFilterError> {
+    fn prepare_sources(&mut self, include_computed: bool) -> Result<(), M3uFilterError> {
         // prepare sources and set id's
         let mut source_index: u16 = 1;
         let mut target_index: u16 = 1;
         for source in &mut self.sources {
-            source_index = source.prepare(source_index)?;
+            source_index = source.prepare(source_index, include_computed)?;
             for target in &mut source.targets {
                 // prepare target templates
                 let prepare_result = match &self.templates {

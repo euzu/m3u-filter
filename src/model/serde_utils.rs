@@ -97,13 +97,14 @@ where
             "live" => flags |= ForceRedirect::Live,
             "vod" => flags |= ForceRedirect::Vod,
             "series" => flags |= ForceRedirect::Series,
-            unknown => return Err(serde::de::Error::custom(format!("Unknown ForceRedirect value: {unknown}"))),
+            unknown => return Err(serde::de::Error::custom(format!("Unknown ForceRedirect value: {unknown}. Valid values are 'live', 'vod', 'series'."))),
         }
     }
 
     Ok(Some(flags))
 }
 
+#[allow(clippy::ref_option)]
 pub(crate) fn serialize_option_force_redirect<S>(force_redirect: &Option<ForceRedirect>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,

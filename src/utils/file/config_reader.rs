@@ -77,7 +77,7 @@ pub async fn read_api_proxy_config(args_api_proxy_config: Option<String>, cfg: &
     }
 }
 
-pub fn read_config(config_path: &str, config_file: &str, sources_file: &str) -> Result<Config, M3uFilterError> {
+pub fn read_config(config_path: &str, config_file: &str, sources_file: &str, include_computed: bool) -> Result<Config, M3uFilterError> {
     let files = vec![std::path::PathBuf::from(config_file), std::path::PathBuf::from(sources_file)];
     match multi_file_reader::MultiFileReader::new(&files) {
         Ok(reader) => {
@@ -86,7 +86,7 @@ pub fn read_config(config_path: &str, config_file: &str, sources_file: &str) -> 
                     result.t_config_path = config_path.to_string();
                     result.t_config_file_path = config_file.to_string();
                     result.t_sources_file_path = sources_file.to_string();
-                    match result.prepare() {
+                    match result.prepare(include_computed) {
                         Err(err) => Err(err),
                         _ => Ok(result),
                     }

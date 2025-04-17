@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
@@ -10,6 +9,7 @@ use crate::repository::storage::ensure_target_storage_path;
 use crate::repository::storage_const;
 use crate::repository::user_repository::user_get_bouquet_filter;
 use crate::utils::file::file_lock_manager::FileReadGuard;
+use std::collections::HashSet;
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct M3uPlaylistIterator {
@@ -94,7 +94,7 @@ impl M3uPlaylistIterator {
     }
 
     fn get_next(&mut self) -> Option<(M3uPlaylistItem, bool)> {
-        let entry =  if let Some(set) = &self.filter {
+        let entry = if let Some(set) = &self.filter {
             self.reader.find(|(pli, _has_next)| set.contains(&pli.group.to_string()))
         } else {
             self.reader.next()
@@ -103,7 +103,9 @@ impl M3uPlaylistIterator {
         // TODO hls and unknown reverse proxy
         entry.map(|(mut m3u_pli, _has_next)| {
             let rewrite_urls = if match &self.proxy_type {
-                ProxyType::Reverse => true,
+                ProxyType::Reverse => if self.target_options.as_ref()
+                    .and_then(|o| o.force_redirect.as_ref())
+                    .is_some_and(|fr| fr.force_redirect(m3u_pli.item_type)) { self.mask_redirect_url } else { true },
                 ProxyType::Redirect => self.mask_redirect_url,
             } {
                 Some((self.get_stream_url(&m3u_pli, self.include_type_in_url), if self.rewrite_resource { Some(self.get_resource_url(&m3u_pli)) } else { None }))

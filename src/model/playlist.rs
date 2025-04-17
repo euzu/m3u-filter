@@ -20,6 +20,7 @@ pub trait PlaylistEntry: Send + Sync {
     fn get_category_id(&self) -> Option<u32>;
     fn get_provider_url(&self) -> String;
     fn get_uuid(&self) -> UUIDType;
+    fn get_item_type(&self) -> PlaylistItemType;
 }
 
 #[derive(Debug, Clone)]
@@ -359,6 +360,12 @@ impl PlaylistEntry for M3uPlaylistItem {
     fn get_uuid(&self) -> UUIDType {
         generate_playlist_uuid(&self.input_name, &self.provider_id, self.item_type, &self.url)
     }
+
+    #[inline]
+    fn get_item_type(&self) -> PlaylistItemType {
+        self.item_type
+    }
+
 }
 
 macro_rules! generate_field_accessor_impl_for_m3u_playlist_item {
@@ -436,6 +443,10 @@ impl PlaylistEntry for XtreamPlaylistItem {
     #[inline]
     fn get_uuid(&self) -> UUIDType {
         generate_playlist_uuid(&self.input_name, &self.provider_id.to_string(), self.item_type, &self.url)
+    }
+    #[inline]
+    fn get_item_type(&self) -> PlaylistItemType {
+        self.item_type
     }
 }
 
@@ -612,6 +623,12 @@ impl PlaylistEntry for PlaylistItem {
         let header = &self.header;
         generate_playlist_uuid(&header.input_name, &header.id, header.item_type, &header.url)
     }
+
+    #[inline]
+    fn get_item_type(&self) -> PlaylistItemType {
+        self.header.item_type
+    }
+
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

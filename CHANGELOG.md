@@ -37,8 +37,12 @@ reverse_proxy:
     period_millis: 500
     burst_size: 10
 ```
-- multi epg processing/optimization, auto guessing/assigning epg id's
-- fixed hls redirect url issue
+- Multi epg processing/optimization, auto guessing/assigning epg id's
+- Fixed hls redirect url issue
+- Added `force_redirect` to target config options. valid options are `live`, `vod`, series`
+```yaml
+ options: {ignore_logo: false, share_live_streams: false, force_redirect: [vod, series]}
+```
 
 ```yaml
 epg:

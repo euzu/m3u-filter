@@ -20,6 +20,7 @@ use crate::model::xtream_const;
 use crate::repository::playlist_repository::get_target_id_mapping;
 use crate::repository::storage::{get_target_storage_path, hex_encode};
 use crate::repository::{storage_const, user_repository, xtream_repository};
+use crate::utils::constants::{DASH_EXT, HLS_EXT};
 use crate::utils::debug_if_enabled;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils;
@@ -41,7 +42,6 @@ use std::fmt::{Display, Formatter};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use crate::utils::constants::{DASH_EXT, HLS_EXT};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub(in crate::api) enum XtreamApiStreamContext {
@@ -200,7 +200,7 @@ async fn xtream_player_api_stream(
 
     let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
 
-    if user.proxy == ProxyType::Redirect {
+    if user.proxy == ProxyType::Redirect || target.is_force_redirect(pli.item_type) {
         if pli.xtream_cluster == XtreamCluster::Series {
             let ext = stream_ext.unwrap_or_else(String::new);
             let url = input.url.as_str();
@@ -459,7 +459,7 @@ async fn xtream_player_api_resource(
     match stream_url {
         None => axum::http::StatusCode::NOT_FOUND.into_response(),
         Some(url) => {
-            if user.proxy == ProxyType::Redirect {
+            if user.proxy == ProxyType::Redirect || target.is_force_redirect(pli.item_type) {
                 trace_if_enabled!("Redirecting resource request to {}", sanitize_sensitive_info(&url));
                 redirect(url.as_str()).into_response()
             } else {
@@ -561,7 +561,7 @@ async fn xtream_get_stream_info_response(app_state: &AppState, user: &ProxyUserC
 
         return match cluster {
             XtreamCluster::Video => {
-                let content = create_vod_info_from_item(user, &pli, virtual_record.last_updated);
+                let content = create_vod_info_from_item(target, user, &pli, virtual_record.last_updated);
                 axum::response::Response::builder()
                     .status(StatusCode::OK)
                     .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
@@ -602,7 +602,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                         if !(limit.is_empty() || limit.eq("0")) {
                             info_url = format!("{info_url}&limit={limit}");
                         }
-                        if user.proxy == ProxyType::Redirect {
+                        if user.proxy == ProxyType::Redirect || target.is_force_redirect(pli.item_type) {
                             return redirect(&info_url).into_response();
                         }
 

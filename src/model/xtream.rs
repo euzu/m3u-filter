@@ -1,13 +1,13 @@
-use crate::model::serde_utils::{deserialize_as_rc_string, deserialize_number_from_string, deserialize_as_option_rc_string, deserialize_as_string_array};
-use std::collections::HashMap;
-use std::iter::FromIterator;
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, XtreamTargetOutput};
+use crate::model::config::{Config, ConfigTarget, ForceRedirect, XtreamTargetOutput};
 use crate::model::playlist::{PlaylistEntry, PlaylistItem, XtreamCluster, XtreamPlaylistItem};
+use crate::model::serde_utils::{deserialize_as_option_rc_string, deserialize_as_rc_string, deserialize_as_string_array, deserialize_number_from_string};
+use crate::model::xtream_const;
 use crate::utils::json_utils::{opt_string_or_number_u32, string_default_on_null, string_or_number_f64, string_or_number_u32};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use crate::model::xtream_const;
+use std::collections::HashMap;
+use std::iter::FromIterator;
 
 
 #[derive(Deserialize, Default)]
@@ -384,15 +384,17 @@ pub struct XtreamMappingOptions {
     pub skip_video_direct_source: bool,
     pub skip_series_direct_source: bool,
     pub rewrite_resource_url: bool,
+    pub force_redirect: Option<ForceRedirect>,
 }
 
 impl XtreamMappingOptions {
-    pub fn from_target_options(target_output: &XtreamTargetOutput, cfg: &Config) -> Self {
+    pub fn from_target_options(target: &ConfigTarget, target_output: &XtreamTargetOutput, cfg: &Config) -> Self {
         Self {
             skip_live_direct_source: target_output.skip_live_direct_source,
             skip_video_direct_source: target_output.skip_video_direct_source,
             skip_series_direct_source: target_output.skip_series_direct_source,
             rewrite_resource_url: cfg.is_reverse_proxy_resource_rewrite_enabled(),
+            force_redirect: target.options.as_ref().and_then(|o| o.force_redirect.clone()),
         }
     }
 }
@@ -449,7 +451,9 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
     let stream_id_value = Value::Number(serde_json::Number::from(pli.virtual_id));
     let (resource_url, logo, logo_small) = match user.proxy {
         ProxyType::Reverse => {
-            if options.rewrite_resource_url {
+            if options.force_redirect.as_ref().is_some_and(|fr| fr.force_redirect(pli.item_type)) {
+                (None, pli.logo.clone(), pli.logo_small.clone())
+            } else if options.rewrite_resource_url {
                 let resource_url = format!("{url}/resource/{}/{}/{}/{}", pli.xtream_cluster.as_stream_type(), user.username, user.password, pli.get_virtual_id());
                 let logo_url = if pli.logo.is_empty() { String::new() } else { format!("{resource_url}/logo") };
                 let logo_small_url = if pli.logo_small.is_empty() { String::new() } else { format!("{resource_url}/logo_small") };
@@ -502,7 +506,7 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
     if let Some(ref add_props) = props {
         for (field_name, field_value) in add_props {
             if !document.contains_key(field_name) {
-              document.insert(field_name.to_string(), field_value.to_owned());
+                document.insert(field_name.to_string(), field_value.to_owned());
             }
         }
     }
