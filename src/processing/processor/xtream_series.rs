@@ -16,10 +16,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
 use crate::model::xtream::{XtreamSeriesEpisode, XtreamSeriesInfoEpisode};
+use crate::model::xtream_const;
 use crate::utils::bincode_utils::bincode_serialize;
 use crate::utils::file::file_utils::file_writer;
-
-const TAG_SERIES_INFO_LAST_MODIFIED: &str = "last_modified";
 
 create_resolve_options_function_for_xtream_target!(series);
 
@@ -53,7 +52,7 @@ fn write_series_episode_record_to_wal_file(
 }
 
 fn should_update_series_info(pli: &mut PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
-    should_update_info(pli, processed_provider_ids, TAG_SERIES_INFO_LAST_MODIFIED)
+    should_update_info(pli, processed_provider_ids, xtream_const::XC_TAG_SERIES_INFO_LAST_MODIFIED)
 }
 
 async fn playlist_resolve_series_info(client: Arc<reqwest::Client>, cfg: &Config, errors: &mut Vec<M3uFilterError>,

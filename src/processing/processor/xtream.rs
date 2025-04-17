@@ -9,13 +9,9 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
-
-const FILE_SERIES_INFO: &str = "xtream_series_info";
-const FILE_VOD_INFO: &str = "xtream_vod_info";
-const FILE_SUFFIX_WAL: &str = "wal";
-const FILE_SERIES_EPISODE_RECORD: &str = "series_episode_record";
-
+use crate::model::xtream_const;
 use crate::repository::bplustree::BPlusTree;
+use crate::repository::storage_const;
 use crate::repository::xtream_repository::xtream_get_record_file_path;
 use crate::utils::file::file_utils::append_or_crate_file;
 use crate::utils::network::xtream;
@@ -51,7 +47,7 @@ pub(in crate::processing) fn write_info_content_to_wal_file(writer: &mut BufWrit
 pub(in crate::processing) fn create_resolve_episode_wal_files(cfg: &Config, input: &ConfigInput) -> Option<(File, PathBuf)> {
     match get_input_storage_path(&input.name, &cfg.working_dir) {
         Ok(storage_path) => {
-            let info_path = storage_path.join(format!("{FILE_SERIES_EPISODE_RECORD}.{FILE_SUFFIX_WAL}"));
+            let info_path = storage_path.join(format!("{}.{}", xtream_const::XC_FILE_SERIES_EPISODE_RECORD, storage_const::FILE_SUFFIX_WAL));
             let info_file = append_or_crate_file(&info_path).ok()?;
             Some((info_file, info_path))
         }
@@ -64,11 +60,11 @@ pub(in crate::processing) fn create_resolve_info_wal_files(cfg: &Config, input: 
         Ok(storage_path) => {
             if let Some(file_prefix) = match cluster {
                 XtreamCluster::Live => None,
-                XtreamCluster::Video => Some(FILE_VOD_INFO),
-                XtreamCluster::Series => Some(FILE_SERIES_INFO)
+                XtreamCluster::Video => Some(xtream_const::XC_FILE_VOD_INFO),
+                XtreamCluster::Series => Some(xtream_const::XC_FILE_SERIES_INFO)
             } {
-                let content_path = storage_path.join(format!("{file_prefix}_content.{FILE_SUFFIX_WAL}"));
-                let info_path = storage_path.join(format!("{file_prefix}_record.{FILE_SUFFIX_WAL}"));
+                let content_path = storage_path.join(format!("{file_prefix}_content.{}", storage_const::FILE_SUFFIX_WAL));
+                let info_path = storage_path.join(format!("{file_prefix}_record.{}", storage_const::FILE_SUFFIX_WAL));
                 let content_file = append_or_crate_file(&content_path).ok()?;
                 let info_file = append_or_crate_file(&info_path).ok()?;
                 return Some((content_file, info_file, content_path, info_path));

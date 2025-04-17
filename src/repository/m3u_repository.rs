@@ -5,7 +5,7 @@ use crate::model::config::{Config, ConfigTarget, M3uTargetOutput};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentIterator, IndexedDocumentWriter};
 use crate::repository::m3u_playlist_iterator::{M3uPlaylistM3uTextIterator};
-use crate::repository::storage::{get_target_storage_path, FILE_SUFFIX_DB, FILE_SUFFIX_INDEX};
+use crate::repository::storage::{get_target_storage_path};
 use crate::utils::file::file_lock_manager::FileReadGuard;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_writer;
@@ -14,8 +14,8 @@ use std::fs::File;
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use crate::repository::storage_const;
 
-const FILE_M3U: &str = "m3u";
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
         create_m3u_filter_error!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
@@ -23,13 +23,13 @@ macro_rules! cant_write_result {
 }
 
 pub fn m3u_get_file_paths(target_path: &Path) -> (PathBuf, PathBuf) {
-    let m3u_path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_DB}")));
-    let index_path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_INDEX}")));
+    let m3u_path = target_path.join(PathBuf::from(format!("{}.{}", storage_const::FILE_M3U, storage_const::FILE_SUFFIX_DB)));
+    let index_path = target_path.join(PathBuf::from(format!("{}.{}", storage_const::FILE_M3U, storage_const::FILE_SUFFIX_INDEX)));
     (m3u_path, index_path)
 }
 
 pub fn m3u_get_epg_file_path(target_path: &Path) -> PathBuf {
-    let path = target_path.join(PathBuf::from(format!("{FILE_M3U}.{FILE_SUFFIX_DB}")));
+    let path = target_path.join(PathBuf::from(format!("{}.{}", storage_const::FILE_M3U, storage_const::FILE_SUFFIX_DB)));
     file_utils::add_prefix_to_filename(&path, "epg_", Some("xml"))
 }
 

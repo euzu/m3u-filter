@@ -3,10 +3,11 @@ use crate::model::config::ConfigInput;
 use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::model::xtream::{XtreamCategory, XtreamSeriesInfo, XtreamSeriesInfoEpisode, XtreamStream};
 use crate::utils::hash_utils::generate_playlist_uuid;
-use crate::utils::network::xtream::{get_xtream_stream_url_base, ACTION_GET_SERIES_INFO};
+use crate::utils::network::xtream::{get_xtream_stream_url_base};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+use crate::model::xtream_const;
 
 fn map_to_xtream_category(categories: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(categories.to_owned()) {
@@ -91,7 +92,7 @@ pub fn get_xtream_url(xtream_cluster: XtreamCluster, url: &str,
             format!("{url}/movie/{username}/{password}/{stream_id}.{ext}")
         }
         XtreamCluster::Series =>
-            format!("{}&action={ACTION_GET_SERIES_INFO}&series_id={stream_id}", get_xtream_stream_url_base(url, username, password))
+            format!("{}&action={}&series_id={stream_id}", get_xtream_stream_url_base(url, username, password), xtream_const::XC_ACTION_GET_SERIES_INFO)
     };
     stream_base_url
 }

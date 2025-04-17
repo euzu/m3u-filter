@@ -9,24 +9,23 @@ use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::api::model::xtream::XtreamAuthorizationResponse;
-use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::create_m3u_filter_error_result;
+use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::TargetType;
 use crate::model::config::{Config, ConfigInput, ConfigTarget};
 use crate::model::playlist::{get_backdrop_path_value, FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::{INFO_RESOURCE_PREFIX, INFO_RESOURCE_PREFIX_EPISODE, PROP_BACKDROP_PATH, SEASON_RESOURCE_PREFIX};
+use crate::model::xtream_const;
 use crate::repository::playlist_repository::get_target_id_mapping;
 use crate::repository::storage::{get_target_storage_path, hex_encode};
-use crate::repository::xtream_repository::{TAG_EPISODES, TAG_INFO_DATA, TAG_SEASONS_DATA};
-use crate::repository::{user_repository, xtream_repository};
+use crate::repository::{storage_const, user_repository, xtream_repository};
 use crate::utils::debug_if_enabled;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils;
 use crate::utils::json_utils::get_u32_from_serde_value;
-use crate::utils::network::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info, DASH_EXT, HLS_EXT};
-use crate::utils::network::xtream::{create_vod_info_from_item, ACTION_GET_LIVE_CATEGORIES, ACTION_GET_LIVE_STREAMS, ACTION_GET_SERIES, ACTION_GET_SERIES_CATEGORIES, ACTION_GET_SERIES_INFO, ACTION_GET_VOD_CATEGORIES, ACTION_GET_VOD_INFO, ACTION_GET_VOD_STREAMS};
+use crate::utils::network::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info};
+use crate::utils::network::xtream::create_vod_info_from_item;
 use crate::utils::network::{request, xtream};
 use crate::utils::trace_if_enabled;
 use axum::http::{HeaderMap, StatusCode};
@@ -42,15 +41,7 @@ use std::fmt::{Display, Formatter};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-
-const ACTION_GET_ACCOUNT_INFO: &str = "get_account_info";
-const ACTION_GET_EPG: &str = "get_epg";
-const ACTION_GET_SHORT_EPG: &str = "get_short_epg";
-const ACTION_GET_CATCHUP_TABLE: &str = "get_simple_data_table";
-const TAG_ID: &str = "id";
-const TAG_CATEGORY_ID: &str = "category_id";
-const TAG_STREAM_ID: &str = "stream_id";
-const TAG_EPG_LISTINGS: &str = "epg_listings";
+use crate::utils::constants::{DASH_EXT, HLS_EXT};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub(in crate::api) enum XtreamApiStreamContext {
@@ -219,8 +210,8 @@ async fn xtream_player_api_stream(
             return redirect(&stream_url).into_response();
         }
 
-        if is_hls_request  || pli.item_type == PlaylistItemType::LiveDash {
-            let redirect_url = if is_hls_request { &replace_url_extension(&pli.url, HLS_EXT)  } else { &replace_url_extension(&pli.url, DASH_EXT) };
+        if is_hls_request || pli.item_type == PlaylistItemType::LiveDash {
+            let redirect_url = if is_hls_request { &replace_url_extension(&pli.url, HLS_EXT) } else { &replace_url_extension(&pli.url, DASH_EXT) };
             debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
             return redirect(redirect_url).into_response();
         }
@@ -327,8 +318,8 @@ fn get_doc_id_and_field_name(input: &str) -> Option<(u32, &str)> {
 
 fn get_doc_resource_field_value(field: &str, doc: Option<&Value>) -> Option<String> {
     if let Some(Value::Object(info_data)) = doc {
-        if field.starts_with(PROP_BACKDROP_PATH) {
-            return get_backdrop_path_value(field, info_data.get(PROP_BACKDROP_PATH));
+        if field.starts_with(xtream_const::XC_PROP_BACKDROP_PATH) {
+            return get_backdrop_path_value(field, info_data.get(xtream_const::XC_PROP_BACKDROP_PATH));
         } else if let Some(Value::String(url)) = info_data.get(field) {
             return Some(url.to_string());
         }
@@ -348,21 +339,21 @@ fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem, targe
     };
     if let Some(content) = info_content {
         let doc: Map<String, Value> = serde_json::from_str(&content)?;
-        let (field, possible_episode_id) = if let Some(field_name_with_episode_id) = resource.strip_prefix(INFO_RESOURCE_PREFIX_EPISODE) {
+        let (field, possible_episode_id) = if let Some(field_name_with_episode_id) = resource.strip_prefix(xtream_const::XC_INFO_RESOURCE_PREFIX_EPISODE) {
             if let Some((episode_id, field_name)) = get_doc_id_and_field_name(field_name_with_episode_id) {
                 (field_name, Some(episode_id))
             } else {
                 return Ok(None);
             }
         } else {
-            (&resource[INFO_RESOURCE_PREFIX.len()..], None)
+            (&resource[xtream_const::XC_INFO_RESOURCE_PREFIX.len()..], None)
         };
         let info_doc = match pli.xtream_cluster {
             XtreamCluster::Video | XtreamCluster::Series => {
                 if let Some(episode_id) = possible_episode_id {
                     get_episode_info_doc(&doc, episode_id)
                 } else {
-                    doc.get(TAG_INFO_DATA)
+                    doc.get(xtream_const::XC_TAG_INFO_DATA)
                 }
             }
             XtreamCluster::Live => None,
@@ -376,15 +367,15 @@ fn xtream_get_info_resource_url(config: &Config, pli: &XtreamPlaylistItem, targe
 }
 
 fn get_episode_info_doc(doc: &Map<String, Value>, episode_id: u32) -> Option<&Value> {
-    let episodes = doc.get(TAG_EPISODES)?.as_object()?;
+    let episodes = doc.get(xtream_const::XC_TAG_EPISODES)?.as_object()?;
     for season_episodes in episodes.values() {
         if let Value::Array(episode_list) = season_episodes {
             for episode in episode_list {
                 if let Value::Object(episode_doc) = episode {
-                    if let Some(episode_id_value) = episode_doc.get(TAG_ID) {
+                    if let Some(episode_id_value) = episode_doc.get(xtream_const::XC_TAG_ID) {
                         if let Some(doc_episode_id) = get_u32_from_serde_value(episode_id_value) {
                             if doc_episode_id == episode_id {
-                                return episode_doc.get(TAG_INFO_DATA);
+                                return episode_doc.get(xtream_const::XC_TAG_INFO_DATA);
                             }
                         }
                     }
@@ -398,7 +389,7 @@ fn get_episode_info_doc(doc: &Map<String, Value>, episode_id: u32) -> Option<&Va
 fn get_season_info_doc(doc: &Vec<Value>, season_id: u32) -> Option<&Value> {
     for season in doc {
         if let Value::Object(season_doc) = season {
-            if let Some(season_id_value) = season_doc.get(TAG_ID) {
+            if let Some(season_id_value) = season_doc.get(xtream_const::XC_TAG_ID) {
                 if let Some(doc_season_id) = get_u32_from_serde_value(season_id_value) {
                     if doc_season_id == season_id {
                         return Some(season);
@@ -421,10 +412,10 @@ fn xtream_get_season_resource_url(config: &Config, pli: &XtreamPlaylistItem, tar
     if let Some(content) = info_content {
         let doc: Map<String, Value> = serde_json::from_str(&content)?;
 
-        if let Some(field_name_with_season_id) = resource.strip_prefix(SEASON_RESOURCE_PREFIX) {
+        if let Some(field_name_with_season_id) = resource.strip_prefix(xtream_const::XC_SEASON_RESOURCE_PREFIX) {
             if let Some((season_id, field)) = get_doc_id_and_field_name(field_name_with_season_id) {
                 let seasons_doc = match pli.xtream_cluster {
-                    XtreamCluster::Series => doc.get(TAG_SEASONS_DATA),
+                    XtreamCluster::Series => doc.get(xtream_const::XC_TAG_SEASONS_DATA),
                     XtreamCluster::Video | XtreamCluster::Live => None,
                 };
 
@@ -457,9 +448,9 @@ async fn xtream_player_api_resource(
     let virtual_id: u32 = try_result_bad_request!(resource_req.stream_id.trim().parse());
     let resource = resource_req.action_path.trim();
     let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
-    let stream_url = if resource.starts_with(INFO_RESOURCE_PREFIX) {
+    let stream_url = if resource.starts_with(xtream_const::XC_INFO_RESOURCE_PREFIX) {
         try_result_bad_request!(xtream_get_info_resource_url(&app_state.config, &pli, target, resource))
-    } else if resource.starts_with(SEASON_RESOURCE_PREFIX) {
+    } else if resource.starts_with(xtream_const::XC_SEASON_RESOURCE_PREFIX) {
         try_result_bad_request!(xtream_get_season_resource_url(&app_state.config, &pli, target, resource))
     } else {
         pli.get_field(resource)
@@ -606,8 +597,8 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
             if pli.provider_id > 0 {
                 let input_name = &pli.input_name;
                 if let Some(input) = app_state.config.get_input_by_name(input_name.as_str()) {
-                    if let Some(action_url) = xtream::get_xtream_player_api_action_url(input, ACTION_GET_SHORT_EPG) {
-                        let mut info_url = format!("{action_url}&{TAG_STREAM_ID}={}", pli.provider_id);
+                    if let Some(action_url) = xtream::get_xtream_player_api_action_url(input, xtream_const::XC_ACTION_GET_SHORT_EPG) {
+                        let mut info_url = format!("{action_url}&{}={}", xtream_const::XC_TAG_STREAM_ID, pli.provider_id);
                         if !(limit.is_empty() || limit.eq("0")) {
                             info_url = format!("{info_url}&limit={limit}");
                         }
@@ -634,21 +625,21 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
 
 async fn xtream_player_api_handle_content_action(config: &Config, target_name: &str, action: &str, category_id: Option<u32>, user: &ProxyUserCredentials) -> Option<impl IntoResponse> {
     if let Ok((path, content)) = match action {
-        ACTION_GET_LIVE_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_LIVE),
-        ACTION_GET_VOD_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_VOD),
-        ACTION_GET_SERIES_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, xtream_repository::COL_CAT_SERIES),
+        xtream_const::XC_ACTION_GET_LIVE_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, storage_const::COL_CAT_LIVE),
+        xtream_const::XC_ACTION_GET_VOD_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, storage_const::COL_CAT_VOD),
+        xtream_const::XC_ACTION_GET_SERIES_CATEGORIES => xtream_repository::xtream_get_collection_path(config, target_name, storage_const::COL_CAT_SERIES),
         _ => Err(str_to_io_error(""))
     } {
         if let Some(file_path) = path {
             // load user bouquet
             let filter = match action {
-                ACTION_GET_LIVE_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Live).await,
-                ACTION_GET_VOD_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Video).await,
-                ACTION_GET_SERIES_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Series).await,
+                xtream_const::XC_ACTION_GET_LIVE_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Live).await,
+                xtream_const::XC_ACTION_GET_VOD_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Video).await,
+                xtream_const::XC_ACTION_GET_SERIES_CATEGORIES => user_repository::user_get_bouquet_filter(config, &user.username, category_id, TargetType::Xtream, XtreamCluster::Series).await,
                 _ => None
             };
             if let Some(flt) = filter {
-                return Some(serve_query(&file_path, &HashMap::from([(TAG_CATEGORY_ID, flt)])).into_response());
+                return Some(serve_query(&file_path, &HashMap::from([(xtream_const::XC_TAG_CATEGORY_ID, flt)])).into_response());
             }
             return Some(serve_file(&file_path, mime::APPLICATION_JSON).await.into_response());
         } else if let Some(payload) = content {
@@ -665,30 +656,31 @@ async fn xtream_get_catchup_response(app_state: &AppState, target: &ConfigTarget
     let virtual_id: u32 = try_result_bad_request!(FromStr::from_str(stream_id));
     let (pli, _) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, Some(XtreamCluster::Live)));
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()));
-    let info_url = try_option_bad_request!(xtream::get_xtream_player_api_action_url(input, ACTION_GET_CATCHUP_TABLE).map(|action_url| format!("{action_url}&{TAG_STREAM_ID}={}&start={start}&end={end}", pli.provider_id)));
+    let info_url = try_option_bad_request!(xtream::get_xtream_player_api_action_url(input, xtream_const::XC_ACTION_GET_CATCHUP_TABLE)
+        .map(|action_url| format!("{action_url}&{}={}&start={start}&end={end}", xtream_const::XC_TAG_STREAM_ID, pli.provider_id)));
     let content = try_result_bad_request!(xtream::get_xtream_stream_info_content(Arc::clone(&app_state.http_client), info_url.as_str(), input).await);
     let mut doc: Map<String, Value> = try_result_bad_request!(serde_json::from_str(&content));
-    let epg_listings = try_option_bad_request!(doc.get_mut(TAG_EPG_LISTINGS).and_then(Value::as_array_mut));
+    let epg_listings = try_option_bad_request!(doc.get_mut(xtream_const::XC_TAG_EPG_LISTINGS).and_then(Value::as_array_mut));
     let target_path = try_option_bad_request!(get_target_storage_path(&app_state.config, target.name.as_str()));
     let (mut target_id_mapping, file_lock) = get_target_id_mapping(&app_state.config, &target_path).await;
     for epg_list_item in epg_listings.iter_mut().filter_map(Value::as_object_mut) {
         // TODO epg_id
-        if let Some(catchup_provider_id) = epg_list_item.get(TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok()) {
+        if let Some(catchup_provider_id) = epg_list_item.get(xtream_const::XC_TAG_ID).and_then(Value::as_str).and_then(|id| id.parse::<u32>().ok()) {
             let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &catchup_provider_id.to_string(), pli.item_type, &pli.url);
             let virtual_id = target_id_mapping.get_and_update_virtual_id(&uuid, catchup_provider_id, PlaylistItemType::Catchup, pli.provider_id);
-            epg_list_item.insert(TAG_ID.to_string(), Value::String(virtual_id.to_string()));
+            epg_list_item.insert(xtream_const::XC_TAG_ID.to_string(), Value::String(virtual_id.to_string()));
         }
     }
     if let Err(err) = target_id_mapping.persist() {
         error!("Failed to write catchup id mapping {err}");
-        return axum::http::StatusCode::BAD_REQUEST.into_response();
+        return StatusCode::BAD_REQUEST.into_response();
     }
     drop(file_lock);
     serde_json::to_string(&doc)
         .map_or_else(
-            |_| axum::http::StatusCode::BAD_REQUEST.into_response(),
+            |_| StatusCode::BAD_REQUEST.into_response(),
             |result| axum::response::Response::builder()
-                .status(axum::http::StatusCode::OK)
+                .status(StatusCode::OK)
                 .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
                 .body(result).unwrap().into_response())
 }
@@ -728,7 +720,7 @@ async fn xtream_player_api(
         }
 
         if user.permission_denied(app_state) {
-            return axum::http::StatusCode::FORBIDDEN.into_response();
+            return StatusCode::FORBIDDEN.into_response();
         }
 
         // Process specific playlist actions
@@ -742,21 +734,21 @@ async fn xtream_player_api(
         };
 
         match action {
-            ACTION_GET_ACCOUNT_INFO => {
+            xtream_const::XC_ACTION_GET_ACCOUNT_INFO => {
                 return axum::response::Json(get_user_info(&user, app_state).await).into_response();
             }
-            ACTION_GET_SERIES_INFO => {
+            xtream_const::XC_ACTION_GET_SERIES_INFO => {
                 skip_json_response_if_flag_set!(skip_series, xtream_get_stream_info_response(app_state, &user, target, api_req.series_id.trim(), XtreamCluster::Series).await);
             }
-            ACTION_GET_VOD_INFO => {
+            xtream_const::XC_ACTION_GET_VOD_INFO => {
                 skip_json_response_if_flag_set!(skip_vod,  xtream_get_stream_info_response(app_state, &user, target, api_req.vod_id.trim(), XtreamCluster::Video).await);
             }
-            ACTION_GET_EPG | ACTION_GET_SHORT_EPG => {
+            xtream_const::XC_ACTION_GET_EPG | xtream_const::XC_ACTION_GET_SHORT_EPG => {
                 return xtream_get_short_epg(
                     app_state, &user, target, api_req.stream_id.trim(), api_req.limit.trim(),
                 ).await.into_response();
             }
-            ACTION_GET_CATCHUP_TABLE => {
+            xtream_const::XC_ACTION_GET_CATCHUP_TABLE => {
                 skip_json_response_if_flag_set!(skip_live, xtream_get_catchup_response(app_state, target, api_req.stream_id.trim(), api_req.start.trim(), api_req.end.trim()).await);
             }
             _ => {}
@@ -771,11 +763,11 @@ async fn xtream_player_api(
         }
 
         let result = match action {
-            ACTION_GET_LIVE_STREAMS =>
+            xtream_const::XC_ACTION_GET_LIVE_STREAMS =>
                 skip_flag_optional!(skip_live, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Live, &app_state.config, target, category_id, &user).await),
-            ACTION_GET_VOD_STREAMS =>
+            xtream_const::XC_ACTION_GET_VOD_STREAMS =>
                 skip_flag_optional!(skip_vod, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Video, &app_state.config, target, category_id, &user).await),
-            ACTION_GET_SERIES =>
+            xtream_const::XC_ACTION_GET_SERIES =>
                 skip_flag_optional!(skip_series, xtream_repository::xtream_load_rewrite_playlist(XtreamCluster::Series, &app_state.config, target, category_id, &user).await),
             _ => Some(Err(info_err!(format!("Cant find action: {action} for target: {}", &target.name))
             )),

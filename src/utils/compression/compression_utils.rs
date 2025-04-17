@@ -3,9 +3,6 @@ use flate2::Compression;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 
-pub const ENCODING_GZIP: &str = "gzip";
-pub const ENCODING_DEFLATE: &str = "deflate";
-
 pub const fn is_gzip(bytes: &[u8]) -> bool {
     // Gzip files start with the bytes 0x1F 0x8B
     bytes.len() >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B

@@ -7,31 +7,7 @@ use crate::utils::json_utils::{opt_string_or_number_u32, string_default_on_null,
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
-
-pub const INFO_RESOURCE_PREFIX: &str = "nfo_";
-pub const INFO_RESOURCE_PREFIX_EPISODE: &str = "nfo_ep_";
-pub const SEASON_RESOURCE_PREFIX: &str = "ssn_";
-
-pub const PROP_BACKDROP_PATH: &str = "backdrop_path";
-pub const PROP_COVER: &str = "cover";
-
-const LIVE_STREAM_FIELDS: &[&str] = &[];
-
-const VIDEO_STREAM_FIELDS: &[&str] = &[
-    "release_date", "cast",
-    "director", "episode_run_time", "genre",
-    "stream_type", "title", "year", "youtube_trailer", "trailer",
-    "plot", "rating_5based", "stream_icon", "container_extension"
-];
-
-const SERIES_STREAM_FIELDS: &[&str] = &[
-    PROP_BACKDROP_PATH, "cast", PROP_COVER, "director", "episode_run_time", "genre",
-    "last_modified", "name", "plot", "rating_5based",
-    "stream_type", "title", "year", "youtube_trailer", "trailer"
-];
-
-const XTREAM_VOD_REWRITE_URL_PROPS: &[&str] = &[PROP_COVER];
-
+use crate::model::xtream_const;
 
 fn deserialize_number_from_string<'de, D, T: DeserializeOwned>(
     deserializer: D,
@@ -256,7 +232,7 @@ impl XtreamStream {
         let mut result = Map::new();
         if let Some(bdpath) = self.backdrop_path.as_ref() {
             if !bdpath.is_empty() {
-                result.insert(String::from(PROP_BACKDROP_PATH), Value::Array(Vec::from([Value::String(String::from(bdpath.first()?))])));
+                result.insert(String::from(xtream_const::XC_PROP_BACKDROP_PATH), Value::Array(Vec::from([Value::String(String::from(bdpath.first()?))])));
             }
         }
         add_rc_str_property_if_exists!(result, self.tmdb, "tmdb");
@@ -543,7 +519,7 @@ fn append_prepared_series_properties(add_props: Option<&Map<String, Value>>, doc
 
 fn make_bdpath_resource_url(resource_url: &str, bd_path: &str, index: usize, field_prefix: &str) -> String {
     if bd_path.starts_with("http") {
-        format!("{resource_url}/{field_prefix}{PROP_BACKDROP_PATH}_{index}")
+        format!("{resource_url}/{field_prefix}{}_{index}", xtream_const::XC_PROP_BACKDROP_PATH)
     } else {
         bd_path.to_string()
     }
@@ -613,36 +589,36 @@ pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, opti
 
     match pli.xtream_cluster {
         XtreamCluster::Live => {
-            append_mandatory_fields(&mut document, LIVE_STREAM_FIELDS);
+            append_mandatory_fields(&mut document, xtream_const::LIVE_STREAM_FIELDS);
             add_to_doc_str_property_if_not_exists!(document, "stream_type", Value::String(String::from("live")));
             add_to_doc_str_property_if_not_exists!(document, "added", Value::String(chrono::Utc::now().timestamp().to_string()));
         }
         XtreamCluster::Video => {
-            append_mandatory_fields(&mut document, VIDEO_STREAM_FIELDS);
+            append_mandatory_fields(&mut document, xtream_const::VIDEO_STREAM_FIELDS);
             add_to_doc_str_property_if_not_exists!(document, "stream_type", Value::String(String::from("movie")));
             add_to_doc_str_property_if_not_exists!(document, "added", Value::String(chrono::Utc::now().timestamp().to_string()));
         }
         XtreamCluster::Series => {
             append_prepared_series_properties(props.as_ref(), &mut document);
-            append_mandatory_fields(&mut document, SERIES_STREAM_FIELDS);
+            append_mandatory_fields(&mut document, xtream_const::SERIES_STREAM_FIELDS);
             append_release_date(&mut document);
         }
     }
 
-    rewrite_doc_urls(resource_url.as_ref(), &mut document, XTREAM_VOD_REWRITE_URL_PROPS, "");
+    rewrite_doc_urls(resource_url.as_ref(), &mut document, xtream_const::XTREAM_VOD_REWRITE_URL_PROPS, "");
 
     Value::Object(document)
 }
 
 pub fn rewrite_doc_urls(resource_url: Option<&String>, document: &mut Map<String, Value>, fields: &[&str], field_prefix: &str) {
     if let Some(rewrite_url) = resource_url {
-        if let Some(bdpath) = document.get(PROP_BACKDROP_PATH) {
+        if let Some(bdpath) = document.get(xtream_const::XC_PROP_BACKDROP_PATH) {
             match bdpath {
                 Value::String(bd_path) => {
-                    document.insert(PROP_BACKDROP_PATH.to_string(), Value::Array(vec![Value::String(make_bdpath_resource_url(rewrite_url.as_str(), bd_path, 0, field_prefix))]));
+                    document.insert(xtream_const::XC_PROP_BACKDROP_PATH.to_string(), Value::Array(vec![Value::String(make_bdpath_resource_url(rewrite_url.as_str(), bd_path, 0, field_prefix))]));
                 }
                 Value::Array(bd_path) => {
-                    document.insert(PROP_BACKDROP_PATH.to_string(), Value::Array(
+                    document.insert(xtream_const::XC_PROP_BACKDROP_PATH.to_string(), Value::Array(
                         bd_path.iter()
                             .filter_map(|val| val.as_str())
                             .enumerate()

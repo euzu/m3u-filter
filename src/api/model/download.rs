@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::model::config::VideoDownloadConfig;
 use crate::repository::storage::hash_string_as_hex;
+use crate::utils::constants::FILENAME_TRIM_PATTERNS;
 
 /// File-Download information.
 #[derive(Clone)]
@@ -59,8 +60,6 @@ fn get_download_directory(download_cfg: &VideoDownloadConfig, filestem: &str) ->
         PathBuf::from(download_cfg.directory.as_ref().unwrap())
     }
 }
-
-const FILENAME_TRIM_PATTERNS: &[char] = &['.', '-', '_'];
 
 impl FileDownload {
 

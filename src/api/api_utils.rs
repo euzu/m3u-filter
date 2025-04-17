@@ -242,6 +242,14 @@ async fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt
     }
 }
 
+
+fn get_grace_period_millis(connection_permission: &UserConnectionPermission, stream_response_params: &StreamingOption, config_grace_period_millis: u64) -> u64 {
+    if config_grace_period_millis > 0 &&
+        (matches!(stream_response_params, StreamingOption::GracePeriod(_, _)) // provider grace period
+            || connection_permission == &UserConnectionPermission::GracePeriod // user grace period
+        ) { config_grace_period_millis } else { 0 }
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn create_stream_response_details(app_state: &AppState, stream_options: &StreamOptions, stream_url: &str,
                                         req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
@@ -249,10 +257,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                                         connection_permission: UserConnectionPermission) -> StreamDetails {
     let (mut provider_connection_guard, stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt).await;
     let config_grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
-    let grace_period_millis = if config_grace_period_millis > 0 &&
-        (matches!(stream_response_params, StreamingOption::GracePeriod(_, _)) // provider grace period
-        || connection_permission == UserConnectionPermission::GracePeriod // user grace period
-        ) { config_grace_period_millis } else { 0 };
+    let grace_period_millis = get_grace_period_millis(&connection_permission, &stream_response_params, config_grace_period_millis);
     match stream_response_params {
         StreamingOption::Custom(provider_stream) => {
             let (stream, stream_info) = provider_stream;
@@ -265,8 +270,8 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
                 provider_connection_guard,
             }
         }
-        StreamingOption::Available(provider_name, request_url)
-        | StreamingOption::GracePeriod(provider_name, request_url) => {
+        StreamingOption::Available(provider_name, request_url) |
+        StreamingOption::GracePeriod(provider_name, request_url) => {
             let parsed_url = Url::parse(&request_url);
             let ((stream, stream_info), reconnect_flag) = if let Ok(url) = parsed_url {
                 if stream_options.pipe_provider_stream {

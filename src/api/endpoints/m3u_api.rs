@@ -5,9 +5,8 @@ use crate::api::model::request::UserApiRequest;
 use crate::model::api_proxy::{ProxyType, UserConnectionPermission};
 use crate::model::config::TargetType;
 use crate::model::playlist::{FieldGetAccessor, PlaylistItemType, XtreamCluster};
-use crate::repository::m3u_playlist_iterator::{M3U_RESOURCE_PATH, M3U_STREAM_PATH};
 use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
-use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info, DASH_EXT, HLS_EXT};
+use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info};
 use crate::utils::debug_if_enabled;
 use axum::response::IntoResponse;
 use bytes::Bytes;
@@ -15,6 +14,8 @@ use futures::stream;
 use log::{debug, error};
 use std::sync::Arc;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
+use crate::repository::storage_const;
+use crate::utils::constants::{DASH_EXT, HLS_EXT};
 
 async fn m3u_api(
     api_req: &UserApiRequest,
@@ -154,7 +155,7 @@ macro_rules! register_m3u_stream_routes {
     ($router:expr, [$($path:expr),*]) => {{
         $router
         $(
-        .route(&format!("/{M3U_STREAM_PATH}/{}/{{username}}/{{password}}/{{stream_id}}", $path), axum::routing::get(m3u_api_stream))
+        .route(&format!("/{}/{}/{{username}}/{{password}}/{{stream_id}}", $path, storage_const::M3U_STREAM_PATH), axum::routing::get(m3u_api_stream))
             // $cfg.service(web::resource(format!("/{M3U_STREAM_PATH}/{}/{{username}}/{{password}}/{{stream_id}}", $path)).route(web::get().to(m3u_api_stream)));
         )*
     }};
@@ -175,6 +176,6 @@ pub fn m3u_api_register() -> axum::Router<Arc<AppState>> {
     let mut router = axum::Router::new();
     router = register_m3u_api_routes!(router, ["get.php", "apiget", "m3u"]);
     register_m3u_stream_routes!(router, ["live", "movie", "series"])
-    .route(&format!("/{M3U_STREAM_PATH}/{{username}}/{{password}}/{{stream_id}}"), axum::routing::get(m3u_api_stream))
-    .route(&format!("/{M3U_RESOURCE_PATH}/{{username}}/{{password}}/{{stream_id}}/{{resource}}"), axum::routing::get(m3u_api_resource))
+    .route(&format!("/{}/{{username}}/{{password}}/{{stream_id}}", storage_const::M3U_STREAM_PATH), axum::routing::get(m3u_api_stream))
+    .route(&format!("/{}/{{username}}/{{password}}/{{stream_id}}/{{resource}}", storage_const::M3U_RESOURCE_PATH), axum::routing::get(m3u_api_resource))
 }

@@ -7,11 +7,9 @@ use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::indexed_document::IndexedDocumentIterator;
 use crate::repository::m3u_repository::m3u_get_file_paths;
 use crate::repository::storage::ensure_target_storage_path;
+use crate::repository::storage_const;
 use crate::repository::user_repository::user_get_bouquet_filter;
 use crate::utils::file::file_lock_manager::FileReadGuard;
-
-pub const M3U_STREAM_PATH: &str = "m3u-stream";
-pub const M3U_RESOURCE_PATH: &str = "resource/m3u";
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct M3uPlaylistIterator {
@@ -89,10 +87,10 @@ impl M3uPlaylistIterator {
     }
 
     fn get_stream_url(&self, m3u_pli: &M3uPlaylistItem, typed: bool) -> String {
-        self.get_rewritten_url(m3u_pli, typed, M3U_STREAM_PATH)
+        self.get_rewritten_url(m3u_pli, typed, storage_const::M3U_STREAM_PATH)
     }
     fn get_resource_url(&self, m3u_pli: &M3uPlaylistItem) -> String {
-        self.get_rewritten_url(m3u_pli, false, M3U_RESOURCE_PATH)
+        self.get_rewritten_url(m3u_pli, false, storage_const::M3U_RESOURCE_PATH)
     }
 
     fn get_next(&mut self) -> Option<(M3uPlaylistItem, bool)> {

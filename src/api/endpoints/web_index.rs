@@ -6,12 +6,12 @@ use crate::auth::password::verify_password;
 use crate::auth::user::UserCredential;
 use axum::response::IntoResponse;
 use log::error;
-use regex::Regex;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc};
 use tower::Service;
+use crate::utils::constants::CONSTANTS;
 
 fn no_web_auth_token() -> impl axum::response::IntoResponse + Send {
     axum::Json(HashMap::from([("token", "authorized")])).into_response()
@@ -83,8 +83,6 @@ async fn token_refresh(
     }
 }
 
-static BASE_HREF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"(href|src)="/([^"]*)""#).unwrap());
-
 async fn index(
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
@@ -92,7 +90,7 @@ async fn index(
     if let Some(web_ui_path) = &app_state.config.web_ui.as_ref().and_then(|c| c.path.as_ref()) {
         match tokio::fs::read_to_string(&path).await {
             Ok(content) => {
-                let mut new_content = BASE_HREF.replace_all(&content, |caps: &regex::Captures| {
+                let mut new_content = CONSTANTS.base_href.replace_all(&content, |caps: &regex::Captures| {
                     format!(r#"{}="/{web_ui_path}/{}""#, &caps[1], &caps[2])
                 }).to_string();
 

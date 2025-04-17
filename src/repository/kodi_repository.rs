@@ -7,9 +7,7 @@ use crate::model::playlist::{
 };
 use crate::model::xtream::XtreamSeriesEpisode;
 use crate::repository::bplustree::BPlusTree;
-use crate::repository::storage::{
-    ensure_target_storage_path, get_input_storage_path, hash_bytes, FILE_SUFFIX_DB,
-};
+use crate::repository::storage::{ensure_target_storage_path, get_input_storage_path, hash_bytes};
 use crate::repository::xtream_repository::{xtream_get_record_file_path, InputVodInfoRecord};
 use crate::utils::file::file_lock_manager::FileReadGuard;
 use crate::utils::file::file_utils;
@@ -21,27 +19,11 @@ use regex::Regex;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc};
 use tokio::fs::{create_dir_all, remove_dir, remove_file, File};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
-
-const FILE_STRM: &str = "strm";
-
-struct KodiStyle {
-    year: Regex,
-    season: Regex,
-    episode: Regex,
-    whitespace: Regex,
-    alphanumeric: Regex,
-}
-
-static KODI_STYLE: LazyLock<KodiStyle> = LazyLock::new(|| KodiStyle {
-    season: Regex::new(r"[Ss]\d{1,2}").unwrap(),
-    episode: Regex::new(r"[Ee]\d{1,2}").unwrap(),
-    year: Regex::new(r"\d{4}").unwrap(),
-    whitespace: Regex::new(r"\s+").unwrap(),
-    alphanumeric: Regex::new(r"[^\w\s]").unwrap(),
-});
+use crate::repository::storage_const;
+use crate::utils::constants::{KodiStyle, CONSTANTS};
 
 fn sanitize_for_filename(text: &str, underscore_whitespace: bool) -> String {
     text.trim()
@@ -350,7 +332,7 @@ async fn get_tmdb_value(
 }
 
 pub fn strm_get_file_paths(target_path: &Path) -> PathBuf {
-    target_path.join(PathBuf::from(format!("{FILE_STRM}.{FILE_SUFFIX_DB}")))
+    target_path.join(PathBuf::from(format!("{}.{}", storage_const::FILE_STRM, storage_const::FILE_SUFFIX_DB)))
 }
 
 #[derive(Serialize)]
@@ -547,7 +529,7 @@ async fn prepare_strm_files(
                 kodi_style_rename(
                     cfg,
                     &strm_item_info,
-                    &KODI_STYLE,
+                    &CONSTANTS.kodi_style,
                     &mut input_tmdb_indexes,
                     underscore_whitespace,
                 ).await

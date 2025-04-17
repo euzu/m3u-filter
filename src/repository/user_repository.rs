@@ -4,6 +4,7 @@ use crate::model::playlist::XtreamCluster;
 use crate::model::playlist_categories::{PlaylistBouquetDto, TargetBouquetDto};
 use crate::model::xtream::PlaylistXtreamCategory;
 use crate::repository::bplustree::BPlusTree;
+use crate::repository::storage_const;
 use crate::repository::xtream_repository::xtream_get_playlist_categories;
 use crate::utils::file::file_utils;
 use crate::utils::json_utils::json_write_documents_to_file;
@@ -12,11 +13,6 @@ use log::error;
 use std::collections::{HashMap, HashSet};
 use std::io::Error;
 use std::path::{Path, PathBuf};
-
-const USER_LIVE_BOUQUET: &str = "live_bouquet.json";
-const USER_VOD_BOUQUET: &str = "vod_bouquet.json";
-const USER_SERIES_BOUQUET: &str = "series_bouquet.json";
-const API_USER_DB_FILE: &str = "api_user.db";
 
 // This is a Helper class to store all user into one Database file.
 // For the Config files we keep the old structure where a user is assigned to a target.
@@ -52,7 +48,7 @@ impl StoredProxyUserCredentials {
             exp_date: proxy.exp_date,
             max_connections: if proxy.max_connections > 0 { Some(proxy.max_connections) } else { None },
             status: proxy.status.clone(),
-            ui_enabled: proxy.ui_enabled
+            ui_enabled: proxy.ui_enabled,
         }
     }
 
@@ -68,14 +64,14 @@ impl StoredProxyUserCredentials {
             exp_date: stored.exp_date,
             max_connections: stored.max_connections.unwrap_or_default(),
             status: stored.status.clone(),
-            ui_enabled: stored.ui_enabled
+            ui_enabled: stored.ui_enabled,
         }
     }
 }
 
 
 pub fn get_api_user_db_path(cfg: &Config) -> PathBuf {
-    PathBuf::from(&cfg.t_config_path).join(API_USER_DB_FILE)
+    PathBuf::from(&cfg.t_config_path).join(storage_const::API_USER_DB_FILE)
 }
 
 
@@ -103,7 +99,7 @@ pub fn merge_api_user(cfg: &Config, target_users: &[TargetUser]) -> Result<u64, 
 /// Will panic if `backup_dir` is not given
 pub fn backup_api_user_db_file(cfg: &Config, path: &Path) {
     if let Some(backup_dir) = cfg.backup_dir.as_ref() {
-        let backup_path = PathBuf::from(backup_dir).join(format!("{API_USER_DB_FILE}_{}", Local::now().format("%Y%m%d_%H%M%S")));
+        let backup_path = PathBuf::from(backup_dir).join(format!("{}_{}", storage_const::API_USER_DB_FILE, Local::now().format("%Y%m%d_%H%M%S")));
         let _lock = cfg.file_locks.read_lock(path);
         match std::fs::copy(path, &backup_path) {
             Ok(_) => {}
@@ -162,15 +158,15 @@ fn ensure_user_storage_path(cfg: &Config, username: &str) -> Option<PathBuf> {
 }
 
 fn user_get_live_bouquet_path(user_storage_path: &Path, target: TargetType) -> PathBuf {
-    user_storage_path.join(PathBuf::from(format!("{}_{USER_LIVE_BOUQUET}", target.to_string().to_lowercase())))
+    user_storage_path.join(PathBuf::from(format!("{}_{}", target.to_string().to_lowercase(), storage_const::USER_LIVE_BOUQUET)))
 }
 
 fn user_get_vod_bouquet_path(user_storage_path: &Path, target: TargetType) -> PathBuf {
-    user_storage_path.join(PathBuf::from(format!("{}_{USER_VOD_BOUQUET}", target.to_string().to_lowercase())))
+    user_storage_path.join(PathBuf::from(format!("{}_{}", target.to_string().to_lowercase(), storage_const::USER_VOD_BOUQUET)))
 }
 
 fn user_get_series_bouquet_path(user_storage_path: &Path, target: TargetType) -> PathBuf {
-    user_storage_path.join(PathBuf::from(format!("{}_{USER_SERIES_BOUQUET}", target.to_string().to_lowercase())))
+    user_storage_path.join(PathBuf::from(format!("{}_{}", target.to_string().to_lowercase(), storage_const::USER_SERIES_BOUQUET)))
 }
 
 async fn save_xtream_user_bouquet_for_target(config: &Config, target_name: &str, storage_path: &Path, cluster: XtreamCluster, bouquet: Option<&Vec<String>>) -> Result<(), Error> {

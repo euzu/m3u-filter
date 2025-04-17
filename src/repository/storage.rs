@@ -4,12 +4,8 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::config::{Config};
 use crate::model::playlist::UUIDType;
 use crate::m3u_filter_error::{notify_err};
+use crate::repository::storage_const;
 use crate::utils::file::file_utils;
-
-pub(in crate::repository) const FILE_SUFFIX_DB: &str = "db";
-pub(in crate::repository) const FILE_SUFFIX_INDEX: &str = "idx";
-
-const FILE_ID_MAPPING: &str = "id_mapping.db";
 
 #[inline]
 pub fn hash_bytes(bytes: &[u8]) -> UUIDType {
@@ -55,7 +51,7 @@ pub fn hash_string_as_hex(url: &str) -> String {
 }
 
 pub(in crate::repository) fn get_target_id_mapping_file(target_path: &Path) -> PathBuf {
-    target_path.join(PathBuf::from(FILE_ID_MAPPING))
+    target_path.join(PathBuf::from(storage_const::FILE_ID_MAPPING))
 }
 
 pub fn ensure_target_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, M3uFilterError> {

@@ -9,14 +9,13 @@ use crate::utils::network::request::{get_credentials_from_url, get_local_file_co
 use crate::utils::sys_utils::exit;
 use chrono::Local;
 use log::{debug, error, info, warn};
-use regex::Regex;
 use serde::Serialize;
 use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor, Error, Read};
 use std::path::PathBuf;
-use std::sync::{LazyLock};
 use url::Url;
+use crate::utils::constants::CONSTANTS;
 
 enum EitherReader<L, R> {
     Left(L),
@@ -169,13 +168,11 @@ pub fn save_main_config(file_path: &str, backup_dir: &str, config: &ConfigDto) -
     write_config_file(file_path, backup_dir, config, "config.yml")
 }
 
-static ENV_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap());
-
 pub fn resolve_env_var(value: &str) -> String {
     if value.is_empty() {
         return String::new();
     }
-    ENV_REGEX.replace_all(value, |caps: &regex::Captures| {
+    CONSTANTS.env.replace_all(value, |caps: &regex::Captures| {
         let var_name = &caps["var"];
         env::var(var_name).unwrap_or_else(|_| format!("${{env:{var_name}}}"))
     }).to_string()

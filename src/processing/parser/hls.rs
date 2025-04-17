@@ -39,6 +39,7 @@ pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> Stri
     let mut result = Vec::new();
     for line in props.content.lines() {
         if line.starts_with('#') {
+
             result.push(line.to_string());
         } else if let Ok(token) = if line.starts_with("http") {
             encrypt_text(props.secret, line)

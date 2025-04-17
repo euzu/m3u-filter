@@ -3,15 +3,13 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{Ordering};
 use std::sync::Arc;
-use std::sync::LazyLock;
 use std::time::Instant;
 
 use flate2::read::{GzDecoder, ZlibDecoder};
 use futures::StreamExt;
 use log::{debug, error, log_enabled, trace, Level};
-use regex::Regex;
 use reqwest::header::CONTENT_ENCODING;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use url::Url;
@@ -21,13 +19,11 @@ use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKin
 use crate::model::config::{ConfigInput, InputFetchMethod};
 use crate::model::stats::format_elapsed_time;
 use crate::repository::storage::{get_input_storage_path, short_hash};
-use crate::repository::xtream_repository::FILE_EPG;
-use crate::utils::compression::compression_utils::{is_deflate, is_gzip, ENCODING_DEFLATE, ENCODING_GZIP};
+use crate::repository::storage_const;
+use crate::utils::compression::compression_utils::{is_deflate, is_gzip};
+use crate::utils::constants::{CONSTANTS, DASH_EXT, DASH_EXT_FRAGMENT, DASH_EXT_QUERY, ENCODING_DEFLATE, ENCODING_GZIP, HLS_EXT, HLS_EXT_FRAGMENT, HLS_EXT_QUERY};
 use crate::utils::debug_if_enabled;
 use crate::utils::file::file_utils::{get_file_path, persist_file};
-
-pub const HLS_EXT: &str = ".m3u8";
-pub const DASH_EXT: &str = ".mpd";
 
 pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
@@ -311,7 +307,7 @@ pub async fn download_text_content_as_file(client: Arc<reqwest::Client>, input: 
         } else {
             let file_path = persist_filepath.map_or_else(|| match get_input_storage_path(&input.name, working_dir) {
                 Ok(download_path) => {
-                    Ok(download_path.join(format!("{}_{FILE_EPG}", short_hash(url_str))))
+                    Ok(download_path.join(format!("{}_{}", short_hash(url_str), storage_const::FILE_EPG)))
                 }
                 Err(err) => Err(err)
             }, Ok);
@@ -368,38 +364,18 @@ pub async fn get_input_json_content(client: Arc<reqwest::Client>, input: &Config
         Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", sanitize_sensitive_info(url), sanitize_sensitive_info(e.to_string().as_str()))
     }
 }
-//
-// pub fn get_base_url(url: &str) -> Option<String> {
-//     if let Some((scheme_end, rest)) = url.split_once("://") {
-//         let scheme = scheme_end;
-//         if let Some(authority_end) = rest.find('/') {
-//             let authority = &rest[..authority_end];
-//             return Some(format!("{}://{}", scheme, authority));
-//         }
-//         return Some(format!("{}://{}", scheme, rest));
-//     }
-//     None
-// }
-
-static USERNAME_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(username=)[^&]*").unwrap());
-static PASSWORD_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(password=)[^&]*").unwrap());
-static TOKEN_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(token=)[^&]*").unwrap());
-static STREAM_URL_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(.*://).*/(live|video|movie|series|m3u-stream|resource)/\w+/\w+").unwrap());
-static URL_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| Regex::new(r"(.*://).*?/(.*)").unwrap());
-
-static SANITIZE_SENSITIVE_INFO: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(true));
 
 pub fn set_sanitize_sensitive_info(value: bool) {
-    SANITIZE_SENSITIVE_INFO.store(value, Ordering::SeqCst);
+    CONSTANTS.sanitize.store(value, Ordering::SeqCst);
 }
 pub fn sanitize_sensitive_info(query: &str) -> String {
-    if SANITIZE_SENSITIVE_INFO.load(Ordering::SeqCst) {
+    if CONSTANTS.sanitize.load(Ordering::SeqCst) {
         // Replace with "***"
-        let masked_query = USERNAME_REGEX.replace_all(query, "$1***");
-        let masked_query = PASSWORD_REGEX.replace_all(&masked_query, "$1***");
-        let masked_query = TOKEN_REGEX.replace_all(&masked_query, "$1***");
-        let masked_query = STREAM_URL_REGEX.replace_all(&masked_query, "$1***/$2/***");
-        let masked_query = URL_REGEX.replace_all(&masked_query, "$1***/$2");
+        let masked_query = CONSTANTS.username.replace_all(query, "$1***");
+        let masked_query = CONSTANTS.password.replace_all(&masked_query, "$1***");
+        let masked_query = CONSTANTS.token.replace_all(&masked_query, "$1***");
+        let masked_query = CONSTANTS.stream_url.replace_all(&masked_query, "$1***/$2/***");
+        let masked_query = CONSTANTS.url.replace_all(&masked_query, "$1***/$2");
         masked_query.to_string()
     } else {
         query.to_string()
@@ -449,12 +425,6 @@ pub fn classify_content_type(headers: &[(String, String)]) -> MimeCategory {
             _ => MimeCategory::Unclassified,
         })
 }
-
-const HLS_EXT_QUERY: &str = ".m3u8?";
-const HLS_EXT_FRAGMENT: &str = ".m3u8#";
-const DASH_EXT_QUERY: &str = ".mpd?";
-const DASH_EXT_FRAGMENT: &str = ".mpd#";
-
 
 pub fn is_hls_url(url: &str) -> bool {
     let lc_url = url.to_lowercase();

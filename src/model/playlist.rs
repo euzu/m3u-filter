@@ -4,7 +4,8 @@ use std::str::FromStr;
 use crate::model::api_proxy::ProxyUserCredentials;
 use crate::model::config::{ConfigInput, ConfigTargetOptions};
 use crate::model::xmltv::TVGuide;
-use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions, PROP_BACKDROP_PATH, PROP_COVER};
+use crate::model::xtream_const;
+use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
 use crate::utils::json_utils::{get_string_from_serde_value, get_u64_from_serde_value};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -475,14 +476,14 @@ macro_rules! generate_field_accessor_impl_for_xtream_playlist_item {
                     )*
                      "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
                     _ => {
-                       if field.starts_with(PROP_BACKDROP_PATH) || field == PROP_COVER {
+                       if field.starts_with(xtream_const::XC_PROP_BACKDROP_PATH) || field == xtream_const::XC_PROP_COVER {
                             let props = self.additional_properties.as_ref().and_then(|add_props| serde_json::from_str::<Map<String, Value>>(add_props).ok());
                             return match props {
                                 Some(doc) => {
-                                    return if field == PROP_COVER {
+                                    return if field == xtream_const::XC_PROP_COVER {
                                        doc.get(field).and_then(|value| value.as_str().map(|s| s.to_string()))
                                     } else {
-                                       get_backdrop_path_value(field, doc.get(PROP_BACKDROP_PATH))
+                                       get_backdrop_path_value(field, doc.get(xtream_const::XC_PROP_BACKDROP_PATH))
                                     }
                                 }
                                 _=> None,

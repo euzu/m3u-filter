@@ -7,11 +7,12 @@ use crate::model::config::{ConfigInput};
 use crate::model::playlist::{PlaylistItemType, XtreamCluster};
 use crate::processing::parser::hls::{rewrite_hls, RewriteHlsProps};
 use crate::utils::network::request;
-use crate::utils::network::request::{is_hls_url, replace_url_extension, sanitize_sensitive_info, HLS_EXT};
+use crate::utils::network::request::{is_hls_url, replace_url_extension, sanitize_sensitive_info};
 use axum::response::IntoResponse;
 use log::{debug, error};
 use serde::Deserialize;
 use std::sync::Arc;
+use crate::utils::constants::HLS_EXT;
 use crate::utils::crypto_utils;
 
 #[derive(Debug, Deserialize)]

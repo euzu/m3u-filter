@@ -13,13 +13,8 @@ use std::io::{BufWriter, Write};
 use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
+use crate::model::xtream_const;
 use crate::utils::file::file_utils::file_writer;
-
-const TAG_VOD_INFO_INFO: &str = "info";
-const TAG_VOD_INFO_MOVIE_DATA: &str = "movie_data";
-const TAG_VOD_INFO_TMDB_ID: &str = "tmdb_id";
-const TAG_VOD_INFO_STREAM_ID: &str = "stream_id";
-const TAG_VOD_INFO_ADDED: &str = "added";
 
 create_resolve_options_function_for_xtream_target!(vod);
 
@@ -30,18 +25,18 @@ async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterErr
 fn extract_info_record_from_vod_info(content: &str) -> Option<(u32, InputVodInfoRecord)> {
     let doc = serde_json::from_str::<Map<String, Value>>(content).ok()?;
 
-    let movie_data = doc.get(TAG_VOD_INFO_MOVIE_DATA)?.as_object()?;
+    let movie_data = doc.get(xtream_const::XC_TAG_VOD_INFO_MOVIE_DATA)?.as_object()?;
     let provider_id = get_u32_from_serde_value(
-        movie_data.get(TAG_VOD_INFO_STREAM_ID)?,
+        movie_data.get(xtream_const::XC_TAG_VOD_INFO_STREAM_ID)?,
     )?;
 
     let added = movie_data
-        .get(TAG_VOD_INFO_ADDED)
+        .get(xtream_const::XC_TAG_VOD_INFO_ADDED)
         .and_then(get_u64_from_serde_value)
         .unwrap_or(0);
 
-    let tmdb_id = doc.get(TAG_VOD_INFO_INFO)?.as_object()
-        .and_then(|info| info.get(TAG_VOD_INFO_TMDB_ID))
+    let tmdb_id = doc.get(xtream_const::XC_TAG_VOD_INFO_INFO)?.as_object()
+        .and_then(|info| info.get(xtream_const::XC_TAG_VOD_INFO_TMDB_ID))
         .and_then(get_u32_from_serde_value)
         .unwrap_or(0);
 
@@ -63,7 +58,7 @@ fn write_vod_info_record_to_wal_file(
 }
 
 fn should_update_vod_info(pli: &mut PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
-    should_update_info(pli, processed_provider_ids, TAG_VOD_INFO_ADDED)
+    should_update_info(pli, processed_provider_ids, xtream_const::XC_TAG_VOD_INFO_ADDED)
 }
 
 pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget, errors: &mut Vec<M3uFilterError>, fpl: &mut FetchedPlaylist<'_>) {

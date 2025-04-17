@@ -10,6 +10,7 @@ pub(crate) mod network;
 pub mod bincode_utils;
 pub mod time_utils;
 pub mod crypto_utils;
+pub mod constants;
 
 #[macro_export]
 macro_rules! debug_if_enabled {
