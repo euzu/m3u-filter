@@ -4,18 +4,10 @@
 - !BREAKING CHANGE! bandwidth `throttle_kbps` attribute for `reverse_proxy.stream` in  `config.yml`
   is now `throttle` and supports units. Allowed units are `KB/s`,`MB/s`,`KiB/s`,`MiB/s`,`kbps`,`mbps`,`Mibps`.
 Default unit is `kbps`.
-- `grace_period_millis` default set to 0 milliseconds.
-- Added rate limiting per IP. The burst_size defines the initial number of available connections, 
- while period_millis specifies the interval at which one connection is replenished.
-If behind a proxy `x-forwarded-for`, `x-real-ip` or `forwarded` should be set as header. 
-The configuration below allows up to 10 connections initially and then replenishes 1 connection every 500 milliseconds.
-```yaml
-reverse_proxy:
-  rate_limit:
-    enabled: true
-    period_millis: 500
-    burst_size: 10
-```
+- !BREAKING_CHANGE!  `log` config `active_clients` renamed to `log_active_user`
+- !BREAKING_CHANGE! user has now the attribute `ui_enabled` to disable/enable web_ui for user.
+  You need to migrate the user db if you have used `use_user_db:true`.
+  Set it to `false` run old m3u-filter version, then update m3u-filter and set `use_user_db:true`and start.
 - !BREAKING_CHANGE! `web_ui config` restructured and added `user_ui_enabled` attribute
 ```yaml
 web_ui:
@@ -28,12 +20,25 @@ web_ui:
     secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
     userfile: user.txt
 ```
-- !BREAKING_CHANGE! user has now the attribute `ui_enabled` to disable/enable web_ui for user.
-You need to migrate the user db if you have used `use_user_db:true`. 
-Set it to `false` run old m3u-filter version, then update m3u-filter and set `use_user_db:true`and start.   
+- `grace_period_millis` default set to 0 milliseconds.
+- Fixed user grace period
+- Added `default_grace_period_timeout_secs` to `reverse_proxy.stream` config. When grace_period granted,
+until the `default_grace_period_timeout_secs` elapses no grace_period is granted again.
+- Added `method` attribute to input config. It can be set to `GET` or `POST`.
+- Added optional `auto_epg` field to `input epg config` for auto-generating provider epg link.
+- Added rate limiting per IP. The burst_size defines the initial number of available connections,
+  while period_millis specifies the interval at which one connection is replenished.
+  If behind a proxy `x-forwarded-for`, `x-real-ip` or `forwarded` should be set as header.
+  The configuration below allows up to 10 connections initially and then replenishes 1 connection every 500 milliseconds.
+```yaml
+reverse_proxy:
+  rate_limit:
+    enabled: true
+    period_millis: 500
+    burst_size: 10
+```
 - multi epg processing/optimization, auto guessing/assigning epg id's
 - fixed hls redirect url issue
-- fixed user grace period
 
 ```yaml
 epg:
@@ -66,13 +71,9 @@ url: ['file:///${env:M3U_FILTER_HOME}/epg.xml', 'file:///${env:M3U_FILTER_HOME}/
 # multi url  epg
 url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.php?epg_id=2']
 ```
-- added `estrip` to input for auto epg matching, if not given `["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]` is default
+- Added `estrip` to input for auto epg matching, if not given `["3840p", "uhd", "fhd", "hd", "sd", "4k", "plus", "raw"]` is default
   When no matching epg_id is found, the display name is used to match a channel name. The given strings are stripped to get a better match.
-- fixed chno assignment issue
-- Added `method` attribute to input config. It can be set to `GET` or `POST`.  
-- !BREAKING_CHANGE!  `log` config `active_clients` renamed to `log_active_user` 
-- added `default_grace_period_timeout_secs` to `reverse_proxy.stream` config. When grace_period granted, 
-until the `default_grace_period_timeout_secs` elapses no grace_period is granted again.
+- Fixed chno assignment issue
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search
