@@ -9,3 +9,4 @@ pub mod healthcheck;
 pub mod playlist_categories;
 pub mod hdhomerun_config;
 pub mod xtream_const;
+mod serde_utils;

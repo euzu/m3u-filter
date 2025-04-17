@@ -1582,6 +1582,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "bincode",
+ "bitflags 2.9.0",
  "blake3",
  "bytes",
  "chrono",

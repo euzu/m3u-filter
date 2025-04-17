@@ -1,4 +1,5 @@
 #![allow(clippy::struct_excessive_bools)]
+use bitflags::bitflags;
 use enum_iterator::Sequence;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
@@ -30,6 +31,7 @@ use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
 use crate::utils::size_utils::{parse_size_base_2, parse_to_kbps};
 use crate::utils::sys_utils::exit;
+use crate::model::serde_utils::{serialize_option_force_redirect, deserialize_option_force_redirect};
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15";
 
@@ -315,6 +317,8 @@ pub struct ConfigTargetOptions {
     pub share_live_streams: bool,
     #[serde(default)]
     pub remove_duplicates: bool,
+    #[serde(default,  serialize_with = "serialize_option_force_redirect", deserialize_with = "deserialize_option_force_redirect")]
+    pub force_redirect: Option<ForceRedirect>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -380,6 +384,15 @@ pub enum TargetOutput {
     M3u(M3uTargetOutput),
     Strm(StrmTargetOutput),
     HdHomeRun(HdHomeRunTargetOutput),
+}
+
+bitflags! {
+    #[derive(Debug, Clone)]
+   pub struct ForceRedirect: u16 {
+        const Live   = 0b0000_0001;
+        const Vod    = 0b0000_0010;
+        const Series = 0b0000_0100;
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -1184,7 +1197,7 @@ pub struct VideoDownloadConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub episode_pattern: Option<String>,
     #[serde(default, skip_serializing, skip_deserializing)]
-    pub t_re_episode_pattern: Option<regex::Regex>,
+    pub t_re_episode_pattern: Option<Regex>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
