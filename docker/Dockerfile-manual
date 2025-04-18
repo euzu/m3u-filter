@@ -1,8 +1,8 @@
-FROM gcr.io/distroless/base-debian12 as build
+FROM gcr.io/distroless/base-debian12 AS build
 
 # Scratch Final container
-FROM scratch as scratch-final
-WORKDIR /
+FROM scratch AS scratch-final
+WORKDIR /app
 
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
@@ -11,10 +11,10 @@ COPY ./m3u-filter /
 COPY ./web /web
 COPY ./resources ./resources
 
-CMD ["./m3u-filter", "-s", "-p", "/config"]
+CMD ["./app/m3u-filter", "-s", "-p", "/config"]
 
 # Alpine Final container
-FROM alpine:latest as alpine-final
+FROM alpine:latest AS alpine-final
 
 RUN apk add --no-cache bash curl strace tcpdump bind-tools nano ca-certificates tini
 

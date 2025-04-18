@@ -5,10 +5,10 @@ services:
     image: ghcr.io/euzu/m3u-filter:latest
     working_dir: /
     volumes:
-      - ./data:/data
-      - ./config:/config
-      - ./backup:/backup
-      - ./downloads:/downloads
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./backup:/app/backup
+      - ./downloads:/app/downloads
     environment:
       - TZ=Europe/Paris
     ports:

@@ -1,5 +1,5 @@
 # Build rust stage
-FROM rust:bookworm as rust-build
+FROM rust:bookworm AS rust-build
 
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config musl-tools libssl-dev
 
@@ -15,7 +15,7 @@ COPY . /src
 RUN cargo build --target x86_64-unknown-linux-musl --release
 
 # Build node stage
-FROM node:lts as node-build
+FROM node:lts AS node-build
 
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
@@ -26,7 +26,7 @@ RUN yarn install --prefer-offline --frozen-lockfile --non-interactive --producti
     yarn build &&  rm -rf node_modules
 
 # Build resource stage (using ffmpeg)
-FROM jrottenberg/ffmpeg:latest as resource-build
+FROM jrottenberg/ffmpeg:latest AS resource-build
 WORKDIR /src
 COPY resources ./resources
 RUN ffmpeg -loop 1 -i ./resources/channel_unavailable.jpg -t 10 -r 1 -an \
@@ -45,18 +45,18 @@ RUN ffmpeg -loop 1 -i ./resources/provider_connections_exhausted.jpg -t 10 -r 1 
   ./resources/provider_connections_exhausted.ts
 
 # Final container (Scratch)
-FROM scratch as scratch-final
+FROM scratch AS scratch-final
 WORKDIR /app
 COPY --from=rust-build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=rust-build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter ./m3u-filter
 COPY --from=node-build /app/build ./web
 COPY --from=resource-build /src/resources ./resources
-ENTRYPOINT ["/m3u-filter"]
+ENTRYPOINT ["/app/m3u-filter"]
 CMD ["-s", "-p", "/app/config"]
 
 # Final container (Alpine)
-FROM alpine:latest as alpine-final
+FROM alpine:latest AS alpine-final
 RUN apk add --no-cache bash curl ca-certificates tini
 WORKDIR /app
 COPY --from=rust-build /src/target/x86_64-unknown-linux-musl/release/m3u-filter ./m3u-filter
