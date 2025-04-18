@@ -6,13 +6,14 @@ import {PlaylistCategories, PlaylistItem} from "../model/playlist";
 const PLAYLIST_API_PATH = 'playlist';
 const TARGET_UPDATE_API_PATH = 'playlist/update';
 const REVERSE_URL_API_PATH = 'playlist/reverse';
+const WEBPLAYER_URL_API_PATH = 'playlist/webplayer';
 
 export default interface PlaylistApiService extends ApiService {
     getPlaylist(req: PlaylistRequest): Observable<PlaylistCategories>;
 
     updateTargets(targets: string[]): Observable<any>;
 
-    getReverseUrl(item: PlaylistItem, req: PlaylistRequest): Observable<string>;
+    getWebPlayerUrl(item: PlaylistItem, req: PlaylistRequest): Observable<string>;
 }
 
 export class DefaultPlaylistApiService extends DefaultApiService implements PlaylistApiService {
@@ -28,7 +29,8 @@ export class DefaultPlaylistApiService extends DefaultApiService implements Play
         return this.post(TARGET_UPDATE_API_PATH, targets);
     }
 
-    getReverseUrl(item: PlaylistItem, req: PlaylistRequest): Observable<string> {
-        return this.post(REVERSE_URL_API_PATH + '/' + req.sourceId, item);
+    getWebPlayerUrl(item: PlaylistItem, req: PlaylistRequest): Observable<string> {
+        return this.post(WEBPLAYER_URL_API_PATH + '/' + req.sourceId, item);
     }
+
 }

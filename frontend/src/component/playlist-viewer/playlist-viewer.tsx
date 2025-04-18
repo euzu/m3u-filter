@@ -100,6 +100,7 @@ interface PlaylistViewerProps {
     playlist: PlaylistCategories;
     searchChannel: Observable<SearchRequest>;
     videoChannel: Observable<[PlaylistItem, PlaylistRequest]>;
+    playlistRequest: PlaylistRequest;
     onProgress: (value: boolean) => void;
     onCopy: (playlistItem: PlaylistItem) => void;
     onPlay?: (playlistItem: PlaylistItem) => void;
@@ -108,7 +109,7 @@ interface PlaylistViewerProps {
 }
 
 export default function PlaylistViewer(props:  PlaylistViewerProps) {
-    const {serverConfig, playlist, searchChannel, videoChannel,
+    const {serverConfig, playlist, playlistRequest, searchChannel, videoChannel,
         onProgress, onCopy, onPlay, onDownload, onWebSearch} = props;
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [data, setData] = useState<PlaylistCategories>(EmptyPlaylistCategories);
@@ -161,7 +162,9 @@ export default function PlaylistViewer(props:  PlaylistViewerProps) {
             case 'player' :
                 return <PlaylistVideo data={data} channel={videoChannel} onPlay={onPlay}/>
             default:
-                return <PlaylistTree data={data} state={checked}
+                return <PlaylistTree data={data}
+                                     playlistRequest={playlistRequest}
+                                     state={checked}
                                      onCopy={onCopy} onPlay={undefined}
                                      onDownload={onDownload}
                                      onWebSearch={onWebSearch}

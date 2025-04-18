@@ -122,7 +122,9 @@ export default function PlaylistBrowser(props: PlaylistBrowserProps) {
                 <SourceSelector onDownload={handleSourceDownload} serverConfig={config}/>
             </div>
             <LoadingIndicator loading={progress}/>
-            <PlaylistViewer playlist={playlist} searchChannel={searchChannel}
+            <PlaylistViewer playlist={playlist}
+                            playlistRequest={playlistRequest}
+                            searchChannel={searchChannel}
                             onProgress={handleProgress} onCopy={handleOnCopy} onPlay={handleOnPlay}
                             onDownload={handleOnDownload}
                             onWebSearch={handleOnWebSearch}

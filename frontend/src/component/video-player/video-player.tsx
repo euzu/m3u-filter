@@ -116,7 +116,7 @@ export const VideoPlayer = ({channel, onReady}: VideoPlayerProps) => {
                 if (playlistItem.item_type === PlaylistItemType.LiveHls) {
                     playVideo(playlistItem, playlistItem.url);
                 } else {
-                    services.playlist().getReverseUrl(playlistItem, playlistRequest).pipe(first()).subscribe({
+                    services.playlist().getWebPlayerUrl(playlistItem, playlistRequest).pipe(first()).subscribe({
                         next: (url: string) => {
                             playVideo(playlistItem, url);
                         },

@@ -216,7 +216,7 @@ async fn playlist_content(
     }
 }
 
-async fn playlist_reverse(
+async fn playlist_webplayer(
     axum::extract::Path(target_id): axum::extract::Path<u32>,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Json(playlist_item): axum::extract::Json<XtreamPlaylistItem>,
@@ -302,7 +302,7 @@ pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>, web_ui_
         .route("/config/main", axum::routing::post(save_config_main))
         .route("/config/user", axum::routing::post(save_config_api_proxy_user))
         .route("/config/apiproxy", axum::routing::post(save_config_api_proxy_config))
-        .route("/playlist/reverse/{target_id}", axum::routing::post(playlist_reverse))
+        .route("/playlist/webplayer/{target_id}", axum::routing::post(playlist_webplayer))
         .route("/playlist/update", axum::routing::post(playlist_update))
         .route("/playlist", axum::routing::post(playlist_content))
         .route("/file/download", axum::routing::post(download_api::queue_download_file))

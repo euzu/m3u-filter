@@ -1,18 +1,21 @@
 import React, {useCallback, useState, useRef, useEffect} from 'react';
 import './playlist-tree.scss';
-import {PlaylistCategories, PlaylistGroup, PlaylistItem} from "../../model/playlist";
+import {PlaylistCategories, PlaylistGroup, PlaylistItem, PlaylistItemType} from "../../model/playlist";
 import copyToClipboard from "../../utils/clipboard";
 import {first} from "rxjs/operators";
 import {noop} from "rxjs";
 import {useSnackbar} from "notistack";
 import {getIconByName} from "../../icons/icons";
 import ServerConfig from "../../model/server-config";
+import {PlaylistRequest, PlaylistRequestType} from "../../model/playlist-request";
+import {useServices} from "../../provider/service-provider";
 
 export type PlaylistTreeState = { [key: number]: boolean };
 
 interface PlaylistTreeProps {
     serverConfig: ServerConfig;
     data: PlaylistCategories;
+    playlistRequest: PlaylistRequest;
     state: PlaylistTreeState;
     onCopy: (playlistItem: PlaylistItem) => void;
     onPlay?: (playlistItem: PlaylistItem) => void;
@@ -21,8 +24,9 @@ interface PlaylistTreeProps {
 }
 
 export default function PlaylistTree(props: PlaylistTreeProps) {
-    const {serverConfig, data, onCopy, onPlay, onDownload, onWebSearch} = props;
+    const {serverConfig, data, playlistRequest, onCopy, onPlay, onDownload, onWebSearch} = props;
 
+    const services = useServices();
     const [, setForceUpdate] = useState(undefined);
     const expanded = useRef<PlaylistTreeState>({});
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
@@ -59,9 +63,35 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         setForceUpdate({});
     }, []);
 
+    const handleClipboardRealUrl = useCallback((e: any) => {
+        const item = getPlaylistItemById(e.target.dataset.item);
+        if (item) {
+            let virtual_id = undefined;
+            switch (playlistRequest.rtype) {
+                case PlaylistRequestType.TARGET:
+                    virtual_id = item.virtual_id;
+                    break;
+                case PlaylistRequestType.INPUT:
+                case PlaylistRequestType.XTREAM:
+                case PlaylistRequestType.M3U:
+                    break;
+            }
+            if (virtual_id) {
+                onCopy(item);
+                copyToClipboard(''+virtual_id).pipe(first()).subscribe({
+                    next: value => enqueueSnackbar(value ? "URL copied to clipboard" : "Copy to clipboard failed!", {variant: value ? 'success' : 'error'}),
+                    error: _ => enqueueSnackbar("Copy to clipboard failed!", {variant: 'error'}),
+                    complete: noop,
+                });
+            }            
+        }
+    }, [enqueueSnackbar, getPlaylistItemById, onCopy, playlistRequest, services]);
+
     const handleClipboardUrl = useCallback((e: any) => {
         const item = getPlaylistItemById(e.target.dataset.item);
         if (item) {
+
+
             onCopy(item);
             copyToClipboard(item.url).pipe(first()).subscribe({
                 next: value => enqueueSnackbar(value ? "URL copied to clipboard" : "Copy to clipboard failed!", {variant: value ? 'success' : 'error'}),
@@ -117,6 +147,9 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
         return <div key={entry.id} className={'tree-group__channel'}>
             <div className={'tree-group__channel-tools'}>
                 <div className={'tool-button'} data-item={entry.id} onClick={handleClipboardUrl}>
+                    {getIconByName('LinkRounded')}
+                </div>
+                <div className={'tool-button'} data-item={entry.id} onClick={handleClipboardRealUrl}>
                     {getIconByName('LinkRounded')}
                 </div>
                 {onPlay && <div className={'tool-button'} data-item={entry.id} onClick={handlePlayUrl}>
