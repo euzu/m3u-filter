@@ -612,26 +612,26 @@ fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache
                 .map(|t| (t.get_attribute_value(EPG_ATTRIB_ID).unwrap(), t)).collect();
 
             let filter_live = |c: &&mut PlaylistItem| c.header.xtream_cluster == XtreamCluster::Live;
-            let filter_missing_epg_id = |c: &&mut PlaylistItem | c.header.epg_channel_id.is_none() || c.header.logo.is_empty() || c.header.logo_small.is_empty();
+            let filter_missing_epg_id = |chan: &&mut PlaylistItem | chan.header.epg_channel_id.is_none() || chan.header.logo.is_empty() || chan.header.logo_small.is_empty();
 
-            let assign_values = |c: &mut PlaylistItem| {
+            let assign_values = |chan: &mut PlaylistItem| {
                 if id_cache.smart_match_enabled {
                     // if the channel has no epg_id  or the epg_id is not present in xmltv/tvguide then we need to match one from existing tvguide
-                    if c.header.epg_channel_id.is_none() || !id_cache.processed.contains(c.header.epg_channel_id.as_ref().unwrap()) {
-                        let normalized = id_cache.normalize(&c.header.name);
+                    if chan.header.epg_channel_id.is_none() || !id_cache.processed.contains(chan.header.epg_channel_id.as_ref().unwrap()) {
+                        let normalized = id_cache.normalize(&chan.header.name);
                         if let Some((_, Some(epg_id))) = id_cache.normalized.get(&Cow::Borrowed(normalized.as_str())) {
-                            c.header.epg_channel_id = Some(epg_id.to_string());
+                            chan.header.epg_channel_id = Some(epg_id.to_string());
                         }
                     }
                 }
-                if c.header.epg_channel_id.is_some() && (c.header.logo.is_empty() || c.header.logo_small.is_empty()) {
-                    if let Some(icon_tag) = icon_tags.get(c.header.epg_channel_id.as_ref().unwrap()) {
+                if chan.header.epg_channel_id.is_some() && (chan.header.logo.is_empty() || chan.header.logo_small.is_empty()) {
+                    if let Some(icon_tag) = icon_tags.get(chan.header.epg_channel_id.as_ref().unwrap()) {
                         if let Some(icon) = icon_tag.icon.as_ref() {
-                            if c.header.logo.is_empty() {
-                                c.header.logo = (*icon).to_string();
+                            if chan.header.logo.is_empty() {
+                                chan.header.logo = (*icon).to_string();
                             }
-                            if c.header.logo_small.is_empty() {
-                                c.header.logo = (*icon).to_string();
+                            if chan.header.logo_small.is_empty() {
+                                chan.header.logo = (*icon).to_string();
                             }
                         }
                     }

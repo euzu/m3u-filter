@@ -27,7 +27,7 @@ struct HlsApiPathParams {
 fn hls_response(hls_content: String) -> impl IntoResponse + Send {
         axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
-            .header(axum::http::header::CONTENT_TYPE, "application/x-mpegURL")
+            .header(axum::http::header::CONTENT_TYPE, "application/x-mpegurl")
             .body(hls_content)
             .unwrap()
             .into_response()

@@ -43,7 +43,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub(in crate::api) enum XtreamApiStreamContext {
     LiveAlt,
     Live,
@@ -95,7 +95,7 @@ impl FromStr for XtreamApiStreamContext {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 struct XtreamApiStreamRequest<'a> {
     context: XtreamApiStreamContext,
     access_token: bool,
@@ -181,7 +181,7 @@ async fn xtream_player_api_stream(
 ) -> impl IntoResponse + Send {
     let (user, target) = try_option_bad_request!(get_user_target_by_credentials(stream_req.username, stream_req.password, api_req, app_state).await, false, format!("Could not find any user {}", stream_req.username));
     if user.permission_denied(app_state) {
-        return axum::http::StatusCode::FORBIDDEN.into_response();
+        return StatusCode::FORBIDDEN.into_response();
     }
     let connection_permission = user.connection_permission(app_state).await;
     if connection_permission == UserConnectionPermission::Exhausted {
@@ -191,43 +191,31 @@ async fn xtream_player_api_stream(
     let target_name = &target.name;
     if !target.has_output(&TargetType::Xtream) {
         debug!("Target has no xtream output {target_name}");
-        return axum::http::StatusCode::BAD_REQUEST.into_response();
+        return StatusCode::BAD_REQUEST.into_response();
     }
+
     let (action_stream_id, stream_ext) = separate_number_and_remainder(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let (pli, mapping) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
-    let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
+    let redirect_request = user.proxy == ProxyType::Redirect || target.is_force_redirect(pli.item_type);
 
-    if user.proxy == ProxyType::Redirect || target.is_force_redirect(pli.item_type) {
-        if pli.xtream_cluster == XtreamCluster::Series {
-            let ext = stream_ext.unwrap_or_else(String::new);
-            let url = input.url.as_str();
-            let username = input.username.as_ref().map_or("", |v| v);
-            let password = input.password.as_ref().map_or("", |v| v);
-            let stream_url = format!("{url}/series/{username}/{password}/{}{ext}", mapping.provider_id);
-            return redirect(&stream_url).into_response();
-        }
-
-        if is_hls_request || pli.item_type == PlaylistItemType::LiveDash {
-            let redirect_url = if is_hls_request { &replace_url_extension(&pli.url, HLS_EXT) } else { &replace_url_extension(&pli.url, DASH_EXT) };
-            debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
-            return redirect(redirect_url).into_response();
-        }
-
-        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&pli.url));
-        return redirect(&pli.url).into_response();
-    }
-
-    // Reverse proxy mode
-    if is_hls_request {
-        return handle_hls_stream_request(app_state, &user, &pli.url, pli.virtual_id, input).await.into_response();
+    // handle redirect for series
+    if  redirect_request && pli.xtream_cluster == XtreamCluster::Series {
+        let ext = stream_ext.unwrap_or_else(String::new);
+        let url = input.url.as_str();
+        let username = input.username.as_ref().map_or("", |v| v);
+        let password = input.password.as_ref().map_or("", |v| v);
+        // TODO do i need action_path like for timeshift ?
+        let stream_url = format!("{url}/series/{username}/{password}/{}{ext}", mapping.provider_id);
+        return redirect(&stream_url).into_response();
     }
 
     let extension = stream_ext.unwrap_or_else(
         || extract_extension_from_url(&pli.url).map_or_else(String::new, std::string::ToString::to_string));
 
+    // if there is a action_path (like for timeshift duration/start) it will be added in front of the stream_id
     let query_path = if stream_req.action_path.is_empty() {
         format!("{}{extension}", pli.provider_id)
     } else {
@@ -239,7 +227,26 @@ async fn xtream_player_api_stream(
         true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}",
         stream_req.context));
 
-    trace_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
+    let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || extension == HLS_EXT;
+
+    // hls or dash redirect
+    if  redirect_request  && (is_hls_request || pli.item_type == PlaylistItemType::LiveDash) {
+        let redirect_url = if is_hls_request { &replace_url_extension(&stream_url, HLS_EXT) } else { &replace_url_extension(&stream_url, DASH_EXT) };
+        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
+        return redirect(redirect_url).into_response();
+    }
+
+    if  redirect_request {
+        debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&stream_url));
+        return redirect(&stream_url).into_response();
+    }
+
+    // Reverse proxy mode
+    if is_hls_request {
+        return handle_hls_stream_request(app_state, &user, &stream_url, pli.virtual_id, input).await.into_response();
+    }
+
+    debug_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
     stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user, connection_permission).await.into_response()
 }
 
@@ -515,18 +522,27 @@ fn get_non_empty<'a>(first: &'a str, second: &'a str, third: &'a str) -> &'a str
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+struct XtreamApiTimeShiftRequest {
+    username: String,
+    password: String,
+    duration: String,
+    start: String,
+    stream_id: String,
+}
+
 async fn xtream_player_api_timeshift_stream(
     req_headers: HeaderMap,
     axum::extract::Query(api_query_req): axum::extract::Query<UserApiRequest>,
-    axum::extract::Path((path_username, path_password, path_duration, path_start, path_stream_id)): axum::extract::Path<(String, String, String, String, String)>,
+    axum::extract::Path(timeshift_request): axum::extract::Path<XtreamApiTimeShiftRequest>,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
     axum::extract::Form(api_form_req): axum::extract::Form<UserApiRequest>,
 ) -> impl IntoResponse + Send {
-    let username = get_non_empty(&path_username, &api_query_req.username, &api_form_req.username);
-    let password = get_non_empty(&path_password, &api_query_req.password, &api_form_req.password);
-    let stream_id = get_non_empty(&path_stream_id, &api_query_req.stream, &api_form_req.stream);
-    let duration = get_non_empty(&path_duration, &api_query_req.duration, &api_form_req.duration);
-    let start = get_non_empty(&path_start, &api_query_req.start, &api_form_req.start);
+    let username = get_non_empty(&timeshift_request.username, &api_query_req.username, &api_form_req.username);
+    let password = get_non_empty(&timeshift_request.password, &api_query_req.password, &api_form_req.password);
+    let stream_id = get_non_empty(&timeshift_request.stream_id, &api_query_req.stream, &api_form_req.stream);
+    let duration = get_non_empty(&timeshift_request.duration, &api_query_req.duration, &api_form_req.duration);
+    let start = get_non_empty(&timeshift_request.start, &api_query_req.start, &api_form_req.start);
     let action_path = format!("{duration}/{start}");
     xtream_player_api_stream(&req_headers, &api_query_req, &app_state, XtreamApiStreamRequest::from(XtreamApiStreamContext::Timeshift, username, password, stream_id, &action_path)).await
 }

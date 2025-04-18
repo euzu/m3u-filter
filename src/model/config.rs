@@ -1465,6 +1465,16 @@ impl StreamConfig {
         if let Some(throttle) = &self.throttle {
             self.throttle_kbps = parse_to_kbps(throttle).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err))?;
         }
+
+        if self.grace_period_millis > 0 {
+            if self.grace_period_timeout_secs == 0 {
+                let triple_ms = self.grace_period_millis * 3;
+                self.grace_period_timeout_secs = std::cmp::max(1, (triple_ms + 999) / 1000);
+            } else if self.grace_period_millis / 1000 > self.grace_period_timeout_secs {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Grace time period timeout {} sec should be more than grace time period {} ms", self.grace_period_timeout_secs, self.grace_period_millis)));
+            }
+        }
+
         Ok(())
     }
 }

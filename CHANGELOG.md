@@ -39,7 +39,7 @@ reverse_proxy:
 ```
 - Multi epg processing/optimization, auto guessing/assigning epg id's
 - Fixed hls redirect url issue
-- Added `force_redirect` to target config options. valid options are `live`, `vod`, series`
+- Added `force_redirect` to target config options. valid options are `live`, `vod`, `series`
 ```yaml
  options: {ignore_logo: false, share_live_streams: false, force_redirect: [vod, series]}
 ```
