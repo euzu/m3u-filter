@@ -108,7 +108,7 @@ async fn m3u_api_stream(
         action_path: "" // TODO is there timeshoft or something like that ?
     };
 
-    if let Some(response) = redirect_response(&redirect_params) {
+    if let Some(response) = redirect_response(&app_state, &redirect_params).await {
         return response.into_response();
     }
 

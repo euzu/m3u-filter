@@ -20,7 +20,7 @@ use crate::model::xtream_const;
 use crate::repository::playlist_repository::get_target_id_mapping;
 use crate::repository::storage::{get_target_storage_path, hex_encode};
 use crate::repository::{storage_const, user_repository, xtream_repository};
-use crate::utils::constants::{HLS_EXT};
+use crate::utils::constants::HLS_EXT;
 use crate::utils::debug_if_enabled;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils;
@@ -140,7 +140,9 @@ pub fn serve_query(file_path: &Path, filter: &HashMap<&str, HashSet<String>>) ->
     axum::Json(filtered)
 }
 
-pub(in crate::api) fn get_xtream_player_api_stream_url(input: &ConfigInput, context: &XtreamApiStreamContext, action_path: &str, fallback_url: &str) -> Option<String> {
+pub(in crate::api) fn get_xtream_player_api_stream_url(
+    input: &ConfigInput, context: &XtreamApiStreamContext, action_path: &str, fallback_url: &str,
+) -> Option<String> {
     if let Some(input_user_info) = input.get_user_info() {
         let ctx = match context {
             XtreamApiStreamContext::LiveAlt |
@@ -209,9 +211,9 @@ async fn xtream_player_api_stream(
         user: &user,
         stream_ext: stream_ext.as_deref(),
         req_context: stream_req.context.clone(),
-        action_path: stream_req.action_path
+        action_path: stream_req.action_path,
     };
-    if let Some(response) = redirect_response(&redirect_params) {
+    if let Some(response) = redirect_response(app_state, &redirect_params).await {
         return response.into_response();
     }
 
@@ -223,11 +225,9 @@ async fn xtream_player_api_stream(
     } else {
         format!("{}/{}{extension}", stream_req.action_path, pli.provider_id)
     };
-    
-    let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input,
-        &stream_req.context, &query_path, &pli.url),
-        true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}",
-        stream_req.context));
+
+    let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input, &stream_req.context, &query_path, &pli.url),
+        true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
 
     let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || extension == HLS_EXT;

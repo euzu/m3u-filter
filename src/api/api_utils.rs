@@ -215,7 +215,7 @@ impl StreamDetails {
 * If successfully a provider connection is used, do not forget to release if unsuccessfully
 */
 async fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Option<&ConfigInput>)
-                         -> (Option<ProviderConnectionGuard>, StreamingOption, Option<HashMap<String, String>>) {
+                               -> (Option<ProviderConnectionGuard>, StreamingOption, Option<HashMap<String, String>>) {
     if let Some(input) = input_opt {
         let provider_connection_guard = app_state.active_provider.acquire_connection(&input.name).await;
         let stream_response_params = match &*provider_connection_guard {
@@ -318,7 +318,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
 
 pub struct RedirectParams<'a, P>
 where
-    P: PlaylistEntry
+    P: PlaylistEntry,
 {
     pub item: &'a P,
     pub provider_id: Option<u32>,
@@ -332,11 +332,28 @@ where
     pub action_path: &'a str,
 }
 
-pub fn redirect_response<P>(params: &RedirectParams<P>) -> Option<impl IntoResponse + Send>
+impl<P> RedirectParams<'_, P>
 where
-    P: PlaylistEntry
+    P: PlaylistEntry,
 {
+    pub fn get_query_path(&self, provider_id: u32, url: &str) -> String {
+        let extension = self.stream_ext.map_or_else(
+            || extract_extension_from_url(url).map_or_else(String::new, std::string::ToString::to_string),
+            std::string::ToString::to_string);
 
+        // if there is a action_path (like for timeshift duration/start) it will be added in front of the stream_id
+        if self.action_path.is_empty() {
+            format!("{provider_id}{extension}")
+        } else {
+            format!("{}/{provider_id}{extension}", self.action_path)
+        }
+    }
+}
+
+pub async fn redirect_response<'a, P>(app_state: &AppState, params: &'a RedirectParams<'a, P>) -> Option<impl IntoResponse + Send>
+where
+    P: PlaylistEntry,
+{
     let item_type = params.item.get_item_type();
     let provider_url = &params.item.get_provider_url();
 
@@ -353,7 +370,6 @@ where
             return Some(redirect(redirect_url.as_str()).into_response());
         }
     } else if params.target_type == TargetType::Xtream {
-
         let Some(provider_id) = params.provider_id else {
             return Some(StatusCode::BAD_REQUEST.into_response());
         };
@@ -362,51 +378,44 @@ where
             return Some(StatusCode::BAD_REQUEST.into_response());
         };
 
-        // handle redirect for series
-        if  redirect_request && params.cluster == XtreamCluster::Series {
-            let ext = params.stream_ext.unwrap_or_default();
-            let url = input.url.as_str();
-            let username = input.username.as_ref().map_or("", |v| v);
-            let password = input.password.as_ref().map_or("", |v| v);
-            // TODO do i need action_path like for timeshift ?
-            let stream_url = format!("{url}/series/{username}/{password}/{provider_id}{ext}");
-            return Some(redirect(&stream_url).into_response());
-        }
+        if redirect_request {
 
-
-        let extension = params.stream_ext.map_or_else(
-            || extract_extension_from_url(provider_url).map_or_else(String::new, std::string::ToString::to_string),
-            std::string::ToString::to_string);
-
-        // if there is a action_path (like for timeshift duration/start) it will be added in front of the stream_id
-        let query_path = if params.action_path.is_empty() {
-            format!("{provider_id}{extension}")
-        } else {
-            format!("{}/{provider_id}{extension}", params.action_path)
-        };
-
-        let target_name = params.target.name.as_str();
-        let virtual_id = params.item.get_virtual_id();
-        let stream_url = match get_xtream_player_api_stream_url(input, &params.req_context, &query_path, provider_url) {
-            None => {
-                error!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", params.req_context);
-                return Some(StatusCode::BAD_REQUEST.into_response())
+            // handle redirect for series but why ?
+            if params.cluster == XtreamCluster::Series {
+                let ext = params.stream_ext.unwrap_or_default();
+                let url = input.url.as_str();
+                let username = input.username.as_ref().map_or("", |v| v);
+                let password = input.password.as_ref().map_or("", |v| v);
+                // TODO do i need action_path like for timeshift ?
+                let stream_url = format!("{url}/series/{username}/{password}/{provider_id}{ext}");
+                return Some(redirect(&stream_url).into_response());
             }
-            Some(url) => url,
-        };
 
-        // hls or dash redirect
-        if redirect_request || is_dash_request {
-            let redirect_url = if is_hls_request { &replace_url_extension(&stream_url, HLS_EXT) } else { &replace_url_extension(&stream_url, DASH_EXT) };
-            debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
-            return Some(redirect(redirect_url).into_response());
-        }
+            let target_name = params.target.name.as_str();
+            let virtual_id = params.item.get_virtual_id();
+            let stream_url = match get_xtream_player_api_stream_url(input, &params.req_context, &params.get_query_path(provider_id, provider_url), provider_url) {
+                None => {
+                    error!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", params.req_context);
+                    return Some(StatusCode::BAD_REQUEST.into_response());
+                }
+                Some(url) => {
+                    match app_state.active_provider.get_next_provider(&input.name).await {
+                        Some(provider_cfg) => get_stream_alternative_url(&url, input, &provider_cfg),
+                        None => url,
+                    }
+                }
+            };
 
-        if  redirect_request {
+            // hls or dash redirect
+            if is_dash_request {
+                let redirect_url = if is_hls_request { &replace_url_extension(&stream_url, HLS_EXT) } else { &replace_url_extension(&stream_url, DASH_EXT) };
+                debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
+                return Some(redirect(redirect_url).into_response());
+            }
+
             debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&stream_url));
             return Some(redirect(&stream_url).into_response());
         }
-
     }
 
     None
