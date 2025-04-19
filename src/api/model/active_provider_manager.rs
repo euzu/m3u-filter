@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
+use log::{debug, log_enabled};
 use tokio::sync::RwLock;
 
 pub struct ProviderConnectionGuard {
@@ -122,6 +123,18 @@ impl ProviderConfig {
         3
     }
 
+    // is intended to use with redirects, to cycle through provider
+    fn get_next(&self, grace: bool) -> bool {
+        let connections = self.current_connections.load(Ordering::SeqCst);
+        if self.max_connections == 0 {
+            return true;
+        }
+        if (!grace && connections < self.max_connections) || (grace && connections <= self.max_connections)  {
+            return true;
+        }
+        false
+    }
+
     pub fn release(&self) {
         let connections = self.current_connections.load(Ordering::SeqCst);
         if connections > 0 {
@@ -154,6 +167,13 @@ impl ProviderConfigWrapper {
             _ => ProviderAllocation::Exhausted,
         }
     }
+
+    pub fn get_next(&self, grace: bool) -> Option<Arc<ProviderConfig>> {
+        if self.inner.get_next(grace) {
+            return Some(Arc::clone(&self.inner));
+        }
+        None
+    }
 }
 impl Deref for ProviderConfigWrapper {
     type Target = ProviderConfig;
@@ -174,6 +194,14 @@ enum ProviderLineup {
 }
 
 impl ProviderLineup {
+
+    fn get_next(&self) -> Option<Arc<ProviderConfig>> {
+        match self {
+            ProviderLineup::Single(lineup) => lineup.get_next(),
+            ProviderLineup::Multi(lineup) => lineup.get_next(),
+        }
+    }
+
     fn acquire(&self) -> ProviderAllocation {
         match self {
             ProviderLineup::Single(lineup) => lineup.acquire(),
@@ -200,6 +228,10 @@ impl SingleProviderLineup {
         Self {
             provider: ProviderConfigWrapper::new(ProviderConfig::new(cfg)),
         }
+    }
+
+    fn get_next(&self) -> Option<Arc<ProviderConfig>> {
+        self.provider.get_next(true)
     }
 
     fn acquire(&self) -> ProviderAllocation {
@@ -338,6 +370,31 @@ impl MultiProviderLineup {
         ProviderAllocation::Exhausted
     }
 
+    // Used for redirect to cylce through provider
+    fn get_next_provider_from_group(priority_group: &ProviderPriorityGroup, grace: bool) -> Option<Arc<ProviderConfig>> {
+        match priority_group {
+            ProviderPriorityGroup::SingleProviderGroup(p) => {
+                return p.get_next(grace);
+            }
+            ProviderPriorityGroup::MultiProviderGroup(index, pg) => {
+                let mut idx = index.load(Ordering::SeqCst);
+                let provider_count = pg.len();
+                let start = idx;
+                for _ in start..provider_count {
+                    let p = pg.get(idx).unwrap();
+                    idx = (idx + 1) % provider_count;
+                    let result = p.get_next(grace);
+                    if result.is_some() {
+                        index.store(idx, Ordering::SeqCst);
+                        return result;
+                    }
+                }
+                index.store(idx, Ordering::SeqCst);
+            }
+        }
+        None
+    }
+
     /// Attempts to acquire a provider from the lineup based on priority and availability.
     ///
     /// # Returns
@@ -390,20 +447,35 @@ impl MultiProviderLineup {
         }
 
         ProviderAllocation::Exhausted
-        // let provider = &self.providers[main_idx];
-        // self.index.store((main_idx + 1) % provider_count, Ordering::SeqCst);
-        //
-        // match provider {
-        //     ProviderPriorityGroup::SingleProviderGroup(p) => ProviderAllocation::Available(p),
-        //     ProviderPriorityGroup::MultiProviderGroup(gindex, group) => {
-        //         let idx = gindex.load(Ordering::SeqCst);
-        //         gindex.store((idx + 1) % group.len(), Ordering::SeqCst);
-        //         match group.get(idx) {
-        //             None => ProviderAllocation::Exhausted,
-        //             Some(p) => ProviderAllocation::Available(p)
-        //         }
-        //     }
-        // }
+    }
+
+    // it intended to use with redirects to cycle through provider
+    fn get_next(&self) -> Option<Arc<ProviderConfig>> {
+        let main_idx = self.index.load(Ordering::SeqCst);
+        let provider_count = self.providers.len();
+
+        for index in main_idx..provider_count {
+            let priority_group = &self.providers[index];
+            let allocation = {
+                let config = Self::get_next_provider_from_group(priority_group, false);
+                if config.is_none() {
+                    Self::get_next_provider_from_group(priority_group, true)
+                } else {
+                    config
+                }
+            };
+            match allocation {
+                None => {}
+                Some(config) => {
+                    if priority_group.is_exhausted() {
+                        self.index.store((index + 1) % provider_count, Ordering::SeqCst);
+                    }
+                    return Some(config);
+                }
+            }
+        }
+
+        None
     }
 
 
@@ -497,9 +569,37 @@ impl ActiveProviderManager {
             Some((lineup, _config)) => lineup.acquire()
         };
 
+        if log_enabled!(log::Level::Debug) {
+            match allocation {
+                ProviderAllocation::Exhausted => {}
+                ProviderAllocation::Available(ref cfg) |
+                ProviderAllocation::GracePeriod(ref cfg) => {
+                    debug!("Using provider {}", cfg.name);
+                }
+            }
+        }
+
         ProviderConnectionGuard {
             manager: Arc::new(self.clone_inner()),
             allocation,
+        }
+    }
+
+    // This method is used for redirects to cycle through provider
+    //
+    pub async fn get_next_provider(&self, input_name: &str) -> Option<Arc<ProviderConfig>> {
+        let providers = self.providers.read().await;
+        match Self::get_provider_config(input_name, &providers) {
+            None => None,
+            Some((lineup, _config)) => {
+                let cfg = lineup.get_next();
+                if log_enabled!(log::Level::Debug) {
+                    if let Some(ref c) = cfg {
+                        debug!("Using provider {}", c.name);
+                    }
+                }
+                cfg
+            }
         }
     }
 

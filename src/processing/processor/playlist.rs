@@ -676,7 +676,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
 
     apply_affixes(&mut processed_fetched_playlists);
 
-    let (new_epg, new_playlist) = process_epg(target, &mut processed_fetched_playlists);
+    let (new_epg, new_playlist) = process_epg(&mut processed_fetched_playlists);
 
     if new_playlist.is_empty() {
         info!("Playlist is empty: {}", &target.name);
@@ -691,7 +691,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
     }
 }
 
-fn process_epg(target: &ConfigTarget, processed_fetched_playlists: &mut Vec<FetchedPlaylist>) -> (Vec<Epg>, Vec<PlaylistGroup>) {
+fn process_epg(processed_fetched_playlists: &mut Vec<FetchedPlaylist>) -> (Vec<Epg>, Vec<PlaylistGroup>) {
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
 
@@ -705,7 +705,7 @@ fn process_epg(target: &ConfigTarget, processed_fetched_playlists: &mut Vec<Fetc
         if id_cache.is_empty() {
             debug!("channel ids are empty");
         } else {
-            debug_if_enabled!("found epg information for {}", &target.name);
+            //debug_if_enabled!("found epg information for {}", &target.name);
             assign_channel_epg(&mut new_epg, fp, &mut id_cache);
         }
         new_playlist.append(&mut fp.playlistgroups);

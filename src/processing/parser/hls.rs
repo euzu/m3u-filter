@@ -12,7 +12,6 @@ pub struct RewriteHlsProps<'a> {
     pub input_id: u16,
 }
 
-
 fn rewrite_hls_url(input: &str, replacement: &str) -> String {
     if replacement.starts_with('/') {
         let parts = input.splitn(4, '/').collect::<Vec<&str>>();

@@ -10,13 +10,13 @@ use crate::api::model::streams::provider_stream::{create_custom_video_stream_res
 use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::auth::authenticator::Claims;
-use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
-use crate::model::config::{ConfigInput, ConfigTarget, InputFetchMethod};
-use crate::model::playlist::PlaylistItemType;
+use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, UserConnectionPermission};
+use crate::model::config::{ConfigInput, ConfigTarget, InputFetchMethod, TargetType};
+use crate::model::playlist::{PlaylistEntry, PlaylistItemType, XtreamCluster};
 use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::file::file_utils::create_new_file_for_write;
 use crate::utils::network::request;
-use crate::utils::network::request::sanitize_sensitive_info;
+use crate::utils::network::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info};
 use crate::utils::{debug_if_enabled, trace_if_enabled};
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
@@ -71,9 +71,11 @@ macro_rules! try_result_bad_request {
 
 pub use try_option_bad_request;
 pub use try_result_bad_request;
+use crate::api::endpoints::xtream_api::{get_xtream_player_api_stream_url, XtreamApiStreamContext};
 use crate::api::model::stream::{BoxedProviderStream, ProviderStreamInfo, ProviderStreamResponse};
 use crate::api::model::streams::throttled_stream::ThrottledStream;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
+use crate::utils::constants::{DASH_EXT, HLS_EXT};
 use crate::utils::default_utils::default_grace_period_millis;
 
 #[allow(clippy::missing_panics_doc)]
@@ -312,6 +314,102 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
             }
         }
     }
+}
+
+pub struct RedirectParams<'a, P>
+where
+    P: PlaylistEntry
+{
+    pub item: &'a P,
+    pub provider_id: Option<u32>,
+    pub cluster: XtreamCluster,
+    pub target_type: TargetType,
+    pub target: &'a ConfigTarget,
+    pub input: Option<&'a ConfigInput>,
+    pub user: &'a ProxyUserCredentials,
+    pub stream_ext: Option<&'a str>,
+    pub req_context: XtreamApiStreamContext,
+    pub action_path: &'a str,
+}
+
+pub fn redirect_response<P>(params: &RedirectParams<P>) -> Option<impl IntoResponse + Send>
+where
+    P: PlaylistEntry
+{
+
+    let item_type = params.item.get_item_type();
+    let provider_url = &params.item.get_provider_url();
+
+    let redirect_request = params.user.proxy == ProxyType::Redirect || params.target.is_force_redirect(item_type);
+    let is_hls_request = item_type == PlaylistItemType::LiveHls || params.stream_ext == Some(HLS_EXT);
+    let is_dash_request = !is_hls_request && item_type == PlaylistItemType::LiveDash || params.stream_ext == Some(DASH_EXT);
+
+    if params.target_type == TargetType::M3u {
+        if redirect_request || is_dash_request {
+            let redirect_url = if is_hls_request { &replace_url_extension(provider_url, HLS_EXT) } else { provider_url };
+            let redirect_url = if is_dash_request { &replace_url_extension(redirect_url, DASH_EXT) } else { redirect_url };
+            // TODO alias processing, redirect to different aliases
+            debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
+            return Some(redirect(redirect_url.as_str()).into_response());
+        }
+    } else if params.target_type == TargetType::Xtream {
+
+        let Some(provider_id) = params.provider_id else {
+            return Some(StatusCode::BAD_REQUEST.into_response());
+        };
+
+        let Some(input) = params.input else {
+            return Some(StatusCode::BAD_REQUEST.into_response());
+        };
+
+        // handle redirect for series
+        if  redirect_request && params.cluster == XtreamCluster::Series {
+            let ext = params.stream_ext.unwrap_or_default();
+            let url = input.url.as_str();
+            let username = input.username.as_ref().map_or("", |v| v);
+            let password = input.password.as_ref().map_or("", |v| v);
+            // TODO do i need action_path like for timeshift ?
+            let stream_url = format!("{url}/series/{username}/{password}/{provider_id}{ext}");
+            return Some(redirect(&stream_url).into_response());
+        }
+
+
+        let extension = params.stream_ext.map_or_else(
+            || extract_extension_from_url(provider_url).map_or_else(String::new, std::string::ToString::to_string),
+            std::string::ToString::to_string);
+
+        // if there is a action_path (like for timeshift duration/start) it will be added in front of the stream_id
+        let query_path = if params.action_path.is_empty() {
+            format!("{provider_id}{extension}")
+        } else {
+            format!("{}/{provider_id}{extension}", params.action_path)
+        };
+
+        let target_name = params.target.name.as_str();
+        let virtual_id = params.item.get_virtual_id();
+        let stream_url = match get_xtream_player_api_stream_url(input, &params.req_context, &query_path, provider_url) {
+            None => {
+                error!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", params.req_context);
+                return Some(StatusCode::BAD_REQUEST.into_response())
+            }
+            Some(url) => url,
+        };
+
+        // hls or dash redirect
+        if redirect_request || is_dash_request {
+            let redirect_url = if is_hls_request { &replace_url_extension(&stream_url, HLS_EXT) } else { &replace_url_extension(&stream_url, DASH_EXT) };
+            debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
+            return Some(redirect(redirect_url).into_response());
+        }
+
+        if  redirect_request {
+            debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&stream_url));
+            return Some(redirect(&stream_url).into_response());
+        }
+
+    }
+
+    None
 }
 
 /// # Panics

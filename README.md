@@ -612,6 +612,15 @@ sort:
     order: asc
   channels:
     - { field: name,  group_pattern: '^DE.*',  order: asc }
+    - field: name
+      group_pattern: '^FR.*'
+      order: asc
+      sequence:
+        - TF1
+        - TF1+1
+        - FRANCE 2
+        - FRANCE 3
+        - FRANCE 4
 ```
 
 ### 2.2.2.2 `output`
@@ -1360,7 +1369,7 @@ Image
 docker build -t m3u-filter .
 ```
 docker-compose.yml
-```dockerfile
+```docker
 version: '3'
 services:
   m3u-filter:
@@ -1383,7 +1392,7 @@ This example is for the local image, the official can be found under `ghcr.io/eu
 
 If you want to use m3u-filter with docker-compose, there is a `--healthcheck` argument for healthchecks
 
-```dockerfile
+```docker
     healthcheck:
       test: ["CMD", "/m3u-filter", "-p", "/config" "--healthcheck"]  
       interval: 30s  

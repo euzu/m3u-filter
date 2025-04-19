@@ -1,21 +1,21 @@
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, redirect, resource_response, separate_number_and_remainder, stream_response, try_option_bad_request, try_result_bad_request};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, redirect, redirect_response, resource_response, separate_number_and_remainder, stream_response, try_option_bad_request, try_result_bad_request, RedirectParams};
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
 use crate::model::api_proxy::{ProxyType, UserConnectionPermission};
 use crate::model::config::{TargetType};
-use crate::model::playlist::{FieldGetAccessor, PlaylistItemType, XtreamCluster};
+use crate::model::playlist::{FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster};
 use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
-use crate::utils::network::request::{replace_url_extension, sanitize_sensitive_info};
-use crate::utils::debug_if_enabled;
+use crate::utils::network::request::{sanitize_sensitive_info};
 use axum::response::IntoResponse;
 use bytes::Bytes;
 use futures::stream;
 use log::{debug, error};
 use std::sync::Arc;
+use crate::api::endpoints::xtream_api::XtreamApiStreamContext;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::repository::storage_const;
-use crate::utils::constants::{DASH_EXT, HLS_EXT};
+use crate::utils::constants::{HLS_EXT};
 
 async fn m3u_api(
     api_req: &UserApiRequest,
@@ -92,17 +92,27 @@ async fn m3u_api_stream(
 
     let input = app_state.config.get_input_by_name(m3u_item.input_name.as_str());
 
-    let is_hls_request = m3u_item.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
-    let is_dash_request = !is_hls_request && m3u_item.item_type == PlaylistItemType::LiveDash || stream_ext.as_deref() == Some(DASH_EXT);
+    let cluster = XtreamCluster::try_from(m3u_item.item_type).unwrap_or(XtreamCluster::Live);
+    let context = XtreamApiStreamContext::try_from(cluster).unwrap_or(XtreamApiStreamContext::Live);
 
-    if user.proxy == ProxyType::Redirect || is_dash_request || target.is_force_redirect(m3u_item.item_type) {
-        let redirect_url = if is_hls_request { &replace_url_extension(&m3u_item.url, HLS_EXT) } else { &m3u_item.url };
-        let redirect_url = if is_dash_request { &replace_url_extension(redirect_url, DASH_EXT) } else { redirect_url };
-        // TODO alias processing, redirect to different aliases
-        debug_if_enabled!("Redirecting m3u stream request to {}", sanitize_sensitive_info(redirect_url));
-        return redirect(redirect_url.as_str()).into_response();
+    let redirect_params = RedirectParams {
+        item: &m3u_item,
+        provider_id: m3u_item.get_provider_id(),
+        cluster,
+        target_type: TargetType::Xtream,
+        target,
+        input,
+        user: &user,
+        stream_ext: stream_ext.as_deref(),
+        req_context: context,
+        action_path: "" // TODO is there timeshoft or something like that ?
+    };
+
+    if let Some(response) = redirect_response(&redirect_params) {
+        return response.into_response();
     }
 
+    let is_hls_request = m3u_item.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
     // Reverse proxy mode
     if is_hls_request {
         let target_name = &target.name;
