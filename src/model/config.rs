@@ -826,6 +826,8 @@ pub struct ConfigInputAlias {
     pub priority: i16,
     #[serde(default)]
     pub max_connections: u16,
+    #[serde(skip)]
+    pub t_base_url: String,
 }
 
 
@@ -839,6 +841,9 @@ impl ConfigInputAlias {
         self.url = self.url.trim().to_string();
         if self.url.is_empty() {
             return Err(info_err!("url for input is mandatory".to_string()));
+        }
+        if let Some(base_url) = get_base_url_from_str(&self.url) {
+            self.t_base_url = base_url;
         }
         self.username = get_trimmed_string(&self.username);
         self.password = get_trimmed_string(&self.password);
@@ -1038,6 +1043,8 @@ pub struct ConfigInput {
     pub max_connections: u16,
     #[serde(default)]
     pub method: InputFetchMethod,
+    #[serde(skip)]
+    pub t_base_url: String,
 }
 
 impl ConfigInput {
@@ -1056,6 +1063,9 @@ impl ConfigInput {
         self.password = get_trimmed_string(&self.password);
         check_input_credentials!(self, self.input_type);
         self.persist = get_trimmed_string(&self.persist);
+        if let Some(base_url) = get_base_url_from_str(&self.url) {
+            self.t_base_url = base_url;
+        }
 
         if let Some(epg) = self.epg.as_mut() {
             let _ = epg.prepare(include_computed);
@@ -1068,8 +1078,8 @@ impl ConfigInput {
 
                 if username.is_none() || password.is_none() {
                     warn!("auto_epg is enabled for input {}, but no credentials could be extracted", self.name);
-                } else if let Some(base_url) = get_base_url_from_str(&self.url) {
-                    let provider_epg_url = format!("{base_url}/xmltv.php?username={}&password={}", username.unwrap_or_default(), password.unwrap_or_default());
+                } else if !self.t_base_url.is_empty()  {
+                    let provider_epg_url = format!("{}/xmltv.php?username={}&password={}", self.t_base_url, username.unwrap_or_default(), password.unwrap_or_default());
                     if !epg.t_urls.contains(&provider_epg_url) {
                         debug!("Added provider epg url {provider_epg_url} for input {}", self.name);
                         epg.t_urls.push(provider_epg_url);
@@ -1136,6 +1146,21 @@ impl ConfigInput {
 
     pub fn get_user_info(&self) -> Option<InputUserInfo> {
         InputUserInfo::new(self.input_type, self.username.as_deref(), self.password.as_deref(), &self.url)
+    }
+
+    pub fn get_matched_config_by_url<'a>(&'a self, url: &str) -> Option<(&'a str, Option<&'a String>, Option<&'a String>)> {
+        if url.contains(&self.t_base_url) {
+            return Some((&self.t_base_url, self.username.as_ref(), self.password.as_ref()));
+        }
+
+        if let Some(aliases) = &self.aliases {
+            for alias in aliases {
+                if url.contains(&alias.t_base_url) {
+                    return Some((&alias.t_base_url, alias.username.as_ref(), alias.password.as_ref()));
+                }
+            }
+        }
+        None
     }
 }
 

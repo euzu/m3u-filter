@@ -716,6 +716,7 @@ mod tests {
             headers: Default::default(),
             options: None,
             method: InputFetchMethod::default(),
+            t_base_url: String::default(),
         }
     }
 
@@ -729,6 +730,7 @@ mod tests {
             password: Some("alias_pass".to_string()),
             priority,
             max_connections,
+            t_base_url: String::default(),
         }
     }
 

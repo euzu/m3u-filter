@@ -496,7 +496,6 @@ pub fn get_base_url_from_str(url: &str) -> Option<String> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::utils::network::request::{get_base_url_from_str, replace_url_extension, sanitize_sensitive_info};

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConfig, ProviderConnectionGuard};
 use crate::api::model::app_state::AppState;
 use crate::api::model::model_utils::get_stream_response_with_headers;
@@ -9,6 +10,12 @@ use crate::api::model::streams::provider_stream;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, create_provider_connections_exhausted_stream, CustomVideoStreamType};
 use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
+use crate::api::endpoints::xtream_api::{get_xtream_player_api_stream_url, XtreamApiStreamContext};
+use crate::api::model::stream::{BoxedProviderStream, ProviderStreamInfo, ProviderStreamResponse};
+use crate::api::model::streams::throttled_stream::ThrottledStream;
+use crate::tools::atomic_once_flag::AtomicOnceFlag;
+use crate::utils::constants::{DASH_EXT, HLS_EXT};
+use crate::utils::default_utils::default_grace_period_millis;
 use crate::auth::authenticator::Claims;
 use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::{ConfigInput, ConfigTarget, InputFetchMethod, TargetType};
@@ -71,12 +78,6 @@ macro_rules! try_result_bad_request {
 
 pub use try_option_bad_request;
 pub use try_result_bad_request;
-use crate::api::endpoints::xtream_api::{get_xtream_player_api_stream_url, XtreamApiStreamContext};
-use crate::api::model::stream::{BoxedProviderStream, ProviderStreamInfo, ProviderStreamResponse};
-use crate::api::model::streams::throttled_stream::ThrottledStream;
-use crate::tools::atomic_once_flag::AtomicOnceFlag;
-use crate::utils::constants::{DASH_EXT, HLS_EXT};
-use crate::utils::default_utils::default_grace_period_millis;
 
 #[allow(clippy::missing_panics_doc)]
 pub async fn serve_file(file_path: &Path, mime_type: mime::Mime) -> impl axum::response::IntoResponse + Send {
@@ -169,6 +170,25 @@ fn get_stream_alternative_url(stream_url: &str, input: &ConfigInput, alias_input
     let modified = stream_url.replace(&input_user_info.base_url, &alt_input_user_info.base_url);
     let modified = modified.replace(&input_user_info.username, &alt_input_user_info.username);
     modified.replace(&input_user_info.password, &alt_input_user_info.password)
+}
+
+async fn get_redirect_alternative_url<'a>(app_state: &AppState, redirect_url: &'a str, input: &ConfigInput) -> Cow<'a, str> {
+    if let Some((base_url, username, password)) = input.get_matched_config_by_url(redirect_url) {
+        if let Some(provider_cfg) = app_state.active_provider.get_next_provider(&input.name).await {
+            let mut new_url = redirect_url.replacen(base_url, provider_cfg.url.as_str(), 1);
+            if let (Some(old_username), Some(old_password)) = (username, password) {
+                if let (Some(new_username), Some(new_password)) = (provider_cfg.username.as_ref(), provider_cfg.password.as_ref()) {
+                    new_url = new_url.replacen(old_username, new_username, 1);
+                    new_url = new_url.replacen(old_password, new_password, 1);
+                    return Cow::Owned(new_url);
+                }
+                // one has credentials the other not, something not right
+                return Cow::Borrowed(redirect_url);
+            }
+            return Cow::Owned(new_url);
+        }
+    }
+    Cow::Borrowed(redirect_url)
 }
 
 type StreamUrl = String;
@@ -365,8 +385,11 @@ where
         if redirect_request || is_dash_request {
             let redirect_url = if is_hls_request { &replace_url_extension(provider_url, HLS_EXT) } else { provider_url };
             let redirect_url = if is_dash_request { &replace_url_extension(redirect_url, DASH_EXT) } else { redirect_url };
-            // TODO alias processing, redirect to different aliases
-            debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(redirect_url));
+            if let Some(input) = params.input {
+                let redirect_url = get_redirect_alternative_url(app_state, redirect_url, input).await;
+                debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&redirect_url));
+                return Some(redirect(&redirect_url).into_response());
+            }
             return Some(redirect(redirect_url.as_str()).into_response());
         }
     } else if params.target_type == TargetType::Xtream {

@@ -303,6 +303,7 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
             password: None,
             priority: 0,
             max_connections: 1,
+            t_base_url: String::default(),
         };
 
         let columns: Vec<&str> = line.split(CSV_SEPARATOR).collect();

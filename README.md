@@ -699,8 +699,9 @@ Target options are:
 If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is added. If `strm_props` is not given `#KODIPROP:inputstream=inputstream.ffmpeg`, `"#KODIPROP:http-reconnect=true` are set too for `kody_style`.
 
 `m3u` output has additional options
-- `m3u_include_type_in_url`, default false, if true adds the stream type `live`, `movie`, `series` to the url of the stream.
-- `m3u_mask_redirect_url`, default false, if true uses urls from `api_proxy.yml` for user in proxy mode `redirect`.
+- `include_type_in_url`, default false, if true adds the stream type `live`, `movie`, `series` to the url of the stream.
+- `mask_redirect_url`, default false, if true uses urls from `api_proxy.yml` for user in proxy mode `redirect`. 
+Needs to be set `true`  if you have multiple provider and want to cycle in redirect mode. 
 
 `xtream` output has additional options
 - `skip_live_direct_source`  if true the direct_source property from provider for live is ignored

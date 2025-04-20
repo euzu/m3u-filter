@@ -43,7 +43,6 @@ impl M3uPlaylistIterator {
                 .map_err(|err| info_err!(format!("Could not deserialize file {m3u_path:?} - {err}")))?;
 
         let filter = user_get_bouquet_filter(cfg, &user.username, None, TargetType::M3u, XtreamCluster::Live).await;
-        // TODO m3u bouquet filter
 
         let server_info = cfg.get_user_server_info(user).await;
         Ok(Self {
