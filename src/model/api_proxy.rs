@@ -55,7 +55,7 @@ impl ProxyType {
     }
 
     pub fn is_reverse(&self, item_type: PlaylistItemType) -> bool {
-        self.is_redirect(item_type)
+        !self.is_redirect(item_type)
     }
 }
 
