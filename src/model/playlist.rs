@@ -79,7 +79,7 @@ impl TryFrom<PlaylistItemType> for XtreamCluster {
         match item_type {
             PlaylistItemType::Live | PlaylistItemType::LiveHls | PlaylistItemType::LiveDash | PlaylistItemType::LiveUnknown => Ok(Self::Live),
             PlaylistItemType::Video => Ok(Self::Video),
-            PlaylistItemType::Series => Ok(Self::Series),
+            PlaylistItemType::Series | PlaylistItemType::SeriesInfo => Ok(Self::Series),
             _ => Err(format!("Cant convert {item_type}")),
         }
     }
