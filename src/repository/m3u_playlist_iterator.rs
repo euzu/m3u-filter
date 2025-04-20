@@ -101,12 +101,9 @@ impl M3uPlaylistIterator {
 
         // TODO hls and unknown reverse proxy
         entry.map(|(mut m3u_pli, _has_next)| {
-            let rewrite_urls = if match &self.proxy_type {
-                ProxyType::Reverse => if self.target_options.as_ref()
-                    .and_then(|o| o.force_redirect.as_ref())
-                    .is_some_and(|fr| fr.force_redirect(m3u_pli.item_type)) { self.mask_redirect_url } else { true },
-                ProxyType::Redirect => self.mask_redirect_url,
-            } {
+            let is_redirect = self.proxy_type.is_redirect(m3u_pli.item_type) || self.target_options.as_ref().and_then(|o| o.force_redirect.as_ref()).is_some_and(|f| f.has_cluster(m3u_pli.item_type));
+            let should_rewrite_urls = if is_redirect { self.mask_redirect_url} else { true };
+            let rewrite_urls = if should_rewrite_urls {
                 Some((self.get_stream_url(&m3u_pli, self.include_type_in_url), if self.rewrite_resource { Some(self.get_resource_url(&m3u_pli)) } else { None }))
             } else {
                 None

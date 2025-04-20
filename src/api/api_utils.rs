@@ -17,7 +17,7 @@ use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::constants::{DASH_EXT, HLS_EXT};
 use crate::utils::default_utils::default_grace_period_millis;
 use crate::auth::authenticator::Claims;
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, UserConnectionPermission};
+use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::{ConfigInput, ConfigTarget, InputFetchMethod, TargetType};
 use crate::model::playlist::{PlaylistEntry, PlaylistItemType, XtreamCluster};
 use crate::tools::lru_cache::LRUResourceCache;
@@ -377,7 +377,7 @@ where
     let item_type = params.item.get_item_type();
     let provider_url = &params.item.get_provider_url();
 
-    let redirect_request = params.user.proxy == ProxyType::Redirect || params.target.is_force_redirect(item_type);
+    let redirect_request = params.user.proxy.is_redirect(item_type) || params.target.is_force_redirect(item_type);
     let is_hls_request = item_type == PlaylistItemType::LiveHls || params.stream_ext == Some(HLS_EXT);
     let is_dash_request = !is_hls_request && item_type == PlaylistItemType::LiveDash || params.stream_ext == Some(DASH_EXT);
 

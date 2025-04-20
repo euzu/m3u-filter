@@ -1,7 +1,6 @@
-use serde::{Deserialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer,};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use crate::model::config::ForceRedirect;
 
 fn value_to_string_array(value: &[Value]) -> Vec<String> {
     value.iter().filter_map(value_to_string).collect()
@@ -84,47 +83,3 @@ where
         }
     }
 }
-
-pub fn deserialize_option_force_redirect<'de, D>(deserializer: D) -> Result<Option<ForceRedirect>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let raw: Vec<String> = Vec::deserialize(deserializer)?;
-    let mut flags = ForceRedirect::empty();
-
-    for s in raw {
-        match s.to_lowercase().as_str() {
-            "live" => flags |= ForceRedirect::Live,
-            "vod" => flags |= ForceRedirect::Vod,
-            "series" => flags |= ForceRedirect::Series,
-            unknown => return Err(serde::de::Error::custom(format!("Unknown ForceRedirect value: {unknown}. Valid values are 'live', 'vod', 'series'."))),
-        }
-    }
-
-    Ok(Some(flags))
-}
-
-#[allow(clippy::ref_option)]
-pub(crate) fn serialize_option_force_redirect<S>(force_redirect: &Option<ForceRedirect>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    if let Some(flags) = force_redirect {
-        let mut flag_strings = Vec::new();
-
-        if flags.contains(ForceRedirect::Live) {
-            flag_strings.push("live".to_string());
-        }
-        if flags.contains(ForceRedirect::Vod) {
-            flag_strings.push("vod".to_string());
-        }
-        if flags.contains(ForceRedirect::Series) {
-            flag_strings.push("series".to_string());
-        }
-
-        serializer.serialize_some(&flag_strings)
-    } else {
-        serializer.serialize_none()
-    }
-}
-

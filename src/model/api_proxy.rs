@@ -1,17 +1,19 @@
-use crate::utils::default_utils::default_as_true;
 use crate::api::model::app_state::AppState;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::Config;
+use crate::model::config::{Config, ClusterFlags};
 use crate::repository::user_repository::{backup_api_user_db_file, get_api_user_db_path, load_api_user, merge_api_user};
+use crate::utils::default_utils::default_as_true;
 use crate::utils::file::config_reader;
 use chrono::Local;
 use enum_iterator::Sequence;
-use log::{debug};
+use log::debug;
 use std::cmp::PartialEq;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs;
 use std::str::FromStr;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use crate::model::playlist::PlaylistItemType;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub enum UserConnectionPermission {
@@ -20,11 +22,9 @@ pub enum UserConnectionPermission {
     GracePeriod,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProxyType {
-    #[serde(rename = "reverse")]
-    Reverse,
-    #[serde(rename = "redirect")]
+    Reverse(Option<ClusterFlags>),
     Redirect,
 }
 
@@ -37,14 +37,40 @@ impl Default for ProxyType {
 impl ProxyType {
     const REVERSE: &'static str = "reverse";
     const REDIRECT: &'static str = "redirect";
+
+    pub fn is_redirect(&self, item_type: PlaylistItemType) -> bool {
+        match self {
+            ProxyType::Reverse(Some(flags)) => {
+                if flags.is_empty() {
+                    return false;
+                }
+                if flags.has_cluster(item_type) {
+                    return false;
+                }
+                true
+            },
+            ProxyType::Reverse(None) => false,
+            ProxyType::Redirect => true
+        }
+    }
+
+    pub fn is_reverse(&self, item_type: PlaylistItemType) -> bool {
+        self.is_redirect(item_type)
+    }
 }
 
 impl Display for ProxyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Self::Reverse => Self::REVERSE,
-            Self::Redirect => Self::REDIRECT,
-        })
+        match self {
+            Self::Reverse(force_redirect) => {
+                if let Some(force) = force_redirect {
+                    write!(f, "{}{force:?}", Self::REVERSE)
+                } else {
+                    write!(f, "{}", Self::REVERSE)
+                }
+            }
+            Self::Redirect => write!(f, "{}", Self::REDIRECT),
+        }
     }
 }
 
@@ -52,13 +78,57 @@ impl FromStr for ProxyType {
     type Err = M3uFilterError;
 
     fn from_str(s: &str) -> Result<Self, M3uFilterError> {
-        match s {
-            Self::REVERSE => Ok(Self::Reverse),
-            Self::REDIRECT => Ok(Self::Redirect),
-            _ => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+        if s == Self::REDIRECT {
+            return Ok(Self::Redirect);
+        }
+        if s == Self::REVERSE {
+            return Ok(Self::Reverse(None));
+        }
+
+        if s.starts_with(Self::REVERSE) {
+            let suffix = s.strip_prefix(Self::REVERSE).unwrap();
+            if let Ok(force_redirect) = ClusterFlags::try_from(suffix) {
+                if force_redirect.has_full_flags() {
+                    return Ok(ProxyType::Reverse(None));
+                }
+                return Ok(Self::Reverse(Some(force_redirect)));
+            }
+        }
+
+        create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+    }
+}
+
+impl<'de> Deserialize<'de> for ProxyType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw: String = Deserialize::deserialize(deserializer)?;
+        if raw == ProxyType::REDIRECT {
+            return Ok(ProxyType::Redirect);
+        } else if raw.starts_with(ProxyType::REVERSE) {
+            return ProxyType::from_str(raw.as_str()).map_err(serde::de::Error::custom);
+        }
+        Err(serde::de::Error::custom("Unknown proxy type"))
+    }
+}
+
+impl Serialize for ProxyType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            ProxyType::Redirect => serializer.serialize_str(ProxyType::REDIRECT),
+            ProxyType::Reverse(None) => serializer.serialize_str(ProxyType::REVERSE),
+            ProxyType::Reverse(Some(ref force_redirect)) => {
+                serializer.serialize_str(&format!("{}{}", ProxyType::REVERSE, force_redirect))
+            },
         }
     }
 }
+
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
 pub enum ProxyUserStatus {
@@ -134,7 +204,7 @@ pub struct ProxyUserCredentials {
     pub max_connections: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ProxyUserStatus>,
-    #[serde(default =  "default_as_true")]
+    #[serde(default = "default_as_true")]
     pub ui_enabled: bool,
 }
 
@@ -207,7 +277,6 @@ impl ProxyUserCredentials {
         }
         UserConnectionPermission::Allowed
     }
-
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

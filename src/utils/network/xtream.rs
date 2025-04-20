@@ -8,7 +8,7 @@ use crate::repository::xtream_repository;
 use log::{info, warn};
 use std::cmp::Ordering;
 use std::io::Error;
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
+use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::xtream_const;
 use crate::utils::json_utils::get_string_from_serde_value;
 use crate::utils::network::request;
@@ -188,7 +188,7 @@ pub async fn get_xtream_playlist(client: Arc<reqwest::Client>, input: &ConfigInp
 
 pub fn create_vod_info_from_item(target: &ConfigTarget, user: &ProxyUserCredentials, pli: &XtreamPlaylistItem, last_updated: i64) -> String {
     let category_id = pli.category_id;
-    let stream_id = if user.proxy == ProxyType::Redirect || target.is_force_redirect(pli.item_type) { pli.provider_id } else { pli.virtual_id };
+    let stream_id = if user.proxy.is_redirect(pli.item_type)  || target.is_force_redirect(pli.item_type) { pli.provider_id } else { pli.virtual_id };
     let name = &pli.name;
     let extension = pli.get_additional_property("container_extension")
         .map_or_else(|| extract_extension_from_url(&pli.url).map_or_else (String::new, std::string::ToString::to_string),

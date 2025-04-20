@@ -2,7 +2,7 @@ use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, red
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
-use crate::model::api_proxy::{ProxyType, UserConnectionPermission};
+use crate::model::api_proxy::{UserConnectionPermission};
 use crate::model::config::{TargetType};
 use crate::model::playlist::{FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster};
 use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
@@ -151,7 +151,7 @@ async fn m3u_api_resource(
     match stream_url {
         None => axum::http::StatusCode::NOT_FOUND.into_response(),
         Some(url) => {
-            if user.proxy == ProxyType::Redirect || target.is_force_redirect(m3u_item.item_type) {
+            if user.proxy.is_redirect(m3u_item.item_type)  || target.is_force_redirect(m3u_item.item_type) {
                 debug!("Redirecting stream request to {}", sanitize_sensitive_info(&url));
                 redirect(url.as_str()).into_response()
             } else {

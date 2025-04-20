@@ -1,5 +1,5 @@
 use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err, str_to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
+use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, ConfigInput, ConfigTarget, XtreamTargetOutput};
 use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::model::xtream::{rewrite_doc_urls, PlaylistXtreamCategory, XtreamMappingOptions, XtreamSeriesEpisode};
@@ -530,17 +530,13 @@ async fn rewrite_xtream_vod_info<P>(
     // we need to update the info data.
     if config.is_reverse_proxy_resource_rewrite_enabled() {
         if let Some(Value::Object(info_data)) = doc.get_mut(xtream_const::XC_TAG_INFO_DATA) {
-            match user.proxy {
-                ProxyType::Reverse => {
-                    if !target.is_force_redirect(pli.get_item_type()) {
-                        let server_info = config.get_user_server_info(user).await;
-                        let url = server_info.get_base_url();
-                        let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
-                        rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, xtream_const::XC_INFO_RESOURCE_PREFIX);
-                        // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
-                    }
-                }
-                ProxyType::Redirect => {}
+            let item_type = pli.get_item_type();
+            if user.proxy.is_reverse(item_type) && !target.is_force_redirect(item_type) {
+                let server_info = config.get_user_server_info(user).await;
+                let url = server_info.get_base_url();
+                let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
+                rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, xtream_const::XC_INFO_RESOURCE_PREFIX);
+                // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
             }
         }
     }
@@ -609,17 +605,13 @@ async fn rewrite_xtream_series_info<P>(
     let target_path = get_target_storage_path(config, target.name.as_str()).ok_or_else(|| str_to_io_error(&format!("Could not find path for target {}", target.name)))?;
 
     let resource_url = if config.is_reverse_proxy_resource_rewrite_enabled() {
-        match user.proxy {
-            ProxyType::Reverse => {
-                if target.is_force_redirect(pli.get_item_type()) {
-                    None
-                } else {
-                    let server_info = config.get_user_server_info(user).await;
-                    let url = server_info.get_base_url();
-                    Some(format!("{url}/resource/series/{}/{}/{}", user.username, user.password, pli.get_virtual_id()))
-                }
-            }
-            ProxyType::Redirect => None,
+        let item_type = pli.get_item_type();
+        if user.proxy.is_reverse(item_type) && !target.is_force_redirect(item_type) {
+            let server_info = config.get_user_server_info(user).await;
+            let url = server_info.get_base_url();
+            Some(format!("{url}/resource/series/{}/{}/{}", user.username, user.password, pli.get_virtual_id()))
+        } else {
+            None
         }
     } else {
         None

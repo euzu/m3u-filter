@@ -1,14 +1,16 @@
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ApiProxyServerInfo, ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTarget, StrmTargetOutput};
+use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials};
+use crate::model::config::{ClusterFlags, Config, ConfigTarget, StrmTargetOutput};
 use crate::model::playlist::{
     FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType, UUIDType,
 };
 use crate::model::xtream::XtreamSeriesEpisode;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::{ensure_target_storage_path, get_input_storage_path, hash_bytes};
+use crate::repository::storage_const;
 use crate::repository::xtream_repository::{xtream_get_record_file_path, InputVodInfoRecord};
+use crate::utils::constants::{KodiStyle, CONSTANTS};
 use crate::utils::file::file_lock_manager::FileReadGuard;
 use crate::utils::file::file_utils;
 use crate::utils::network::request::extract_extension_from_url;
@@ -19,11 +21,9 @@ use regex::Regex;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc};
+use std::sync::Arc;
 use tokio::fs::{create_dir_all, remove_dir, remove_file, File};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
-use crate::repository::storage_const;
-use crate::utils::constants::{KodiStyle, CONSTANTS};
 
 fn sanitize_for_filename(text: &str, underscore_whitespace: bool) -> String {
     text.trim()
@@ -582,7 +582,7 @@ pub async fn kodi_write_strm_playlist(
 
     let Some(root_path) = file_utils::get_file_path(
         &cfg.working_dir,
-        Some(std::path::PathBuf::from(&target_output.directory))
+        Some(std::path::PathBuf::from(&target_output.directory)),
     ) else {
         return Err(info_err!(format!(
             "Failed to get file path for {}",
@@ -590,7 +590,7 @@ pub async fn kodi_write_strm_playlist(
         )));
     };
 
-    let credentials_and_server_info = get_credentials_and_server_info(cfg, target_output.username.as_ref()).await;
+    let user_and_server_info = get_credentials_and_server_info(cfg, target_output.username.as_ref()).await;
     let strm_index_path =
         strm_get_file_paths(&ensure_target_storage_path(cfg, target.name.as_str())?);
     let existing_strm = {
@@ -606,6 +606,8 @@ pub async fn kodi_write_strm_playlist(
     let mut failed = vec![];
 
     prepare_strm_output_directory(&root_path).await?;
+
+    let target_force_redirect = target.options.as_ref().and_then(|o| o.force_redirect.as_ref());
 
     // we need to consider
     // - Live streams
@@ -628,7 +630,7 @@ pub async fn kodi_write_strm_playlist(
         let relative_file_path = get_relative_path_str(&file_path, &root_path);
 
         // create content
-        let url = get_strm_url(credentials_and_server_info.as_ref(), &strm_file.strm_info);
+        let url = get_strm_url(target_force_redirect, user_and_server_info.as_ref(), &strm_file.strm_info);
         let mut content = target_output.strm_props.as_ref().map_or_else(Vec::new, std::clone::Clone::clone);
         content.push(url);
         let content_text = content.join("\r\n");
@@ -768,9 +770,6 @@ async fn get_credentials_and_server_info(
 ) -> Option<(ProxyUserCredentials, ApiProxyServerInfo)> {
     let username = username?;
     let credentials = cfg.get_user_credentials(username).await?;
-    if credentials.proxy != ProxyType::Reverse {
-        return None;
-    }
     let server_info = cfg.get_user_server_info(&credentials).await;
     Some((credentials, server_info))
 }
@@ -787,33 +786,36 @@ async fn read_strm_file_index(strm_file_index_path: &Path) -> std::io::Result<Ha
 }
 
 fn get_strm_url(
-    credentials_and_server_info: Option<&(ProxyUserCredentials, ApiProxyServerInfo)>,
+    target_force_redirect: Option<&ClusterFlags>,
+    user_and_server_info: Option<&(ProxyUserCredentials, ApiProxyServerInfo)>,
     str_item_info: &StrmItemInfo,
 ) -> String {
-    credentials_and_server_info.as_ref().map_or_else(
-        || str_item_info.url.to_string(),
-        |(user, server_info)| {
-            if let Some(stream_type) = match str_item_info.item_type {
-                PlaylistItemType::Series => Some("series"),
-                PlaylistItemType::Live => Some("live"),
-                PlaylistItemType::Video => Some("movie"),
-                _ => None,
-            } {
-                let url = str_item_info.url.as_str();
-                let ext = extract_extension_from_url(url)
-                    .map_or_else(String::new, std::string::ToString::to_string);
-                format!(
-                    "{}/{stream_type}/{}/{}/{}{ext}",
-                    server_info.get_base_url(),
-                    user.username,
-                    user.password,
-                    str_item_info.virtual_id
-                )
-            } else {
-                str_item_info.url.to_string()
-            }
-        },
-    )
+    let Some((user, server_info)) = user_and_server_info else { return str_item_info.url.to_string(); };
+
+    let redirect = user.proxy.is_redirect(str_item_info.item_type) || target_force_redirect.is_some_and(|f| f.has_cluster(str_item_info.item_type));
+    if redirect {
+        return str_item_info.url.to_string();
+    }
+
+    if let Some(stream_type) = match str_item_info.item_type {
+        PlaylistItemType::Series => Some("series"),
+        PlaylistItemType::Live => Some("live"),
+        PlaylistItemType::Video => Some("movie"),
+        _ => None,
+    } {
+        let url = str_item_info.url.as_str();
+        let ext = extract_extension_from_url(url)
+            .map_or_else(String::new, std::string::ToString::to_string);
+        format!(
+            "{}/{stream_type}/{}/{}/{}{ext}",
+            server_info.get_base_url(),
+            user.username,
+            user.password,
+            str_item_info.virtual_id
+        )
+    } else {
+        str_item_info.url.to_string()
+    }
 }
 
 // /////////////////////////////////////////////

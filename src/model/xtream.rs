@@ -1,5 +1,5 @@
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTarget, ForceRedirect, XtreamTargetOutput};
+use crate::model::api_proxy::{ProxyUserCredentials};
+use crate::model::config::{Config, ConfigTarget, ClusterFlags, XtreamTargetOutput};
 use crate::model::playlist::{PlaylistEntry, PlaylistItem, XtreamCluster, XtreamPlaylistItem};
 use crate::model::serde_utils::{deserialize_as_option_rc_string, deserialize_as_rc_string, deserialize_as_string_array, deserialize_number_from_string};
 use crate::model::xtream_const;
@@ -384,7 +384,7 @@ pub struct XtreamMappingOptions {
     pub skip_video_direct_source: bool,
     pub skip_series_direct_source: bool,
     pub rewrite_resource_url: bool,
-    pub force_redirect: Option<ForceRedirect>,
+    pub force_redirect: Option<ClusterFlags>,
 }
 
 impl XtreamMappingOptions {
@@ -449,22 +449,15 @@ fn make_bdpath_resource_url(resource_url: &str, bd_path: &str, index: usize, fie
 
 pub fn xtream_playlistitem_to_document(pli: &XtreamPlaylistItem, url: &str, options: &XtreamMappingOptions, user: &ProxyUserCredentials) -> serde_json::Value {
     let stream_id_value = Value::Number(serde_json::Number::from(pli.virtual_id));
-    let (resource_url, logo, logo_small) = match user.proxy {
-        ProxyType::Reverse => {
-            if options.force_redirect.as_ref().is_some_and(|fr| fr.force_redirect(pli.item_type)) {
-                (None, pli.logo.clone(), pli.logo_small.clone())
-            } else if options.rewrite_resource_url {
-                let resource_url = format!("{url}/resource/{}/{}/{}/{}", pli.xtream_cluster.as_stream_type(), user.username, user.password, pli.get_virtual_id());
-                let logo_url = if pli.logo.is_empty() { String::new() } else { format!("{resource_url}/logo") };
-                let logo_small_url = if pli.logo_small.is_empty() { String::new() } else { format!("{resource_url}/logo_small") };
-                (Some(resource_url), logo_url, logo_small_url)
-            } else {
-                (None, pli.logo.clone(), pli.logo_small.clone())
-            }
-        }
-        ProxyType::Redirect => {
-            (None, pli.logo.clone(), pli.logo_small.clone())
-        }
+
+    let is_reverse = user.proxy.is_reverse(pli.item_type) && !options.force_redirect.as_ref().is_some_and(|o| o.has_cluster(pli.item_type));
+    let (resource_url, logo, logo_small) = if is_reverse && options.rewrite_resource_url {
+        let resource_url = format!("{url}/resource/{}/{}/{}/{}", pli.xtream_cluster.as_stream_type(), user.username, user.password, pli.get_virtual_id());
+        let logo_url = if pli.logo.is_empty() { String::new() } else { format!("{resource_url}/logo") };
+        let logo_small_url = if pli.logo_small.is_empty() { String::new() } else { format!("{resource_url}/logo_small") };
+        (Some(resource_url), logo_url, logo_small_url)
+    } else {
+        (None, pli.logo.clone(), pli.logo_small.clone())
     };
     let mut document = serde_json::Map::from_iter([
         ("category_id".to_string(), Value::String(format!("{}", &pli.category_id))),

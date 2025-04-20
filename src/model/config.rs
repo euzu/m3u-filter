@@ -1,8 +1,9 @@
 #![allow(clippy::struct_excessive_bools)]
-use bitflags::bitflags;
+use bitflags::{bitflags};
 use enum_iterator::Sequence;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
+use std::{fmt};
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufRead;
@@ -16,6 +17,8 @@ use log::{debug, error, warn};
 use path_clean::PathClean;
 use rand::Rng;
 use regex::Regex;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::Error;
 use url::Url;
 
 use crate::foundation::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
@@ -25,7 +28,6 @@ use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::model::serde_utils::{deserialize_option_force_redirect, serialize_option_force_redirect};
 use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16, default_grace_period_millis, default_grace_period_timeout_secs};
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
@@ -318,12 +320,8 @@ pub struct ConfigTargetOptions {
     pub share_live_streams: bool,
     #[serde(default)]
     pub remove_duplicates: bool,
-    #[serde(
-        default,
-        serialize_with = "serialize_option_force_redirect",
-        deserialize_with = "deserialize_option_force_redirect"
-    )]
-    pub force_redirect: Option<ForceRedirect>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub force_redirect: Option<ClusterFlags>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -392,21 +390,87 @@ pub enum TargetOutput {
 }
 
 bitflags! {
-    #[derive(Debug, Clone)]
-   pub struct ForceRedirect: u16 {
-        const Live   = 0b0000_0001;
-        const Vod  = 0b0000_0010;
-        const Series = 0b0000_0100;
+    #[derive(Debug, Clone, PartialEq, Eq)]
+   pub struct ClusterFlags: u16 {
+        const Live   = 1;      // 0b0000_0001
+        const Vod    = 1 << 1; // 0b0000_0010
+        const Series = 1 << 2; // 0b0000_0100
     }
 }
 
-impl ForceRedirect {
-    pub fn force_redirect(&self, item_type: PlaylistItemType) -> bool {
+impl ClusterFlags {
+    pub fn has_cluster(&self, item_type: PlaylistItemType) -> bool {
         XtreamCluster::try_from(item_type).ok().is_some_and(|cluster| match cluster {
-            XtreamCluster::Live => self.contains(ForceRedirect::Live),
-            XtreamCluster::Video => self.contains(ForceRedirect::Vod),
-            XtreamCluster::Series => self.contains(ForceRedirect::Series),
+            XtreamCluster::Live => self.contains(ClusterFlags::Live),
+            XtreamCluster::Video => self.contains(ClusterFlags::Vod),
+            XtreamCluster::Series => self.contains(ClusterFlags::Series),
         })
+    }
+
+    pub fn has_full_flags(&self) -> bool {
+        self.is_all()
+    }
+}
+
+impl fmt::Display for ClusterFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut flag_strings = Vec::new();
+        if self.contains(ClusterFlags::Live) {
+            flag_strings.push("live");
+        }
+        if self.contains(ClusterFlags::Vod) {
+            flag_strings.push("vod");
+        }
+        if self.contains(ClusterFlags::Series) {
+            flag_strings.push("series");
+        }
+
+        write!(f, "[{}]", flag_strings.join(","))
+    }
+}
+
+impl TryFrom<&str> for ClusterFlags {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+
+        let input = value.trim().trim_matches(|c| c == '[' || c == ']');
+        let items: Vec<&str> = input.split(',')
+            .map(str::trim)
+            .collect();
+        let mut result = ClusterFlags::empty();
+
+        for item in items {
+            match item {
+                "live" => result.set(ClusterFlags::Live, true),
+                "vod" => result.set(ClusterFlags::Vod, true),
+                "series" => result.set(ClusterFlags::Series, true),
+                _ => return Err("Invalid flag {item}, allowed are live, vod, series"),
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+impl Serialize for ClusterFlags {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_some(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for ClusterFlags {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw: String = String::deserialize(deserializer)?;
+        let result = ClusterFlags::try_from(raw.as_str()).map_err(D::Error::custom)?;
+
+        Ok(result)
     }
 }
 
@@ -604,7 +668,7 @@ impl ConfigTarget {
         self.options
             .as_ref()
             .and_then(|options| options.force_redirect.as_ref())
-            .is_some_and(|flags| flags.force_redirect(item_type))
+            .is_some_and(|flags| flags.has_cluster(item_type))
     }
 }
 
@@ -1078,7 +1142,7 @@ impl ConfigInput {
 
                 if username.is_none() || password.is_none() {
                     warn!("auto_epg is enabled for input {}, but no credentials could be extracted", self.name);
-                } else if !self.t_base_url.is_empty()  {
+                } else if !self.t_base_url.is_empty() {
                     let provider_epg_url = format!("{}/xmltv.php?username={}&password={}", self.t_base_url, username.unwrap_or_default(), password.unwrap_or_default());
                     if !epg.t_urls.contains(&provider_epg_url) {
                         debug!("Added provider epg url {provider_epg_url} for input {}", self.name);

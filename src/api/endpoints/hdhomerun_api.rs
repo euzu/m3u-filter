@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use axum::response::IntoResponse;
 use crate::api::model::app_state::{HdHomerunAppState};
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
+use crate::model::api_proxy::{ProxyUserCredentials};
 use crate::model::config::{Config, TargetType};
-use crate::model::playlist::{M3uPlaylistItem, XtreamCluster, XtreamPlaylistItem};
+use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::processing::parser::xtream::get_xtream_url;
 use crate::utils::json_utils::get_string_from_serde_value;
 use bytes::Bytes;
@@ -241,19 +241,18 @@ async fn lineup_json(axum::extract::State(app_state): axum::extract::State<Arc<H
                 .unwrap().into_response();
         } else if (use_all || use_xtream) && target.has_output(&TargetType::Xtream) {
             let server_info = app_state.app_state.config.get_user_server_info(&credentials).await;
-            let base_url = if credentials.proxy == ProxyType::Reverse {
-                Some(server_info.get_base_url())
-            } else {
-                None
-            };
+            let base_url = server_info.get_base_url();
+
+            let base_url_live =  if credentials.proxy.is_redirect(PlaylistItemType::Live) || target.is_force_redirect(PlaylistItemType::Live) { None } else { Some(base_url.clone()) };
+            let base_url_vod =  if credentials.proxy.is_redirect(PlaylistItemType::Video) || target.is_force_redirect(PlaylistItemType::Video) { None } else { Some(base_url) };
 
             let live_channels = XtreamPlaylistIterator::new(XtreamCluster::Live, &cfg, target, None, &credentials).await.ok();
             let vod_channels = XtreamPlaylistIterator::new(XtreamCluster::Video, &cfg, target, None, &credentials).await.ok();
             // TODO include series when resolved
             //let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
             let user_credentials = Arc::new(credentials);
-            let live_stream = xtream_item_to_lineup_stream(Arc::clone(&cfg), XtreamCluster::Live, Arc::clone(&user_credentials), base_url.clone(), live_channels);
-            let vod_stream = xtream_item_to_lineup_stream(Arc::clone(&cfg), XtreamCluster::Video, Arc::clone(&user_credentials), base_url.clone(), vod_channels);
+            let live_stream = xtream_item_to_lineup_stream(Arc::clone(&cfg), XtreamCluster::Live, Arc::clone(&user_credentials), base_url_live.clone(), live_channels);
+            let vod_stream = xtream_item_to_lineup_stream(Arc::clone(&cfg), XtreamCluster::Video, Arc::clone(&user_credentials), base_url_vod.clone(), vod_channels);
             let body_stream = stream::once(async { Ok(Bytes::from("[")) })
                 .chain(live_stream)
                 .chain(stream::once(async { Ok(Bytes::from(",")) }))

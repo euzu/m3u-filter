@@ -266,7 +266,7 @@ async fn xtream_player_api_stream_with_token(
             username: "api_user".to_string(),
             password: "api_user".to_string(),
             token: None,
-            proxy: ProxyType::Reverse,
+            proxy: ProxyType::Reverse(None),
             server: Some(server.to_string()),
             epg_timeshift: None,
             created_at: None,
@@ -457,7 +457,7 @@ async fn xtream_player_api_resource(
     match stream_url {
         None => axum::http::StatusCode::NOT_FOUND.into_response(),
         Some(url) => {
-            if user.proxy == ProxyType::Redirect || target.is_force_redirect(pli.item_type) {
+            if user.proxy.is_redirect(pli.item_type)  || target.is_force_redirect(pli.item_type) {
                 trace_if_enabled!("Redirecting resource request to {}", sanitize_sensitive_info(&url));
                 redirect(url.as_str()).into_response()
             } else {
@@ -609,7 +609,7 @@ async fn xtream_get_short_epg(app_state: &AppState, user: &ProxyUserCredentials,
                         if !(limit.is_empty() || limit.eq("0")) {
                             info_url = format!("{info_url}&limit={limit}");
                         }
-                        if user.proxy == ProxyType::Redirect || target.is_force_redirect(pli.item_type) {
+                        if user.proxy.is_redirect(pli.item_type)  || target.is_force_redirect(pli.item_type) {
                             return redirect(&info_url).into_response();
                         }
 
