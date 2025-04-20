@@ -314,7 +314,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
             <button data-tooltip='LABEL.SAVE' onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
         <TabSet tabs={configs.tabs} active={activeTab} onTabChange={handleTabChange}></TabSet>
-        <div className={'content'}>
+        <div className={'main-config__content'}>
             <div className={'main-config__content-form' + ('api' !== activeTab ? ' hidden' : '')}>
                 <FormView data={apiConfig} fields={configs.api_fields}></FormView>
                 <div className={'main-config__content-help'}>

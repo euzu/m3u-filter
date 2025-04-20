@@ -4,10 +4,6 @@ import {Credentials} from "../../model/server-config";
 import useTranslator from "../../hook/use-translator";
 import FormView, {FormFieldType} from "../form-view/from-view";
 
-const PROXY_OPTIONS = [
-    {value: 'reverse', label: 'Reverse'},
-    {value: 'redirect', label: 'Redirect'}
-];
 const STATUS_OPTIONS = [
     {value: 'Active', label: 'Active'},
     {value: 'Expired', label: 'Expired'},
@@ -22,7 +18,7 @@ const COLUMNS = [
     {name: 'password', label: 'LABEL.PASSWORD', fieldType: FormFieldType.TEXT},
     {name: 'token', label: 'LABEL.TOKEN', fieldType: FormFieldType.TEXT},
     {name: 'server', label: 'LABEL.SERVER', fieldType: FormFieldType.SINGLE_SELECT},
-    {name: 'proxy', label: 'LABEL.PROXY', fieldType: FormFieldType.SINGLE_SELECT, options: PROXY_OPTIONS},
+    {name: 'proxy', label: 'LABEL.PROXY', fieldType: FormFieldType.PROXY_TYPE},
     {name: 'max_connections', label: 'LABEL.MAX_CON', fieldType: FormFieldType.NUMBER},
     {name: 'status', label: 'LABEL.STATUS', fieldType: FormFieldType.SINGLE_SELECT, options: STATUS_OPTIONS},
     {name: 'exp_date', label: 'LABEL.EXP_DATE', fieldType: FormFieldType.DATE},

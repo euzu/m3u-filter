@@ -1,6 +1,6 @@
 import React, {useCallback, useState, useRef, useEffect} from 'react';
 import './playlist-tree.scss';
-import {PlaylistCategories, PlaylistGroup, PlaylistItem, PlaylistItemType} from "../../model/playlist";
+import {PlaylistCategories, PlaylistGroup, PlaylistItem} from "../../model/playlist";
 import copyToClipboard from "../../utils/clipboard";
 import {first} from "rxjs/operators";
 import {noop} from "rxjs";
@@ -8,7 +8,6 @@ import {useSnackbar} from "notistack";
 import {getIconByName} from "../../icons/icons";
 import ServerConfig from "../../model/server-config";
 import {PlaylistRequest, PlaylistRequestType} from "../../model/playlist-request";
-import {useServices} from "../../provider/service-provider";
 
 export type PlaylistTreeState = { [key: number]: boolean };
 
@@ -26,7 +25,6 @@ interface PlaylistTreeProps {
 export default function PlaylistTree(props: PlaylistTreeProps) {
     const {serverConfig, data, playlistRequest, onCopy, onPlay, onDownload, onWebSearch} = props;
 
-    const services = useServices();
     const [, setForceUpdate] = useState(undefined);
     const expanded = useRef<PlaylistTreeState>({});
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
@@ -85,7 +83,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 });
             }            
         }
-    }, [enqueueSnackbar, getPlaylistItemById, onCopy, playlistRequest, services]);
+    }, [enqueueSnackbar, getPlaylistItemById, onCopy, playlistRequest]);
 
     const handleClipboardUrl = useCallback((e: any) => {
         const item = getPlaylistItemById(e.target.dataset.item);
@@ -172,7 +170,7 @@ export default function PlaylistTree(props: PlaylistTreeProps) {
                 <div className={'tree-group__channel-nr'}>{index + 1}</div>
                 {entry.name}</div>
         </div>
-    }, [onPlay, handleClipboardUrl, handlePlayUrl, handleDownloadUrl, isVideoFile, handleWebSearch, serverConfig]);
+    }, [onPlay, handleClipboardUrl, handlePlayUrl, handleDownloadUrl, isVideoFile, handleWebSearch, serverConfig, handleClipboardRealUrl]);
 
     const renderGroup = useCallback((group: PlaylistGroup): React.ReactNode => {
         return <div className={'tree-group'} key={group.id}>

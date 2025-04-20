@@ -9,6 +9,7 @@ import DatePicker from "../date-picker/date-picker";
 import {genUuid} from "../../utils/uuid";
 import {getIconByName} from "../../icons/icons";
 import useTranslator from "../../hook/use-translator";
+import ProxySelect from "../proxy-select/proxy-select";
 // export const isNumber = (value: string): boolean => {
 //     return !isNaN(value as any);
 // }
@@ -23,7 +24,8 @@ export enum FormFieldType {
     TAGS = 'tags',
     MAP = 'map',
     SCHEDULE = 'schedule',
-    DATE = 'date'
+    DATE = 'date',
+    PROXY_TYPE = 'proxy',
 }
 
 export type FormField = {
@@ -128,6 +130,9 @@ export default function FormView(props: FormViewProps) {
             case FormFieldType.SINGLE_SELECT:
                 return <TagSelect options={field.options} name={field.name}
                                   defaultValues={formData?.[field.name]} multi={false} onSelect={handleChange}></TagSelect>
+            case FormFieldType.PROXY_TYPE: {
+                return <ProxySelect name={field.name} value={formData?.[field.name]} onSelect={handleChange}></ProxySelect>
+            }
             case FormFieldType.MAP:
                 return <div className="form-view__map-editor"><MapEditor onChange={handleChange} name={field.name} values={formData?.[field.name]}></MapEditor></div>
             case FormFieldType.TAGS:

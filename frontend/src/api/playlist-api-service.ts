@@ -5,7 +5,6 @@ import {PlaylistCategories, PlaylistItem} from "../model/playlist";
 
 const PLAYLIST_API_PATH = 'playlist';
 const TARGET_UPDATE_API_PATH = 'playlist/update';
-const REVERSE_URL_API_PATH = 'playlist/reverse';
 const WEBPLAYER_URL_API_PATH = 'playlist/webplayer';
 
 export default interface PlaylistApiService extends ApiService {

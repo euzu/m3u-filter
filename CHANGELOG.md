@@ -79,6 +79,10 @@ url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.p
   When no matching epg_id is found, the display name is used to match a channel name. The given strings are stripped to get a better match.
 - Fixed chno assignment issue
 - Redirect Proxy  provider cycle implemented (m3u playlist only cycles when output param `mask_redirect_url` is set). 
+- Reverse Proxy mode for user can now be a subset
+  - `reverse`           -> all reverse
+  - `reverse[live]`     -> only live reverse, vod and series redirect
+  - `reverse[live,vod]` -> series redirect, others reverse
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search
