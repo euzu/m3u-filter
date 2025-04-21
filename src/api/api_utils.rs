@@ -411,6 +411,7 @@ where
                 let password = input.password.as_ref().map_or("", |v| v);
                 // TODO do i need action_path like for timeshift ?
                 let stream_url = format!("{url}/series/{username}/{password}/{provider_id}{ext}");
+                debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&stream_url));
                 return Some(redirect(&stream_url).into_response());
             }
 
