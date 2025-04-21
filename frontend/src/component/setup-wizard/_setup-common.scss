@@ -1,0 +1,45 @@
+@use '../../scss/common' as common;
+
+.setup-label {
+
+}
+
+.wizard-page {
+  display: flex;
+  flex-flow: column;
+  overflow: hidden;
+
+  &__header-title {
+    display: flex;
+    color: var(--title-label-color);
+    justify-content: center;
+  }
+
+  &__content {
+    display: flex;
+    flex-flow: column;
+    overflow: auto;
+  }
+
+  &__toolbar {
+    display: flex;
+    flex-flow: row;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+
+    svg {
+      fill: var(--icon-button-color);
+    }
+
+    button {
+      @include common.textButton();
+    }
+
+    .finish-button {
+      color: var(--option-active-color);
+      background-color: var(--option-active-background-color);
+    }
+  }
+}
