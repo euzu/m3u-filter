@@ -92,6 +92,16 @@
 
       label {
         flex: 1 1 0;
+        display: flex;
+        flex-flow: row;
+        align-items: center;
+        align-content: center;
+        gap: 8px;
+      }
+
+      &-options {
+        font-size: 0.9rem;
+        color: var(--warn-color);
       }
 
       &-toolbar {

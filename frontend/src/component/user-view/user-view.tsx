@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import React, {JSX, ReactNode, useCallback, useEffect, useRef, useState} from "react";
 import './user-view.scss';
 import ServerConfig, {Credentials, TargetUser} from "../../model/server-config";
 import {getIconByName} from "../../icons/icons";
@@ -158,6 +158,7 @@ export default function UserView(props: UserViewProps) {
     const {enqueueSnackbar/*, closeSnackbar*/} = useSnackbar();
     const [serverOptions, setServerOptions] = useState<{ value: string, label: string }[]>([]);
     const [targets, setTargets] = useState<TargetUser[]>([]);
+    const [targetOptions, setTargetOptions] = useState<Record<string, any>>({});
     const [activeTarget, setActiveTarget] = useState<string>(undefined);
     const [tabs, setTabs] = useState<TabSetTab[]>([]);
     const [showHiddenFields, setShowHiddenFields] = useState<Record<string, boolean>>({});
@@ -176,6 +177,13 @@ export default function UserView(props: UserViewProps) {
             setServerOptions(serverOptions || []);
             const target_names = ConfigUtils.getTargetNames(config);
             const missing = config?.api_proxy?.user.filter(target => !target_names.includes(target.target));
+            const targetOptions = config.sources
+                ?.flatMap(s => s.targets || [])
+                ?.reduce((acc: any, t: any) => {
+                    acc[t.name] = t.options || {};
+                    return acc;
+                }, {});
+            setTargetOptions(targetOptions);
             const result: TargetUser[] = target_names?.map(name => ({
                 src: true,
                 target: name,
@@ -338,6 +346,14 @@ export default function UserView(props: UserViewProps) {
         return false;
     }, [targets, translate, enqueueSnackbar]);
 
+    const renderTargetOptions = useCallback((target: string): JSX.Element => {
+        let options = targetOptions?.[target];
+        if (options?.force_redirect?.length > 2) {
+            return <div className={'user__target-target-options'}>{translate('HINT.CONFIG.USER.TARGET_FORCE_REDIRECT')} {options.force_redirect}</div>;
+        }
+        return <></>;
+    }, [targetOptions, translate]);
+
     return <div className={'user'}>
 
         <div className={'user__toolbar'}><label>{translate('LABEL.USER')}</label>
@@ -351,7 +367,10 @@ export default function UserView(props: UserViewProps) {
                     targets?.map(target => <div key={target.target}
                                                 className={'user__target' + (activeTarget !== target.target ? ' hidden' : '')}>
                         <div className={'user__target-target'}>
-                            <label className={(target as any).src ? '' : 'target-not-exists'}>{target.target}</label>
+                            <label className={(target as any).src ? '' : 'target-not-exists'}>
+                                {target.target}
+                                {renderTargetOptions(target.target)}
+                            </label>
                             <div className={'user__target-target-toolbar'}>
                                 <button data-tooltip={'New User'} data-target={target.target}
                                         onClick={handleUserAdd}>{getIconByName('PersonAdd')}</button>

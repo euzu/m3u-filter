@@ -154,6 +154,9 @@
       "API_PROXY": {
         "PATH": "URL path prefix"
       },
+      "USER": {
+        "TARGET_FORCE_REDIRECT": "Force Redirect is set for target"
+      },
       "LOG": {
         "ACTIVE_CLIENTS": "Activates active clients info log"
       },
