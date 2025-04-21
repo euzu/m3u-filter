@@ -25,12 +25,19 @@
       gap: 5px;
     }
 
-    span {
-      padding: 4px;
+    &-sub {
+      border-radius: 2px;
+      border: 1px solid transparent;
+      padding: 2px 4px;
       &:hover {
-        background-color: var(--hint-color);
+        border: 1px solid var(--option-active-background-color);
       }
 
+    }
+
+    &-sub.selected {
+      color: var(--option-active-color);
+      background-color: var(--option-active-background-color);
     }
 
     &:hover {
@@ -40,11 +47,6 @@
     &-selected {
       background-color: var(--checkbox-checked-background-color);
       color: var(--text-color);
-      span.selected {
-        color: var(--option-active-color);
-        background-color: var(--option-active-background-color);
-      }
-
     }
   }
 }
