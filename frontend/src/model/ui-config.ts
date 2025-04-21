@@ -9,7 +9,7 @@ export interface UiConfig {
 }
 
 export const DefaultUiConfig: UiConfig = {
-    languages: ["en", "de", "fr", "tr", "es", "it", "ru", "zh-CN", "zh-HK"],
+    languages: ["en", "de", "fr", "tr", "es", "it", "ru"],
     app_title: "m3u-filter",
     api: {
         apiUrl: "/api/v1/",
