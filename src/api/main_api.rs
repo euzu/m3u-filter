@@ -12,17 +12,11 @@ use crate::api::model::download::DownloadQueue;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
 use crate::model::config::{validate_targets, Config, ProcessTargets, RateLimitConfig, ScheduleConfig};
-use crate::model::healthcheck::{Healthcheck, StatusCheck};
+use crate::model::healthcheck::{Healthcheck};
 use crate::processing::processor::playlist;
 use crate::tools::lru_cache::LRUResourceCache;
-use crate::utils::size_utils::human_readable_byte_size;
-use crate::utils::sys_utils;
-use crate::{BUILD_TIMESTAMP, VERSION};
-use axum::response::IntoResponse;
-use chrono::{DateTime, Utc};
 use log::{error, info};
 use reqwest::Client;
-use std::collections::BTreeMap;
 use std::future::IntoFuture;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
@@ -32,6 +26,8 @@ use std::time::Duration;
 use axum::Router;
 use tokio::sync::Mutex;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
+use crate::api::api_utils::{get_build_time, get_server_time};
+use crate::VERSION;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
     let web_dir = web_root.to_string();
@@ -44,67 +40,17 @@ fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std
 }
 
 
-fn get_server_time() -> String {
-    chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string()
-}
-
-fn get_build_time() -> Option<String> {
-    BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string())
-}
-
-fn get_memory_usage() -> String {
-    sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size)
-}
-
 fn create_healthcheck() -> Healthcheck {
     Healthcheck {
         status: "ok".to_string(),
         version: VERSION.to_string(),
         build_time: get_build_time(),
         server_time: get_server_time(),
-        memory: get_memory_usage(),
-    }
-}
-
-async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
-    let cache = match app_state.cache.as_ref().as_ref() {
-        None => None,
-        Some(lock) => {
-            Some(lock.lock().await.get_size_text())
-        }
-    };
-    let (active_users, active_user_connections) = {
-        let active_user = &app_state.active_users;
-        (active_user.active_users().await, active_user.active_connections().await)
-    };
-
-    let active_provider_connections = app_state.active_provider.active_connections().await.map(|c| c.into_iter().collect::<BTreeMap<_, _>>());
-
-    StatusCheck {
-        status: "ok".to_string(),
-        version: VERSION.to_string(),
-        build_time: get_build_time(),
-        server_time: get_server_time(),
-        memory: get_memory_usage(),
-        active_users,
-        active_user_connections,
-        active_provider_connections,
-        cache,
     }
 }
 
 async fn healthcheck() -> impl axum::response::IntoResponse {
     axum::Json(create_healthcheck())
-}
-
-#[axum::debug_handler]
-async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> axum::response::Response {
-    let status = create_status_check(&app_state).await;
-    match serde_json::to_string_pretty(&status) {
-        Ok(pretty_json) => axum::response::Response::builder().status(axum::http::StatusCode::OK)
-            .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string()).body(pretty_json).unwrap().into_response(),
-        Err(_) => axum::Json(status).into_response(),
-    }
 }
 
 async fn create_shared_data(cfg: &Arc<Config>) -> AppState {
@@ -125,13 +71,12 @@ async fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let active_users = Arc::new(ActiveUserManager::new(cfg.log.as_ref().is_some_and(|l| l.log_active_user)));
     let active_provider = Arc::new(ActiveProviderManager::new(cfg).await);
 
-    let client = if cfg.connect_timeout_secs > 0 {
-        Client::builder()
-            .connect_timeout(Duration::from_secs(u64::from(cfg.connect_timeout_secs)))
-            .build().unwrap_or_else(|_| Client::new())
-    } else {
-        Client::new()
+    let mut builder = Client::builder();
+    if cfg.connect_timeout_secs > 0 {
+        builder = builder.connect_timeout(Duration::from_secs(u64::from(cfg.connect_timeout_secs)))
     };
+
+    let client = builder.build().unwrap_or_else(|_| Client::new());
 
     AppState {
         config: Arc::clone(cfg),
@@ -298,8 +243,7 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
 
     // Web Server
     let mut router = axum::Router::new()
-        .route("/healthcheck", axum::routing::get(healthcheck))
-        .route(&format!("{web_ui_path}/status"), axum::routing::get(status));
+        .route("/healthcheck", axum::routing::get(healthcheck));
     if web_ui_enabled {
         router = router
             .nest_service(&format!("{web_ui_path}/static"), tower_http::services::ServeDir::new(web_dir_path.join("static")))
@@ -321,7 +265,8 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
         api_router = add_rate_limiter(api_router, &rate_limiter);
     }
 
-    router = router.merge(api_router);
+    router = router
+        .merge(api_router);
 
     if web_ui_enabled && web_ui_path.is_empty() {
         router = router.merge(index_register_without_path(&web_dir_path));
@@ -330,7 +275,6 @@ pub async fn start_server(cfg: Arc<Config>, targets: Arc<ProcessTargets>) -> fut
     router = router.layer(create_cors_layer())
         .layer(create_compression_layer());
     //router = router.layer(tower_http::trace::TraceLayer::new_for_http()); // `Logger::default()`
-
     // router = router.layer(axum::middleware::from_fn(log_routes));
 
     let router: axum::Router<()> = router.with_state(shared_data.clone());

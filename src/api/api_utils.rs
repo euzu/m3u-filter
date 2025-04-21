@@ -24,7 +24,7 @@ use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::file::file_utils::create_new_file_for_write;
 use crate::utils::network::request;
 use crate::utils::network::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info};
-use crate::utils::{debug_if_enabled, trace_if_enabled};
+use crate::utils::{debug_if_enabled, sys_utils, trace_if_enabled};
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use futures::{StreamExt, TryStreamExt};
@@ -35,6 +35,7 @@ use std::collections::HashMap;
 use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
+use chrono::{DateTime, Utc};
 use tokio::sync::Mutex;
 use url::Url;
 
@@ -78,6 +79,21 @@ macro_rules! try_result_bad_request {
 
 pub use try_option_bad_request;
 pub use try_result_bad_request;
+use crate::BUILD_TIMESTAMP;
+use crate::utils::size_utils::human_readable_byte_size;
+
+pub fn get_server_time() -> String {
+    chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string()
+}
+
+pub fn get_build_time() -> Option<String> {
+    BUILD_TIMESTAMP.to_string().parse::<DateTime<Utc>>().ok().map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string())
+}
+
+pub fn get_memory_usage() -> String {
+    sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size)
+}
+
 
 #[allow(clippy::missing_panics_doc)]
 pub async fn serve_file(file_path: &Path, mime_type: mime::Mime) -> impl axum::response::IntoResponse + Send {

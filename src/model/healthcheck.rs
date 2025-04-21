@@ -8,7 +8,6 @@ pub struct Healthcheck {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build_time: Option<String>,
     pub server_time: String,
-    pub memory: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

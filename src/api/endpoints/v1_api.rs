@@ -16,9 +16,11 @@ use crate::utils::network::request::sanitize_sensitive_info;
 use axum::response::IntoResponse;
 use log::error;
 use serde_json::{json};
-use std::collections::{HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use crate::api::endpoints::api_playlist_utils::{get_playlist, get_playlist_for_target};
+use crate::model::healthcheck::StatusCheck;
+use crate::VERSION;
 
 fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
@@ -296,9 +298,48 @@ async fn config(
     axum::response::Json(result).into_response()
 }
 
+
+async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
+    let cache = match app_state.cache.as_ref().as_ref() {
+        None => None,
+        Some(lock) => {
+            Some(lock.lock().await.get_size_text())
+        }
+    };
+    let (active_users, active_user_connections) = {
+        let active_user = &app_state.active_users;
+        (active_user.active_users().await, active_user.active_connections().await)
+    };
+
+    let active_provider_connections = app_state.active_provider.active_connections().await.map(|c| c.into_iter().collect::<BTreeMap<_, _>>());
+
+    StatusCheck {
+        status: "ok".to_string(),
+        version: VERSION.to_string(),
+        build_time: crate::api::api_utils::get_build_time(),
+        server_time: crate::api::api_utils::get_server_time(),
+        memory: crate::api::api_utils::get_memory_usage(),
+        active_users,
+        active_user_connections,
+        active_provider_connections,
+        cache,
+    }
+}
+#[axum::debug_handler]
+async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> axum::response::Response {
+    let status = create_status_check(&app_state).await;
+    match serde_json::to_string_pretty(&status) {
+        Ok(pretty_json) => axum::response::Response::builder().status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string()).body(pretty_json).unwrap().into_response(),
+        Err(_) => axum::Json(status).into_response(),
+    }
+}
+
 pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>, web_ui_path: &str) -> axum::Router<Arc<AppState>> {
     let mut router = axum::Router::new();
-    router = router.route("/config", axum::routing::get(config))
+    router = router
+        .route("/status", axum::routing::get(status))
+        .route("/config", axum::routing::get(config))
         .route("/config/main", axum::routing::post(save_config_main))
         .route("/config/user", axum::routing::post(save_config_api_proxy_user))
         .route("/config/apiproxy", axum::routing::post(save_config_api_proxy_config))
