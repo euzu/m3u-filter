@@ -11,7 +11,8 @@ export enum SortOrder {
 export enum TargetType {
     m3u = "m3u",
     xtream = "xtream",
-    strm = "strm"
+    strm = "strm",
+    hdhomerun = "hdhomerun"
 }
 
 export enum ProcessingOrder {
@@ -44,20 +45,9 @@ export interface TargetConfig {
     name: string,
     options: {
         ignore_logo: boolean,
-        underscore_whitespace: boolean,
-        cleanup: boolean,
-        kodi_style: boolean,
-        xtream_skip_live_direct_source: boolean,
-        xtream_skip_video_direct_source: boolean,
-        xtream_skip_series_direct_source: boolean,
-        xtream_resolve_series: boolean,
-        xtream_resolve_series_delay: number,
-        xtream_resolve_vod: boolean,
-        xtream_resolve_vod_delay: number,
-        m3u_include_type_in_url: boolean,
-        m3u_mask_redirect_url: boolean,
         share_live_streams: boolean,
         remove_duplicates: boolean,
+        force_redirect?: string,
     },
     sort: {
         match_as_ascii: boolean,
@@ -74,8 +64,29 @@ export interface TargetConfig {
     filter: string,
     output: [
         {
-            target: TargetType,
+            type: TargetType,
+            // m3u
             filename: string
+            include_type_in_url: boolean,
+            mask_redirect_url: boolean,
+            // xtream
+            skip_live_direct_source: boolean,
+            skip_video_direct_source: boolean,
+            skip_series_direct_source: boolean,
+            resolve_series: boolean,
+            resolve_series_delay: number,
+            resolve_vod: boolean,
+            resolve_vod_delay: number,
+            // strm
+            cleanup: boolean,
+            kodi_style: boolean,
+            directory: string,
+            username?: string, // hdhomerun & strm
+            underscore_whitespace: boolean,
+            strm_props?: string[],
+            // hdhomerun
+            device: String,
+            use_output?: TargetType,
         }
     ],
     rename: [

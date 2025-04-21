@@ -18,7 +18,7 @@ use path_clean::PathClean;
 use rand::Rng;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::de::Error;
+use serde::de::{self, Visitor, SeqAccess, Error};
 use url::Url;
 
 use crate::foundation::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
@@ -410,6 +410,25 @@ impl ClusterFlags {
     pub fn has_full_flags(&self) -> bool {
         self.is_all()
     }
+
+    fn from_items<I, S>(items: I) -> Result<Self, &'static str>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut result = ClusterFlags::empty();
+
+        for item in items {
+            match item.as_ref().trim() {
+                "live" => result.set(ClusterFlags::Live, true),
+                "vod" => result.set(ClusterFlags::Vod, true),
+                "series" => result.set(ClusterFlags::Series, true),
+                _  => return Err("Invalid flag {item}, allowed are live, vod, series"),
+            }
+        }
+
+        Ok(result)
+    }
 }
 
 impl fmt::Display for ClusterFlags {
@@ -433,23 +452,17 @@ impl TryFrom<&str> for ClusterFlags {
     type Error = &'static str;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let input = value.trim().trim_matches(['[', ']'].as_ref());
+        let items = input.split(',').map(str::trim);
+        ClusterFlags::from_items(items)
+    }
+}
 
-        let input = value.trim().trim_matches(|c| c == '[' || c == ']');
-        let items: Vec<&str> = input.split(',')
-            .map(str::trim)
-            .collect();
-        let mut result = ClusterFlags::empty();
+impl TryFrom<Vec<String>> for ClusterFlags {
+    type Error = &'static str;
 
-        for item in items {
-            match item {
-                "live" => result.set(ClusterFlags::Live, true),
-                "vod" => result.set(ClusterFlags::Vod, true),
-                "series" => result.set(ClusterFlags::Series, true),
-                _ => return Err("Invalid flag {item}, allowed are live, vod, series"),
-            }
-        }
-
-        Ok(result)
+    fn try_from(value: Vec<String>) -> Result<Self, Self::Error> {
+        ClusterFlags::from_items(value)
     }
 }
 
@@ -467,10 +480,35 @@ impl<'de> Deserialize<'de> for ClusterFlags {
     where
         D: Deserializer<'de>,
     {
-        let raw: String = String::deserialize(deserializer)?;
-        let result = ClusterFlags::try_from(raw.as_str()).map_err(D::Error::custom)?;
+        struct ClusterFlagsVisitor;
 
-        Ok(result)
+        impl<'de> Visitor<'de> for ClusterFlagsVisitor {
+            type Value = ClusterFlags;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string or a map entry like : [vod, live, series]")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                ClusterFlags::try_from(v).map_err(E::custom)
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut values = Vec::new();
+                while let Some(val) = seq.next_element::<String>()? {
+                    let entry = val.trim().to_lowercase();
+                    values.push(entry);
+                }
+                ClusterFlags::try_from(values).map_err(A::Error::custom)
+            }
+        }
+        deserializer.deserialize_any(ClusterFlagsVisitor)
     }
 }
 
