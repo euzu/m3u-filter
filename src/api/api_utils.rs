@@ -489,7 +489,8 @@ pub fn read_session_cookie(headers: &HeaderMap) -> Option<String> {
 }
 
 fn get_session_cookie(cookie: &str) -> String {
-    format!("{SESSION_COOKIE}{cookie}; HttpOnly; Secure.")
+    // 3 hours should be enough
+    format!("{SESSION_COOKIE}{cookie}; Max-Age=10800; HttpOnly; Secure; SameSite=Strict")
 }
 
 /// # Panics
