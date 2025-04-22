@@ -2,7 +2,14 @@
 Change into the root directory and run:
 
 ```shell
-docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final .  
+# Build for a specific architecture
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=x86_64-unknown-linux-musl .
+
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=aarch64-unknown-linux-musl .
+
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=armv7-unknown-linux-musleabihf .
+
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=x86_64-apple-darwin .
 ```
 PS: If you build `alpine-final` target be aware of the path prefix: `/app`  
 
