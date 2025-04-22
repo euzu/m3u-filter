@@ -10,6 +10,7 @@ import Preferences from "../component/preferences/preferences";
 import useTranslator, {LANGUAGE} from "../hook/use-translator";
 import i18next from "i18next";
 import PlaylistBrowser from '../component/playlist-browser/playlist-browser';
+import SetupWizard from "../component/setup-wizard/setup-wizard";
 
 /* eslint-disable @typescript-eslint/no-empty-interface */
 interface AppProps {
@@ -70,6 +71,12 @@ export default function App(props: AppProps) {
                 <div className={'app-header__toolbar'}><button data-tooltip={preferencesVisible ? 'LABEL.PLAYLIST_BROWSER' : 'LABEL.CONFIGURATION'} onClick={handlePreferences}>{getIconByName(preferencesVisible ? 'Live' : 'Config')}</button></div>
                 <div className={'app-header__toolbar'}><button data-tooltip='LABEL.LOGOUT' onClick={handleLogout}>{getIconByName('Logout')}</button></div>
             </div>
+            {/*<div className={'app-main'}>*/}
+            {/*    <div className={'app-content'}>*/}
+            {/*        <SetupWizard />*/}
+            {/*    </div>*/}
+            {/*</div>*/}
+
             <div className={'app-main' + (preferencesVisible ? '' : '  hidden')}>
                 <div className={'app-content'}>
                     <Preferences config={serverConfig} />

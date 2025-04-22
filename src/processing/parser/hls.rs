@@ -1,5 +1,5 @@
 use crate::model::api_proxy::ProxyUserCredentials;
-use crate::utils::crypto_utils::encrypt_text;
+use crate::utils::crypto_utils::{obfuscate_text};
 use std::str;
 use crate::utils::constants::{CONSTANTS, HLS_PREFIX};
 
@@ -31,7 +31,7 @@ fn rewrite_hls_url(input: &str, replacement: &str) -> String {
 fn rewrite_uri_attrib(line: &str, props: &RewriteHlsProps) -> String {
     if let Some(caps) = CONSTANTS.re_memory_usage.captures(line) {
         let uri = &caps[1];
-        if let Ok(encrypted_uri) = encrypt_text(props.secret, &rewrite_hls_url(&props.hls_url, uri)) {
+        if let Ok(encrypted_uri) = obfuscate_text(props.secret, &rewrite_hls_url(&props.hls_url, uri)) {
             return CONSTANTS.re_hls_uri.replace(line, format!(r#"URI="{encrypted_uri}""#)).to_string();
         }
     }
@@ -46,9 +46,9 @@ pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> Stri
         if line.starts_with('#') {
             result.push(rewrite_uri_attrib(line, props));
         } else if let Ok(token) = if line.starts_with("http") {
-            encrypt_text(props.secret, line)
+            obfuscate_text(props.secret, line)
         } else {
-            encrypt_text(props.secret, &rewrite_hls_url(&props.hls_url, line))
+            obfuscate_text(props.secret, &rewrite_hls_url(&props.hls_url, line))
         } {
             result.push(format!("{}/{HLS_PREFIX}/{username}/{password}/{}/{}/{token}", props.base_url, props.input_id, props.virtual_id));
         }

@@ -1,8 +1,9 @@
-use std::borrow::Cow;
+use crate::api::endpoints::xtream_api::{get_xtream_player_api_stream_url, XtreamApiStreamContext};
 use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConfig, ProviderConnectionGuard};
 use crate::api::model::app_state::AppState;
 use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::request::UserApiRequest;
+use crate::api::model::stream::{BoxedProviderStream, ProviderStreamInfo, ProviderStreamResponse};
 use crate::api::model::stream_error::StreamError;
 use crate::api::model::streams::active_client_stream::ActiveClientStream;
 use crate::api::model::streams::persist_pipe_stream::PersistPipeStream;
@@ -10,32 +11,35 @@ use crate::api::model::streams::provider_stream;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, create_provider_connections_exhausted_stream, CustomVideoStreamType};
 use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
-use crate::api::endpoints::xtream_api::{get_xtream_player_api_stream_url, XtreamApiStreamContext};
-use crate::api::model::stream::{BoxedProviderStream, ProviderStreamInfo, ProviderStreamResponse};
 use crate::api::model::streams::throttled_stream::ThrottledStream;
-use crate::tools::atomic_once_flag::AtomicOnceFlag;
-use crate::utils::constants::{DASH_EXT, HLS_EXT};
-use crate::utils::default_utils::default_grace_period_millis;
 use crate::auth::authenticator::Claims;
 use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::{ConfigInput, ConfigTarget, InputFetchMethod, TargetType};
 use crate::model::playlist::{PlaylistEntry, PlaylistItemType, XtreamCluster};
+use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::tools::lru_cache::LRUResourceCache;
+use crate::utils::constants::{DASH_EXT, HLS_EXT};
+use crate::utils::crypto_utils::{deobfuscate_text, obfuscate_text};
+use crate::utils::default_utils::default_grace_period_millis;
 use crate::utils::file::file_utils::create_new_file_for_write;
 use crate::utils::network::request;
 use crate::utils::network::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info};
+use crate::utils::size_utils::human_readable_byte_size;
 use crate::utils::{debug_if_enabled, sys_utils, trace_if_enabled};
+use crate::BUILD_TIMESTAMP;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
+use chrono::{DateTime, Utc};
 use futures::{StreamExt, TryStreamExt};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use log::{debug, error, log_enabled, trace};
 use reqwest::StatusCode;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
+use axum::body::Body;
 use tokio::sync::Mutex;
 use url::Url;
 
@@ -79,8 +83,6 @@ macro_rules! try_result_bad_request {
 
 pub use try_option_bad_request;
 pub use try_result_bad_request;
-use crate::BUILD_TIMESTAMP;
-use crate::utils::size_utils::human_readable_byte_size;
 
 pub fn get_server_time() -> String {
     chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string()
@@ -250,10 +252,13 @@ impl StreamDetails {
 /**
 * If successfully a provider connection is used, do not forget to release if unsuccessfully
 */
-async fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Option<&ConfigInput>)
+async fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Option<&ConfigInput>, force_provider: Option<&str>)
                                -> (Option<ProviderConnectionGuard>, StreamingOption, Option<HashMap<String, String>>) {
     if let Some(input) = input_opt {
-        let provider_connection_guard = app_state.active_provider.acquire_connection(&input.name).await;
+        let provider_connection_guard = match force_provider {
+            Some(provider) => app_state.active_provider.force_exact_acquire_connection(provider).await,
+            None => app_state.active_provider.acquire_connection(&input.name).await
+        };
         let stream_response_params = match &*provider_connection_guard {
             ProviderAllocation::Exhausted => {
                 let stream = create_provider_connections_exhausted_stream(&app_state.config, &[]);
@@ -261,7 +266,9 @@ async fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt
             }
             ProviderAllocation::Available(ref provider)
             | ProviderAllocation::GracePeriod(ref provider) => {
-                let (provider, url) = if provider.id == input.id {
+                // force_stream_provider means we keep the url and the provider.
+                // If force_stream_provider or the input is the same as the config we dont need to get new url
+                let (provider, url) = if force_provider.is_some() || provider.id == input.id {
                     (input.name.to_string(), stream_url.to_string())
                 } else {
                     (provider.name.to_string(), get_stream_alternative_url(stream_url, input, provider))
@@ -292,9 +299,12 @@ fn get_grace_period_millis(connection_permission: &UserConnectionPermission, str
 async fn create_stream_response_details(app_state: &AppState, stream_options: &StreamOptions, stream_url: &str,
                                         req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
                                         item_type: PlaylistItemType, share_stream: bool,
-                                        connection_permission: UserConnectionPermission) -> StreamDetails {
-    let (mut provider_connection_guard, stream_response_params, input_headers) = get_streaming_options(app_state, stream_url, input_opt).await;
-    let config_grace_period_millis = app_state.config.reverse_proxy.as_ref().and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
+                                        connection_permission: UserConnectionPermission,
+                                        force_provider: Option<&str>) -> StreamDetails {
+    let (mut provider_connection_guard, stream_response_params, input_headers) =
+        get_streaming_options(app_state, stream_url, input_opt, force_provider).await;
+    let config_grace_period_millis = app_state.config.reverse_proxy.as_ref()
+        .and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
     let grace_period_millis = get_grace_period_millis(&connection_permission, &stream_response_params, config_grace_period_millis);
     match stream_response_params {
         StreamingOption::Custom(provider_stream) => {
@@ -327,6 +337,7 @@ async fn create_stream_response_details(app_state: &AppState, stream_options: &S
             // if we have no stream we should release the provider
             if stream.is_none() {
                 drop(provider_connection_guard.take());
+                error!("Cant open stream {}", sanitize_sensitive_info(&request_url));
             }
 
             if log_enabled!(log::Level::Debug) {
@@ -461,6 +472,80 @@ where
     None
 }
 
+fn is_throttled_stream(item_type: PlaylistItemType, throttle_kbps: usize) -> bool {
+    throttle_kbps > 0 && matches!(item_type, PlaylistItemType::Video | PlaylistItemType::Series  | PlaylistItemType::SeriesInfo)
+}
+
+const SESSION_COOKIE: &str = "m3uflt_session=";
+
+pub fn read_session_cookie(headers: &HeaderMap) -> Option<String> {
+    if let Some(cookie_header) = headers.get(axum::http::header::COOKIE) {
+        let cookie_value = cookie_header.to_str().unwrap_or_default();
+        if let Some(cookie) = cookie_value.split(';').map(str::trim).find(|&part| part.starts_with(SESSION_COOKIE)).and_then(|p| p.strip_prefix(SESSION_COOKIE)) {
+            return Some(cookie.to_string());
+        }
+    }
+    None
+}
+
+fn get_session_cookie(cookie: &str) -> String {
+    format!("{SESSION_COOKIE}{cookie}; HttpOnly; Secure.")
+}
+
+/// # Panics
+pub async fn seek_stream_response(app_state: &AppState,
+                                  cookie: &str,
+                                  req_headers: &HeaderMap,
+                                  input: Option<&ConfigInput>,
+                                  item_type: PlaylistItemType,
+                                  _target: &ConfigTarget,
+                                  user: &ProxyUserCredentials) -> impl axum::response::IntoResponse + Send {
+    let stream_options = get_stream_options(app_state);
+    let share_stream = false;
+    let connection_permission = UserConnectionPermission::Allowed;
+
+    if let Ok(provider_and_stream_url) = deobfuscate_text(&app_state.config.t_encrypt_secret, cookie) {
+        let mut parts = provider_and_stream_url.splitn(2, '@');
+        let provider_name = parts.next().unwrap_or("");
+        let stream_url = parts.next().unwrap_or("");
+        if !provider_name.is_empty() && !stream_url.is_empty() {
+            let mut stream_details =
+                create_stream_response_details(app_state, &stream_options, stream_url, req_headers, input, item_type, share_stream, connection_permission.clone(), Some(provider_name)).await;
+
+            if stream_details.has_stream() {
+                let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
+                let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
+
+                let (status_code, header_map) = get_stream_response_with_headers(provider_response);
+                let mut response = axum::response::Response::builder()
+                    .status(status_code);
+                for (key, value) in &header_map {
+                    response = response.header(key, value);
+                }
+
+                response = response.header(axum::http::header::SET_COOKIE, get_session_cookie(cookie));
+
+                let body_stream = prepare_body_stream(app_state, item_type, stream);
+                debug_if_enabled!("Streaming partial stream request from {}", sanitize_sensitive_info(stream_url));
+                return response.body(body_stream).unwrap().into_response();
+            }
+            drop(stream_details.provider_connection_guard.take());
+        }
+    }
+    error!("Cant open partial stream for cookie {cookie}");
+    axum::http::StatusCode::BAD_REQUEST.into_response()
+}
+
+fn prepare_body_stream(app_state: &AppState, item_type: PlaylistItemType, stream: ActiveClientStream) -> Body {
+    let throttle_kbps = usize::try_from(get_stream_throttle(app_state)).unwrap_or_default();
+    let body_stream = if is_throttled_stream(item_type, throttle_kbps) {
+        axum::body::Body::from_stream(ThrottledStream::new(stream.boxed(), throttle_kbps))
+    } else {
+        axum::body::Body::from_stream(stream)
+    };
+    body_stream
+}
+
 /// # Panics
 #[allow(clippy::too_many_arguments)]
 pub async fn stream_response(app_state: &AppState,
@@ -486,11 +571,12 @@ pub async fn stream_response(app_state: &AppState,
 
     let stream_options = get_stream_options(app_state);
     let mut stream_details =
-        create_stream_response_details(app_state, &stream_options, stream_url, req_headers, input, item_type, share_stream, connection_permission.clone()).await;
-
+        create_stream_response_details(app_state, &stream_options, stream_url, req_headers, input, item_type, share_stream, connection_permission.clone(), None).await;
     if stream_details.has_stream() {
         // let content_length = get_stream_content_length(provider_response.as_ref());
         let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
+        let provider_name = stream_details.provider_connection_guard.as_ref().and_then(ProviderConnectionGuard::get_provider_name);
+
         let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
         let stream_resp = if share_stream {
             // Shared Stream response
@@ -515,12 +601,13 @@ pub async fn stream_response(app_state: &AppState,
                 response = response.header(key, value);
             }
 
-            let throttle_kbps = usize::try_from(get_stream_throttle(app_state)).unwrap_or_default();
-            let body_stream = if throttle_kbps > 0 && matches!(item_type, PlaylistItemType::Video | PlaylistItemType::Series  | PlaylistItemType::SeriesInfo) {
-                axum::body::Body::from_stream(ThrottledStream::new(stream.boxed(), throttle_kbps as usize))
-            } else {
-                axum::body::Body::from_stream(stream)
-            };
+            if let Some(provider) = provider_name {
+                if let Ok(cookie_value) = obfuscate_text(&app_state.config.t_encrypt_secret, &format!("{provider}@{stream_url}")) {
+                    response = response.header(axum::http::header::SET_COOKIE, get_session_cookie(&cookie_value));
+                }
+            }
+
+            let body_stream = prepare_body_stream(app_state, item_type, stream);
             response.body(body_stream).unwrap().into_response()
             // if content_length > 0 { response_builder.body(SizedStream::new(content_length, stream)) } else { response_builder.streaming(stream) }
         };
@@ -528,7 +615,6 @@ pub async fn stream_response(app_state: &AppState,
         return stream_resp.into_response();
     }
     drop(stream_details.provider_connection_guard.take());
-    error!("Cant open stream {}", sanitize_sensitive_info(stream_url));
     axum::http::StatusCode::BAD_REQUEST.into_response()
 }
 
@@ -682,4 +768,17 @@ pub fn redirect(url: &str) -> impl IntoResponse {
         .header("Location", url)
         .body(axum::body::Body::empty())
         .unwrap()
+}
+
+pub fn is_seek_response(req_headers: &HeaderMap) -> Option<String> {
+    if let Some(cookie) = read_session_cookie(req_headers) {
+        if let Some(maybe_value) = req_headers.get("range") {
+            if let Ok(value) = maybe_value.to_str() {
+                if !value.starts_with("bytes=0-") {
+                    return Some(cookie);
+                }
+            }
+        }
+    }
+    None
 }

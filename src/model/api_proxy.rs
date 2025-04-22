@@ -185,6 +185,7 @@ impl FromStr for ProxyUserStatus {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProxyUserCredentials {
     pub username: String,
     pub password: String,
@@ -363,6 +364,7 @@ impl ApiProxyServerInfo {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ApiProxyConfig {
     pub server: Vec<ApiProxyServerInfo>,
     pub user: Vec<TargetUser>,

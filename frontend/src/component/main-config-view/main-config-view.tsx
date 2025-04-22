@@ -38,6 +38,16 @@ const isNumber = (value: string): boolean => {
     return !isNaN(value as any);
 }
 
+const getObject = (value: any): any => {
+    if (!value) {
+        return undefined;
+    }
+    if (Object.keys(value).length === 0) {
+        return undefined;
+    }
+    return value;
+}
+
 const CONFIG_API_FIELDS = [
     {name: 'host', label: 'LABEL.HOST', fieldType: FormFieldType.TEXT, validator: undefined},
     {name: 'port', label: 'LABEL.PORT', fieldType: FormFieldType.NUMBER, validator: isNumber},
@@ -240,28 +250,34 @@ export default function MainConfigView(props: MainConfigViewProps) {
             let pushoverConfigAvailable = pushoverConfig?.user?.trim().length && pushoverConfig?.token?.length;
             const cfgMessaging: MessagingConfig = {
                 notify_on: messagingConfig.notify_on,
-                telegram: telegramConfigAvailable ? telegramConfig : undefined,
-                rest: restConfigAvailable ? restConfig : undefined,
-                pushover: pushoverConfigAvailable ? pushoverConfig : undefined,
+                telegram: telegramConfigAvailable ? getObject(telegramConfig) : undefined,
+                rest: restConfigAvailable ? getObject(restConfig) : undefined,
+                pushover: pushoverConfigAvailable ? getObject(pushoverConfig) : undefined,
             };
 
-            let cfgReverseProxyStreamBuffer: StreamConfig = {
+
+            let reverseProxyStreamConfigAvailable = getObject(reverseProxyStreamConfig) != undefined;
+            let cfgReverseProxyStreamBuffer: StreamConfig = reverseProxyStreamConfigAvailable ? ({
                 retry: reverseProxyStreamConfig.retry,
-                throttle: reverseProxyStreamConfig.throttle,
+                throttle: reverseProxyStreamConfig.throttle?.trim().length ? reverseProxyStreamConfig.throttle : undefined,
                 grace_period_millis: reverseProxyStreamConfig.grace_period_millis,
                 grace_period_timeout_secs: reverseProxyStreamConfig.grace_period_timeout_secs,
                 buffer: {
                     enabled: reverseProxyStreamBufferConfig.enabled,
                     size: reverseProxyStreamBufferConfig.size ?? undefined,
                 }
-            }
+            }): undefined;
 
-            const cfgReverseProxy: ReverseProxyConfig = {
+            const reverseProxyConfigAvailable = getObject(reverseProxyConfig) ||
+                getObject(cfgReverseProxyStreamBuffer) ||
+                getObject(reverseProxyCacheConfig) ||
+                getObject(reverseProxyRateLimitConfig);
+            const cfgReverseProxy: ReverseProxyConfig = reverseProxyConfigAvailable ? {
                 resource_rewrite_disabled: reverseProxyConfig.resource_rewrite_disabled,
-                stream: cfgReverseProxyStreamBuffer ?? undefined,
-                cache: reverseProxyCacheConfig ?? undefined,
-                rate_limit: reverseProxyRateLimitConfig ?? undefined,
-            };
+                stream: getObject(cfgReverseProxyStreamBuffer),
+                cache: getObject(reverseProxyCacheConfig),
+                rate_limit: getObject(reverseProxyRateLimitConfig),
+            } : undefined;
 
             const cfgWebUiConfig: WebUiConfig = {
                 enabled: webUiConfig.enabled ?? false,
@@ -270,10 +286,10 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 auth: webAuthConfig,
             }
 
-            const cfgVideo = {
+            const cfgVideo = getObject(videoConfig) && getObject(videoDownloadConfig) ? {
                 ...videoConfig,
-                download: videoDownloadConfig
-            };
+                download: getObject(videoDownloadConfig)
+            }: undefined;
 
             const cfgLog = {
                 ...logConfig
@@ -285,12 +301,12 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 backup_dir: mainConfig.backup_dir,
                 schedules: mainConfig.schedules?.filter(s => s.schedule?.trim().length),
                 threads: mainConfig.threads,
-                messaging: cfgMessaging,
-                reverse_proxy: cfgReverseProxy,
-                video: cfgVideo,
-                log: cfgLog,
+                messaging: getObject(cfgMessaging),
+                reverse_proxy: getObject(cfgReverseProxy),
+                video: getObject(cfgVideo),
+                log: getObject(cfgLog),
                 update_on_boot: mainConfig.update_on_boot,
-                web_ui: cfgWebUiConfig,
+                web_ui: getObject(cfgWebUiConfig),
             };
 
             services.config().saveMainConfig(cfgMain).subscribe({

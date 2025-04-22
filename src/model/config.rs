@@ -28,7 +28,7 @@ use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::utils::default_utils::{default_as_default, default_as_true, default_as_two_u16, default_grace_period_millis, default_grace_period_timeout_secs};
+use crate::utils::default_utils::{default_as_default, default_as_true, default_resolve_delay_secs, default_grace_period_millis, default_grace_period_timeout_secs, default_connect_timeout_secs};
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
@@ -335,11 +335,11 @@ pub struct XtreamTargetOutput {
     pub skip_series_direct_source: bool,
     #[serde(default)]
     pub resolve_series: bool,
-    #[serde(default = "default_as_two_u16")]
+    #[serde(default = "default_resolve_delay_secs")]
     pub resolve_series_delay: u16,
     #[serde(default)]
     pub resolve_vod: bool,
-    #[serde(default = "default_as_two_u16")]
+    #[serde(default = "default_resolve_delay_secs")]
     pub resolve_vod_delay: u16,
 }
 
@@ -1330,6 +1330,7 @@ pub struct LogConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct LogLevelConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub log: Option<LogConfig>,
@@ -1737,7 +1738,7 @@ pub struct Config {
     pub log: Option<LogConfig>,
     #[serde(default)]
     pub user_access_control: bool,
-    #[serde(default)]
+    #[serde(default = "default_connect_timeout_secs")]
     pub connect_timeout_secs: u32,
     #[serde(default)]
     pub update_on_boot: bool,

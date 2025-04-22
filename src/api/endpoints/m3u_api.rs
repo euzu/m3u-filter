@@ -1,4 +1,4 @@
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, redirect, redirect_response, resource_response, separate_number_and_remainder, stream_response, try_option_bad_request, try_result_bad_request, RedirectParams};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_response, redirect, redirect_response, resource_response, seek_stream_response, separate_number_and_remainder, stream_response, try_option_bad_request, try_result_bad_request, RedirectParams};
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
@@ -73,10 +73,6 @@ async fn m3u_api_stream(
     if user.permission_denied(&app_state) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
-    let connection_permission = user.connection_permission(&app_state).await;
-    if connection_permission == UserConnectionPermission::Exhausted {
-        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
-    }
 
     if !target.has_output(&TargetType::M3u) {
         return axum::http::StatusCode::BAD_REQUEST.into_response();
@@ -91,6 +87,17 @@ async fn m3u_api_stream(
     };
 
     let input = app_state.config.get_input_by_name(m3u_item.input_name.as_str());
+
+
+    if let Some(cookie) = is_seek_response(&req_headers) {
+        // partial request means we are in reverse proxy mode, seek happened
+        return seek_stream_response(&app_state, &cookie, &req_headers, input, m3u_item.item_type, target, &user).await.into_response()
+    }
+
+    let connection_permission = user.connection_permission(&app_state).await;
+    if connection_permission == UserConnectionPermission::Exhausted {
+        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+    }
 
     let cluster = XtreamCluster::try_from(m3u_item.item_type).unwrap_or(XtreamCluster::Live);
     let context = XtreamApiStreamContext::try_from(cluster).unwrap_or(XtreamApiStreamContext::Live);

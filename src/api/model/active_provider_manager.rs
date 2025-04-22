@@ -1,14 +1,26 @@
 use crate::model::config::{Config, ConfigInput, ConfigInputAlias, InputType, InputUserInfo};
+use log::{debug, log_enabled};
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::sync::{Arc};
 use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
-use log::{debug, log_enabled};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub struct ProviderConnectionGuard {
     manager: Arc<ActiveProviderManager>,
     allocation: ProviderAllocation,
+}
+
+impl ProviderConnectionGuard {
+    pub fn get_provider_name(&self) -> Option<String> {
+        match self.allocation {
+            ProviderAllocation::Exhausted => None,
+            ProviderAllocation::Available(ref cfg) |
+            ProviderAllocation::GracePeriod(ref cfg) => {
+                Some(cfg.name.clone())
+            }
+        }
+    }
 }
 
 impl Deref for ProviderConnectionGuard {
@@ -22,7 +34,7 @@ impl Drop for ProviderConnectionGuard {
     fn drop(&mut self) {
         match &self.allocation {
             ProviderAllocation::Exhausted => {}
-            ProviderAllocation::Available(config)|
+            ProviderAllocation::Available(config) |
             ProviderAllocation::GracePeriod(config) => {
                 let manager = self.manager.clone();
                 let provider_config = Arc::clone(config);
@@ -116,11 +128,15 @@ impl ProviderConfig {
             self.current_connections.fetch_add(1, Ordering::SeqCst);
             return 1;
         }
-        if (!grace && connections < self.max_connections) || (grace && connections <= self.max_connections)  {
+        if (!grace && connections < self.max_connections) || (grace && connections <= self.max_connections) {
             self.current_connections.fetch_add(1, Ordering::SeqCst);
             return if connections < self.max_connections { 1 } else { 2 };
         }
         3
+    }
+
+    fn force_allocate(&self) {
+        self.current_connections.fetch_add(1, Ordering::SeqCst);
     }
 
     // is intended to use with redirects, to cycle through provider
@@ -129,7 +145,7 @@ impl ProviderConfig {
         if self.max_connections == 0 {
             return true;
         }
-        if (!grace && connections < self.max_connections) || (grace && connections <= self.max_connections)  {
+        if (!grace && connections < self.max_connections) || (grace && connections <= self.max_connections) {
             return true;
         }
         false
@@ -149,7 +165,7 @@ impl ProviderConfig {
 
 #[derive(Clone, Debug)]
 struct ProviderConfigWrapper {
-  inner: Arc<ProviderConfig>
+    inner: Arc<ProviderConfig>,
 }
 
 
@@ -158,6 +174,11 @@ impl ProviderConfigWrapper {
         Self {
             inner: Arc::new(cfg)
         }
+    }
+
+    pub fn force_allocate(&self) -> ProviderAllocation {
+        self.inner.force_allocate();
+        ProviderAllocation::Available(Arc::clone(&self.inner))
     }
 
     pub fn try_allocate(&self, grace: bool) -> ProviderAllocation {
@@ -194,7 +215,6 @@ enum ProviderLineup {
 }
 
 impl ProviderLineup {
-
     fn get_next(&self) -> Option<Arc<ProviderConfig>> {
         match self {
             ProviderLineup::Single(lineup) => lineup.get_next(),
@@ -533,7 +553,7 @@ impl ActiveProviderManager {
         self.providers.write().await.push(lineup);
     }
 
-    fn get_provider_config<'a>(name: &str, providers: &'a Vec<ProviderLineup>) -> Option<(&'a ProviderLineup, &'a ProviderConfig)> {
+    fn get_provider_config<'a>(name: &str, providers: &'a Vec<ProviderLineup>) -> Option<(&'a ProviderLineup, &'a ProviderConfigWrapper)> {
         for lineup in providers {
             match lineup {
                 ProviderLineup::Single(single) => {
@@ -562,10 +582,24 @@ impl ActiveProviderManager {
         None
     }
 
+    pub async fn force_exact_acquire_connection(&self, input_name: &str) -> ProviderConnectionGuard {
+        let providers = self.providers.read().await;
+        let allocation = match Self::get_provider_config(input_name, &providers) {
+            None => ProviderAllocation::Exhausted, // No Name matched, we don't have this provider
+            Some((_lineup, config)) => config.force_allocate(),
+        };
+
+        ProviderConnectionGuard {
+            manager: Arc::new(self.clone_inner()),
+            allocation,
+        }
+    }
+
+    // Returns the next available provider connection
     pub async fn acquire_connection(&self, input_name: &str) -> ProviderConnectionGuard {
         let providers = self.providers.read().await;
         let allocation = match Self::get_provider_config(input_name, &providers) {
-            None => ProviderAllocation::Exhausted,
+            None => ProviderAllocation::Exhausted, // No Name matched, we don't have this provider
             Some((lineup, _config)) => lineup.acquire()
         };
 
@@ -661,9 +695,9 @@ impl ActiveProviderManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::config::InputFetchMethod;
     use crate::Arc;
     use std::thread;
-    use crate::model::config::InputFetchMethod;
 
     macro_rules! should_available {
         ($lineup:expr, $provider_id:expr) => {
@@ -796,7 +830,6 @@ mod tests {
         should_grace_period!(lineup, 2);
 
         should_exhausted!(lineup);
-
     }
 
 
@@ -909,9 +942,9 @@ mod tests {
 
         let mut handles = vec![];
 
-        let available_count= Arc::new(AtomicU16::new(2));
-        let grace_period_count= Arc::new(AtomicU16::new(1));
-        let exhausted_count= Arc::new(AtomicU16::new(2));
+        let available_count = Arc::new(AtomicU16::new(2));
+        let grace_period_count = Arc::new(AtomicU16::new(1));
+        let exhausted_count = Arc::new(AtomicU16::new(2));
 
         for _ in 0..5 {
             let lineup_clone = Arc::clone(&lineup);
@@ -925,7 +958,6 @@ mod tests {
                     ProviderAllocation::Available(_) => available.fetch_sub(1, Ordering::SeqCst),
                     ProviderAllocation::GracePeriod(_) => grace_period.fetch_sub(1, Ordering::SeqCst),
                 }
-
             });
             handles.push(handle);
         }

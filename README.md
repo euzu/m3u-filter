@@ -1,16 +1,14 @@
-[![wiki](https://github.com/user-attachments/assets/68251546-7c96-44c1-bebe-f8eaf2675992)](https://github.com/euzu/m3u-filter/wiki)
 
 
 ![m3u-filter_banner](https://github.com/user-attachments/assets/ea10bc02-eb2d-415f-828f-a14f9b57f5e8)
 
-**m3u-filter** is a versatile tool for processing playlists. Key capabilities include:
-
-- Filtering, renaming, mapping, and sorting playlist entries and saving them in EXTM3U, XTREAM, or Strm (Kodi) formats.
-- Process multiple input files and create multiple output files through target definitions.
-- Act as a simple Xtream or M3U redirect or reverse proxy after processing entries.
+# 🧬 **m3u-filter** is a versatile tool for processing and serving playlists.
+- 🔨 Build with rust for best performance and low resource usage
+- Filtering, renaming, mapping, and sorting playlist entries.
+- Reverse/Redirect proxy for EXTM3U, XTREAM, HdHomerun or Strm (Kodi) formats.
+- Multiple input multíple output, merge playlists and create new one.
 - Schedule updates in server mode.
 - Running as a CLI tool to deliver playlists through web servers (e.g., Nginx, Apache).
-- Define multiple filtering targets to create several playlists from a large one.
 - DRY (Don't Repeat Yourself): Define templates and reuse them.
 - Using regular expressions for matching and defining templates for reusability.
 - Define filters with statements, e.g.: filter:
@@ -26,7 +24,7 @@ If you need to exclude certain entries from a playlist, you can create filters u
 Run `m3u-filter` in server mode for a web-based UI to view the playlist contents, filter or search entries.
 Playlist User can also defie their Group filter through the Web-UI.
 
-![m3u-filter_function](https://github.com/user-attachments/assets/1b5ba462-712a-4f41-9140-8cca913ba5f4)
+## Want to join the community: [**m3u-filter Discord Server**]( https://discord.gg/gkzCmWw9Tf)
 
 ## Starting in server mode for Web-UI
 The Web-UI is available in server mode. You need to start `m3u-filter` with the `-s` (`--server`) option.
@@ -1685,3 +1683,22 @@ templates:
   value: '!EXCLUDED_CHANNELS! AND (!GERMAN_CHANNELS! OR !FRENCH_CHANNELS!)'
 ```
 
+# VLC seek problem when  *user_access_control* is enabled.
+The issue with **max_connection** is that setting a hard limit can cause problems during channel switching. Seeking, for instance,
+is essentially a rapid channel change — because each seek action triggers a new request to the provider.
+
+Players like VLC calculate the seek position and determine the appropriate byte range based on the content size.
+Then, a **partial request** is made using that byte range — that’s what we call a seek operation.
+
+The more frequently a user seeks, the more they bombard the provider with new requests.
+
+Now here's the tricky part: requests can come in so quickly that the termination of the previous connection is delayed.
+This leads to the **max_connection** problem — the system might think the user is still connected multiple times.
+
+To handle this, we introduce a **grace period_millis** and **grace_period_timeout_secs**.
+```yaml
+ grace_period_millis: 2000
+ grace_period_timeout_secs: 5
+```
+The grace period means: if a user reaches the connection limit, we still allow one more connection for a short time.
+After a delay, we check whether old connections have been properly closed. If not, we then enforce the limit and terminate the excess connection(s).

@@ -80,6 +80,9 @@ pub fn parse_to_kbps(input: &str) ->  Result<u64, String> {
     ];
 
     let speed_str = input.trim();
+    if speed_str.is_empty() {
+        return Ok(0);
+    }
     for (unit, multiplier) in units {
        if let Some(speed_unit) = speed_str.strip_suffix(unit) {
             let number_part = speed_unit.trim();

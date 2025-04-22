@@ -77,7 +77,7 @@ async fn hls_api_stream(
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
-    let Ok(hls_url) = crypto_utils::decrypt_text(&app_state.config.t_encrypt_secret, &params.token) else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
+    let Ok(hls_url) = crypto_utils::deobfuscate_text(&app_state.config.t_encrypt_secret, &params.token) else { return axum::http::StatusCode::BAD_REQUEST.into_response(); };
 
     let target_name = &target.name;
     let virtual_id = params.stream_id;

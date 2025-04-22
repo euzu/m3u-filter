@@ -135,7 +135,7 @@ export interface PushoverConfig {
 }
 
 export interface MessagingConfig {
-    notify_on?: string[];
+    notify_on: string[];
     telegram?: TelegramConfig;
     rest?: RestConfig;
     pushover?: PushoverConfig;
@@ -205,7 +205,7 @@ export interface StreamBufferConfig {
 export interface StreamConfig {
     retry: boolean,
     buffer?: StreamBufferConfig,
-    throttle?: number,
+    throttle?: string,
     grace_period_millis?: number,
     grace_period_timeout_secs?: number,
 }

@@ -222,6 +222,7 @@ async fn provider_initial_request(cfg: &Config, request_client: Arc<reqwest::Cli
                     // We need some header information from the provider, we extract the necessary headers and forward them to the client
                     debug_if_enabled!("Provider response  status: '{}' headers: {:?}", response.status(), response.headers_mut());
                     let response_headers: Vec<(String, String)> = get_response_headers(response.headers());
+                    //let url = stream_options.get_url();
                     // debug!("First  headers {headers:?} {} {}", sanitize_sensitive_info(url.as_str()));
                     Some((response_headers, response.status()))
                 };

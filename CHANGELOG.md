@@ -20,7 +20,8 @@ web_ui:
     secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
     userfile: user.txt
 ```
-- `grace_period_millis` default set to 0 milliseconds.
+- `grace_period_millis` default set to 2000 milliseconds.
+- `grace_period_timeout_secs` default set to 5 seconds.
 - Fixed user grace period
 - Added `default_grace_period_timeout_secs` to `reverse_proxy.stream` config. When grace_period granted,
 until the `default_grace_period_timeout_secs` elapses no grace_period is granted again.
@@ -83,6 +84,8 @@ url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.p
   - `reverse`           -> all reverse
   - `reverse[live]`     -> only live reverse, vod and series redirect
   - `reverse[live,vod]` -> series redirect, others reverse
+- `/status` api endpoint moved to  `/api/v1/status` for auth protection
+- fixed multi provider VOD seek problem (provider cycle  on seek request prevented playback)
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

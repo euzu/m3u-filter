@@ -1,7 +1,7 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
 use crate::api::api_utils;
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, redirect_response, resource_response, separate_number_and_remainder, serve_file, stream_response, RedirectParams};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_response, redirect_response, resource_response, seek_stream_response, separate_number_and_remainder, serve_file, stream_response, RedirectParams};
 use crate::api::api_utils::{redirect, try_option_bad_request, try_result_bad_request};
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::endpoints::xmltv_api::get_empty_epg_response;
@@ -185,10 +185,6 @@ async fn xtream_player_api_stream(
     if user.permission_denied(app_state) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    let connection_permission = user.connection_permission(app_state).await;
-    if connection_permission == UserConnectionPermission::Exhausted {
-        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
-    }
 
     let target_name = &target.name;
     if !target.has_output(&TargetType::Xtream) {
@@ -196,11 +192,25 @@ async fn xtream_player_api_stream(
         return StatusCode::BAD_REQUEST.into_response();
     }
 
+
     let (action_stream_id, stream_ext) = separate_number_and_remainder(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let (pli, mapping) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
 
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
+
+    if let Some(cookie) = is_seek_response(req_headers) {
+        // partial request means we are in reverse proxy mode, seek happened
+        return seek_stream_response(app_state, &cookie, req_headers, Some(input), pli.item_type, target, &user).await.into_response()
+
+    }
+
+    let connection_permission = user.connection_permission(app_state).await;
+    if connection_permission == UserConnectionPermission::Exhausted {
+        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+    }
+
+
     let redirect_params = RedirectParams {
         item: &pli,
         provider_id: Some(mapping.provider_id),
@@ -240,6 +250,7 @@ async fn xtream_player_api_stream(
     debug_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
     stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user, connection_permission).await.into_response()
 }
+
 
 async fn xtream_player_api_stream_with_token(
     req_headers: &HeaderMap,

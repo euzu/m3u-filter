@@ -71,10 +71,10 @@ async fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let active_users = Arc::new(ActiveUserManager::new(cfg.log.as_ref().is_some_and(|l| l.log_active_user)));
     let active_provider = Arc::new(ActiveProviderManager::new(cfg).await);
 
-    let mut builder = Client::builder();
+    let mut builder = Client::builder().http1_only();
     if cfg.connect_timeout_secs > 0 {
-        builder = builder.connect_timeout(Duration::from_secs(u64::from(cfg.connect_timeout_secs)))
-    };
+        builder = builder.connect_timeout(Duration::from_secs(u64::from(cfg.connect_timeout_secs)));
+    }
 
     let client = builder.build().unwrap_or_else(|_| Client::new());
 

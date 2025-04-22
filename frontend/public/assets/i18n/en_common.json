@@ -168,5 +168,15 @@
         "PATH": "Configuration of a path prefix, allowing it to be accessed behind a reverse proxy under a custom subpath. like https://yourdomain.com/m3uflt"
       }
     }
+  },
+  "SETUP":{
+    "LABEL": {
+      "NEXT": "Next",
+      "BACK": "Back",
+      "FINISH_SETUP": "Finish Setup"
+    },
+    "MSG": {
+      "WELCOME": "Welcome to m3u-filter setup. This wizard will guide you through the initial setup process."
+    }
   }
 }
