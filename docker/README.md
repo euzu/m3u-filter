@@ -1,4 +1,9 @@
 # Build docker image
+
+Targets are
+- `scratch-final`
+- `alpine-final`
+
 Change into the root directory and run:
 
 ```shell
@@ -11,7 +16,7 @@ docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --bu
 
 docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=x86_64-apple-darwin .
 ```
-PS: If you build `alpine-final` target be aware of the path prefix: `/app`  
+Both targets have the path prefix: `/app`  
 
 This will build the complete project and create a docker image.
 

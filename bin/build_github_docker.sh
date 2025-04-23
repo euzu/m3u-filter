@@ -7,7 +7,15 @@ BIN_DIR="${WORKING_DIR}/bin"
 RESOURCES_DIR="${WORKING_DIR}/resources"
 DOCKER_DIR="${WORKING_DIR}/docker"
 FRONTEND_DIR="${WORKING_DIR}/frontend"
-TARGET=x86_64-unknown-linux-musl
+declare -A ARCHITECTURES=(
+    [LINUX]=x86_64-unknown-linux-musl
+    [AARCH64]=aarch64-unknown-linux-musl
+)
+
+declare -A BUILDS=(
+    [LINUX]="m3u-filter:scratch-final m3u-filter-alpine:alpine-final"
+    [AARCH64]="m3u-filter-aarch64:scratch-final"
+)
 
 cd "$FRONTEND_DIR" && rm -rf build && yarn  && yarn build
 cd "$WORKING_DIR"
@@ -16,64 +24,72 @@ if [ ! -f "${BIN_DIR}/build_resources.sh" ]; then
   "${BIN_DIR}/build_resources.sh"
 fi
 
-
 # Check if the frontend build directory exists
 if [ ! -d "$FRONTEND_DIR/build" ]; then
-    echo "Error: Web directory '$FRONTEND_DIR/build' does not exist."
+    echo "🧨 Error: Web directory '$FRONTEND_DIR/build' does not exist."
     exit 1
 fi
 
-cargo clean || true
-env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$TARGET"
-
-# Check if the binary exists
-if [ ! -f "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" ]; then
-    echo "Error: Static binary '${WORKING_DIR}/target/${TARGET}/release/m3u-filter' does not exist."
-    exit 1
-fi
-
-# Prepare Docker build context
-BIN_FILE=${WORKING_DIR}/target/${TARGET}/release/m3u-filter
-cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
-rm -rf "${DOCKER_DIR}/web"
-cp -r "${FRONTEND_DIR}/build" "${DOCKER_DIR}/web"
-cp -r "${RESOURCES_DIR}" "${DOCKER_DIR}/resources"
-
-# Get the version from the binary
-VERSION=$("$BIN_FILE" -V | sed 's/m3u-filter *//')
+VERSION=$(grep -Po '^version\s*=\s*"\K[0-9\.]+' Cargo.toml)
 if [ -z "${VERSION}" ]; then
-    echo "Error: Failed to determine the version from the binary."
+    echo "🧨 Error: Failed to determine the version."
     exit 1
 fi
 
-cd "${DOCKER_DIR}"
-echo "Building Docker images for version ${VERSION}"
-SCRATCH_IMAGE_NAME=m3u-filter
-ALPINE_IMAGE_NAME=m3u-filter-alpine
+declare -a BUILT_IMAGES=()
 
-# Build scratch image and tag as "latest"
-docker build -f Dockerfile-manual -t ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" --target scratch-final .
-docker tag ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}" ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
+# Start build loop per platform
+for PLATFORM in "${!ARCHITECTURES[@]}"; do
+  ARCHITECTURE=${ARCHITECTURES[$PLATFORM]}
 
-# Build alpine image and tag as "latest"
-docker build -f Dockerfile-manual -t ghcr.io/euzu/${ALPINE_IMAGE_NAME}:"${VERSION}" --target alpine-final .
-docker tag ghcr.io/euzu/${ALPINE_IMAGE_NAME}:"${VERSION}" ghcr.io/euzu/${ALPINE_IMAGE_NAME}:latest
+  echo "🛠️ Building binary for architecture: $ARCHITECTURE"
 
-echo "Logging into GitHub Container Registry..."
+  cargo clean || true
+  env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$ARCHITECTURE"
+
+  BINARY_PATH="${WORKING_DIR}/target/${ARCHITECTURE}/release/m3u-filter"
+  if [ ! -f "$BINARY_PATH" ]; then
+      echo "🧨 Error: Binary $BINARY_PATH does not exist."
+      exit 1
+  fi
+
+  # Prepare Docker context
+  cp "$BINARY_PATH" "${DOCKER_DIR}/"
+  rm -rf "${DOCKER_DIR}/web"
+  cp -r "${FRONTEND_DIR}/build" "${DOCKER_DIR}/web"
+  cp -r "${RESOURCES_DIR}" "${DOCKER_DIR}/resources"
+
+  cd "${DOCKER_DIR}"
+  echo "🛠️ Building Docker images for platform: $PLATFORM, version: ${VERSION}"
+
+  for pair in ${BUILDS[$PLATFORM]}; do
+      IMAGE_NAME="${pair%%:*}"
+      BUILD_TARGET="${pair##*:}"
+
+      echo "🎯 Building ${IMAGE_NAME} with target ${BUILD_TARGET}"
+
+      docker build -f Dockerfile-manual \
+        -t ghcr.io/euzu/${IMAGE_NAME}:${VERSION} \
+        --target "$BUILD_TARGET" .
+
+      docker tag ghcr.io/euzu/${IMAGE_NAME}:${VERSION} ghcr.io/euzu/${IMAGE_NAME}:latest
+
+      BUILT_IMAGES+=("ghcr.io/euzu/${IMAGE_NAME}:${VERSION}")
+      BUILT_IMAGES+=("ghcr.io/euzu/${IMAGE_NAME}:latest")
+  done
+done
+
+echo "🔑 Logging into GitHub Container Registry..."
 docker login ghcr.io -u euzu -p "${GHCR_IO_TOKEN}"
-
-# Push scratch
-docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:"${VERSION}"
-docker push ghcr.io/euzu/${SCRATCH_IMAGE_NAME}:latest
-
-# Push alpine
-docker push ghcr.io/euzu/${ALPINE_IMAGE_NAME}:"${VERSION}"
-docker push ghcr.io/euzu/${ALPINE_IMAGE_NAME}:latest
+for img in "${BUILT_IMAGES[@]}"; do
+     echo "📦 Pushing $img"
+     docker push "$img"
+done
 
 # Clean up
-echo "Cleaning up build artifacts..."
+echo "🗑 Cleaning up Docker context..."
 rm -rf "${DOCKER_DIR}/web"
 rm -f "${DOCKER_DIR}/m3u-filter"
 rm -rf "${DOCKER_DIR}/resources"
 
-echo "Docker images for version ${VERSION} have been successfully built, tagged, and pushed."
+echo "🎉 Docker images for version ${VERSION} have been successfully built, tagged, and pushed."

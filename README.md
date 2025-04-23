@@ -1306,8 +1306,10 @@ Log Level has module support like `m3u_filter::util=error,m3u_filter::filter=deb
 
 ## 6. Web-UI
 
-![m3u-filter-tree](https://github.com/euzu/m3u-filter/assets/33094714/0455d598-1953-4b69-b9ab-d741e81f0031)
-![m3u-filter-prefs](https://github.com/euzu/m3u-filter/assets/33094714/9763c11a-fc12-4e0b-93f5-6f05546dd628)
+The WebUI is for configuration the m3u-filter config.
+
+If you enable authentication, users can log in with their accounts (you can disable login per user),
+and configure their playlist.
 
 ## 6. Compilation
 
@@ -1346,27 +1348,25 @@ rustup target add x86_64-unknown-linux-musl
 cargo build --target x86_64-unknown-linux-musl --release
 ```
 #### Dockerize
-Dockerfile
-```dockerfile
-FROM gcr.io/distroless/base-debian12 as build
+There is a Dockerfile in `docker` directory. 
 
-FROM scratch
+##### Build Image
 
-WORKDIR /
+Targets are 
+- `scratch-final`
+- `alpine-final`
 
-COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-
-COPY ./m3u-filter /
-COPY ./web /web
-
-CMD ["/m3u-filter", "-s", "-p", "/config"]
-```
-Image
 ```shell
-docker build -t m3u-filter .
+# Build for a specific architecture
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=x86_64-unknown-linux-musl .
+
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=aarch64-unknown-linux-musl .
+
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=armv7-unknown-linux-musleabihf .
+
+docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=x86_64-apple-darwin .
 ```
-docker-compose.yml
+##### docker-compose.yml
 ```docker
 version: '3'
 services:
@@ -1374,12 +1374,12 @@ services:
     container_name: m3u-filter
     image: m3u-filter
     user: "133:144"
-    working_dir: /
+    working_dir: /app
     volumes:
-      - ./config:/config
-      - ./data:/data
-      - ./backup:/backup
-      - ./downloads:/downloads
+      - /opt/m3u-filter/config:/app/config
+      - /opt/m3u-filter/data:/app/data
+      - /opt/m3u-filter/backup:/app/backup
+      - /opt/m3u-filter/downloads:/app/downloads
     environment:
       - TZ=Europe/Paris
     ports:
@@ -1392,7 +1392,7 @@ If you want to use m3u-filter with docker-compose, there is a `--healthcheck` ar
 
 ```docker
     healthcheck:
-      test: ["CMD", "/m3u-filter", "-p", "/config" "--healthcheck"]  
+      test: ["CMD", "/app/m3u-filter", "-p", "/app/config" "--healthcheck"]  
       interval: 30s  
       timeout: 10s   
       retries: 3     

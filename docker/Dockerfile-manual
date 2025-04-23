@@ -7,11 +7,11 @@ WORKDIR /app
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY ./m3u-filter /
-COPY ./web /web
+COPY ./m3u-filter ./
+COPY ./web ./web
 COPY ./resources ./resources
 
-CMD ["./app/m3u-filter", "-s", "-p", "/config"]
+CMD ["/app/m3u-filter", "-s", "-p", "/app/config"]
 
 # Alpine Final container
 FROM alpine:latest AS alpine-final
@@ -20,7 +20,7 @@ RUN apk add --no-cache bash curl strace tcpdump bind-tools nano ca-certificates 
 
 WORKDIR /app
 
-COPY ./m3u-filter .
+COPY ./m3u-filter ./
 COPY ./web ./web
 COPY ./resources ./resources
 # config should be mounted as volume
