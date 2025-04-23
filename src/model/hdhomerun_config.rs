@@ -67,7 +67,7 @@ pub struct HdHomeRunConfig {
     #[serde(default)]
     pub enabled: bool,
     #[serde(default)]
-    pub basic_auth: bool,
+    pub auth: bool,
     pub devices: Vec<HdHomeRunDeviceConfig>,
 }
 

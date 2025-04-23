@@ -228,25 +228,25 @@ async fn lineup(app_state: &Arc<HdHomerunAppState>, cfg: &Arc<Config>, credentia
     let use_m3u = use_output.as_ref() == Some(&TargetType::M3u);
     let use_xtream = use_output.as_ref() == Some(&TargetType::Xtream);
     if (use_all || use_m3u) && target.has_output(&TargetType::M3u) {
-        let iterator = M3uPlaylistIterator::new(&cfg,target,&credentials).await.ok();
+        let iterator = M3uPlaylistIterator::new(cfg,target,credentials).await.ok();
         let stream = m3u_item_to_lineup_stream(iterator);
         let body_stream = stream::once(async { Ok(Bytes::from("[")) })
             .chain(stream)
             .chain(stream::once(async { Ok(Bytes::from("]")) }));
-        axum::response::Response::builder()
+        return axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
             .body(axum::body::Body::from_stream(body_stream))
             .unwrap().into_response();
     } else if (use_all || use_xtream) && target.has_output(&TargetType::Xtream) {
-        let server_info = app_state.app_state.config.get_user_server_info(&credentials).await;
+        let server_info = app_state.app_state.config.get_user_server_info(credentials).await;
         let base_url = server_info.get_base_url();
 
         let base_url_live =  if credentials.proxy.is_redirect(PlaylistItemType::Live) || target.is_force_redirect(PlaylistItemType::Live) { None } else { Some(base_url.clone()) };
         let base_url_vod =  if credentials.proxy.is_redirect(PlaylistItemType::Video) || target.is_force_redirect(PlaylistItemType::Video) { None } else { Some(base_url) };
 
-        let live_channels = XtreamPlaylistIterator::new(XtreamCluster::Live, &cfg, target, None, &credentials).await.ok();
-        let vod_channels = XtreamPlaylistIterator::new(XtreamCluster::Video, &cfg, target, None, &credentials).await.ok();
+        let live_channels = XtreamPlaylistIterator::new(XtreamCluster::Live, cfg, target, None, credentials).await.ok();
+        let vod_channels = XtreamPlaylistIterator::new(XtreamCluster::Video, cfg, target, None, credentials).await.ok();
         // TODO include series when resolved
         //let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
         let live_stream = xtream_item_to_lineup_stream(Arc::clone(cfg), XtreamCluster::Live, Arc::clone(credentials), base_url_live.clone(), live_channels);
@@ -256,13 +256,14 @@ async fn lineup(app_state: &Arc<HdHomerunAppState>, cfg: &Arc<Config>, credentia
             .chain(stream::once(async { Ok(Bytes::from(",")) }))
             .chain(vod_stream)
             .chain(stream::once(async { Ok(Bytes::from("]")) }));
-        axum::response::Response::builder()
+        return axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
             .body(axum::body::Body::from_stream(body_stream))
             .unwrap()
             .into_response();
     }
+    axum::http::StatusCode::NOT_FOUND.into_response()
 }
 
 async fn auth_lineup_json(AuthBasic((username, password)): AuthBasic, axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {

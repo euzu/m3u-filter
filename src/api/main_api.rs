@@ -177,7 +177,7 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
                     let app_host = host.clone();
                     let port = device.port;
                     let device_clone = Arc::new(device.clone());
-                    let basic_auth = hdhomerun.basic_auth;
+                    let basic_auth = hdhomerun.auth;
                     infos.push(format!("HdHomeRun Server '{}' running: http://{host}:{port}", device.name));
                     tokio::spawn(async move {
                         let router = axum::Router::<Arc<HdHomerunAppState>>::new()
