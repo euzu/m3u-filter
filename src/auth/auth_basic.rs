@@ -38,7 +38,7 @@ impl AuthBasic {
                 let decoded = decode(contents)?;
                 Ok(Self::from_header(decoded))
             },
-            _ => Err((StatusCode::BAD_REQUEST, "`Authorization` header must be a bearer token")),
+            _ => Err((StatusCode::BAD_REQUEST, "`Authorization` header must be a basic auth")),
         }
     }
 }
