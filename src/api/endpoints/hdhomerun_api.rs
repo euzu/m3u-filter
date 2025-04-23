@@ -2,7 +2,7 @@ use std::sync::Arc;
 use axum::response::IntoResponse;
 use crate::api::model::app_state::{HdHomerunAppState};
 use crate::model::api_proxy::{ProxyUserCredentials};
-use crate::model::config::{Config, TargetType};
+use crate::model::config::{Config, ConfigTarget, TargetType};
 use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::processing::parser::xtream::get_xtream_url;
 use crate::utils::json_utils::get_string_from_serde_value;
@@ -11,6 +11,7 @@ use futures::{stream, Stream, StreamExt};
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::{json};
+use crate::auth::auth_basic::AuthBasic;
 use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
 use crate::repository::xtream_playlist_iterator::{XtreamPlaylistIterator};
 
@@ -221,50 +222,66 @@ async fn lineup_status() -> impl IntoResponse {
             }))
 }
 
+async fn lineup(app_state: &Arc<HdHomerunAppState>, cfg: &Arc<Config>, credentials: &Arc<ProxyUserCredentials>, target: &ConfigTarget) -> impl IntoResponse {
+    let use_output = target.get_hdhomerun_output().as_ref().and_then(|o| o.use_output);
+    let use_all = use_output.is_none();
+    let use_m3u = use_output.as_ref() == Some(&TargetType::M3u);
+    let use_xtream = use_output.as_ref() == Some(&TargetType::Xtream);
+    if (use_all || use_m3u) && target.has_output(&TargetType::M3u) {
+        let iterator = M3uPlaylistIterator::new(&cfg,target,&credentials).await.ok();
+        let stream = m3u_item_to_lineup_stream(iterator);
+        let body_stream = stream::once(async { Ok(Bytes::from("[")) })
+            .chain(stream)
+            .chain(stream::once(async { Ok(Bytes::from("]")) }));
+        axum::response::Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+            .body(axum::body::Body::from_stream(body_stream))
+            .unwrap().into_response();
+    } else if (use_all || use_xtream) && target.has_output(&TargetType::Xtream) {
+        let server_info = app_state.app_state.config.get_user_server_info(&credentials).await;
+        let base_url = server_info.get_base_url();
+
+        let base_url_live =  if credentials.proxy.is_redirect(PlaylistItemType::Live) || target.is_force_redirect(PlaylistItemType::Live) { None } else { Some(base_url.clone()) };
+        let base_url_vod =  if credentials.proxy.is_redirect(PlaylistItemType::Video) || target.is_force_redirect(PlaylistItemType::Video) { None } else { Some(base_url) };
+
+        let live_channels = XtreamPlaylistIterator::new(XtreamCluster::Live, &cfg, target, None, &credentials).await.ok();
+        let vod_channels = XtreamPlaylistIterator::new(XtreamCluster::Video, &cfg, target, None, &credentials).await.ok();
+        // TODO include series when resolved
+        //let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
+        let live_stream = xtream_item_to_lineup_stream(Arc::clone(cfg), XtreamCluster::Live, Arc::clone(credentials), base_url_live.clone(), live_channels);
+        let vod_stream = xtream_item_to_lineup_stream(Arc::clone(cfg), XtreamCluster::Video, Arc::clone(credentials), base_url_vod.clone(), vod_channels);
+        let body_stream = stream::once(async { Ok(Bytes::from("[")) })
+            .chain(live_stream)
+            .chain(stream::once(async { Ok(Bytes::from(",")) }))
+            .chain(vod_stream)
+            .chain(stream::once(async { Ok(Bytes::from("]")) }));
+        axum::response::Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
+            .body(axum::body::Body::from_stream(body_stream))
+            .unwrap()
+            .into_response();
+    }
+}
+
+async fn auth_lineup_json(AuthBasic((username, password)): AuthBasic, axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {
+    let cfg = Arc::clone(&app_state.app_state.config);
+    if let Some((credentials, target)) = cfg.get_target_for_username(&app_state.device.t_username).await {
+        if !username.eq(&credentials.username) || !password.eq(&credentials.password) {
+            return axum::http::StatusCode::UNAUTHORIZED.into_response()
+        }
+        let user_credentials = Arc::new(credentials);
+        return lineup(&app_state, &cfg, &user_credentials, target).await.into_response();
+    }
+    axum::http::StatusCode::NOT_FOUND.into_response()
+}
+
 async fn lineup_json(axum::extract::State(app_state): axum::extract::State<Arc<HdHomerunAppState>>) -> impl IntoResponse {
     let cfg = Arc::clone(&app_state.app_state.config);
     if let Some((credentials, target)) = cfg.get_target_for_username(&app_state.device.t_username).await {
-        let use_output = target.get_hdhomerun_output().as_ref().and_then(|o| o.use_output);
-        let use_all = use_output.is_none();
-        let use_m3u = use_output.as_ref() == Some(&TargetType::M3u);
-        let use_xtream = use_output.as_ref() == Some(&TargetType::Xtream);
-        if (use_all || use_m3u) && target.has_output(&TargetType::M3u) {
-            let iterator = M3uPlaylistIterator::new(&cfg,target,&credentials).await.ok();
-            let stream = m3u_item_to_lineup_stream(iterator);
-            let body_stream = stream::once(async { Ok(Bytes::from("[")) })
-                .chain(stream)
-                .chain(stream::once(async { Ok(Bytes::from("]")) }));
-            return axum::response::Response::builder()
-                .status(axum::http::StatusCode::OK)
-                .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
-                .body(axum::body::Body::from_stream(body_stream))
-                .unwrap().into_response();
-        } else if (use_all || use_xtream) && target.has_output(&TargetType::Xtream) {
-            let server_info = app_state.app_state.config.get_user_server_info(&credentials).await;
-            let base_url = server_info.get_base_url();
-
-            let base_url_live =  if credentials.proxy.is_redirect(PlaylistItemType::Live) || target.is_force_redirect(PlaylistItemType::Live) { None } else { Some(base_url.clone()) };
-            let base_url_vod =  if credentials.proxy.is_redirect(PlaylistItemType::Video) || target.is_force_redirect(PlaylistItemType::Video) { None } else { Some(base_url) };
-
-            let live_channels = XtreamPlaylistIterator::new(XtreamCluster::Live, &cfg, target, None, &credentials).await.ok();
-            let vod_channels = XtreamPlaylistIterator::new(XtreamCluster::Video, &cfg, target, None, &credentials).await.ok();
-            // TODO include series when resolved
-            //let series_channels = xtream_repository::iter_raw_xtream_playlist(cfg, target, XtreamCluster::Series);
-            let user_credentials = Arc::new(credentials);
-            let live_stream = xtream_item_to_lineup_stream(Arc::clone(&cfg), XtreamCluster::Live, Arc::clone(&user_credentials), base_url_live.clone(), live_channels);
-            let vod_stream = xtream_item_to_lineup_stream(Arc::clone(&cfg), XtreamCluster::Video, Arc::clone(&user_credentials), base_url_vod.clone(), vod_channels);
-            let body_stream = stream::once(async { Ok(Bytes::from("[")) })
-                .chain(live_stream)
-                .chain(stream::once(async { Ok(Bytes::from(",")) }))
-                .chain(vod_stream)
-                .chain(stream::once(async { Ok(Bytes::from("]")) }));
-            return axum::response::Response::builder()
-                .status(axum::http::StatusCode::OK)
-                .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
-                .body(axum::body::Body::from_stream(body_stream))
-                .unwrap()
-                .into_response();
-        }
+        let user_credentials = Arc::new(credentials);
+        return lineup(&app_state, &cfg, &user_credentials, target).await.into_response();
     }
     axum::http::StatusCode::NOT_FOUND.into_response()
 }
@@ -275,16 +292,16 @@ async fn auto_channel(axum::extract::State(_app_state): axum::extract::State<Arc
     axum::http::StatusCode::NOT_FOUND.into_response()
 }
 
-pub fn hdhr_api_register() -> axum::Router<Arc<HdHomerunAppState>> {
+pub fn hdhr_api_register(basic_auth: bool) -> axum::Router<Arc<HdHomerunAppState>> {
     axum::Router::new()
      .route("/device.xml", axum::routing::get(device_xml))
      .route("/device.json", axum::routing::get(device_json))
      .route("/discover.json", axum::routing::get(discover_json))
      .route("/lineup_status.json", axum::routing::get(lineup_status))
-     .route("/lineup.json", axum::routing::get(lineup_json))
+     .route("/lineup.json", if basic_auth { axum::routing::get(auth_lineup_json) } else { axum::routing::get(lineup_json) })
     // cfg.service(web::resource("/lineup.xml").route(web::get().to(lineup_xml)));
     // cfg.service(web::resource("/lineup.m3u").route(web::get().to(lineup_m3u)));
-        .route("/auto/{channel}", axum::routing::get(auto_channel))
+    .route("/auto/{channel}", axum::routing::get(auto_channel))
     .route("/tuner{tuner_num}/{channel}", axum::routing::get(auto_channel))
 }
 
