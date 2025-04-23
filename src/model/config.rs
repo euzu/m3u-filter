@@ -1330,7 +1330,6 @@ pub struct LogConfig {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 pub struct LogLevelConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub log: Option<LogConfig>,
@@ -1696,11 +1695,16 @@ impl WebUiConfig {
         }
 
         if let Some(web_ui_path) = self.path.as_ref() {
-            let web_path = web_ui_path.trim().trim_start_matches('/').trim_end_matches('/').to_string();
-            if RESERVED_PATHS.contains(&web_path.to_lowercase().as_str()) {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("web ui path is a reserved path. Do not use {RESERVED_PATHS:?}")));
+            let web_path = web_ui_path.trim();
+            if web_path.is_empty() {
+                self.path = None;
+            } else {
+                let web_path = web_path.trim().trim_start_matches('/').trim_end_matches('/').to_string();
+                if RESERVED_PATHS.contains(&web_path.to_lowercase().as_str()) {
+                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("web ui path is a reserved path. Do not use {RESERVED_PATHS:?}")));
+                }
+                self.path = Some(web_path);
             }
-            self.path = Some(web_path);
         }
 
         if let Some(web_auth) = &mut self.auth {

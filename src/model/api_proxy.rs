@@ -306,6 +306,7 @@ impl TargetUser {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ApiProxyServerInfo {
     pub name: String,
     pub protocol: String,
@@ -318,35 +319,57 @@ pub struct ApiProxyServerInfo {
 }
 
 impl ApiProxyServerInfo {
-    pub fn is_valid(&mut self) -> bool {
-        self.protocol = self.protocol.trim().to_string();
-        if self.protocol.is_empty() {
-            return false;
-        }
-        self.host = self.host.trim().to_string();
-        if self.host.is_empty() {
-            return false;
-        }
-        self.port = self.port.trim().to_string();
-        if self.port.is_empty() {
-            if self.protocol == "http" {
-                self.port = "80".to_string();
-            } else {
-                self.port = "443".to_string();
-            }
-        } else if self.port.parse::<u16>().is_err() {
-            return false;
-        }
 
-        self.timezone = self.timezone.trim().to_string();
-        if self.timezone.is_empty() {
-            self.timezone = "UTC".to_string();
-        }
-        if self.message.is_empty() {
-            self.message = "Welcome to m3u-filter".to_string();
-        }
+   pub fn prepare(&mut self ) -> Result<(), M3uFilterError> {
+       self.name = self.name.trim().to_string();
+       if self.name.is_empty() {
+           return Err(info_err!("Server info name is empty ".to_string()));
+       }
+       self.protocol = self.protocol.trim().to_string();
+       if self.protocol.is_empty() {
+           return Err(info_err!("protocol cant be empty for api server config".to_string()));
+       }
+       self.host = self.host.trim().to_string();
+       if self.host.is_empty() {
+           return Err(info_err!("host cant be empty for api server config".to_string()));
+       }
+       self.port = self.port.trim().to_string();
+       if self.port.is_empty() {
+           if self.protocol == "http" {
+               self.port = "80".to_string();
+           } else {
+               self.port = "443".to_string();
+           }
+       } else if self.port.parse::<u16>().is_err() {
+           return Err(info_err!("invalid port for api server config".to_string()));
+       }
 
-        true
+       self.timezone = self.timezone.trim().to_string();
+       if self.timezone.is_empty() {
+           self.timezone = "UTC".to_string();
+       }
+       if self.message.is_empty() {
+           self.message = "Welcome to m3u-filter".to_string();
+       }
+       if let Some(path) = &self.path {
+           if path.trim().is_empty() {
+               self.path = None;
+           }
+       }
+
+       if let Some(path) = &self.path {
+           let trimmed_path = path.trim();
+           if trimmed_path.is_empty() {
+               self.path = None;
+           } else {
+               self.path = Some(trimmed_path.to_string());
+           }
+       }
+
+       Ok(())
+   }
+    pub fn validate(&mut self) -> bool {
+        self.prepare().is_ok()
     }
 
     pub fn get_base_url(&self) -> String {
@@ -433,11 +456,12 @@ impl ApiProxyConfig {
 
     fn prepare_server_config(&mut self, errors: &mut Vec<String>) {
         let mut name_set = HashSet::new();
-        for server in &self.server {
-            if server.name.trim().is_empty() {
-                errors.push("Server info name is empty ".to_owned());
-            } else if name_set.contains(server.name.as_str()) {
-                errors.push(format!("Non unique server info name found {}", &server.name));
+        for server in &mut self.server {
+            if let Err(err) = server.prepare() {
+                errors.push(err.to_string());
+            }
+            if name_set.contains(server.name.as_str()) {
+                errors.push(format!("Non-unique server info name found {}", &server.name));
             } else {
                 name_set.insert(server.name.clone());
             }

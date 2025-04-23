@@ -108,7 +108,7 @@ async fn save_config_api_proxy_config(
     axum::extract::Json(mut req_api_proxy): axum::extract::Json<Vec<ApiProxyServerInfo>>,
 ) -> impl axum::response::IntoResponse + Send {
     for server_info in &mut req_api_proxy {
-        if !server_info.is_valid() {
+        if !server_info.validate() {
             return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error": "Invalid content"}))).into_response();
         }
     }
