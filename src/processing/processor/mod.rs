@@ -3,6 +3,7 @@ mod xtream;
 mod affix;
 mod xtream_vod;
 mod xtream_series;
+pub mod epg;
 
 #[macro_export]
 macro_rules! handle_error {

@@ -1,6 +1,5 @@
 use crate::model::config::{EpgNamePrefix, EpgSmartMatchConfig};
 use crate::model::xmltv::{Epg, TVGuide, XmlTag, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_CHANNEL, EPG_TAG_DISPLAY_NAME, EPG_TAG_ICON, EPG_TAG_PROGRAMME, EPG_TAG_TV};
-use crate::processing::processor::playlist::EpgIdCache;
 use crate::utils::compression::compressed_file_reader::CompressedFileReader;
 use deunicode::deunicode;
 use quick_xml::events::{BytesStart, BytesText, Event};
@@ -13,6 +12,7 @@ use std::mem;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
+use crate::processing::processor::epg::EpgIdCache;
 use crate::utils::constants::CONSTANTS;
 
 fn split_by_first_match<'a>(input: &'a str, delimiters: &[char]) -> (Option<&'a str>, &'a str) {
@@ -92,7 +92,7 @@ impl TVGuide {
                     EPG_TAG_DISPLAY_NAME => {
                         if smart_match {
                             if let Some(name) = &child.value {
-                                tag.normalized_epg_ids.insert(normalize_channel_name(name, &id_cache.smart_match_config));
+                                tag.normalized_epg_ids.push(normalize_channel_name(name, &id_cache.smart_match_config));
                             }
                         }
                     }
@@ -108,33 +108,19 @@ impl TVGuide {
     }
 
     fn try_fuzzy_matching(id_cache: &mut EpgIdCache, epg_id: &str, tag: &XmlTag, fuzzy_matching: bool) -> bool {
-        let id: Cow<str> = Cow::Owned(epg_id.to_string());
-        let mut matched = {
-            let mut match_found = false;
-            for normalized_epg_id in &tag.normalized_epg_ids {
-                let key = Cow::Owned(normalized_epg_id.to_string());
-                id_cache.normalized.entry(key).and_modify(|entry| {
-                    entry.1 = Some(id.clone());
-                    id_cache.channel.insert(id.clone());
-                    match_found = true;
-                });
-            }
-            match_found
-        };
-
+        let mut matched = id_cache.match_with_normalized(epg_id, &tag.normalized_epg_ids);
         if !matched && fuzzy_matching {
-            let (fuzzy_matched, matched_normalized_epg_id) = Self::find_best_fuzzy_match(id_cache, tag);
-            matched = fuzzy_matched;
-            if matched {
-                let key = Cow::Owned(matched_normalized_epg_id.unwrap().to_string());
+            let (fuzzy_matched, matched_normalized_name) = Self::find_best_fuzzy_match(id_cache, tag);
+            if fuzzy_matched {
+                let key = matched_normalized_name.unwrap();
+                let id = epg_id.to_string();
                 id_cache.normalized.entry(key).and_modify(|entry| {
-                    entry.1 = Some(id.clone());
-                    id_cache.channel.insert(id.clone());
+                    entry.replace(id.clone());
+                    id_cache.channel_epg_id.insert(Cow::Owned(id));
                     matched = true;
                 });
             }
         }
-
         matched
     }
 
@@ -145,28 +131,26 @@ impl TVGuide {
         let match_threshold = id_cache.smart_match_config.match_threshold;
         let best_match_threshold = id_cache.smart_match_config.best_match_threshold;
 
-        id_cache.normalized.par_iter().for_each(|(norm_key, (phonetic_code_opt, _))| {
+        id_cache.normalized.par_iter().for_each(|(norm_key, _epg_id_opt)| {
             if early_exit_flag.load(Ordering::SeqCst) {
                 return;
             }
-            if let Some(phonetic_code) = phonetic_code_opt {
-                for normalized_epg_id in &tag.normalized_epg_ids {
-                    let code_key: Cow<str> = Cow::Owned(normalized_epg_id.to_string());
-                    let code = id_cache.phonetic(&code_key);
-                    if &code == phonetic_code {
-                        let match_jw = strsim::jaro_winkler(norm_key, normalized_epg_id);
-                        #[allow(clippy::cast_possible_truncation)]
-                        #[allow(clippy::cast_sign_loss)]
-                        let mjw = min(100, match_jw as u16 * 100);
-                        if mjw >= match_threshold {
-                            let mut lock = data.lock().unwrap();
-                            if lock.0 < mjw {
-                                *lock = (mjw, Some(Cow::Borrowed(norm_key)));
-                            }
-                            if mjw > best_match_threshold {
-                                early_exit_flag.store(true, Ordering::SeqCst);
-                                return; // (true, matched_normalized_epg_id.map(|s| s.to_string()));
-                            }
+            let phonetic_code = id_cache.phonetic(norm_key);
+            for normalized_epg_id in &tag.normalized_epg_ids {
+                let code = id_cache.phonetic(normalized_epg_id);
+                if code == phonetic_code {
+                    let match_jw = strsim::jaro_winkler(norm_key, normalized_epg_id);
+                    #[allow(clippy::cast_possible_truncation)]
+                    #[allow(clippy::cast_sign_loss)]
+                    let mjw = min(100, match_jw as u16 * 100);
+                    if mjw >= match_threshold {
+                        let mut lock = data.lock().unwrap();
+                        if lock.0 < mjw {
+                            *lock = (mjw, Some(Cow::Borrowed(norm_key)));
+                        }
+                        if mjw > best_match_threshold {
+                            early_exit_flag.store(true, Ordering::SeqCst);
+                            return; // (true, matched_normalized_epg_id.map(|s| s.to_string()));
                         }
                     }
                 }
@@ -199,7 +183,7 @@ impl TVGuide {
                                         }
                                     } else {
                                         let borrowed_epg_id = Cow::Borrowed(epg_id.as_str());
-                                        if id_cache.channel.contains(&borrowed_epg_id) {
+                                        if id_cache.channel_epg_id.contains(&borrowed_epg_id) {
                                             children.push(tag);
                                         }
                                     }
@@ -210,7 +194,7 @@ impl TVGuide {
                             if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
                                 if !id_cache.processed.contains(epg_id) {
                                     let borrowed_epg_id = Cow::Borrowed(epg_id.as_str());
-                                    if id_cache.channel.contains(&borrowed_epg_id) {
+                                    if id_cache.channel_epg_id.contains(&borrowed_epg_id) {
                                         children.push(tag);
                                     }
                                 }
@@ -245,7 +229,7 @@ impl TVGuide {
     }
 
     pub fn filter(&self, id_cache: &mut EpgIdCache) -> Option<Epg> {
-        if id_cache.channel.is_empty() && id_cache.normalized.is_empty() {
+        if id_cache.channel_epg_id.is_empty() && id_cache.normalized.is_empty() {
             return None;
         }
         let epgs: Vec<Epg> = self.file_paths.iter()
