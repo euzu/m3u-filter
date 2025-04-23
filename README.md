@@ -1,10 +1,10 @@
-# <img src="https://github.com/user-attachments/assets/a654f9e8-4b97-471f-9989-1e8372d1756e" height="24" /> **m3u-filter** - A Powerful Playlist Processing & Proxy Tool
+# <img src="https://github.com/user-attachments/assets/8ef9ea79-62ff-4298-978f-22326c5c3d02" height="24" /> **m3u-filter** - A Powerful Playlist Processing & Proxy Tool
 
 **m3u-filter** is a flexible and efficient tool built in Rust 🦀,
 designed for processing, filtering, and serving media playlists with minimal resource usage.
 
 <p align="center">
-<img src="https://github.com/user-attachments/assets/a654f9e8-4b97-471f-9989-1e8372d1756e" height="128" />
+<img src="https://github.com/user-attachments/assets/8ef9ea79-62ff-4298-978f-22326c5c3d02" height="128" />
 </p>
 
 ## 🔧 Core Features:
