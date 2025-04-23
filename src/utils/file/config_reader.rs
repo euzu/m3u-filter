@@ -2,6 +2,7 @@ use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_r
 use crate::model::api_proxy::ApiProxyConfig;
 use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputAlias, InputType};
 use crate::model::mapping::Mappings;
+use crate::utils::constants::CONSTANTS;
 use crate::utils::file::env_resolving_reader::EnvResolvingReader;
 use crate::utils::file::file_utils::{file_reader, resolve_relative_path};
 use crate::utils::file::{file_utils, multi_file_reader};
@@ -15,7 +16,6 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor, Error, Read};
 use std::path::PathBuf;
 use url::Url;
-use crate::utils::constants::CONSTANTS;
 
 enum EitherReader<L, R> {
     Left(L),
@@ -174,7 +174,10 @@ pub fn resolve_env_var(value: &str) -> String {
     }
     CONSTANTS.re_env_var.replace_all(value, |caps: &regex::Captures| {
         let var_name = &caps["var"];
-        env::var(var_name).unwrap_or_else(|_| format!("${{env:{var_name}}}"))
+        env::var(var_name).unwrap_or_else(|e| {
+            error!("Could not resolve env var '{var_name}': {e}");
+            format!("${{env:{var_name}}}")
+        })
     }).to_string()
 }
 
@@ -262,7 +265,7 @@ fn csv_assign_config_input_column(config_input: &mut ConfigInputAlias, header: &
 
 pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl BufRead) -> Result<Vec<ConfigInputAlias>, io::Error> {
     let input_type = match batch_input_type {
-        InputType::M3uBatch  | InputType::M3u => InputType::M3uBatch,
+        InputType::M3uBatch | InputType::M3u => InputType::M3uBatch,
         InputType::XtreamBatch | InputType::Xtream => InputType::XtreamBatch
     };
     let mut result = vec![];
@@ -272,10 +275,10 @@ pub fn csv_read_inputs_from_reader(batch_input_type: InputType, reader: impl Buf
     for line in reader.lines() {
         let line = line?;
         if line.is_empty() {
-            continue
+            continue;
         }
         if line.starts_with(HEADER_PREFIX) {
-            if  !header_defined {
+            if !header_defined {
                 header_defined = true;
                 default_columns = line[1..].split(CSV_SEPARATOR).map(|s| {
                     match s {
@@ -350,10 +353,10 @@ fn get_csv_file_path(file_uri: &String) -> Result<PathBuf, Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{BufReader, Cursor};
     use crate::model::config::InputType;
     use crate::utils::file::config_reader::{csv_read_inputs_from_reader, resolve_env_var};
-const M3U_BATCH: &str = r#"
+    use std::io::{BufReader, Cursor};
+    const M3U_BATCH: &str = r#"
 #url;name;max_connections;priority
 http://hd.providerline.com:8080/get.php?username=user1&password=user1&type=m3u_plus;input_1
 http://hd.providerline.com/get.php?username=user2&password=user2&type=m3u_plus;input_2;1;2
@@ -361,7 +364,7 @@ http://hd.providerline.com/get.php?username=user3&password=user3&type=m3u_plus;i
 http://hd.providerline.com/get.php?username=user4&password=user4&type=m3u_plus;input_4
 "#;
 
-const XTREAM_BATCH: &str = r#"
+    const XTREAM_BATCH: &str = r#"
 #name;username;password;url;max_connections
 input_1;desanocra;eyCG8SN523KQ;http://provider_1.tv:80;1
 input_2;desanocra;eyCG8SN523KQ;http://provider_2.tv:8080;1
@@ -374,7 +377,7 @@ input_2;desanocra;eyCG8SN523KQ;http://provider_2.tv:8080;1
         assert_eq!(result.is_ok(), true);
         let aliases = result.unwrap();
         assert_eq!(aliases.is_empty(), false);
-        for config in  aliases {
+        for config in aliases {
             assert_eq!(config.url.contains("username"), true);
         }
     }
@@ -386,7 +389,7 @@ input_2;desanocra;eyCG8SN523KQ;http://provider_2.tv:8080;1
         assert_eq!(result.is_ok(), true);
         let aliases = result.unwrap();
         assert_eq!(aliases.is_empty(), false);
-        for config in  aliases {
+        for config in aliases {
             assert_eq!(config.url.contains("username"), true);
         }
     }
@@ -398,7 +401,7 @@ input_2;desanocra;eyCG8SN523KQ;http://provider_2.tv:8080;1
         assert_eq!(result.is_ok(), true);
         let aliases = result.unwrap();
         assert_eq!(aliases.is_empty(), false);
-        for config in  aliases {
+        for config in aliases {
             assert_eq!(config.url.contains("username"), false);
         }
     }
@@ -410,7 +413,7 @@ input_2;desanocra;eyCG8SN523KQ;http://provider_2.tv:8080;1
         assert_eq!(result.is_ok(), true);
         let aliases = result.unwrap();
         assert_eq!(aliases.is_empty(), false);
-        for config in  aliases {
+        for config in aliases {
             assert_eq!(config.url.contains("username"), false);
         }
     }

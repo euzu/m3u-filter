@@ -228,7 +228,7 @@ fn init_logger(user_log_level: Option<&String>, env_log_level: Option<String>, c
         .or_else(|| {               // config
             File::open(config_file).ok()
                 .and_then(|file| serde_yaml::from_reader::<_, LogLevelConfig>(config_file_reader(file, true))
-                    .map_err(|e| error!("Failed to parse log config file: {}", e))
+                    .map_err(|e| error!("Failed to parse log config file: {e}"))
                     .ok())
                 .and_then(|cfg| cfg.log.and_then(|l| l.log_level))
         })
