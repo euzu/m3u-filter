@@ -1,37 +1,36 @@
+# <img src="https://github.com/user-attachments/assets/a654f9e8-4b97-471f-9989-1e8372d1756e" height="24" /> **m3u-filter** - A Powerful Playlist Processing & Proxy Tool
 
+**m3u-filter** is a flexible and efficient tool built in Rust 🦀,
+designed for processing, filtering, and serving media playlists with minimal resource usage.
 
-![m3u-filter_banner](https://github.com/user-attachments/assets/ea10bc02-eb2d-415f-828f-a14f9b57f5e8)
+<p align="center">
+<img src="https://github.com/user-attachments/assets/a654f9e8-4b97-471f-9989-1e8372d1756e" height="128" />
+</p>
 
-# 🧬 **m3u-filter** is a versatile tool for processing and serving playlists.
-- 🔨 Build with rust for best performance and low resource usage
-- Filtering, renaming, mapping, and sorting playlist entries.
-- Reverse/Redirect proxy for EXTM3U, XTREAM, HdHomerun or Strm (Kodi) formats.
-- Multiple input multíple output, merge playlists and create new one.
-- Schedule updates in server mode.
-- Running as a CLI tool to deliver playlists through web servers (e.g., Nginx, Apache).
-- DRY (Don't Repeat Yourself): Define templates and reuse them.
-- Using regular expressions for matching and defining templates for reusability.
-- Define filters with statements, e.g.: filter:
-   `(Group ~ "^FR.*") AND NOT (Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~ ".*MOVIES.*")`
-- Sending alerts via Telegram bot, Pushover or REST when issues arise.
-- Monitoring group changes and sending notifications.
-- Sharing live tv connections
-- Display own video stream when channel is unavailable
-- Define HdHomeRun devices to use with Plex/Emby/Jellyfin
-- Define provider aliases to use multiple lines from same provider
+## 🔧 Core Features:
 
-If you need to exclude certain entries from a playlist, you can create filters using headers and apply regex-based renaming or mapping.
-Run `m3u-filter` in server mode for a web-based UI to view the playlist contents, filter or search entries.
-Playlist User can also defie their Group filter through the Web-UI.
+- **Advanced Playlist Processing**: Filter, rename, map, and sort entries with ease.
+- **Flexible Proxy Support**: Acts as a reverse/redirect proxy for EXTM3U, Xtream Codes, HDHomeRun, and STRM (Kodi) formats.
+- **Multi-Source Handling**: Supports multiple input and output sources. Merge various playlists and generate custom outputs.
+- **Scheduled Updates**: Keep playlists fresh with automatic updates in server mode.
+- **Web Delivery**: Run as a CLI tool to create m3u playlist to serve with web servers like Nginx or Apache.
+- **Template Reuse (DRY)**: Create and reuse templates using regular expressions and declarative logic.
 
-## Want to join the community: [**m3u-filter Discord Server**]( https://discord.gg/gkzCmWw9Tf)
+## 🔍 Smart Filtering:
+Define complex filters using expressive logic, e.g.:
+`(Group ~ "^FR.*") AND NOT (Group ~ ".*XXX.*" OR Group ~ ".*SERIES.*" OR Group ~ ".*MOVIES.*")`
 
-## Starting in server mode for Web-UI
-The Web-UI is available in server mode. You need to start `m3u-filter` with the `-s` (`--server`) option.
-On the first page you can select one of the defined input sources in the configuration, or write an url to the text field.
-The contents of the playlist are displayed in Gallery or Tree-View. Each link has one or more buttons. 
-The first is for copying the url into clipboard. The others are visible if you have configured the `video` section. 
-Based on the stream type, you will be able to download or search in a configured movie database for this entry.   
+## 📢 Monitoring & Alerts:
+- Send notifications via **Telegram**, **Pushover**, or custom **REST** endpoints when problems occur.
+- Track group changes and get real-time alerts.
+
+## 📺 Stream Management:
+- Share live TV connections.
+- Show a fallback video stream if a channel becomes unavailable.
+- Integrate **HDHomeRun** devices with **Plex**, **Emby**, or **Jellyfin**.
+- Use provider aliases to manage multiple lines from the same source.
+
+## Want to join the community: [on <img src="https://cdn.simpleicons.org/discord/5865F2" height="24" /> Discord ](https://discord.gg/gkzCmWw9Tf)
 
 ## Command line Arguments
 ```
@@ -83,7 +82,7 @@ Top level entries in the config files are:
 If you are running on a cpu which has multiple cores, you can set for example `threads: 2` to run two threads.
 Don't use too many threads, you should consider max of `cpu cores * 2`.
 Default is `0`.
-If you process the same provider multiple times each thread uses a connection. Keep in mind that you hit the provider max-connection.  
+If you process the same provider multiple times each thread uses a connection. Keep in mind that you hit the provider max-connection.
 
 ### 1.2. `api`
 `api` contains the `server-mode` settings. To run `m3u-filter` in `server-mode` you need to start it with the `-s`cli argument.
@@ -96,7 +95,7 @@ If you process the same provider multiple times each thread uses a connection. K
 With this configuration, you should create a `data` directory where you execute the binary.
 
 Be aware that different configurations (e.g. user bouquets) along the playlists are stored in this directory.
- 
+
 ### 1.4 `messaging`
 `messaging` is an optional configuration for receiving messages.
 Currently `telegram`, `rest` and `pushover.net` is supported.
@@ -135,17 +134,17 @@ For more information: [Telegram bots](https://core.telegram.org/bots/tutorial)
 It has 2 entries `extensions` and `download`.
 
 - `extensions` are a list of video file extensions like `mp4`, `avi`, `mkv`.  
-When you have input `m3u` and output `xtream` the url's with the matching endings will be categorized as `video`.
+  When you have input `m3u` and output `xtream` the url's with the matching endings will be categorized as `video`.
 
-- `download` is _optional_ and is only necessary if you want to download the video files from the ui 
-to a specific directory. if defined, the download button from the `ui` is available.
+- `download` is _optional_ and is only necessary if you want to download the video files from the ui
+  to a specific directory. if defined, the download button from the `ui` is available.
   - `headers` _optional_, download headers
-  - `organize_into_directories` _optional_, orgainize downloads into directories  
-  - `episode_pattern` _optional_ if you download episodes, the suffix like `S01.E01` should be removed to place all 
-files into one folder. The named capture group `episode` is mandatory.  
-Example: `.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*`
-- `web_search` is _optional_, example: `https://www.imdb.com/search/title/?title={}`, 
-define `download.episode_pattern` to remove episode suffix from titles. 
+  - `organize_into_directories` _optional_, orgainize downloads into directories
+  - `episode_pattern` _optional_ if you download episodes, the suffix like `S01.E01` should be removed to place all
+    files into one folder. The named capture group `episode` is mandatory.  
+    Example: `.*(?P<episode>[Ss]\\d{1,2}(.*?)[Ee]\\d{1,2}).*`
+- `web_search` is _optional_, example: `https://www.imdb.com/search/title/?title={}`,
+  define `download.episode_pattern` to remove episode suffix from titles.
 
 ```yaml
 video:
@@ -198,7 +197,7 @@ Attributes:
 - `retry`
 - `buffer`
 - `throttle_kbps` Kilobit per second
-- `grace_period_millis` 
+- `grace_period_millis`
 
 ##### 1.6.1.1 `retry`
 If set to `true` on connection loss to provider, the stream will be reconnected.
@@ -210,7 +209,7 @@ Has 2 attributes
 
 If `enabled` = true The stream is buffered. This is only possible if the provider stream is faster than the consumer.
 The stream is buffered with the configured `size`.
-`size` is the amount of `8192 byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.  
+`size` is the amount of `8192 byte` chunks. In this case the value `1024` means approx `8MB` for `2Mbit/s` stream.
 
 - *a.* if `retry` is `false` and `buffer.enabled` is `false`  the provider stream is piped as is to the client.
 - *b.* if `retry` is `true` or  `buffer.enabled` is `true` the provider stream is processed and send to the client.
@@ -228,9 +227,9 @@ Bandwidth throttle (speed limit).
 |4K (3840x2160)   |  30 fps | 20.480–49.152  | Ultra-HD    |
 
 ##### 1.6.1.3 `grace_period_millis`
-If you have a provider or a user where the max_connection attribute is greater than 0, 
-a grace period can be given during the switchover. 
-If this period is set too short, it may result in access being denied in some cases. 
+If you have a provider or a user where the max_connection attribute is greater than 0,
+a grace period can be given during the switchover.
+If this period is set too short, it may result in access being denied in some cases.
 The default is 0 milliseconds.
 If the connection is not throttled, the player will play its buffered content longer than expected.
 
@@ -269,7 +268,7 @@ if set to true, an update is started when the application starts.
 - `sanitize_sensitive_info` default true
 - `active_clients` default false, if set to true reverse proxy client count is printed as info log.
 - `log_level` can be set to `trace`, `debug`, `info`, `warn` and `error`.
-You can also set module based level like `hyper_util::client::legacy::connect=error,m3u_filter=debug` 
+  You can also set module based level like `hyper_util::client::legacy::connect=error,m3u_filter=debug`
 
 
 `log_level` priority  CLI-Argument, Env-Var, Config, Default(`info`).
@@ -332,11 +331,11 @@ api:
 ```
 
 ### 1.12 `user_access_control`
-The default is `false`. 
+The default is `false`.
 If you set it to `true`,  the attributes (if available)
 
-- expiration date, 
-- status and 
+- expiration date,
+- status and
 - max_connections
 
 are checked to permit or deny access.
@@ -354,12 +353,12 @@ Following attributes are available:
 - `user_connections_exhausted`: _optional_
 - ` provider_connections_exhausted`: _optional_
 
-Video files with name `channel_unavailable.ts`, `user_connections_exhausted`, `provider_connections_exhausted` 
-are already available in the docker image. 
+Video files with name `channel_unavailable.ts`, `user_connections_exhausted`, `provider_connections_exhausted`
+are already available in the docker image.
 
 You can convert an image with `ffmpeg`.
 
-`ffmpeg -loop 1 -i blank_screen.jpg -t 10 -r 1 -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p blank_screen.ts` 
+`ffmpeg -loop 1 -i blank_screen.jpg -t 10 -r 1 -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p blank_screen.ts`
 
 and add it to the `config.yml`.
 
@@ -405,10 +404,10 @@ sources:
 
 The HdHomerun config has the following attribute:
 `enabled`:  default is `false`,  you need to set it to `true`
-`devices`: is a list of HdHomeRun Device configuraitons. 
+`devices`: is a list of HdHomeRun Device configuraitons.
 For each output you need to define one device with a unique name. Each output gets his own port to connect.
 
-HdHomeRun device config has the following attributes: 
+HdHomeRun device config has the following attributes:
 
 - `name`: _mandatory_ and must be unique
 - `tuner_count`: _optional_, default 1
@@ -465,11 +464,11 @@ Each input has the following attributes:
 - `prefix` is optional, it is applied to the given field with the given value
 - `suffix` is optional, it is applied to the given field with the given value
 - `options` is optional,
-    + `xtream_skip_live` true or false, live section can be skipped.
-    + `xtream_skip_vod` true or false, vod section can be skipped. 
-    + `xtream_skip_series` true or false, series section can be skipped.
-    + `xtream_live_stream_without_extension` default false, if set to true `.ts` extension is not added to the stream link.
-    + `xtream_live_stream_use_prefix` default true, if set to true `/live/` prefix is added to the stream link.
+  + `xtream_skip_live` true or false, live section can be skipped.
+  + `xtream_skip_vod` true or false, vod section can be skipped.
+  + `xtream_skip_series` true or false, series section can be skipped.
+  + `xtream_live_stream_without_extension` default false, if set to true `.ts` extension is not added to the stream link.
+  + `xtream_live_stream_use_prefix` default true, if set to true `/live/` prefix is added to the stream link.
 - `aliases`  for alias definitions for the same provider with different credentials
 
 `persist` should be different for `m3u` and `xtream` types. For `m3u` use full filename like `./playlist_{}.m3u`.
@@ -694,12 +693,12 @@ Target options are:
 - `cleanup` deletes the directory given at `filename`. Don't point at existing media folder or everything will be deleted.
 - `kodi_style` tries to rename `filename` with [kodi style](https://kodi.wiki/view/Naming_video_files/TV_shows).
 - `strm_props` is a list of properties written to the strm file.
-If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is added. If `strm_props` is not given `#KODIPROP:inputstream=inputstream.ffmpeg`, `"#KODIPROP:http-reconnect=true` are set too for `kody_style`.
+  If `kodi_style` set to `true` the property `#KODIPROP:seekable=true|false` is added. If `strm_props` is not given `#KODIPROP:inputstream=inputstream.ffmpeg`, `"#KODIPROP:http-reconnect=true` are set too for `kody_style`.
 
 `m3u` output has additional options
 - `include_type_in_url`, default false, if true adds the stream type `live`, `movie`, `series` to the url of the stream.
-- `mask_redirect_url`, default false, if true uses urls from `api_proxy.yml` for user in proxy mode `redirect`. 
-Needs to be set `true`  if you have multiple provider and want to cycle in redirect mode. 
+- `mask_redirect_url`, default false, if true uses urls from `api_proxy.yml` for user in proxy mode `redirect`.
+  Needs to be set `true`  if you have multiple provider and want to cycle in redirect mode.
 
 `xtream` output has additional options
 - `skip_live_direct_source`  if true the direct_source property from provider for live is ignored
@@ -726,7 +725,7 @@ we need to fetch this info for each movie entry. But be aware the provider can b
   This can cause a lot of requests to the provider. Be cautious when using this option.
 - `xtream` `resolve_vod_delay` to avoid a provider ban you can set the seconds between vod_info_request's. Default is 2 seconds.
   But be aware that the more series entries there are, the longer the process takes.
-Unlike `series info` `movie info` is only fetched once for each movie. If the data is stored locally there will be no update.
+  Unlike `series info` `movie info` is only fetched once for each movie. If the data is stored locally there will be no update.
 
 There is a difference for `resolve_vod` and `resolve_series`.
 `resolve_series` works only when input: `xtream` and output: `m3u`.
@@ -831,7 +830,7 @@ sources:
 
 ### 2.5.2.8 `watch`
 For each target with a *unique name*, you can define watched groups.
-It is a list of regular expression matching final group names from this target playlist. 
+It is a list of regular expression matching final group names from this target playlist.
 Final means in this case: the name in the resulting playlist after applying all steps
 of transformation.
 
@@ -892,7 +891,7 @@ Has the following top level entries:
 Is referenced in the `config.yml`, should be a unique identifier
 
 ### 2.3.2 `match_as_ascii`
-If you have non ascii characters in you playlist and want to 
+If you have non ascii characters in you playlist and want to
 write regexp without considering chars like `é` and use `e` instead, set this option to `true`.
 [unidecode](https://crates.io/crates/unidecode) is used to convert the text.
 
@@ -1038,7 +1037,7 @@ Each transformation can have the following attributes:
 - `modifier` _mandatory_, values are: `lowercase`, `uppercase` and `capitalize`
 - `pattern` _optional_  is a regular expression (not filter!) with captures. Only needed when you want to transform parts of the property.
 
-For example: first 3 chars of channel name to lowercase: 
+For example: first 3 chars of channel name to lowercase:
 
 ```yaml
       mapper:
@@ -1188,18 +1187,18 @@ instead of username+password
 `max_connections`, `status` and `exp_date` are only used when `user_access_control` ist ste to true.
 
 
-If you have a lot of users and dont want to keep them in `api-proxy.yml`, you can set the option 
+If you have a lot of users and dont want to keep them in `api-proxy.yml`, you can set the option
 - `use_user_db` to true to store the user information inside a db-file.
 
-If the `use_user_db` option is switched to `false` or `true`, the users will automatically 
+If the `use_user_db` option is switched to `false` or `true`, the users will automatically
 be migrated to the corresponding file (`false` → `api_proxy.yml`, `true` → `api_user.db`).
 
 If you set  `use_user_db` to `true` you need to use the `Web-UI` to `edit`/`add`/`remove` users.
 
-To access the api for: 
+To access the api for:
 - `xtream` use url like `http://192.169.1.2/player_api.php?username={}&password={}`
 - `m3u` use url `http://192.169.1.2/get.php?username={}&password={}`
-or with token
+  or with token
 - `xtream` use url like `http://192.169.1.2/player_api.php?token={}`
 - `m3u` use url `http://192.169.1.2/get.php?token={}`
 
@@ -1218,7 +1217,7 @@ When you define credentials for a `target`, ensure that this target has
 
 The `proxy` property can be `reverse`or `redirect`. `reverse` means the streams are going through m3u-filter, `redirect` means the streams are comming from your provider.
 
-If you use `https` you need a ssl terminator. `m3u-filter` does not support https traffic. 
+If you use `https` you need a ssl terminator. `m3u-filter` does not support https traffic.
 
 If you use a ssl-terminator or proxy in front of m3u-filter you can set a `path` to make the configuration of your proxy simpler.
 For example you use `nginx` as your reverse proxy.
@@ -1295,7 +1294,7 @@ Following log levels are supported:
 - `info` _default_
 - `warn`
 - `error`
- 
+
 Use the `-l` or `--log-level` cli-argument to specify the log-level.
 
 The log level can be set through environment variable `M3U_FILTER_LOG`,
@@ -1478,7 +1477,7 @@ env  RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target armv
 
 # Different Scenarios
 ## Using `m3u-filter` with a m3u provider.
- todo.
+todo.
 
 ## Using `m3u-filter` with a xtream provider.
 
@@ -1669,18 +1668,18 @@ No Problem. You can write a filter for your channel using the `Name` or `Title` 
 
 ```yaml
 templates:
-- name: NO_SHOPPING
-  value: 'NOT(Group ~ "(?i).*Shopping.*" OR Group ~ "(?i).*Einkaufen.*") OR Group ~ "(?i).*téléachat.*"'
-- name: GERMAN_CHANNELS
-  value: 'Group ~ "^DE: .*"'
-- name: FRENCH_CHANNELS
-  value: 'Group ~ "^FR: .*"'
-- name: NO_TV5MONDE_IN_TF1
-  value: 'NOT(Group ~ "FR: TF1" AND Title ~ "FR: TV5Monde")'
-- name: EXCLUDED_CHANNELS
-  value: '!NO_TV5MONDE_IN_TF1! AND !NO_SHOOPING!'
-- name: MY_CHANNELS
-  value: '!EXCLUDED_CHANNELS! AND (!GERMAN_CHANNELS! OR !FRENCH_CHANNELS!)'
+  - name: NO_SHOPPING
+    value: 'NOT(Group ~ "(?i).*Shopping.*" OR Group ~ "(?i).*Einkaufen.*") OR Group ~ "(?i).*téléachat.*"'
+  - name: GERMAN_CHANNELS
+    value: 'Group ~ "^DE: .*"'
+  - name: FRENCH_CHANNELS
+    value: 'Group ~ "^FR: .*"'
+  - name: NO_TV5MONDE_IN_TF1
+    value: 'NOT(Group ~ "FR: TF1" AND Title ~ "FR: TV5Monde")'
+  - name: EXCLUDED_CHANNELS
+    value: '!NO_TV5MONDE_IN_TF1! AND !NO_SHOOPING!'
+  - name: MY_CHANNELS
+    value: '!EXCLUDED_CHANNELS! AND (!GERMAN_CHANNELS! OR !FRENCH_CHANNELS!)'
 ```
 
 # VLC seek problem when  *user_access_control* is enabled.
