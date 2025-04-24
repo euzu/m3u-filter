@@ -1,4 +1,4 @@
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_response, redirect, redirect_response, resource_response, seek_stream_response, separate_number_and_remainder, stream_response, try_option_bad_request, try_result_bad_request, RedirectParams};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_response, redirect, redirect_response, resource_response, force_provider_stream_response, separate_number_and_remainder, stream_response, try_option_bad_request, try_result_bad_request, RedirectParams, check_force_provider};
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
@@ -6,12 +6,13 @@ use crate::model::api_proxy::{UserConnectionPermission};
 use crate::model::config::{TargetType};
 use crate::model::playlist::{FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster};
 use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
-use crate::utils::network::request::{sanitize_sensitive_info};
+use crate::utils::network::request::{extract_extension_from_url, sanitize_sensitive_info};
 use axum::response::IntoResponse;
 use bytes::Bytes;
 use futures::stream;
 use log::{debug, error};
 use std::sync::Arc;
+use axum::http::StatusCode;
 use crate::api::endpoints::xtream_api::XtreamApiStreamContext;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::repository::storage_const;
@@ -66,45 +67,39 @@ async fn m3u_api_stream(
     axum::extract::Path((username, password, stream_id)): axum::extract::Path<(String, String, String)>,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
 ) -> impl axum::response::IntoResponse + Send {
+    let (user, target) = try_option_bad_request!(get_user_target_by_credentials(&username, &password, &api_req, &app_state).await, false, format!("Could not find any user {username}"));
+    if user.permission_denied(&app_state) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let target_name = &target.name;
+    if !target.has_output(&TargetType::M3u) {
+        debug!("Target has no m3u output {target_name}");
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+
     let (action_stream_id, stream_ext) = separate_number_and_remainder(&stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
-    let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
-    else { return axum::http::StatusCode::BAD_REQUEST.into_response() };
-    if user.permission_denied(&app_state) {
-        return axum::http::StatusCode::FORBIDDEN.into_response();
-    }
+    let pli = try_result_bad_request!(m3u_get_item_for_stream_id(virtual_id, &app_state.config, target).await, true, format!("Failed to read m3u item for stream id {}", virtual_id));
+    let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, stream_id {virtual_id}"));
 
-    if !target.has_output(&TargetType::M3u) {
-        return axum::http::StatusCode::BAD_REQUEST.into_response();
-    }
+    let cluster = XtreamCluster::try_from(pli.item_type).unwrap_or(XtreamCluster::Live);
 
-    let m3u_item = match m3u_get_item_for_stream_id(virtual_id, &app_state.config, target).await {
-        Ok(item) => item,
-        Err(err) => {
-            error!("Failed to get m3u url: {}", sanitize_sensitive_info(err.to_string().as_str()));
-            return axum::http::StatusCode::BAD_REQUEST.into_response();
-        }
-    };
-
-    let input = app_state.config.get_input_by_name(m3u_item.input_name.as_str());
-
-
-    if let Some(cookie) = is_seek_response(&req_headers) {
+    if let Some(cookie) = is_seek_response(cluster, pli.virtual_id, &app_state.config.t_encrypt_secret, &req_headers) {
         // partial request means we are in reverse proxy mode, seek happened
-        return seek_stream_response(&app_state, &cookie, &req_headers, input, m3u_item.item_type, target, &user).await.into_response()
+        return force_provider_stream_response(&app_state, &cookie, pli.virtual_id, pli.item_type, &req_headers, input, &user).await.into_response()
     }
 
-    let connection_permission = user.connection_permission(&app_state).await;
+    let (provider_name, connection_permission) = check_force_provider(&app_state, virtual_id, &req_headers, &user).await;
     if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
-    let cluster = XtreamCluster::try_from(m3u_item.item_type).unwrap_or(XtreamCluster::Live);
     let context = XtreamApiStreamContext::try_from(cluster).unwrap_or(XtreamApiStreamContext::Live);
 
     let redirect_params = RedirectParams {
-        item: &m3u_item,
-        provider_id: m3u_item.get_provider_id(),
+        item: &pli,
+        provider_id: pli.get_provider_id(),
         cluster,
         target_type: TargetType::Xtream,
         target,
@@ -119,15 +114,16 @@ async fn m3u_api_stream(
         return response.into_response();
     }
 
-    let is_hls_request = m3u_item.item_type == PlaylistItemType::LiveHls || stream_ext.as_deref() == Some(HLS_EXT);
+    let extension = stream_ext.unwrap_or_else(
+        || extract_extension_from_url(&pli.url).map_or_else(String::new, std::string::ToString::to_string));
+
+    let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || pli.item_type == PlaylistItemType::LiveDash || extension == HLS_EXT;
     // Reverse proxy mode
     if is_hls_request {
-        let target_name = &target.name;
-        let hls_input = try_option_bad_request!(input, true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
-        return handle_hls_stream_request(&app_state, &user, &m3u_item.url, m3u_item.virtual_id, hls_input).await.into_response();
+        return handle_hls_stream_request(&app_state, &user, provider_name, &pli.url, pli.virtual_id, input).await.into_response();
     }
 
-    stream_response(&app_state, m3u_item.url.as_str(), &req_headers, input, m3u_item.item_type, target, &user, connection_permission).await.into_response()
+    stream_response(&app_state, pli.virtual_id, pli.item_type, pli.url.as_str(), &req_headers, input, target, &user, connection_permission).await.into_response()
 }
 
 async fn m3u_api_resource(
