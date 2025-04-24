@@ -30,7 +30,7 @@ fn rewrite_hls_url(input: &str, replacement: &str) -> String {
 }
 
 fn rewrite_uri_attrib(line: &str, props: &RewriteHlsProps) -> String {
-    if let Some(caps) = CONSTANTS.re_memory_usage.captures(line) {
+    if let Some(caps) = CONSTANTS.re_hls_uri.captures(line) {
         let uri = &caps[1];
         let target_url = &rewrite_hls_url(&props.hls_url, uri);
         if let Some(token) = create_token_for_provider(props.secret, props.virtual_id, &props.provider_name, target_url) {

@@ -472,7 +472,7 @@ fn is_throttled_stream(item_type: PlaylistItemType, throttle_kbps: usize) -> boo
 const SESSION_COOKIE_NAME: &str = "m3uflt_session=";
 
 fn create_delete_session_cookie() -> String {
-    format!("{SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly")
+    format!("{SESSION_COOKIE_NAME}; Max-Age=0; Path=/; HttpOnly")
 }
 
 fn create_session_cookie(cookie: &str) -> String {
@@ -822,17 +822,11 @@ pub fn redirect(url: &str) -> impl IntoResponse {
 
 pub fn is_seek_response(
     cluster: XtreamCluster,
-    virtual_id: u32,
+    _virtual_id: u32,
     req_headers: &HeaderMap,
 ) -> Option<String> {
     // seek only for non-live streams
     if cluster == XtreamCluster::Live {
-        return None;
-    }
-
-    // cookie needs to have virtual_id to identify that we have the same item
-    let cookie = read_session_cookie(req_headers)?;
-    if !cookie.starts_with(&format!("{virtual_id}:")) {
         return None;
     }
 
@@ -842,7 +836,7 @@ pub fn is_seek_response(
         return None;
     }
 
-    Some(cookie)
+    Some(read_session_cookie(req_headers)?)
 }
 
 pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {

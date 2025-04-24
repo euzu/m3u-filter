@@ -21,12 +21,12 @@ impl ProviderConnectionGuard {
             }
         }
     }
-    pub fn get_provider_config(&self) -> Option<&Arc<ProviderConfig>> {
+    pub fn get_provider_config(&self) -> Option<Arc<ProviderConfig>> {
         match self.allocation {
             ProviderAllocation::Exhausted => None,
             ProviderAllocation::Available(ref cfg) |
             ProviderAllocation::GracePeriod(ref cfg) => {
-                Some(cfg)
+                Some(Arc::clone(cfg))
             }
         }
     }
@@ -488,7 +488,7 @@ impl MultiProviderLineup {
             let allocation = {
                 let config = Self::get_next_provider_from_group(priority_group, false);
                 if config.is_none() {
-                    Self::get_next_provider_from_group(priority_group, false)
+                    Self::get_next_provider_from_group(priority_group, true)
                 } else {
                     config
                 }
@@ -574,7 +574,9 @@ impl ActiveProviderManager {
                     for group in &multi.providers {
                         match group {
                             ProviderPriorityGroup::SingleProviderGroup(config) => {
-                                return Some((lineup, config));
+                                if config.name == name {
+                                    return Some((lineup, config));
+                                }
                             }
                             ProviderPriorityGroup::MultiProviderGroup(_, configs) => {
                                 for config in configs {

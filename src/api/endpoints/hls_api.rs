@@ -29,7 +29,7 @@ fn hls_response(hls_content: String, cookie: Option<String>) -> impl IntoRespons
         .status(axum::http::StatusCode::OK)
         .header(axum::http::header::CONTENT_TYPE, "application/x-mpegurl");
     if let Some(cookie) = cookie {
-        builder = builder.header(axum::http::header::COOKIE, cookie);
+        builder = builder.header(axum::http::header::SET_COOKIE, cookie);
     }
     builder.body(hls_content)
         .unwrap()
@@ -62,7 +62,7 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
             None => (url, None, None),
         },
         Some(provider) => match app_state.active_provider.force_exact_acquire_connection(&provider).await.get_provider_config() {
-            Some(provider_cfg) => create_stream_and_cookie(provider_cfg),
+            Some(provider_cfg) => create_stream_and_cookie(&provider_cfg),
             None => (url, None, None),
         },
     };
