@@ -32,8 +32,8 @@ jsonwebtoken = "9.3"
 rust-argon2 = "2.1"
 futures = "0.3"
 path-clean = "1"
-pest = "2.7"
-pest_derive = "2.7"
+pest = "2.8"
+pest_derive = "2.8"
 enum-iterator = "2"
 openssl = { version = "*", features = ["vendored"] } #https://docs.rs/openssl/0.10.34/openssl/#vendored
 deunicode = "1.6.1"
@@ -43,9 +43,9 @@ env_logger = "0.11"
 rustelebot = "0.3"
 bincode = { version = "2.0.1",  features = ["std", "serde"] }
 rand = "0.9"
-rpassword = "7.3"
+rpassword = "7.4"
 flate2 = "1"
-blake3 = "1.7"
+blake3 = "1.8"
 bytes = "1.10"
 tokio-stream = { version = "0.1", features = ["sync"] }
 tokio = { version = "1.44", features = ["rt-multi-thread", "parking_lot", "fs"] }

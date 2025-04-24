@@ -573,9 +573,9 @@ impl ActiveProviderManager {
                 ProviderLineup::Multi(multi) => {
                     for group in &multi.providers {
                         match group {
-                            ProviderPriorityGroup::SingleProviderGroup(config) => {
-                                if config.name == name {
-                                    return Some((lineup, config));
+                            ProviderPriorityGroup::SingleProviderGroup(single) => {
+                                if single.name == name {
+                                    return Some((lineup, single));
                                 }
                             }
                             ProviderPriorityGroup::MultiProviderGroup(_, configs) => {

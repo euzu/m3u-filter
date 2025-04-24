@@ -822,12 +822,19 @@ pub fn redirect(url: &str) -> impl IntoResponse {
 
 pub fn is_seek_response(
     cluster: XtreamCluster,
-    _virtual_id: u32,
+    virtual_id: u32,
+    secret: &[u8],
     req_headers: &HeaderMap,
 ) -> Option<String> {
     // seek only for non-live streams
     if cluster == XtreamCluster::Live {
         return None;
+    }
+
+    let cookie = read_session_cookie(req_headers)?;
+    match get_stream_info_from_crypted_cookie(secret, &cookie) {
+        Some((vid, _, _)) if vid == virtual_id => {},
+        _ => return None,
     }
 
     // seek requests contain range header
@@ -836,7 +843,7 @@ pub fn is_seek_response(
         return None;
     }
 
-    Some(read_session_cookie(req_headers)?)
+    read_session_cookie(req_headers)
 }
 
 pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {
