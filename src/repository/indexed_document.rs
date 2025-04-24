@@ -544,7 +544,7 @@ mod tests {
             for i in 0u32..=500 {
                 idw.write_doc(i, &Record {
                     id: i,
-                    data: format!("E {}", i),
+                    data: format!("E {i}"),
                 })?;
             }
 

@@ -710,7 +710,7 @@ mod tests {
 
         match get_filter(flt, None) {
             Ok(filter) => {
-                let result = CONSTANTS.re_whitespace.replace_all(&flt, " ");
+                let result = CONSTANTS.re_whitespace.replace_all(flt, " ");
                 assert_eq!(format!("{filter}"), result.trim());
             }
             Err(e) => {

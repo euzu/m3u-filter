@@ -68,7 +68,7 @@ mod tests {
 
         let mut index:usize = 0;
         while let Some(chunk) = ring_buffer.next_chunk() {
-            for &byte in chunk.iter() {
+            for byte in chunk {
                 let expected_value = buffer[index % buffer.len()];
                 assert_eq!(byte, expected_value, "Wrong value {byte} != {expected_value} at index {index} detected!");
                 index+=1;
