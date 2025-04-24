@@ -425,7 +425,7 @@ where
         }
     }
 
-    const fn new_with_root(root: BPlusTreeNode::<K, V>) -> Self {
+    const fn new_with_root(root: BPlusTreeNode<K, V>) -> Self {
         let (inner_order, leaf_order) = calc_order::<K, V>();
         Self {
             root,
@@ -822,22 +822,22 @@ mod tests {
         // Query the tree
         for i in 0u32..=test_size {
             let found = tree.query(&i);
-            assert!(found.is_some(), "{content} {} not found", i);
+            assert!(found.is_some(), "{content} {i} not found");
             assert!(found.unwrap().eq(&Record {
                 id: i,
                 data: format!("{content} {i}"),
-            }), "{content} {} not found", i);
+            }), "{content} {i} not found");
         }
 
         let mut tree_query: BPlusTreeQuery<u32, Record> = BPlusTreeQuery::try_new(&filepath)?;
         for i in 0u32..=test_size {
             let found = tree_query.query(&i);
-            assert!(found.is_some(), "{content} {} not found", i);
+            assert!(found.is_some(), "{content} {i} not found");
             let entry = found.unwrap();
             assert!(entry.eq(&Record {
                 id: i,
                 data: format!("{content} {i}"),
-            }), "{content} {} not found", i);
+            }), "{content} {i} not found");
         }
 
         let mut tree_update: BPlusTreeUpdate<u32, Record> = BPlusTreeUpdate::try_new(&filepath)?;
@@ -850,7 +850,7 @@ mod tests {
                 };
                 tree_update.update(&i, new_record)?;
             } else {
-                assert!(false, "{content} {} not found", i);
+                assert!(false, "{content} {i} not found");
             }
         }
 
@@ -858,13 +858,13 @@ mod tests {
 
         for i in 0u32..=test_size {
             let found = tree_query.query(&i);
-            assert!(found.is_some(), "{content} {} not found", i);
+            assert!(found.is_some(), "{content} {i} not found");
             let entry = found.unwrap();
             let expected = Record {
                 id: i,
                 data: format!("{content} {}", i + 9000),
             };
-            assert!(entry.eq(&expected), "Entry not equal {:?} != {:?}", entry, expected);
+            assert!(entry.eq(&expected), "Entry not equal {entry:?} != {expected:?}");
         }
 
         Ok(())
@@ -890,7 +890,7 @@ mod tests {
 
         tree.traverse(|keys, values| {
             keys.iter().zip(values.iter()).for_each(|(k, v)| {
-                assert!(format!("{content} {}", k + 1).eq(&v.data), "Wrong entry")
+                assert!(format!("{content} {}", k + 1).eq(&v.data), "Wrong entry");
             });
         });
 
@@ -914,8 +914,8 @@ mod tests {
         let tree: BPlusTree<u32, Record> = BPlusTree::load(&filepath)?;
 
         // Traverse the tree
-        for (key, value) in tree.iter() {
-            assert!(format!("Entry {}", key).eq(&value.data), "Wrong entry");
+        for (key, value) in &tree {
+            assert!(format!("Entry {key}").eq(&value.data), "Wrong entry");
             entry_set.remove(key);
         }
         assert!(entry_set.is_empty());

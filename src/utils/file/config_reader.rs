@@ -104,15 +104,15 @@ pub fn read_mapping(mapping_file: &str, resolve_var: bool) -> Result<Option<Mapp
     let mapping_file = std::path::PathBuf::from(mapping_file);
     if let Ok(file) = file_utils::open_file(&mapping_file) {
         let mapping: Result<Mappings, _> = serde_yaml::from_reader(config_file_reader(file, resolve_var));
-        match mapping {
+        return match mapping {
             Ok(mut result) => {
                 handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, result.prepare());
-                return Ok(Some(result));
+                Ok(Some(result))
             }
             Err(err) => {
-                return Err(info_err!(err.to_string()));
+                Err(info_err!(err.to_string()))
             }
-        }
+        };
     }
     warn!("cant read mapping file: {}", mapping_file.to_str().unwrap_or("?"));
     Ok(None)
@@ -339,10 +339,10 @@ fn get_csv_file_path(file_uri: &String) -> Result<PathBuf, Error> {
     if file_uri.contains("://") {
         if let Ok(url) = file_uri.parse::<url::Url>() {
             if url.scheme() == "file" {
-                match url.to_file_path() {
-                    Ok(path) => return Ok(path),
-                    Err(()) => return Err(str_to_io_error(&format!("Could not open {file_uri}"))),
-                }
+                return match url.to_file_path() {
+                    Ok(path) => Ok(path),
+                    Err(()) => Err(str_to_io_error(&format!("Could not open {file_uri}"))),
+                };
             }
         }
         Err(str_to_io_error(&format!("Only file:// is supported {file_uri}")))

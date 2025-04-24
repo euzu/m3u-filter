@@ -180,9 +180,9 @@ pub fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
             if content.len() >= 2 && is_gzip(&content[0..2]) {
                 let mut decoder = GzDecoder::new(&content[..]);
                 let mut decode_buffer = String::new();
-                match decoder.read_to_string(&mut decode_buffer) {
-                    Ok(_) => return Ok(decode_buffer),
-                    Err(err) => return Err(str_to_io_error(&format!("failed to decode gzip content {err}")))
+                return match decoder.read_to_string(&mut decode_buffer) {
+                    Ok(_) => Ok(decode_buffer),
+                    Err(err) => Err(str_to_io_error(&format!("failed to decode gzip content {err}")))
                 };
             }
             return Ok(String::from_utf8_lossy(&content).parse().unwrap());
@@ -504,8 +504,8 @@ mod tests {
     fn test_url_mask() {
         // Replace with "***"
         let query = "https://bubblegum.tv/live/username/password/2344";
-        let masked = sanitize_sensitive_info(&query);
-        println!("{masked}")
+        let masked = sanitize_sensitive_info(query);
+        println!("{masked}");
     }
 
     #[test]

@@ -121,7 +121,7 @@ pub fn parse_xtream(input: &ConfigInput,
 
             match map_to_xtream_streams(xtream_cluster, streams) {
                 Ok(mut xtream_streams) => {
-                    let mut group_map: HashMap::<String, XtreamCategory> =
+                    let mut group_map: HashMap<String, XtreamCategory> =
                         xtream_categories.into_iter().map(|category|
                             (category.category_id.to_string(), category)
                         ).collect();

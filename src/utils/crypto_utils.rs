@@ -69,7 +69,7 @@ mod tests {
     fn test_encrypt() {
         let secret: [u8; 16] = rand::rng().random(); // Random IV (AES-CBC 16 Bytes)
         let plain = "hello world";
-        let encrypted = encrypt_text(&secret, &plain);
+        let encrypted = encrypt_text(&secret, plain);
         let decrypted = decrypt_text(&secret, &encrypted.unwrap()).unwrap();
 
         assert_eq!(decrypted, plain);
