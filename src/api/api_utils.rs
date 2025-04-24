@@ -833,7 +833,7 @@ pub fn is_seek_response(
 
     let cookie = read_session_cookie(req_headers)?;
     match get_stream_info_from_crypted_cookie(secret, &cookie) {
-        Some((vid, _, _)) if vid == virtual_id => {},
+        Some((vid, _, _)) if vid == virtual_id => {}
         _ => return None,
     }
 
@@ -873,11 +873,12 @@ mod tests {
     #[test]
     fn test_cookie() {
         let cookie_value = format!("{SESSION_COOKIE_NAME}bbblegum; sehe=dfd; sdfsdf=sdfsd;");
-        if let Some(cookie) = cookie_value.split(';')
+        let cookie = cookie_value.split(';')
             .map(str::trim)
             .find(|&part| part.starts_with(SESSION_COOKIE_NAME))
             .and_then(|p| {
                 p.strip_prefix(SESSION_COOKIE_NAME).map(str::trim)
-            }) {}
+            }).expect("Cookie not found");
+        assert_eq!(cookie, "bbblegum");
     }
 }
