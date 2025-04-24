@@ -1,6 +1,6 @@
 use crate::model::api_proxy::ProxyUserCredentials;
-use crate::utils::crypto_utils::{obfuscate_text};
 use std::str;
+use crate::api::api_utils::{create_token_for_provider};
 use crate::utils::constants::{CONSTANTS, HLS_PREFIX};
 
 pub struct RewriteHlsProps<'a> {
@@ -10,6 +10,7 @@ pub struct RewriteHlsProps<'a> {
     pub hls_url: String,
     pub virtual_id: u32,
     pub input_id: u16,
+    pub provider_name: String,
 }
 
 fn rewrite_hls_url(input: &str, replacement: &str) -> String {
@@ -31,8 +32,9 @@ fn rewrite_hls_url(input: &str, replacement: &str) -> String {
 fn rewrite_uri_attrib(line: &str, props: &RewriteHlsProps) -> String {
     if let Some(caps) = CONSTANTS.re_memory_usage.captures(line) {
         let uri = &caps[1];
-        if let Ok(encrypted_uri) = obfuscate_text(props.secret, &rewrite_hls_url(&props.hls_url, uri)) {
-            return CONSTANTS.re_hls_uri.replace(line, format!(r#"URI="{encrypted_uri}""#)).to_string();
+        let target_url = &rewrite_hls_url(&props.hls_url, uri);
+        if let Some(token) = create_token_for_provider(props.secret, props.virtual_id, &props.provider_name, target_url) {
+            return CONSTANTS.re_hls_uri.replace(line, format!(r#"URI="{token}""#)).to_string();
         }
     }
     line.to_string()
@@ -43,14 +45,30 @@ pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> Stri
     let password = &user.password;
     let mut result = Vec::new();
     for line in props.content.lines() {
+        // skip comments
         if line.starts_with('#') {
-            result.push(rewrite_uri_attrib(line, props));
-        } else if let Ok(token) = if line.starts_with("http") {
-            obfuscate_text(props.secret, line)
+            let rewritten = rewrite_uri_attrib(line, props);
+            result.push(rewritten);
+            continue;
+        }
+
+        // target url
+        let target_url = if line.starts_with("http") {
+            line.to_string()
         } else {
-            obfuscate_text(props.secret, &rewrite_hls_url(&props.hls_url, line))
-        } {
-            result.push(format!("{}/{HLS_PREFIX}/{username}/{password}/{}/{}/{token}", props.base_url, props.input_id, props.virtual_id));
+            rewrite_hls_url(&props.hls_url, line)
+        };
+        if let Some(token) = create_token_for_provider(props.secret, props.virtual_id, &props.provider_name, &target_url) {
+            let url = format!(
+                "{}/{HLS_PREFIX}/{}/{}/{}/{}/{}",
+                props.base_url,
+                username,
+                password,
+                props.input_id,
+                props.virtual_id,
+                token
+            );
+            result.push(url);
         }
     }
     result.join("\r\n")

@@ -31,7 +31,8 @@ pub const FILENAME_TRIM_PATTERNS: &[char] = &['.', '-', '_'];
 
 pub const MEDIA_STREAM_HEADERS: &[&str] = &["accept", "content-type", "content-length", "connection",
     "accept-ranges", "content-range", "vary", "transfer-encoding", "access-control-allow-origin",
-    "access-control-allow-credentials", "icy-metadata"];
+    "access-control-allow-credentials", "icy-metadata", "cache-control", "referer", "last-modified",
+    "etag", "expires"];
 
 pub struct KodiStyle {
     pub year: Regex,

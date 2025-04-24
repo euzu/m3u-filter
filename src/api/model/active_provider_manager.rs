@@ -21,6 +21,15 @@ impl ProviderConnectionGuard {
             }
         }
     }
+    pub fn get_provider_config(&self) -> Option<&Arc<ProviderConfig>> {
+        match self.allocation {
+            ProviderAllocation::Exhausted => None,
+            ProviderAllocation::Available(ref cfg) |
+            ProviderAllocation::GracePeriod(ref cfg) => {
+                Some(cfg)
+            }
+        }
+    }
 }
 
 impl Deref for ProviderConnectionGuard {
@@ -251,7 +260,7 @@ impl SingleProviderLineup {
     }
 
     fn get_next(&self) -> Option<Arc<ProviderConfig>> {
-        self.provider.get_next(true)
+        self.provider.get_next(false)
     }
 
     fn acquire(&self) -> ProviderAllocation {
@@ -479,7 +488,7 @@ impl MultiProviderLineup {
             let allocation = {
                 let config = Self::get_next_provider_from_group(priority_group, false);
                 if config.is_none() {
-                    Self::get_next_provider_from_group(priority_group, true)
+                    Self::get_next_provider_from_group(priority_group, false)
                 } else {
                     config
                 }
@@ -582,9 +591,9 @@ impl ActiveProviderManager {
         None
     }
 
-    pub async fn force_exact_acquire_connection(&self, input_name: &str) -> ProviderConnectionGuard {
+    pub async fn force_exact_acquire_connection(&self, provider_name: &str) -> ProviderConnectionGuard {
         let providers = self.providers.read().await;
-        let allocation = match Self::get_provider_config(input_name, &providers) {
+        let allocation = match Self::get_provider_config(provider_name, &providers) {
             None => ProviderAllocation::Exhausted, // No Name matched, we don't have this provider
             Some((_lineup, config)) => config.force_allocate(),
         };
