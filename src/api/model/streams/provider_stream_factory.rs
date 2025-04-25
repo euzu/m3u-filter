@@ -248,9 +248,9 @@ async fn provider_initial_request(cfg: &Config, request_client: Arc<reqwest::Cli
 async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderStreamOptions) -> Option<BoxedProviderStream> {
     let url = stream_options.get_url();
     debug_if_enabled!("stream provider {}", sanitize_sensitive_info(url.as_str()));
-    let mut max_retries = 5;
+    let mut retry_counter = 0;
     while stream_options.should_reconnect() {
-        if max_retries < 0 {
+        if retry_counter >= 5 { // TODO make this configurable
             stream_options.cancel_reconnect();
             return None;
         }
@@ -258,9 +258,9 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
         let (client, _) = prepare_client(&client, &stream_options);
         match client.send().await {
             Ok(response) => {
-                max_retries = 0;
                 let status = response.status();
                 if status.is_success() {
+                    retry_counter = 0;
                     let provider_stream = response.bytes_stream().map_err(|err| {
                         // error!("Stream error {err}");
                         StreamError::reqwest(&err)
@@ -270,6 +270,8 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                     } else {
                         Some(provider_stream)
                     };
+                } else {
+                    retry_counter += 1;
                 }
                 if status.is_client_error() {
                     debug!("Client error status response : {status}");
@@ -277,7 +279,7 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                         StatusCode::REQUEST_TIMEOUT |
                         StatusCode::TOO_EARLY => {}
                         StatusCode::TOO_MANY_REQUESTS => {
-                            tokio::time::sleep(Duration::from_millis(1000)).await;
+                            tokio::time::sleep(Duration::from_millis(retry_counter *1000)).await;
                         }
                         _ => {
                             debug!("Reconnect stopped because of client error status response : {status}");
@@ -285,7 +287,6 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                             return None;
                         }
                     }
-                    max_retries -= 1;
                 }
                 if status.is_server_error() {
                     debug!("Server error status response : {status}");
@@ -301,7 +302,6 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                             return None;
                         }
                     }
-                    max_retries -= 1;
                 }
             }
             Err(err) => {
