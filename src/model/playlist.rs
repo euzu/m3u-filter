@@ -259,6 +259,7 @@ macro_rules! generate_field_accessor_impl_for_playlist_item_header {
                     $(
                         stringify!($prop) => Some(self.$prop.clone()),
                     )*
+                    "caption" =>  Some(if self.title.is_empty() { self.name.clone() } else { self.title.clone() }),
                     "epg_channel_id" | "epg_id" => self.epg_channel_id.clone(),
                     _ => None,
                 }
@@ -274,6 +275,11 @@ macro_rules! generate_field_accessor_impl_for_playlist_item_header {
                             true
                         }
                     )*
+                    "caption" => {
+                        self.title = val.clone();
+                        self.name = val;
+                        true
+                    }
                     "epg_channel_id" | "epg_id" => {
                         self.epg_channel_id = Some(value.to_owned());
                         true

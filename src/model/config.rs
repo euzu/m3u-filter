@@ -38,13 +38,13 @@ use crate::utils::sys_utils::exit;
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15";
 
 pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
-    "name", "title", "group", "id", "chno", "logo",
+    "name", "title", "caption", "group", "id", "chno", "logo",
     "logo_small", "parent_code", "audio_track",
     "time_shift", "rec", "url", "epg_channel_id", "epg_id"
 ];
 
-pub const AFFIX_FIELDS: &[&str] = &["name", "title", "group"];
-pub const COUNTER_FIELDS: &[&str] = &["name", "title", "chno"];
+pub const AFFIX_FIELDS: &[&str] = &["name", "title", "caption", "group"];
+pub const COUNTER_FIELDS: &[&str] = &["name", "title", "caption", "chno"];
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8192byte chunks and 2Mbit/s approx 8MB
 
@@ -166,7 +166,7 @@ impl Display for ProcessingOrder {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, Eq, PartialEq)]
 pub enum ItemField {
     #[serde(rename = "group")]
     Group,
@@ -180,6 +180,8 @@ pub enum ItemField {
     Input,
     #[serde(rename = "type")]
     Type,
+    #[serde(rename = "caption")]
+    Caption,
 }
 
 impl ItemField {
@@ -189,6 +191,7 @@ impl ItemField {
     const URL: &'static str = "Url";
     const INPUT: &'static str = "Input";
     const TYPE: &'static str = "Type";
+    const CAPTION: &'static str = "Caption";
 }
 
 impl Display for ItemField {
@@ -200,6 +203,7 @@ impl Display for ItemField {
             Self::Url => Self::URL,
             Self::Input => Self::INPUT,
             Self::Type => Self::TYPE,
+            Self::Caption => Self::CAPTION,
         })
     }
 }

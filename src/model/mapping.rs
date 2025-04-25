@@ -1,6 +1,6 @@
 use enum_iterator::Sequence;
 use log::{debug, error, trace};
-use regex::{Regex};
+use regex::Regex;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -295,7 +295,7 @@ impl MappingValueProcessor<'_> {
         }
     }
 
-    fn apply_tags(&mut self, value: &str, captures: &HashMap<&str, &str>) -> Option<String> {
+    fn apply_tags(&self, value: &str, captures: &HashMap<&str, &str>) -> Option<String> {
         let mut new_value = String::from(value);
         let tag_captures = CONSTANTS.re_template_tag.captures_iter(value)
             .filter(|caps| caps.len() > 1)
@@ -336,12 +336,12 @@ impl MappingValueProcessor<'_> {
 
     fn apply_suffix(&mut self, captures: &HashMap<&str, &str>) {
         let mapper = self.mapper;
-        let suffix = &mapper.suffix;
+        let suffixes = &mapper.suffix;
 
-        for (key, value) in suffix {
+        for (key, value) in suffixes {
             if let Some(suffix) = self.apply_tags(value, captures) {
                 if let Some(old_value) = self.get_property(key) {
-                    let new_value = format!("{}{}", &old_value, suffix);
+                    let new_value = format!("{old_value}{suffix}");
                     self.set_property(key, &new_value);
                 }
             }

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use std::path::PathBuf;
 use quick_xml::{Error, Writer};
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
@@ -20,7 +20,7 @@ pub struct XmlTag {
     pub attributes: Option<HashMap<String, String>>,
     pub children: Option<Vec<XmlTag>>,
     pub icon: Option<String>,
-    pub normalized_epg_ids: HashSet<String>,
+    pub normalized_epg_ids: Vec<String>,
 }
 
 impl XmlTag {
@@ -32,7 +32,7 @@ impl XmlTag {
             attributes: attribs,
             children: None,
             icon: None,
-            normalized_epg_ids: HashSet::new(),
+            normalized_epg_ids: Vec::new(),
         }
     }
 
