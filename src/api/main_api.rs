@@ -177,13 +177,14 @@ fn start_hdhomerun(cfg: &Arc<Config>, app_state: &Arc<AppState>, infos: &mut Vec
                     let app_host = host.clone();
                     let port = device.port;
                     let device_clone = Arc::new(device.clone());
+                    let basic_auth = hdhomerun.auth;
                     infos.push(format!("HdHomeRun Server '{}' running: http://{host}:{port}", device.name));
                     tokio::spawn(async move {
                         let router = axum::Router::<Arc<HdHomerunAppState>>::new()
                             .layer(create_cors_layer())
                             .layer(create_compression_layer())
                             // .layer(TraceLayer::new_for_http()) // `Logger::default()`
-                            .merge(hdhr_api_register());
+                            .merge(hdhr_api_register(basic_auth));
 
                         let router: axum::Router<()> = router.with_state(Arc::new(HdHomerunAppState {
                             app_state: Arc::clone(&app_data),

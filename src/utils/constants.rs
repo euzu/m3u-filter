@@ -31,7 +31,8 @@ pub const FILENAME_TRIM_PATTERNS: &[char] = &['.', '-', '_'];
 
 pub const MEDIA_STREAM_HEADERS: &[&str] = &["accept", "content-type", "content-length", "connection",
     "accept-ranges", "content-range", "vary", "transfer-encoding", "access-control-allow-origin",
-    "access-control-allow-credentials", "icy-metadata"];
+    "access-control-allow-credentials", "icy-metadata", "cache-control", "referer", "last-modified",
+    "etag", "expires"];
 
 pub struct KodiStyle {
     pub year: Regex,
@@ -69,7 +70,7 @@ pub static CONSTANTS: LazyLock<Constants> = LazyLock::new(||
         re_username: Regex::new(r"(username=)[^&]*").unwrap(),
         re_password: Regex::new(r"(password=)[^&]*").unwrap(),
         re_token: Regex::new(r"(token=)[^&]*").unwrap(),
-        re_stream_url: Regex::new(r"(.*://).*/(live|video|movie|series|m3u-stream|resource)/\w+/\w+").unwrap(),
+        re_stream_url: Regex::new(r"(?i)^(?P<scheme>https?://)[^/]+/(?P<ctx>live|video|movie|series|m3u-stream|resource)/[^/]+/[^/]+/").unwrap(),
         re_url: Regex::new(r"(.*://).*?/(.*)").unwrap(),
         re_base_href: Regex::new(r#"(href|src)="/([^"]*)""#).unwrap(),
         re_env_var: Regex::new(r"\$\{env:(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)}").unwrap(),

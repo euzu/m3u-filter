@@ -1,7 +1,7 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
 use crate::api::api_utils;
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_response, redirect_response, resource_response, seek_stream_response, separate_number_and_remainder, serve_file, stream_response, RedirectParams};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_response, redirect_response, resource_response, force_provider_stream_response, separate_number_and_remainder, serve_file, stream_response, RedirectParams, check_force_provider};
 use crate::api::api_utils::{redirect, try_option_bad_request, try_result_bad_request};
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::endpoints::xmltv_api::get_empty_epg_response;
@@ -21,7 +21,6 @@ use crate::repository::playlist_repository::get_target_id_mapping;
 use crate::repository::storage::{get_target_storage_path, hex_encode};
 use crate::repository::{storage_const, user_repository, xtream_repository};
 use crate::utils::constants::HLS_EXT;
-use crate::utils::debug_if_enabled;
 use crate::utils::hash_utils::generate_playlist_uuid;
 use crate::utils::json_utils;
 use crate::utils::json_utils::get_u32_from_serde_value;
@@ -192,35 +191,34 @@ async fn xtream_player_api_stream(
         return StatusCode::BAD_REQUEST.into_response();
     }
 
-
     let (action_stream_id, stream_ext) = separate_number_and_remainder(stream_req.stream_id);
     let virtual_id: u32 = try_result_bad_request!(action_stream_id.trim().parse());
     let (pli, mapping) = try_result_bad_request!(xtream_repository::xtream_get_item_for_stream_id(virtual_id, &app_state.config, target, None), true, format!("Failed to read xtream item for stream id {}", virtual_id));
-
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
+    let cluster = pli.xtream_cluster;
 
-    if let Some(cookie) = is_seek_response(req_headers) {
+    if let Some(cookie) = is_seek_response(cluster, pli.virtual_id, &app_state.config.t_encrypt_secret, req_headers) {
         // partial request means we are in reverse proxy mode, seek happened
-        return seek_stream_response(app_state, &cookie, req_headers, Some(input), pli.item_type, target, &user).await.into_response()
-
+        return force_provider_stream_response(app_state, &cookie, pli.virtual_id, pli.item_type, req_headers, input, &user).await.into_response()
     }
 
-    let connection_permission = user.connection_permission(app_state).await;
+    let (provider_name, connection_permission) = check_force_provider(app_state, virtual_id, req_headers, &user).await;
     if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
 
+    let context = stream_req.context.clone();
 
     let redirect_params = RedirectParams {
         item: &pli,
         provider_id: Some(mapping.provider_id),
-        cluster: pli.xtream_cluster,
+        cluster,
         target_type: TargetType::Xtream,
         target,
-        input: Some(input),
+        input,
         user: &user,
         stream_ext: stream_ext.as_deref(),
-        req_context: stream_req.context.clone(),
+        req_context: context,
         action_path: stream_req.action_path,
     };
     if let Some(response) = redirect_response(app_state, &redirect_params).await {
@@ -239,18 +237,14 @@ async fn xtream_player_api_stream(
     let stream_url = try_option_bad_request!(get_xtream_player_api_stream_url(input, &stream_req.context, &query_path, &pli.url),
         true, format!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
 
-
-    let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || extension == HLS_EXT;
-
+    let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || pli.item_type == PlaylistItemType::LiveDash || extension == HLS_EXT;
     // Reverse proxy mode
     if is_hls_request {
-        return handle_hls_stream_request(app_state, &user, &stream_url, pli.virtual_id, input).await.into_response();
+        return handle_hls_stream_request(app_state, &user, provider_name, &stream_url, pli.virtual_id, input).await.into_response();
     }
 
-    debug_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
-    stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user, connection_permission).await.into_response()
+    stream_response(app_state, pli.virtual_id, pli.item_type, &stream_url, req_headers, input, target, &user, connection_permission).await.into_response()
 }
-
 
 async fn xtream_player_api_stream_with_token(
     req_headers: &HeaderMap,
@@ -287,9 +281,11 @@ async fn xtream_player_api_stream_with_token(
             ui_enabled: false,
         };
 
+        // TODO how should we use fixed provider for hls in multi provider config?
+
         // Reverse proxy mode
         if is_hls_request {
-            return handle_hls_stream_request(app_state, &user, &pli.url, pli.virtual_id, input).await.into_response();
+            return handle_hls_stream_request(app_state, &user, None, &pli.url, pli.virtual_id, input).await.into_response();
         }
 
         let extension = stream_ext.unwrap_or_else(
@@ -307,7 +303,7 @@ async fn xtream_player_api_stream_with_token(
         stream_req.context));
 
         trace_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(&stream_url));
-        stream_response(app_state, &stream_url, req_headers, Some(input), pli.item_type, target, &user, UserConnectionPermission::Allowed).await.into_response()
+        stream_response(app_state, pli.virtual_id, pli.item_type, &stream_url, req_headers, input, target, &user, UserConnectionPermission::Allowed).await.into_response()
     } else {
         axum::http::StatusCode::BAD_REQUEST.into_response()
     }

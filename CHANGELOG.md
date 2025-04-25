@@ -86,6 +86,15 @@ url: ['http://localhost:3001/xmltv.php?epg_id=1', 'http://localhost:3001/xmltv.p
   - `reverse[live,vod]` -> series redirect, others reverse
 - `/status` api endpoint moved to  `/api/v1/status` for auth protection
 - fixed multi provider VOD seek problem (provider cycle  on seek request prevented playback)
+- hdhomerun supports now basic auth like <http://user:password@ip:port/lineup.json>  
+you need to enable auth in config
+```yaml
+hdhomerun:
+  enabled: true
+  auth: true
+  devices:
+  - name: hdhr1
+```
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

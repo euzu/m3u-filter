@@ -9,11 +9,11 @@ fn format_duration(duration: Duration) -> String {
     let millis_rem = duration.subsec_millis();
 
     if millis < 1_000 {
-        format!("{} ms", millis)
+        format!("{millis} ms")
     } else if secs < 60 {
-        format!("{}.{:03} s", secs, millis_rem)
+        format!("{secs}.{millis_rem:03} s")
     } else {
-        format!("{}:{:02}.{:03} min", mins, secs_rem, millis_rem)
+        format!("{mins}:{secs_rem:02}.{millis_rem:03} min")
     }
 }
 

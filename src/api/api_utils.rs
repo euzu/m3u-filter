@@ -27,6 +27,7 @@ use crate::utils::network::request::{extract_extension_from_url, replace_url_ext
 use crate::utils::size_utils::human_readable_byte_size;
 use crate::utils::{debug_if_enabled, sys_utils, trace_if_enabled};
 use crate::BUILD_TIMESTAMP;
+use axum::body::Body;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
@@ -39,7 +40,6 @@ use std::collections::HashMap;
 use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
-use axum::body::Body;
 use tokio::sync::Mutex;
 use url::Url;
 
@@ -181,7 +181,7 @@ fn get_stream_options(app_state: &AppState) -> StreamOptions {
 //     content_length
 // }
 
-fn get_stream_alternative_url(stream_url: &str, input: &ConfigInput, alias_input: &Arc<ProviderConfig>) -> String {
+pub fn get_stream_alternative_url(stream_url: &str, input: &ConfigInput, alias_input: &Arc<ProviderConfig>) -> String {
     let Some(input_user_info) = input.get_user_info() else { return stream_url.to_owned() };
     let Some(alt_input_user_info) = alias_input.get_user_info() else { return stream_url.to_owned() };
 
@@ -252,39 +252,35 @@ impl StreamDetails {
 /**
 * If successfully a provider connection is used, do not forget to release if unsuccessfully
 */
-async fn get_streaming_options(app_state: &AppState, stream_url: &str, input_opt: Option<&ConfigInput>, force_provider: Option<&str>)
+async fn get_streaming_options(app_state: &AppState, stream_url: &str, input: &ConfigInput, force_provider: Option<&str>)
                                -> (Option<ProviderConnectionGuard>, StreamingOption, Option<HashMap<String, String>>) {
-    if let Some(input) = input_opt {
-        let provider_connection_guard = match force_provider {
-            Some(provider) => app_state.active_provider.force_exact_acquire_connection(provider).await,
-            None => app_state.active_provider.acquire_connection(&input.name).await
-        };
-        let stream_response_params = match &*provider_connection_guard {
-            ProviderAllocation::Exhausted => {
-                let stream = create_provider_connections_exhausted_stream(&app_state.config, &[]);
-                StreamingOption::Custom(stream)
-            }
-            ProviderAllocation::Available(ref provider)
-            | ProviderAllocation::GracePeriod(ref provider) => {
-                // force_stream_provider means we keep the url and the provider.
-                // If force_stream_provider or the input is the same as the config we dont need to get new url
-                let (provider, url) = if force_provider.is_some() || provider.id == input.id {
-                    (input.name.to_string(), stream_url.to_string())
-                } else {
-                    (provider.name.to_string(), get_stream_alternative_url(stream_url, input, provider))
-                };
+    let provider_connection_guard = match force_provider {
+        Some(provider) => app_state.active_provider.force_exact_acquire_connection(provider).await,
+        None => app_state.active_provider.acquire_connection(&input.name).await
+    };
+    let stream_response_params = match &*provider_connection_guard {
+        ProviderAllocation::Exhausted => {
+            let stream = create_provider_connections_exhausted_stream(&app_state.config, &[]);
+            StreamingOption::Custom(stream)
+        }
+        ProviderAllocation::Available(ref provider)
+        | ProviderAllocation::GracePeriod(ref provider) => {
+            // force_stream_provider means we keep the url and the provider.
+            // If force_stream_provider or the input is the same as the config we dont need to get new url
+            let (provider, url) = if force_provider.is_some() || provider.id == input.id {
+                (input.name.to_string(), stream_url.to_string())
+            } else {
+                (provider.name.to_string(), get_stream_alternative_url(stream_url, input, provider))
+            };
 
-                if matches!(&*provider_connection_guard, ProviderAllocation::Available(_)) {
-                    StreamingOption::Available(Some(provider), url)
-                } else {
-                    StreamingOption::GracePeriod(Some(provider), url)
-                }
+            if matches!(&*provider_connection_guard, ProviderAllocation::Available(_)) {
+                StreamingOption::Available(Some(provider), url)
+            } else {
+                StreamingOption::GracePeriod(Some(provider), url)
             }
-        };
-        (Some(provider_connection_guard), stream_response_params, Some(input.headers.clone()))
-    } else {
-        (None, StreamingOption::Available(None, stream_url.to_string()), None)
-    }
+        }
+    };
+    (Some(provider_connection_guard), stream_response_params, Some(input.headers.clone()))
 }
 
 
@@ -296,13 +292,17 @@ fn get_grace_period_millis(connection_permission: &UserConnectionPermission, str
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn create_stream_response_details(app_state: &AppState, stream_options: &StreamOptions, stream_url: &str,
-                                        req_headers: &HeaderMap, input_opt: Option<&ConfigInput>,
-                                        item_type: PlaylistItemType, share_stream: bool,
+async fn create_stream_response_details(app_state: &AppState,
+                                        stream_options: &StreamOptions,
+                                        stream_url: &str,
+                                        req_headers: &HeaderMap,
+                                        input: &ConfigInput,
+                                        item_type: PlaylistItemType,
+                                        share_stream: bool,
                                         connection_permission: UserConnectionPermission,
                                         force_provider: Option<&str>) -> StreamDetails {
     let (mut provider_connection_guard, stream_response_params, input_headers) =
-        get_streaming_options(app_state, stream_url, input_opt, force_provider).await;
+        get_streaming_options(app_state, stream_url, input, force_provider).await;
     let config_grace_period_millis = app_state.config.reverse_proxy.as_ref()
         .and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
     let grace_period_millis = get_grace_period_millis(&connection_permission, &stream_response_params, config_grace_period_millis);
@@ -372,7 +372,7 @@ where
     pub cluster: XtreamCluster,
     pub target_type: TargetType,
     pub target: &'a ConfigTarget,
-    pub input: Option<&'a ConfigInput>,
+    pub input: &'a ConfigInput,
     pub user: &'a ProxyUserCredentials,
     pub stream_ext: Option<&'a str>,
     pub req_context: XtreamApiStreamContext,
@@ -412,19 +412,12 @@ where
         if redirect_request || is_dash_request {
             let redirect_url = if is_hls_request { &replace_url_extension(provider_url, HLS_EXT) } else { provider_url };
             let redirect_url = if is_dash_request { &replace_url_extension(redirect_url, DASH_EXT) } else { redirect_url };
-            if let Some(input) = params.input {
-                let redirect_url = get_redirect_alternative_url(app_state, redirect_url, input).await;
-                debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&redirect_url));
-                return Some(redirect(&redirect_url).into_response());
-            }
-            return Some(redirect(redirect_url.as_str()).into_response());
+            let redirect_url = get_redirect_alternative_url(app_state, redirect_url, params.input).await;
+            debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&redirect_url));
+            return Some(redirect(&redirect_url).into_response());
         }
     } else if params.target_type == TargetType::Xtream {
         let Some(provider_id) = params.provider_id else {
-            return Some(StatusCode::BAD_REQUEST.into_response());
-        };
-
-        let Some(input) = params.input else {
             return Some(StatusCode::BAD_REQUEST.into_response());
         };
 
@@ -433,9 +426,9 @@ where
             // handle redirect for series but why ?
             if params.cluster == XtreamCluster::Series {
                 let ext = params.stream_ext.unwrap_or_default();
-                let url = input.url.as_str();
-                let username = input.username.as_ref().map_or("", |v| v);
-                let password = input.password.as_ref().map_or("", |v| v);
+                let url = params.input.url.as_str();
+                let username = params.input.username.as_ref().map_or("", |v| v);
+                let password = params.input.password.as_ref().map_or("", |v| v);
                 // TODO do i need action_path like for timeshift ?
                 let stream_url = format!("{url}/series/{username}/{password}/{provider_id}{ext}");
                 debug_if_enabled!("Redirecting stream request to {}", sanitize_sensitive_info(&stream_url));
@@ -444,14 +437,14 @@ where
 
             let target_name = params.target.name.as_str();
             let virtual_id = params.item.get_virtual_id();
-            let stream_url = match get_xtream_player_api_stream_url(input, &params.req_context, &params.get_query_path(provider_id, provider_url), provider_url) {
+            let stream_url = match get_xtream_player_api_stream_url(params.input, &params.req_context, &params.get_query_path(provider_id, provider_url), provider_url) {
                 None => {
                     error!("Cant find stream url for target {target_name}, context {}, stream_id {virtual_id}", params.req_context);
                     return Some(StatusCode::BAD_REQUEST.into_response());
                 }
                 Some(url) => {
-                    match app_state.active_provider.get_next_provider(&input.name).await {
-                        Some(provider_cfg) => get_stream_alternative_url(&url, input, &provider_cfg),
+                    match app_state.active_provider.get_next_provider(&params.input.name).await {
+                        Some(provider_cfg) => get_stream_alternative_url(&url, params.input, &provider_cfg),
                         None => url,
                     }
                 }
@@ -476,65 +469,70 @@ fn is_throttled_stream(item_type: PlaylistItemType, throttle_kbps: usize) -> boo
     throttle_kbps > 0 && matches!(item_type, PlaylistItemType::Video | PlaylistItemType::Series  | PlaylistItemType::SeriesInfo)
 }
 
-const SESSION_COOKIE: &str = "m3uflt_session=";
+const SESSION_COOKIE_NAME: &str = "m3uflt_session=";
+
+fn create_delete_session_cookie() -> String {
+    format!("{SESSION_COOKIE_NAME}; Max-Age=0; Path=/; HttpOnly")
+}
+
+fn create_session_cookie(cookie: &str) -> String {
+    // 3 hours should be enough
+    format!("{SESSION_COOKIE_NAME}{cookie}; Max-Age=10800; HttpOnly; SameSite=Strict")
+}
+
+pub fn create_token_for_provider(secret: &[u8], virtual_id: u32, provider_name: &str, stream_url: &str) -> Option<String> {
+    if let Ok(cookie_value) = obfuscate_text(secret, &format!("{virtual_id}:{provider_name}@{stream_url}")) {
+        return Some(cookie_value);
+    }
+    None
+}
+
+
+pub fn create_session_cookie_for_provider(secret: &[u8], virtual_id: u32, provider_name: &str, stream_url: &str) -> Option<String> {
+    if let Some(cookie_value) = create_token_for_provider(secret, virtual_id, provider_name, stream_url) {
+        return Some(create_session_cookie(&cookie_value));
+    }
+    None
+}
 
 pub fn read_session_cookie(headers: &HeaderMap) -> Option<String> {
     if let Some(cookie_header) = headers.get(axum::http::header::COOKIE) {
         let cookie_value = cookie_header.to_str().unwrap_or_default();
-        if let Some(cookie) = cookie_value.split(';').map(str::trim).find(|&part| part.starts_with(SESSION_COOKIE)).and_then(|p| p.strip_prefix(SESSION_COOKIE)) {
+        if let Some(cookie) = cookie_value.split(';')
+            .map(str::trim)
+            .find(|&part| part.starts_with(SESSION_COOKIE_NAME))
+            .and_then(|p| {
+                p.strip_prefix(SESSION_COOKIE_NAME).map(str::trim)
+            }) {
             return Some(cookie.to_string());
         }
     }
     None
 }
 
-fn get_session_cookie(cookie: &str) -> String {
-    // 3 hours should be enough
-    format!("{SESSION_COOKIE}{cookie}; Max-Age=10800; HttpOnly; Secure; SameSite=Strict")
-}
+pub fn get_stream_info_from_crypted_cookie(secret: &[u8], cookie: &str) -> Option<(u32, String, String)> {
+    if let Ok(decrypted) = deobfuscate_text(secret, cookie) {
+        let (virtual_id_and_provider, stream_url) = decrypted.split_once('@')?;
+        let (virtual_id, provider_name) = virtual_id_and_provider.split_once(':')?;
 
-/// # Panics
-pub async fn seek_stream_response(app_state: &AppState,
-                                  cookie: &str,
-                                  req_headers: &HeaderMap,
-                                  input: Option<&ConfigInput>,
-                                  item_type: PlaylistItemType,
-                                  _target: &ConfigTarget,
-                                  user: &ProxyUserCredentials) -> impl axum::response::IntoResponse + Send {
-    let stream_options = get_stream_options(app_state);
-    let share_stream = false;
-    let connection_permission = UserConnectionPermission::Allowed;
+        if virtual_id.is_empty() || provider_name.is_empty() || stream_url.is_empty() {
+            return None;
+        }
 
-    if let Ok(provider_and_stream_url) = deobfuscate_text(&app_state.config.t_encrypt_secret, cookie) {
-        let mut parts = provider_and_stream_url.splitn(2, '@');
-        let provider_name = parts.next().unwrap_or("");
-        let stream_url = parts.next().unwrap_or("");
-        if !provider_name.is_empty() && !stream_url.is_empty() {
-            let mut stream_details =
-                create_stream_response_details(app_state, &stream_options, stream_url, req_headers, input, item_type, share_stream, connection_permission.clone(), Some(provider_name)).await;
-
-            if stream_details.has_stream() {
-                let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
-                let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
-
-                let (status_code, header_map) = get_stream_response_with_headers(provider_response);
-                let mut response = axum::response::Response::builder()
-                    .status(status_code);
-                for (key, value) in &header_map {
-                    response = response.header(key, value);
-                }
-
-                response = response.header(axum::http::header::SET_COOKIE, get_session_cookie(cookie));
-
-                let body_stream = prepare_body_stream(app_state, item_type, stream);
-                debug_if_enabled!("Streaming partial stream request from {}", sanitize_sensitive_info(stream_url));
-                return response.body(body_stream).unwrap().into_response();
-            }
-            drop(stream_details.provider_connection_guard.take());
+        if let Ok(vid) = virtual_id.parse::<u32>() {
+            return Some((
+                vid,
+                provider_name.to_string(),
+                stream_url.to_string(),
+            ));
         }
     }
-    error!("Cant open partial stream for cookie {cookie}");
-    axum::http::StatusCode::BAD_REQUEST.into_response()
+    None
+}
+
+pub fn get_stream_info_from_cookie(secret: &[u8], headers: &HeaderMap) -> Option<(u32, String, String)> {
+    let encrypted_cookie = read_session_cookie(headers)?;
+    get_stream_info_from_crypted_cookie(secret, &encrypted_cookie)
 }
 
 fn prepare_body_stream(app_state: &AppState, item_type: PlaylistItemType, stream: ActiveClientStream) -> Body {
@@ -547,13 +545,63 @@ fn prepare_body_stream(app_state: &AppState, item_type: PlaylistItemType, stream
     body_stream
 }
 
+pub fn bad_response_with_delete_cookie() -> impl IntoResponse + Send {
+    error!("Cant open provider forced stream, cookie invalid");
+    if let Ok(delete_cookie_header) = axum::http::header::HeaderValue::from_str(&create_delete_session_cookie()) {
+        ([(axum::http::header::SET_COOKIE, delete_cookie_header)], StatusCode::BAD_REQUEST).into_response()
+    } else {
+        StatusCode::BAD_REQUEST.into_response()
+    }
+}
+
+/// # Panics
+pub async fn force_provider_stream_response(app_state: &AppState,
+                                            cookie: &str,
+                                            virtual_id: u32,
+                                            item_type: PlaylistItemType,
+                                            req_headers: &HeaderMap,
+                                            input: &ConfigInput,
+                                            user: &ProxyUserCredentials) -> impl axum::response::IntoResponse + Send {
+    if let Some((stream_virtual_id, provider_name, stream_url)) = get_stream_info_from_crypted_cookie(&app_state.config.t_encrypt_secret, cookie) {
+        if stream_virtual_id == virtual_id {
+            let stream_options = get_stream_options(app_state);
+            let share_stream = false;
+            let connection_permission = UserConnectionPermission::Allowed;
+
+            let mut stream_details =
+                create_stream_response_details(app_state, &stream_options, &stream_url, req_headers, input, item_type, share_stream, connection_permission.clone(), Some(&provider_name)).await;
+
+            if stream_details.has_stream() {
+                let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
+                let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
+
+                let (status_code, header_map) = get_stream_response_with_headers(provider_response);
+                let mut response = axum::response::Response::builder()
+                    .status(status_code);
+                for (key, value) in &header_map {
+                    response = response.header(key, value);
+                }
+
+                response = response.header(axum::http::header::SET_COOKIE, create_session_cookie(cookie));
+
+                let body_stream = prepare_body_stream(app_state, item_type, stream);
+                debug_if_enabled!("Streaming provider forced stream request from {}", sanitize_sensitive_info(&stream_url));
+                return response.body(body_stream).unwrap().into_response();
+            }
+            drop(stream_details.provider_connection_guard.take());
+        }
+    }
+    bad_response_with_delete_cookie().into_response()
+}
+
 /// # Panics
 #[allow(clippy::too_many_arguments)]
 pub async fn stream_response(app_state: &AppState,
+                             virtual_id: u32,
+                             item_type: PlaylistItemType,
                              stream_url: &str,
                              req_headers: &HeaderMap,
-                             input: Option<&ConfigInput>,
-                             item_type: PlaylistItemType,
+                             input: &ConfigInput,
                              target: &ConfigTarget,
                              user: &ProxyUserCredentials,
                              connection_permission: UserConnectionPermission) -> impl axum::response::IntoResponse + Send {
@@ -580,6 +628,7 @@ pub async fn stream_response(app_state: &AppState,
 
         let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
         let stream_resp = if share_stream {
+            debug_if_enabled!("Streaming shared stream request from {}", sanitize_sensitive_info(stream_url));
             // Shared Stream response
             let shared_headers = provider_response.as_ref().map_or_else(Vec::new, |(h, _)| h.clone());
             SharedStreamManager::subscribe(app_state, stream_url, stream, shared_headers, stream_options.buffer_size).await;
@@ -595,16 +644,16 @@ pub async fn stream_response(app_state: &AppState,
                 axum::http::StatusCode::BAD_REQUEST.into_response()
             }
         } else {
+            debug_if_enabled!("Streaming stream request from {}", sanitize_sensitive_info(stream_url));
             let (status_code, header_map) = get_stream_response_with_headers(provider_response);
-            let mut response = axum::response::Response::builder()
-                .status(status_code);
+            let mut response = axum::response::Response::builder().status(status_code);
             for (key, value) in &header_map {
                 response = response.header(key, value);
             }
 
             if let Some(provider) = provider_name {
-                if let Ok(cookie_value) = obfuscate_text(&app_state.config.t_encrypt_secret, &format!("{provider}@{stream_url}")) {
-                    response = response.header(axum::http::header::SET_COOKIE, get_session_cookie(&cookie_value));
+                if let Some(cookie_value) = create_session_cookie_for_provider(&app_state.config.t_encrypt_secret, virtual_id, &provider, stream_url) {
+                    response = response.header(axum::http::header::SET_COOKIE, &cookie_value);
                 }
             }
 
@@ -629,7 +678,7 @@ fn get_stream_throttle(app_state: &AppState) -> u64 {
 
 async fn shared_stream_response(app_state: &AppState, stream_url: &str, user: &ProxyUserCredentials, connect_permission: UserConnectionPermission) -> Option<impl IntoResponse> {
     if let Some(stream) = SharedStreamManager::subscribe_shared_stream(app_state, stream_url).await {
-        debug_if_enabled!("Using shared channel {}", sanitize_sensitive_info(stream_url));
+        debug_if_enabled!("Using shared stream {}", sanitize_sensitive_info(stream_url));
         if let Some(headers) = app_state.shared_stream_manager.get_shared_state_headers(stream_url).await {
             let (status_code, header_map) = get_stream_response_with_headers(Some((headers.clone(), StatusCode::OK)));
             let stream_details = StreamDetails::from_stream(stream);
@@ -771,15 +820,65 @@ pub fn redirect(url: &str) -> impl IntoResponse {
         .unwrap()
 }
 
-pub fn is_seek_response(req_headers: &HeaderMap) -> Option<String> {
-    if let Some(cookie) = read_session_cookie(req_headers) {
-        if let Some(maybe_value) = req_headers.get("range") {
-            if let Ok(value) = maybe_value.to_str() {
-                if !value.starts_with("bytes=0-") {
-                    return Some(cookie);
-                }
-            }
+pub fn is_seek_response(
+    cluster: XtreamCluster,
+    virtual_id: u32,
+    secret: &[u8],
+    req_headers: &HeaderMap,
+) -> Option<String> {
+    // seek only for non-live streams
+    if cluster == XtreamCluster::Live {
+        return None;
+    }
+
+    let cookie = read_session_cookie(req_headers)?;
+    match get_stream_info_from_crypted_cookie(secret, &cookie) {
+        Some((vid, _, _)) if vid == virtual_id => {}
+        _ => return None,
+    }
+
+    // seek requests contain range header
+    let range = req_headers.get("range")?.to_str().ok()?;
+    if range.starts_with("bytes=0-") {
+        return None;
+    }
+
+    read_session_cookie(req_headers)
+}
+
+pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {
+
+    // if you have multi provider setup you need to delegate the same hls requests
+    // to the same provider. Hls has alternating m3u8 and stream requests.
+    let mut provider_name = None;
+    if let Some((stream_virtual_id, stream_provider_name, _stream_url)) = get_stream_info_from_cookie(&app_state.config.t_encrypt_secret, req_headers) {
+        if stream_virtual_id == virtual_id {
+            provider_name = Some(stream_provider_name);
         }
     }
-    None
+
+    let connection_permission = match provider_name {
+        None => user.connection_permission(app_state).await,
+        Some(_) => UserConnectionPermission::Allowed
+    };
+
+    (provider_name, connection_permission)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::api::api_utils::SESSION_COOKIE_NAME;
+
+    #[test]
+    fn test_cookie() {
+        let cookie_value = format!("{SESSION_COOKIE_NAME}bbblegum; sehe=dfd; sdfsdf=sdfsd;");
+        let cookie = cookie_value.split(';')
+            .map(str::trim)
+            .find(|&part| part.starts_with(SESSION_COOKIE_NAME))
+            .and_then(|p| {
+                p.strip_prefix(SESSION_COOKIE_NAME).map(str::trim)
+            }).expect("Cookie not found");
+        assert_eq!(cookie, "bbblegum");
+    }
 }

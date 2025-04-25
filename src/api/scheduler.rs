@@ -72,7 +72,7 @@ mod tests {
                 }
             }
             Err(_) => {}
-        };
+        }
         let duration = start.elapsed();
 
         assert!(runs.load(Ordering::SeqCst) == 6, "Failed to run");

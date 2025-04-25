@@ -196,6 +196,14 @@ where
     }
 }
 
+impl<K> Default for DirectedGraph<K>
+where
+    K: Eq + std::hash::Hash + Clone + Display + Debug,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -203,8 +211,8 @@ mod tests {
     use std::collections::HashSet;
 
     fn are_vecs_equal(vec1: &Vec<&str>, vec2: Vec<&str>) -> bool {
-        let set1: HashSet<String> = vec1.into_iter().map(|s| s.to_string()).collect();
-        let set2: HashSet<String> = vec2.into_iter().map(|s| s.to_string()).collect();
+        let set1: HashSet<String> = vec1.iter().map(|s| s.to_string()).collect();
+        let set2: HashSet<String> = vec2.iter().map(|s| s.to_string()).collect();
 
         set1 == set2
     }
@@ -324,14 +332,5 @@ mod tests {
         // should be {"D": ["C", "E"], "G": ["C", "F"], "C": ["A", "B"]}
         assert!(graph.get_dependencies().is_some(), "No dependencies");
 
-    }
-}
-
-impl<K> Default for DirectedGraph<K>
-where
-    K: Eq + std::hash::Hash + Clone + Display + Debug,
-{
-    fn default() -> Self {
-        Self::new()
     }
 }

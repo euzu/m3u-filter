@@ -21,6 +21,15 @@ impl ProviderConnectionGuard {
             }
         }
     }
+    pub fn get_provider_config(&self) -> Option<Arc<ProviderConfig>> {
+        match self.allocation {
+            ProviderAllocation::Exhausted => None,
+            ProviderAllocation::Available(ref cfg) |
+            ProviderAllocation::GracePeriod(ref cfg) => {
+                Some(Arc::clone(cfg))
+            }
+        }
+    }
 }
 
 impl Deref for ProviderConnectionGuard {
@@ -251,7 +260,7 @@ impl SingleProviderLineup {
     }
 
     fn get_next(&self) -> Option<Arc<ProviderConfig>> {
-        self.provider.get_next(true)
+        self.provider.get_next(false)
     }
 
     fn acquire(&self) -> ProviderAllocation {
@@ -564,8 +573,10 @@ impl ActiveProviderManager {
                 ProviderLineup::Multi(multi) => {
                     for group in &multi.providers {
                         match group {
-                            ProviderPriorityGroup::SingleProviderGroup(config) => {
-                                return Some((lineup, config));
+                            ProviderPriorityGroup::SingleProviderGroup(single) => {
+                                if single.name == name {
+                                    return Some((lineup, single));
+                                }
                             }
                             ProviderPriorityGroup::MultiProviderGroup(_, configs) => {
                                 for config in configs {
@@ -582,9 +593,9 @@ impl ActiveProviderManager {
         None
     }
 
-    pub async fn force_exact_acquire_connection(&self, input_name: &str) -> ProviderConnectionGuard {
+    pub async fn force_exact_acquire_connection(&self, provider_name: &str) -> ProviderConnectionGuard {
         let providers = self.providers.read().await;
-        let allocation = match Self::get_provider_config(input_name, &providers) {
+        let allocation = match Self::get_provider_config(provider_name, &providers) {
             None => ProviderAllocation::Exhausted, // No Name matched, we don't have this provider
             Some((_lineup, config)) => config.force_allocate(),
         };
@@ -736,7 +747,7 @@ mod tests {
             id,
             name: name.to_string(),
             url: "http://example.com".to_string(),
-            epg: Default::default(),
+            epg: Option::default(),
             username: None,
             password: None,
             persist: None,
@@ -747,7 +758,7 @@ mod tests {
             max_connections,
             priority,
             aliases: None,
-            headers: Default::default(),
+            headers: HashMap::default(),
             options: None,
             method: InputFetchMethod::default(),
             t_base_url: String::default(),

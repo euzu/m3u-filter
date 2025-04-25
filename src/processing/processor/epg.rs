@@ -37,7 +37,7 @@ impl EpgIdCache<'_> {
 
     fn normalize_and_store(&mut self, name: &str, epg_id: Option<&String>) {
         let normalized_name = self.normalize(name);
-        self.normalized.insert(normalized_name, epg_id.map(|v| v.to_string()));
+        self.normalized.insert(normalized_name, epg_id.map(std::string::ToString::to_string));
     }
 
     fn normalize(&self, name: &str) -> String {
@@ -107,7 +107,7 @@ fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache
                     if not_processed {
                         let normalized = id_cache.normalize(&chan.header.name);
                         if let Some(epg_id) = id_cache.normalized.get(&normalized) {
-                            chan.header.epg_channel_id = epg_id.clone();
+                            chan.header.epg_channel_id.clone_from(epg_id);
                         }
                     }
                 }
