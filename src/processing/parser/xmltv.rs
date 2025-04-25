@@ -1,6 +1,8 @@
 use crate::model::config::{EpgNamePrefix, EpgSmartMatchConfig};
 use crate::model::xmltv::{Epg, TVGuide, XmlTag, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_CHANNEL, EPG_TAG_DISPLAY_NAME, EPG_TAG_ICON, EPG_TAG_PROGRAMME, EPG_TAG_TV};
+use crate::processing::processor::epg::EpgIdCache;
 use crate::utils::compression::compressed_file_reader::CompressedFileReader;
+use crate::utils::constants::CONSTANTS;
 use deunicode::deunicode;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
@@ -12,8 +14,6 @@ use std::mem;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use crate::processing::processor::epg::EpgIdCache;
-use crate::utils::constants::CONSTANTS;
 
 fn split_by_first_match<'a>(input: &'a str, delimiters: &[char]) -> (Option<&'a str>, &'a str) {
     for delim in delimiters {
@@ -125,21 +125,17 @@ impl TVGuide {
     }
 
     fn find_best_fuzzy_match(id_cache: &mut EpgIdCache, tag: &XmlTag) -> (bool, Option<String>) {
-        let early_exit_flag = Arc::new(AtomicBool::new(false)); // Flag für den frühen Abbruch
+        let early_exit_flag = Arc::new(AtomicBool::new(false));
         let data: Mutex<(u16, Option<Cow<str>>)> = Mutex::new((0, None));
 
         let match_threshold = id_cache.smart_match_config.match_threshold;
         let best_match_threshold = id_cache.smart_match_config.best_match_threshold;
 
-        id_cache.normalized.par_iter().for_each(|(norm_key, _epg_id_opt)| {
-            if early_exit_flag.load(Ordering::SeqCst) {
-                return;
-            }
-            let phonetic_code = id_cache.phonetic(norm_key);
-            for normalized_epg_id in &tag.normalized_epg_ids {
-                let code = id_cache.phonetic(normalized_epg_id);
-                if code == phonetic_code {
-                    let match_jw = strsim::jaro_winkler(norm_key, normalized_epg_id);
+        for tag_normalized in &tag.normalized_epg_ids {
+            let tag_code = id_cache.phonetic(tag_normalized);
+            if let Some(normalized) = id_cache.phonetics.get(&tag_code) {
+                normalized.par_iter().find_any(|norm_key| {
+                    let match_jw = strsim::jaro_winkler(norm_key, tag_normalized);
                     #[allow(clippy::cast_possible_truncation)]
                     #[allow(clippy::cast_sign_loss)]
                     let mjw = min(100, (match_jw * 100.0).round() as u16);
@@ -149,14 +145,15 @@ impl TVGuide {
                             *lock = (mjw, Some(Cow::Borrowed(norm_key)));
                         }
                         if mjw > best_match_threshold {
-                            early_exit_flag.store(true, Ordering::SeqCst);
-                            return; // (true, matched_normalized_epg_id.map(|s| s.to_string()));
+                            return true; // (true, matched_normalized_epg_id.map(|s| s.to_string()));
                         }
                     }
-                }
+                    false
+                });
             }
-            // is there an early exit strategy ???
-        });
+        }
+        // is there an early exit strategy ???
+
         if early_exit_flag.load(Ordering::SeqCst) {
             let result = data.lock().unwrap().1.take();
             return (true, result.as_ref().map(std::string::ToString::to_string));
@@ -174,25 +171,26 @@ impl TVGuide {
                 let mut filter_tags = |mut tag: XmlTag| {
                     match tag.name.as_str() {
                         EPG_TAG_CHANNEL => {
-                            Self::prepare_tag(id_cache, &mut tag, smart_match);
-                            if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
-                                if !id_cache.processed.contains(epg_id) {
-                                    if smart_match {
-                                        if Self::try_fuzzy_matching(id_cache, epg_id, &tag, fuzzy_matching) {
-                                            children.push(tag);
-                                        }
-                                    } else {
-                                        let borrowed_epg_id = Cow::Borrowed(epg_id.as_str());
-                                        if id_cache.channel_epg_id.contains(&borrowed_epg_id) {
-                                            children.push(tag);
-                                        }
+                            let epg_id = tag.get_attribute_value(EPG_ATTRIB_ID).map_or_else(String::new, std::string::ToString::to_string);
+                            if !epg_id.is_empty() && !id_cache.processed.contains(&epg_id) {
+                                Self::prepare_tag(id_cache, &mut tag, smart_match);
+                                if smart_match {
+                                    if Self::try_fuzzy_matching(id_cache, &epg_id, &tag, fuzzy_matching) {
+                                        children.push(tag);
+                                        id_cache.processed.insert(epg_id);
+                                    }
+                                } else {
+                                    let borrowed_epg_id = Cow::Borrowed(epg_id.as_str());
+                                    if id_cache.channel_epg_id.contains(&borrowed_epg_id) {
+                                        children.push(tag);
+                                        id_cache.processed.insert(epg_id);
                                     }
                                 }
                             }
                         }
                         EPG_TAG_PROGRAMME => {
                             if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_CHANNEL) {
-                                if !id_cache.processed.contains(epg_id) {
+                                if id_cache.processed.contains(epg_id) {
                                     let borrowed_epg_id = Cow::Borrowed(epg_id.as_str());
                                     if id_cache.channel_epg_id.contains(&borrowed_epg_id) {
                                         children.push(tag);
@@ -212,12 +210,6 @@ impl TVGuide {
                 if children.is_empty() {
                     return None;
                 }
-
-                children.iter().filter(|tag| tag.name == EPG_TAG_CHANNEL).for_each(|tag| {
-                    if let Some(epg_id) = tag.get_attribute_value(EPG_ATTRIB_ID) {
-                        id_cache.processed.insert(epg_id.to_string());
-                    }
-                });
 
                 Some(Epg {
                     attributes: tv_attributes,
@@ -403,6 +395,15 @@ mod tests {
     use crate::model::config::{EpgNamePrefix, EpgSmartMatchConfig};
     use crate::processing::parser::xmltv::normalize_channel_name;
 
+    #[test]
+    fn parse_normalize() -> Result<(), M3uFilterError> {
+        let epg_normalize = EpgSmartMatchConfig::new()?;
+        let normalized = normalize_channel_name("Love Nature", &epg_normalize);
+        assert_eq!(normalized, "lovenature".to_string());
+        Ok(())
+    }
+
+
     // #[test]
     // fn parse_test() -> io::Result<()> {
     //     let file_path = PathBuf::from("/tmp/epg.xml.gz");
@@ -437,7 +438,9 @@ mod tests {
         assert_eq!("odisea.bg", normalize_channel_name("BG | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg));
     }
 
+    use crate::m3u_filter_error::M3uFilterError;
     use rphonetic::{Encoder, Metaphone};
+
     #[test]
     fn test_metaphone() {
         let metaphone = Metaphone::default();

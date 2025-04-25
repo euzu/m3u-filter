@@ -1003,6 +1003,13 @@ pub struct EpgSmartMatchConfig {
 }
 
 impl EpgSmartMatchConfig {
+
+    pub fn new() -> Result<Self, M3uFilterError> {
+        let mut this =  Self { enabled: true, ..Self::default() };
+        this.prepare()?;
+        Ok(this)
+    }
+
     /// # Panics
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if !self.enabled {
