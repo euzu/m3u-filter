@@ -1,5 +1,5 @@
-use std::time::{Duration, Instant};
 use log::{debug, log_enabled, Level};
+use std::time::{Duration, Instant};
 
 fn format_duration(duration: Duration) -> String {
     let millis = duration.as_millis();
@@ -33,10 +33,23 @@ impl StepMeasure {
     }
 
     pub fn tick(&mut self, msg: &str) {
-        if self.enabled  {
+        if self.enabled {
             debug!("{} in {}", self.msg, format_duration(self.start.elapsed()));
             self.msg = msg.to_string();
             self.start = Instant::now();
         }
+    }
+
+    pub fn stop(&mut self) {
+        if self.enabled && !self.msg.is_empty() {
+            debug!("{} in {}", self.msg, format_duration( self.start.elapsed()));
+            self.enabled = false;
+        }
+    }
+}
+
+impl Drop for StepMeasure {
+    fn drop(&mut self) {
+        self.stop();
     }
 }

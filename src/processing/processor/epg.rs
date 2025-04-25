@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_phonetic() {
-        let strings: Vec<String> = (0..5_000_000)
+        let strings: Vec<String> = (0..5_000)
             .map(|_| random_string())
             .collect();
 

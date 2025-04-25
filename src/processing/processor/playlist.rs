@@ -562,7 +562,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
         process_watch(target, cfg, &flat_new_playlist);
         step.tick("Persisting playlists");
         let result = persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg).await;
-        step.tick("");
+        step.stop();
         result
     }
 }

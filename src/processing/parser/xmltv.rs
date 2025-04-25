@@ -142,7 +142,7 @@ impl TVGuide {
                     let match_jw = strsim::jaro_winkler(norm_key, normalized_epg_id);
                     #[allow(clippy::cast_possible_truncation)]
                     #[allow(clippy::cast_sign_loss)]
-                    let mjw = min(100, match_jw as u16 * 100);
+                    let mjw = min(100, (match_jw * 100.0).round() as u16);
                     if mjw >= match_threshold {
                         let mut lock = data.lock().unwrap();
                         if lock.0 < mjw {
