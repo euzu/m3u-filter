@@ -23,6 +23,7 @@ pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
         ItemField::Url => header.url.to_string(),
         ItemField::Input => header.input_name.to_string(),
         ItemField::Type => header.item_type.to_string(),
+        ItemField::Caption => if header.title.is_empty() { header.name.to_string() } else { header.title.to_string() },
     };
     value.to_string()
 }
@@ -35,6 +36,10 @@ pub fn set_field_value(pli: &mut PlaylistItem, field: &ItemField, value: String)
         ItemField::Title => header.title = value,
         ItemField::Url => header.url = value,
         ItemField::Input => header.input_name = value,
+        ItemField::Caption => {
+            header.title.clone_from(&value);
+            header.name = value;
+        },
         ItemField::Type => {}
     }
 }
@@ -77,7 +82,7 @@ pub struct RegexWithCaptures {
 #[derive(Parser)]
 #[grammar_inline = r#"
 WHITESPACE = _{ " " | "\t" | "\r" | "\n"}
-field = { ^"group" | ^"title" | ^"name" | ^"url" | ^"input"}
+field = { ^"group" | ^"title" | ^"name" | ^"url" | ^"input" | ^"caption"}
 and = { ^"and" }
 or = { ^"or" }
 not = { ^"not" }
@@ -138,8 +143,18 @@ impl Filter {
     pub fn filter(&self, provider: &ValueProvider, processor: &mut dyn ValueProcessor) -> bool {
         match self {
             Self::FieldComparison(field, rewc) => {
-                let value = provider.call(field);
-                let is_match = rewc.re.is_match(value.as_str());
+                let (is_match, value) = if field == &ItemField::Caption {
+                    let value = provider.call(&ItemField::Title);
+                    if rewc.re.is_match(value.as_str()) {
+                        (true, value)
+                    } else {
+                        let value = provider.call(&ItemField::Name);
+                        (rewc.re.is_match(value.as_str()), value)
+                    }
+                } else {
+                    let value = provider.call(field);
+                    (rewc.re.is_match(value.as_str()), value)
+                };
                 if log_enabled!(Level::Trace) {
                     if is_match {
                         debug!("Match found: {:?} {} => {}={}", &rewc, &rewc.restr, &field, &value);

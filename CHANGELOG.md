@@ -95,6 +95,9 @@ hdhomerun:
   devices:
   - name: hdhr1
 ```
+- A new filter field `caption` has been added. This field is used to bypass the `title/name` issue. 
+If `caption` is provided, its value is read from `title` if available, otherwise from `name`. 
+When setting `caption`, both `title` and `name` are updated.”
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search
