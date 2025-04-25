@@ -71,5 +71,6 @@ pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> Stri
             result.push(url);
         }
     }
+    result.push("\r\n".to_string());
     result.join("\r\n")
 }
