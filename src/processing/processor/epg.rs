@@ -1,6 +1,6 @@
 use crate::model::config::{EpgConfig, EpgSmartMatchConfig};
 use crate::model::playlist::{FetchedPlaylist, PlaylistItem, XtreamCluster};
-use crate::model::xmltv::Epg;
+use crate::model::xmltv::{Epg, XmlTag, EPG_ATTRIB_ID};
 use crate::processing::parser::xmltv::normalize_channel_name;
 use log::debug;
 use rphonetic::{DoubleMetaphone, Encoder};
@@ -9,11 +9,12 @@ use std::collections::{HashMap, HashSet};
 pub struct EpgIdCache<'a> {
     pub channel_epg_id: HashSet<Cow<'a, str>>,
     pub normalized: HashMap<String, Option<String>>,
+    pub phonetics: HashMap<String, HashSet<String>>,
     pub processed: HashSet<String>,
     pub smart_match_config: EpgSmartMatchConfig,
     pub metaphone: DoubleMetaphone,
-    pub smart_match_enabled: bool,
-    pub fuzzy_match_enabled: bool,
+    pub smart_match_enabled: bool, // smart match is enabled, normalizing names
+    pub fuzzy_match_enabled: bool, // fuzzy matching enabled
 }
 
 impl EpgIdCache<'_> {
@@ -22,6 +23,7 @@ impl EpgIdCache<'_> {
         EpgIdCache {
             channel_epg_id: HashSet::new(), // contains the epg_ids collected from playlist channels
             normalized: HashMap::new(),
+            phonetics: HashMap::new(),
             processed: HashSet::new(),
             metaphone: DoubleMetaphone::default(),
             smart_match_enabled: normalize_config.enabled,
@@ -37,7 +39,9 @@ impl EpgIdCache<'_> {
 
     fn normalize_and_store(&mut self, name: &str, epg_id: Option<&String>) {
         let normalized_name = self.normalize(name);
+        let phonetic = self.phonetic(&normalized_name);
         self.normalized.insert(normalized_name, epg_id.map(std::string::ToString::to_string));
+        self.phonetics.entry(phonetic.to_string()).or_default().insert(phonetic);
     }
 
     fn normalize(&self, name: &str) -> String {
@@ -89,9 +93,9 @@ fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache
     if let Some(tv_guide) = &fp.epg {
         if let Some(epg) = tv_guide.filter(id_cache) {
             // // icon tags
-            // let icon_tags: HashMap<&String, &XmlTag> = epg.children.iter()
-            //     .filter(|tag| tag.icon.is_some() && tag.get_attribute_value(EPG_ATTRIB_ID).is_some())
-            //     .map(|t| (t.get_attribute_value(EPG_ATTRIB_ID).unwrap(), t)).collect();
+            let icon_tags: HashMap<&String, &XmlTag> = epg.children.iter()
+                .filter(|tag| tag.icon.is_some() && tag.get_attribute_value(EPG_ATTRIB_ID).is_some())
+                .map(|t| (t.get_attribute_value(EPG_ATTRIB_ID).unwrap(), t)).collect();
 
             let filter_live = |c: &&mut PlaylistItem| c.header.xtream_cluster == XtreamCluster::Live;
             // let filter_missing_epg_id = |chan: &mut PlaylistItem| chan.header.epg_channel_id.is_none() || chan.header.logo.is_empty() || chan.header.logo_small.is_empty();
@@ -111,18 +115,18 @@ fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache
                         }
                     }
                 }
-                // if chan.header.epg_channel_id.is_some() && (chan.header.logo.is_empty() || chan.header.logo_small.is_empty()) {
-                //     if let Some(icon_tag) = icon_tags.get(chan.header.epg_channel_id.as_ref().unwrap()) {
-                //         if let Some(icon) = icon_tag.icon.as_ref() {
-                //             if chan.header.logo.is_empty() {
-                //                 chan.header.logo = (*icon).to_string();
-                //             }
-                //             if chan.header.logo_small.is_empty() {
-                //                 chan.header.logo = (*icon).to_string();
-                //             }
-                //         }
-                //     }
-                // }
+                if chan.header.epg_channel_id.is_some() && (chan.header.logo.is_empty() || chan.header.logo_small.is_empty()) {
+                    if let Some(icon_tag) = icon_tags.get(chan.header.epg_channel_id.as_ref().unwrap()) {
+                        if let Some(icon) = icon_tag.icon.as_ref() {
+                            if chan.header.logo.is_empty() {
+                                chan.header.logo = (*icon).to_string();
+                            }
+                            if chan.header.logo_small.is_empty() {
+                                chan.header.logo = (*icon).to_string();
+                            }
+                        }
+                    }
+                }
             };
 
             fp.playlistgroups.iter_mut()
@@ -140,7 +144,7 @@ pub fn process_playlist_epg(fp: &mut FetchedPlaylist, epg: &mut Vec<Epg>) {
     let mut id_cache = EpgIdCache::new(fp.input.epg.as_ref());
     id_cache.collect_epg_id(fp);
 
-    if id_cache.is_empty() { // TODO && not fuzzy matching {
+    if id_cache.is_empty() && !id_cache.smart_match_enabled {
         debug!("No epg ids found");
     } else {
         assign_channel_epg(epg, fp, &mut id_cache);
