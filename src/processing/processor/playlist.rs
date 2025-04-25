@@ -118,7 +118,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
         }
         if let Some(channel_sorts) = &sort.channels {
             for channel_sort in channel_sorts {
-                let regexp = channel_sort.re.as_ref().unwrap();
+                let regexp = channel_sort.t_re_group_pattern.as_ref().unwrap();
                 for group in new_playlist.iter_mut() {
                     let group_title = if match_as_ascii { deunicode(&group.title) } else { group.title.to_string() };
                     if regexp.is_match(group_title.as_str()) {

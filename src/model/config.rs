@@ -1,15 +1,15 @@
 #![allow(clippy::struct_excessive_bools)]
-use bitflags::{bitflags};
+use bitflags::bitflags;
 use enum_iterator::Sequence;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
-use std::{fmt};
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::fmt;
 use tokio::sync::RwLock;
 
 use crate::auth::user::UserCredential;
@@ -17,8 +17,8 @@ use log::{debug, error, warn};
 use path_clean::PathClean;
 use rand::Rng;
 use regex::Regex;
+use serde::de::{self, Error, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::de::{self, Visitor, SeqAccess, Error};
 use url::Url;
 
 use crate::foundation::filter::{get_filter, prepare_templates, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
@@ -28,7 +28,7 @@ use crate::messaging::MsgKind;
 use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::mapping::Mapping;
 use crate::model::mapping::Mappings;
-use crate::utils::default_utils::{default_as_default, default_as_true, default_resolve_delay_secs, default_grace_period_millis, default_grace_period_timeout_secs, default_connect_timeout_secs};
+use crate::utils::default_utils::{default_as_default, default_as_true, default_connect_timeout_secs, default_grace_period_millis, default_grace_period_timeout_secs, default_resolve_delay_secs};
 use crate::utils::file::file_lock_manager::FileLockManager;
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::file_reader;
@@ -68,7 +68,7 @@ macro_rules! valid_property {
     }};
 }
 pub use valid_property;
-use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
+use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list};
 use crate::model::hdhomerun_config::HdHomeRunConfig;
 use crate::model::playlist::{PlaylistItemType, XtreamCluster};
 use crate::utils::constants::CONSTANTS;
@@ -125,7 +125,6 @@ impl TryFrom<TargetType> for HdHomeRunUseTargetType {
         }
     }
 }
-
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Default)]
 pub enum ProcessingOrder {
@@ -245,31 +244,49 @@ impl ProcessTargets {
 #[serde(deny_unknown_fields)]
 pub struct ConfigSortGroup {
     pub order: SortOrder,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sequence: Option<Vec<String>>,
+    #[serde(default, skip)]
+    pub t_sequence: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigSortChannel {
-    pub field: ItemField,
     // channel field
-    pub group_pattern: String,
+    pub field: ItemField,
     // match against group title
+    pub group_pattern: String,
     pub order: SortOrder,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sequence: Option<Vec<String>>,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub re: Option<regex::Regex>,
+    #[serde(default, skip)]
+    pub t_sequence: Option<Vec<Regex>>,
+    #[serde(skip)]
+    pub t_re_group_pattern: Option<Regex>,
 }
 
 impl ConfigSortChannel {
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
-        match regex::Regex::new(&self.group_pattern) {
-            Ok(pattern) => {
-                self.re = Some(pattern);
-                Ok(())
-            }
-            Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", &self.group_pattern),
-        }
+        // Compile group_pattern
+        self.t_re_group_pattern = Some(
+            Regex::new(&self.group_pattern).map_err(|err| {
+                create_m3u_filter_error!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", &self.group_pattern)
+            })?
+        );
+
+        // Compile sequence patterns, if any
+        self.t_sequence = self.sequence.as_ref()
+            .map(|seq| {
+                seq.iter()
+                    .map(|s| Regex::new(s).map_err(|err| {
+                        create_m3u_filter_error!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", s)
+                    }))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?; // convert Option<Result<...>> to Result<Option<...>>
+
+        Ok(())
     }
 }
 
@@ -417,7 +434,7 @@ impl ClusterFlags {
 
     fn from_items<I, S>(items: I) -> Result<Self, &'static str>
     where
-        I: IntoIterator<Item = S>,
+        I: IntoIterator<Item=S>,
         S: AsRef<str>,
     {
         let mut result = ClusterFlags::empty();
@@ -427,7 +444,7 @@ impl ClusterFlags {
                 "live" => result.set(ClusterFlags::Live, true),
                 "vod" => result.set(ClusterFlags::Vod, true),
                 "series" => result.set(ClusterFlags::Series, true),
-                _  => return Err("Invalid flag {item}, allowed are live, vod, series"),
+                _ => return Err("Invalid flag {item}, allowed are live, vod, series"),
             }
         }
 
@@ -1003,7 +1020,6 @@ pub struct EpgSmartMatchConfig {
 }
 
 impl EpgSmartMatchConfig {
-
     /// Creates a new enabled `EpgSmartMatchConfig` with default settings and prepares it.
     ///
     /// Returns an error if preparation fails.
@@ -1015,7 +1031,7 @@ impl EpgSmartMatchConfig {
     /// assert!(config.enabled);
     /// ```
     pub fn new() -> Result<Self, M3uFilterError> {
-        let mut this =  Self { enabled: true, ..Self::default() };
+        let mut this = Self { enabled: true, ..Self::default() };
         this.prepare()?;
         Ok(this)
     }
@@ -1027,7 +1043,7 @@ impl EpgSmartMatchConfig {
     /// Adjusts match thresholds to valid ranges, compiles the normalization regex, and sets default strip values and name prefix separators if not provided. Returns an error if the normalization regex is invalid.
     ///
     /// # Returns
-    /// 
+    ///
     /// `Ok(())` if preparation succeeds, or an `M3uFilterError` if regex compilation fails.
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if !self.enabled {
