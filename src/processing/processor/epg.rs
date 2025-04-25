@@ -40,8 +40,8 @@ impl EpgIdCache<'_> {
     fn normalize_and_store(&mut self, name: &str, epg_id: Option<&String>) {
         let normalized_name = self.normalize(name);
         let phonetic = self.phonetic(&normalized_name);
-        self.normalized.insert(normalized_name, epg_id.map(std::string::ToString::to_string));
-        self.phonetics.entry(phonetic.to_string()).or_default().insert(phonetic);
+        self.normalized.insert(normalized_name.to_string(), epg_id.map(std::string::ToString::to_string));
+        self.phonetics.entry(phonetic.to_string()).or_default().insert(normalized_name);
     }
 
     fn normalize(&self, name: &str) -> String {
@@ -122,7 +122,7 @@ fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache
                                 chan.header.logo = (*icon).to_string();
                             }
                             if chan.header.logo_small.is_empty() {
-                                chan.header.logo = (*icon).to_string();
+                                chan.header.logo_small = (*icon).to_string();
                             }
                         }
                     }
