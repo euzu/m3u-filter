@@ -12,7 +12,7 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 fn split_by_first_match<'a>(input: &'a str, delimiters: &[char]) -> (Option<&'a str>, &'a str) {
@@ -125,9 +125,8 @@ impl TVGuide {
     }
 
     fn find_best_fuzzy_match(id_cache: &mut EpgIdCache, tag: &XmlTag) -> (bool, Option<String>) {
-        let early_exit_flag = Arc::new(AtomicBool::new(false)); // Flag für den frühen Abbruch
-        let data: Mutex<Option<Cow<str>>> = Mutex::new(None);
-        let current_best_match = AtomicU16::new(0); // Flag für den frühen Abbruch
+        let early_exit_flag = Arc::new(AtomicBool::new(false));
+        let data: Mutex<(u16, Option<Cow<str>>)> = Mutex::new((0, None));
 
         let match_threshold = id_cache.smart_match_config.match_threshold;
         let best_match_threshold = id_cache.smart_match_config.best_match_threshold;
@@ -141,10 +140,9 @@ impl TVGuide {
                     #[allow(clippy::cast_sign_loss)]
                     let mjw = min(100, (match_jw * 100.0).round() as u16);
                     if mjw >= match_threshold {
-                        if current_best_match.load(Ordering::SeqCst) < mjw {
-                            let mut lock = data.lock().unwrap();
-                            *lock = Some(Cow::Borrowed(norm_key));
-                            current_best_match.store(mjw, Ordering::SeqCst);
+                        let mut lock = data.lock().unwrap();
+                        if lock.0 < mjw {
+                            *lock = (mjw, Some(Cow::Borrowed(norm_key)));
                         }
                         if mjw > best_match_threshold {
                             return true; // (true, matched_normalized_epg_id.map(|s| s.to_string()));
@@ -157,7 +155,7 @@ impl TVGuide {
         // is there an early exit strategy ???
 
         if early_exit_flag.load(Ordering::SeqCst) {
-            let result = data.lock().unwrap().take();
+            let result = data.lock().unwrap().1.take();
             return (true, result.as_ref().map(std::string::ToString::to_string));
         }
         (false, None)
