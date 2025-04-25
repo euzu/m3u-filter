@@ -18,6 +18,16 @@ pub struct EpgIdCache<'a> {
 }
 
 impl EpgIdCache<'_> {
+    /// Creates a new `EpgIdCache` with configuration for smart and fuzzy matching.
+    ///
+    /// Initializes all internal caches and sets matching options based on the provided EPG configuration. If no configuration is given, defaults are used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let cache = EpgIdCache::new(None);
+    /// assert!(cache.is_empty());
+    /// ```
     pub fn new(epg_config: Option<&EpgConfig>) -> Self {
         let normalize_config = epg_config.map_or_else(EpgSmartMatchConfig::default, |epg_config| epg_config.t_smart_match.clone());
         EpgIdCache {
@@ -37,6 +47,18 @@ impl EpgIdCache<'_> {
         self.channel_epg_id.is_empty() && self.normalized.is_empty()
     }
 
+    /// Normalizes a channel name, computes its phonetic encoding, and stores both in the cache for later EPG matching.
+    ///
+    /// The normalized name is mapped to the provided EPG ID (if any), and the phonetic encoding is added to the phonetics map.
+    /// This facilitates efficient lookup and fuzzy matching of channel names during EPG assignment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut cache = EpgIdCache::new(None);
+    /// cache.normalize_and_store("Discovery Channel", Some(&"discovery.epg".to_string()));
+    /// assert!(cache.normalized.contains_key(&cache.normalize("Discovery Channel")));
+    /// ```
     fn normalize_and_store(&mut self, name: &str, epg_id: Option<&String>) {
         let normalized_name = self.normalize(name);
         let phonetic = self.phonetic(&normalized_name);
@@ -44,6 +66,15 @@ impl EpgIdCache<'_> {
         self.phonetics.entry(phonetic.to_string()).or_default().insert(phonetic);
     }
 
+    /// Returns the normalized form of a channel name using the configured smart match settings.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let cache = EpgIdCache::new(None);
+    /// let normalized = cache.normalize("HBO HD");
+    /// assert!(!normalized.is_empty());
+    /// ```
     fn normalize(&self, name: &str) -> String {
         normalize_channel_name(name, &self.smart_match_config)
     }
@@ -89,6 +120,18 @@ impl EpgIdCache<'_> {
     }
 }
 
+/// Assigns EPG IDs and logos to live playlist channels by matching them with EPG data.
+///
+/// For each live channel in the playlist missing an EPG ID, attempts to assign one using normalized name matching if smart matching is enabled. If a channel has an EPG ID but lacks logos, assigns logos from the corresponding EPG icon tags. Adds the matched EPG data to the provided vector.
+///
+/// # Examples
+///
+/// ```
+/// let mut new_epg = Vec::new();
+/// let mut playlist = FetchedPlaylist::default();
+/// let mut id_cache = EpgIdCache::new(None);
+/// assign_channel_epg(&mut new_epg, &mut playlist, &mut id_cache);
+/// ```
 fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache: &mut EpgIdCache) {
     if let Some(tv_guide) = &fp.epg {
         if let Some(epg) = tv_guide.filter(id_cache) {
@@ -139,6 +182,17 @@ fn assign_channel_epg(new_epg: &mut Vec<Epg>, fp: &mut FetchedPlaylist, id_cache
     }
 }
 
+/// Processes a fetched playlist and assigns EPG data to its channels.
+///
+/// Collects EPG channel IDs from the playlist, initializes an EPG ID cache, and assigns EPG data to channels using normalization and smart matching if enabled. Logs a debug message if no EPG IDs are found and smart matching is disabled.
+///
+/// # Examples
+///
+/// ```
+/// let mut playlist = FetchedPlaylist::default();
+/// let mut epg_data = Vec::new();
+/// process_playlist_epg(&mut playlist, &mut epg_data);
+/// ```
 pub fn process_playlist_epg(fp: &mut FetchedPlaylist, epg: &mut Vec<Epg>) {
     // collect all epg_channel ids
     let mut id_cache = EpgIdCache::new(fp.input.epg.as_ref());

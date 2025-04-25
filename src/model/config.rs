@@ -1004,14 +1004,29 @@ pub struct EpgSmartMatchConfig {
 
 impl EpgSmartMatchConfig {
 
+    /// Creates a new enabled `EpgSmartMatchConfig` with default settings and prepares it.
+    ///
+    /// Returns an error if preparation fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let config = EpgSmartMatchConfig::new().unwrap();
+    /// assert!(config.enabled);
+    /// ```
     pub fn new() -> Result<Self, M3uFilterError> {
         let mut this =  Self { enabled: true, ..Self::default() };
         this.prepare()?;
         Ok(this)
     }
 
-    /// # Panics
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    /// Prepares the EPG smart match configuration by validating thresholds, compiling normalization regex, and setting default values as needed.
+    ///
+    /// Adjusts match thresholds to valid ranges, compiles the normalization regex, and sets default strip values and name prefix separators if not provided. Returns an error if the normalization regex is invalid.
+    ///
+    /// # Returns
+    /// 
+    /// `Ok(())` if preparation succeeds, or an `M3uFilterError` if regex compilation fails.    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if !self.enabled {
             return Ok(());
         }

@@ -15,6 +15,22 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
+/// Splits a string at the first delimiter if the prefix matches a known country code.
+///
+/// Returns a tuple containing the country code prefix (if found) and the remainder of the string, both trimmed. If no valid prefix is found, returns `None` and the original input.
+///
+/// # Examples
+///
+/// ```
+/// let delimiters = vec!['.', '-', '_'];
+/// let (prefix, rest) = split_by_first_match("US.HBO", &delimiters);
+/// assert_eq!(prefix, Some("US"));
+/// assert_eq!(rest, "HBO");
+///
+/// let (prefix, rest) = split_by_first_match("HBO", &delimiters);
+/// assert_eq!(prefix, None);
+/// assert_eq!(rest, "HBO");
+/// ```
 fn split_by_first_match<'a>(input: &'a str, delimiters: &[char]) -> (Option<&'a str>, &'a str) {
     for delim in delimiters {
         if let Some(index) = input.find(*delim) {
@@ -124,6 +140,24 @@ impl TVGuide {
         matched
     }
 
+    /// Finds the best fuzzy match for a channel's normalized EPG ID using phonetic encoding and Jaro-Winkler similarity.
+    ///
+    /// Iterates over the tag's normalized EPG IDs, computes their phonetic codes, and searches for candidates in the phonetics map.
+    /// For each candidate, calculates the Jaro-Winkler similarity score and tracks the best match above the configured threshold.
+    /// Returns a tuple indicating whether a suitable match was found and the matched normalized EPG ID if available.
+    ///
+    /// # Returns
+    ///
+    /// A tuple where the first element is `true` if a match above the threshold was found, and the second element is the matched normalized EPG ID.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (found, matched) = find_best_fuzzy_match(&mut id_cache, &tag);
+    /// if found {
+    ///     println!("Best match: {:?}", matched);
+    /// }
+    /// ```
     fn find_best_fuzzy_match(id_cache: &mut EpgIdCache, tag: &XmlTag) -> (bool, Option<String>) {
         let early_exit_flag = Arc::new(AtomicBool::new(false)); // Flag für den frühen Abbruch
         let data: Mutex<Option<Cow<str>>> = Mutex::new(None);
@@ -163,6 +197,19 @@ impl TVGuide {
         (false, None)
     }
 
+    /// Parses and filters a compressed EPG XML file, extracting relevant channel and program tags based on smart and fuzzy matching criteria.
+    ///
+    /// Returns an `Epg` containing filtered tags and TV attributes if any matching channels are found; otherwise, returns `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut id_cache = EpgIdCache::default();
+    /// let epg_file = Path::new("guide.xml.gz");
+    /// if let Some(epg) = process_epg_file(&mut id_cache, epg_file) {
+    ///     assert!(!epg.children.is_empty());
+    /// }
+    /// ```
     fn process_epg_file(id_cache: &mut EpgIdCache, epg_file: &Path) -> Option<Epg> {
         match CompressedFileReader::new(epg_file) {
             Ok(mut reader) => {
@@ -398,6 +445,13 @@ mod tests {
     use crate::processing::parser::xmltv::normalize_channel_name;
 
     #[test]
+    /// Tests normalization of a channel name using the default smart match configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// parse_normalize().unwrap();
+    /// ```
     fn parse_normalize() -> Result<(), M3uFilterError> {
         let epg_normalize = EpgSmartMatchConfig::new()?;
         let normalized = normalize_channel_name("Love Nature", &epg_normalize);
@@ -426,6 +480,14 @@ mod tests {
     // }
 
     #[test]
+    /// Tests normalization of channel names with various prefixes, suffixes, and special characters using a configured `EpgSmartMatchConfig`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// normalize();
+    /// // This will assert that various channel names are normalized as expected.
+    /// ```
     fn normalize() {
         let mut epg_smart_cfg = EpgSmartMatchConfig::default();
         epg_smart_cfg.enabled = true;
@@ -444,6 +506,16 @@ mod tests {
     use rphonetic::{Encoder, Metaphone};
 
     #[test]
+    /// Demonstrates phonetic encoding (Metaphone) of normalized channel names with various prefixes and suffixes.
+    ///
+    /// This test prints the Metaphone-encoded representations of several normalized channel names using a configured `EpgSmartMatchConfig`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// test_metaphone();
+    /// // Output will show the Metaphone encodings for different channel name variants.
+    /// ```
     fn test_metaphone() {
         let metaphone = Metaphone::default();
         let mut epg_smart_cfg = EpgSmartMatchConfig::default();
