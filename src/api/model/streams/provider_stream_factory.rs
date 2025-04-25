@@ -1,11 +1,12 @@
 use crate::api::api_utils::{get_headers_from_request, StreamOptions};
 use crate::api::model::model_utils::get_response_headers;
+use crate::api::model::stream::{BoxedProviderStream, ProviderStreamFactoryResponse};
 use crate::api::model::stream_error::StreamError;
 use crate::api::model::streams::buffered_stream::BufferedStream;
 use crate::api::model::streams::client_stream::ClientStream;
 use crate::api::model::streams::provider_stream::{create_channel_unavailable_stream, get_header_filter_for_item_type};
-use crate::api::model::streams::timed_client_stream::{TimeoutClientStream};
-use crate::model::config::{Config};
+use crate::api::model::streams::timed_client_stream::TimeoutClientStream;
+use crate::model::config::Config;
 use crate::model::playlist::PlaylistItemType;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::debug_if_enabled;
@@ -20,7 +21,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use url::Url;
-use crate::api::model::stream::{BoxedProviderStream, ProviderStreamFactoryResponse};
 
 // TODO make this configurable
 pub const STREAM_QUEUE_SIZE: usize = 4096; // mpsc channel holding messages. with possible 8192byte chunks
@@ -32,14 +32,14 @@ pub struct BufferStreamOptions {
     buffer_enabled: bool,
     buffer_size: usize,
     share_stream: bool,
-    reconnect_flag: Arc<AtomicOnceFlag>
+    reconnect_flag: Arc<AtomicOnceFlag>,
 }
 
 impl BufferStreamOptions {
     pub(crate) fn new(
         item_type: PlaylistItemType,
         share_stream: bool,
-        stream_options: &StreamOptions
+        stream_options: &StreamOptions,
     ) -> Self {
         Self {
             item_type,
@@ -48,7 +48,7 @@ impl BufferStreamOptions {
             buffer_enabled: stream_options.buffer_enabled,
             buffer_size: stream_options.buffer_size,
             share_stream,
-            reconnect_flag: Arc::new(AtomicOnceFlag::new())
+            reconnect_flag: Arc::new(AtomicOnceFlag::new()),
         }
     }
 
@@ -81,15 +81,15 @@ impl BufferStreamOptions {
     pub fn get_reconnect_flag_clone(&self) -> Arc<AtomicOnceFlag> {
         Arc::clone(&self.reconnect_flag)
     }
-
 }
 
 
 #[derive(Debug, Clone)]
 struct ProviderStreamOptions {
     buffer_size: usize,
-    continue_flag: Arc<AtomicOnceFlag>,
+    item_type: PlaylistItemType,
     url: Url,
+    reconnect_flag: Arc<AtomicOnceFlag>,
     reconnect: bool,
     reconnect_force_secs: u32,
     headers: HeaderMap,
@@ -106,28 +106,28 @@ impl ProviderStreamOptions {
         self.buffer_size
     }
     #[inline]
-    pub fn get_continue_flag_clone(&self) -> Arc<AtomicOnceFlag> {
-        Arc::clone(&self.continue_flag)
+    pub fn clone_reconnect_flag(&self) -> Arc<AtomicOnceFlag> {
+        Arc::clone(&self.reconnect_flag)
     }
-
-    // #[inline]
-    // pub fn get_continue_flag(&self) -> &Arc<AtomicFlag> {
-    //     &self.continue_flag
-    // }
 
     #[inline]
     pub fn cancel_reconnect(&self) {
-        self.continue_flag.notify();
+        self.reconnect_flag.notify();
+    }
+
+    #[inline]
+    pub fn should_reconnect(&self) -> bool {
+        self.reconnect_flag.is_active()
+    }
+
+    #[inline]
+    pub fn is_reconnect_enabled(&self) -> bool {
+        self.reconnect
     }
 
     #[inline]
     pub fn get_url(&self) -> &Url {
         &self.url
-    }
-
-    #[inline]
-    pub fn should_reconnect(&self) -> bool {
-        self.reconnect
     }
 
     #[inline]
@@ -147,11 +147,6 @@ impl ProviderStreamOptions {
     #[inline]
     pub fn get_range_bytes_clone(&self) -> Arc<Option<AtomicUsize>> {
         Arc::clone(&self.range_bytes)
-    }
-
-    #[inline]
-    pub fn should_continue(&self) -> bool {
-        self.continue_flag.is_active()
     }
 }
 
@@ -253,11 +248,17 @@ async fn provider_initial_request(cfg: &Config, request_client: Arc<reqwest::Cli
 async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderStreamOptions) -> Option<BoxedProviderStream> {
     let url = stream_options.get_url();
     debug_if_enabled!("stream provider {}", sanitize_sensitive_info(url.as_str()));
-    while stream_options.should_continue() {
+    let mut max_retries = 5;
+    while stream_options.should_reconnect() {
+        if max_retries < 0 {
+            stream_options.cancel_reconnect();
+            return None;
+        }
         debug_if_enabled!("Reconnecting stream {}", sanitize_sensitive_info(url.as_str()));
         let (client, _) = prepare_client(&client, &stream_options);
         match client.send().await {
             Ok(response) => {
+                max_retries = 0;
                 let status = response.status();
                 if status.is_success() {
                     let provider_stream = response.bytes_stream().map_err(|err| {
@@ -272,26 +273,42 @@ async fn stream_provider(client: Arc<reqwest::Client>, stream_options: ProviderS
                 }
                 if status.is_client_error() {
                     debug!("Client error status response : {status}");
-                    return None;
+                    match status {
+                        StatusCode::REQUEST_TIMEOUT |
+                        StatusCode::TOO_EARLY => {}
+                        StatusCode::TOO_MANY_REQUESTS => {
+                            tokio::time::sleep(Duration::from_millis(1000)).await;
+                        }
+                        _ => {
+                            debug!("Reconnect stopped because of client error status response : {status}");
+                            stream_options.cancel_reconnect();
+                            return None;
+                        }
+                    }
+                    max_retries -= 1;
                 }
                 if status.is_server_error() {
+                    debug!("Server error status response : {status}");
                     match status {
                         StatusCode::INTERNAL_SERVER_ERROR |
                         StatusCode::BAD_GATEWAY |
                         StatusCode::SERVICE_UNAVAILABLE |
                         StatusCode::GATEWAY_TIMEOUT => {}
                         _ => {
-                            debug!("Server error status response : {status}");
-                            return None
+                            if stream_options.item_type != PlaylistItemType::Live {
+                                stream_options.cancel_reconnect();
+                            }
+                            return None;
                         }
                     }
+                    max_retries -= 1;
                 }
             }
             Err(err) => {
                 debug!("Server connection failed with {err}");
             }
         }
-        if !stream_options.should_continue() {
+        if !stream_options.should_reconnect() {
             return None;
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -305,7 +322,7 @@ const ERR_MAX_RETRY_COUNT: u32 = 5;
 async fn get_initial_stream(cfg: &Config, client: Arc<reqwest::Client>, stream_options: &ProviderStreamOptions) -> Option<ProviderStreamFactoryResponse> {
     let start = Instant::now();
     let mut connect_err: u32 = 1;
-    while stream_options.should_continue() {
+    while stream_options.should_reconnect() {
         match provider_initial_request(cfg, Arc::clone(&client), stream_options).await {
             Ok(Some(value)) => return Some(value),
             Ok(None) => {
@@ -348,7 +365,8 @@ fn create_provider_stream_options(stream_url: &Url,
 
     ProviderStreamOptions {
         buffer_size,
-        continue_flag: Arc::clone(&options.reconnect_flag),
+        reconnect_flag: Arc::clone(&options.reconnect_flag),
+        item_type: options.item_type,
         url,
         reconnect,
         reconnect_force_secs,
@@ -367,7 +385,7 @@ pub async fn create_provider_stream(cfg: &Config,
 
     let client_stream_factory = |stream, reconnect_flag, range_cnt| {
         let stream = if stream_options.is_buffered() && !options.is_shared_stream() {
-            BufferedStream::new(stream, stream_options.get_buffer_size(), stream_options.get_continue_flag_clone(), stream_url.as_str()).boxed()
+            BufferedStream::new(stream, stream_options.get_buffer_size(), stream_options.clone_reconnect_flag(), stream_url.as_str()).boxed()
         } else {
             stream
         };
@@ -382,15 +400,15 @@ pub async fn create_provider_stream(cfg: &Config,
                 true // don't know what it is but lets assume it is
             };
 
-            let continue_signal = stream_options.get_continue_flag_clone();
-            if is_media_stream && stream_options.should_reconnect() {
-                let continue_client_signal = Arc::clone(&continue_signal);
-                let continue_streaming_signal = continue_client_signal.clone();
+            let reconnect_signal = stream_options.clone_reconnect_flag();
+            if is_media_stream && stream_options.is_reconnect_enabled() {
+                let reconnect_client_signal = Arc::clone(&reconnect_signal);
+                let reconnect_streaming_signal = reconnect_client_signal.clone();
                 let stream_options_provider = stream_options.clone();
                 let unfold: BoxedProviderStream = stream::unfold((), move |()| {
                     let client = Arc::clone(&client);
                     let stream_opts = stream_options_provider.clone();
-                    let continue_streaming = continue_streaming_signal.clone();
+                    let continue_streaming = reconnect_streaming_signal.clone();
                     async move {
                         if continue_streaming.is_active() {
                             let stream = stream_provider(client, stream_opts).await?;
@@ -400,9 +418,9 @@ pub async fn create_provider_stream(cfg: &Config,
                         }
                     }
                 }).flatten().boxed();
-                Some((client_stream_factory(init_stream.chain(unfold).boxed(), Arc::clone(&continue_client_signal), stream_options.get_range_bytes_clone()).boxed(), info))
+                Some((client_stream_factory(init_stream.chain(unfold).boxed(), Arc::clone(&reconnect_client_signal), stream_options.get_range_bytes_clone()).boxed(), info))
             } else {
-                Some((client_stream_factory(init_stream.boxed(), Arc::clone(&continue_signal), stream_options.get_range_bytes_clone()).boxed(), info))
+                Some((client_stream_factory(init_stream.boxed(), Arc::clone(&reconnect_signal), stream_options.get_range_bytes_clone()).boxed(), info))
             }
         }
         None => None

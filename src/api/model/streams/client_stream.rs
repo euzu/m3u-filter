@@ -16,14 +16,14 @@ use crate::utils::network::request::sanitize_sensitive_info;
 #[repr(align(64))]
 pub(in crate::api::model) struct ClientStream {
     inner: BoxedProviderStream,
-    close_signal: Arc<AtomicOnceFlag>,
+    continue_signal: Arc<AtomicOnceFlag>,
     total_bytes: Arc<Option<AtomicUsize>>,
     url: String,
 }
 
 impl ClientStream {
-    pub(crate) fn new(inner: BoxedProviderStream, close_signal: Arc<AtomicOnceFlag>, total_bytes: Arc<Option<AtomicUsize>>, url: &str) -> Self {
-        Self { inner, close_signal, total_bytes, url: url.to_string() }
+    pub(crate) fn new(inner: BoxedProviderStream, continue_signal: Arc<AtomicOnceFlag>, total_bytes: Arc<Option<AtomicUsize>>, url: &str) -> Self {
+        Self { inner, continue_signal, total_bytes, url: url.to_string() }
     }
 }
 impl Stream for ClientStream {
@@ -33,7 +33,7 @@ impl Stream for ClientStream {
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        if self.close_signal.is_active() {
+        if self.continue_signal.is_active() {
             loop {
                 match Pin::as_mut(&mut self.inner).poll_next(cx) {
                     Poll::Ready(Some(Ok(bytes))) => {
@@ -49,7 +49,7 @@ impl Stream for ClientStream {
                         return Poll::Ready(Some(Ok(bytes)));
                     }
                     Poll::Ready(None) => {
-                        self.close_signal.notify();
+                        self.continue_signal.notify();
                         return Poll::Ready(None);
                     }
                     Poll::Pending => return Poll::Pending,
@@ -68,6 +68,6 @@ impl Stream for ClientStream {
 impl Drop for ClientStream {
     fn drop(&mut self) {
         trace_if_enabled!("Client disconnected {}", sanitize_sensitive_info(&self.url));
-        self.close_signal.notify();
+        self.continue_signal.notify();
     }
 }
