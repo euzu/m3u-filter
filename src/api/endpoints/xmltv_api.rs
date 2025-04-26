@@ -1,6 +1,3 @@
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use axum::response::IntoResponse;
 use chrono::{Duration, NaiveDateTime, TimeDelta};
 use flate2::write::GzEncoder;
@@ -8,6 +5,9 @@ use flate2::Compression;
 use log::{error, trace};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, Writer};
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::model::app_state::AppState;
@@ -173,20 +173,22 @@ fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> impl axum::r
 async fn xmltv_api(
     axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
-) -> impl axum::response::IntoResponse + Send {
-    if let Some((user, target)) = get_user_target(&api_req, &app_state).await {
-        if user.permission_denied(&app_state) {
-            return axum::http::StatusCode::FORBIDDEN.into_response();
-        }
-        match get_epg_path_for_target(&app_state.config, target) {
-            None => {
-                // No epg configured,  No processing or timeshift, epg can't be mapped to the channels.
-                // we do not deliver epg
-            }
-            Some(epg_path) => return serve_epg(&epg_path, &user).await.into_response()
-        }
+) -> impl IntoResponse + Send {
+    let Some((user, target)) = get_user_target(&api_req, &app_state).await else {
+        return axum::http::StatusCode::FORBIDDEN.into_response();
+    };
+
+    if user.permission_denied(&app_state) {
+        return axum::http::StatusCode::FORBIDDEN.into_response();
     }
-    get_empty_epg_response().into_response()
+
+    let Some(epg_path) = get_epg_path_for_target(&app_state.config, target) else {
+        // No epg configured,  No processing or timeshift, epg can't be mapped to the channels.
+        // we do not deliver epg
+        return get_empty_epg_response().into_response();
+    };
+
+    serve_epg(&epg_path, &user).await.into_response()
 }
 
 pub fn xmltv_api_register() -> axum::Router<Arc<AppState>> {
