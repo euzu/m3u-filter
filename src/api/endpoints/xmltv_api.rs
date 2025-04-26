@@ -1,6 +1,3 @@
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use axum::response::IntoResponse;
 use chrono::{Duration, NaiveDateTime, TimeDelta};
 use flate2::write::GzEncoder;
@@ -8,6 +5,9 @@ use flate2::Compression;
 use log::{error, trace};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, Writer};
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::model::app_state::AppState;
@@ -170,25 +170,48 @@ fn serve_epg_with_timeshift(epg_file: File, offset_minutes: i32) -> impl axum::r
         .into_response()
 }
 
+/// Handles XMLTV EPG API requests, serving the appropriate EPG file with optional time-shifting based on user configuration.
+///
+/// Returns a 403 Forbidden response if the user or target is invalid or if the user lacks permission. If no EPG file is configured for the target, returns an empty EPG response. Otherwise, serves the EPG file, applying a time shift if specified by the user.
+///
+/// # Examples
+///
+/// ```
+/// // Example usage within an Axum router:
+/// let router = xmltv_api_register();
+/// // A GET request to /xmltv.php with valid query parameters will invoke this handler.
+/// ```
 async fn xmltv_api(
     axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,
     axum::extract::State(app_state): axum::extract::State<Arc<AppState>>,
-) -> impl axum::response::IntoResponse + Send {
-    if let Some((user, target)) = get_user_target(&api_req, &app_state).await {
-        if user.permission_denied(&app_state) {
-            return axum::http::StatusCode::FORBIDDEN.into_response();
-        }
-        match get_epg_path_for_target(&app_state.config, target) {
-            None => {
-                // No epg configured,  No processing or timeshift, epg can't be mapped to the channels.
-                // we do not deliver epg
-            }
-            Some(epg_path) => return serve_epg(&epg_path, &user).await.into_response()
-        }
+) -> impl IntoResponse + Send {
+    let Some((user, target)) = get_user_target(&api_req, &app_state).await else {
+        return axum::http::StatusCode::FORBIDDEN.into_response();
+    };
+
+    if user.permission_denied(&app_state) {
+        return axum::http::StatusCode::FORBIDDEN.into_response();
     }
-    get_empty_epg_response().into_response()
+
+    let Some(epg_path) = get_epg_path_for_target(&app_state.config, target) else {
+        // No epg configured,  No processing or timeshift, epg can't be mapped to the channels.
+        // we do not deliver epg
+        return get_empty_epg_response().into_response();
+    };
+
+    serve_epg(&epg_path, &user).await.into_response()
 }
 
+/// Registers the XMLTV EPG API routes for handling HTTP GET requests.
+///
+/// The returned router maps the `/xmltv.php`, `/update/epg.php`, and `/epg` endpoints to the `xmltv_api` handler, enabling XMLTV EPG data retrieval with optional time-shifting and compression.
+///
+/// # Examples
+///
+/// ```
+/// let router = xmltv_api_register();
+/// // The router can now be used with an Axum server.
+/// ```
 pub fn xmltv_api_register() -> axum::Router<Arc<AppState>> {
     axum::Router::new()
         .route("/xmltv.php", axum::routing::get(xmltv_api))
