@@ -98,11 +98,10 @@ impl ActiveUserManager {
                         // Grace timeout still active, deny connection
                         debug!("User access denied, grace exhausted, too many connections: {username}");
                         return UserConnectionPermission::Exhausted;
-                    } else {
-                        // Grace timeout expired, reset grace counters
-                        connection_data.granted_grace = false;
-                        connection_data.grace_ts = 0;
                     }
+                    // Grace timeout expired, reset grace counters
+                    connection_data.granted_grace = false;
+                    connection_data.grace_ts = 0;
                 }
 
                 if self.grace_period_millis > 0 && current_connections == max_connections {

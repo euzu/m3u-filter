@@ -13,21 +13,11 @@ pub enum ProviderConfigAllocation {
     GracePeriod,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct ProviderConfigConnection {
-    current_connections: u16,
+    current_connections: usize,
     granted_grace: bool,
     grace_ts: u64,
-}
-
-impl Default for ProviderConfigConnection {
-    fn default() -> Self {
-        Self {
-            current_connections: 0,
-            granted_grace: false,
-            grace_ts: 0,
-        }
-    }
 }
 
 /// This struct represents an individual provider configuration with fields like:
@@ -45,7 +35,7 @@ pub struct ProviderConfig {
     pub username: Option<String>,
     pub password: Option<String>,
     pub input_type: InputType,
-    max_connections: u16,
+    max_connections: usize,
     priority: i16,
     connection: RwLock<ProviderConfigConnection>,
 }
@@ -59,7 +49,7 @@ impl ProviderConfig {
             username: cfg.username.clone(),
             password: cfg.password.clone(),
             input_type: cfg.input_type,
-            max_connections: cfg.max_connections,
+            max_connections: cfg.max_connections as usize,
             priority: cfg.priority,
             connection: RwLock::new(ProviderConfigConnection::default()),
         }
@@ -73,7 +63,7 @@ impl ProviderConfig {
             username: alias.username.clone(),
             password: alias.password.clone(),
             input_type: cfg.input_type,
-            max_connections: alias.max_connections,
+            max_connections: alias.max_connections as usize,
             priority: alias.priority,
             connection: RwLock::new(ProviderConfigConnection::default()),
         }
@@ -134,11 +124,10 @@ impl ProviderConfig {
                     // Grace timeout still active, deny connection
                     debug!("Provider access denied, grace exhausted, too many connections: {}", self.name);
                     return ProviderConfigAllocation::Exhausted;
-                } else {
-                    // Grace timeout expired, reset grace counters
-                    guard.granted_grace = false;
-                    guard.grace_ts = 0;
                 }
+                // Grace timeout expired, reset grace counters
+                guard.granted_grace = false;
+                guard.grace_ts = 0;
             }
             guard.granted_grace = true;
             guard.grace_ts = now;
@@ -162,11 +151,10 @@ impl ProviderConfig {
                     // Grace timeout still active, deny connection
                     debug!("Provider access denied, grace exhausted, too many connections: {}", self.name);
                     return false;
-                } else {
-                    // Grace timeout expired, reset grace counters
-                    guard.granted_grace = false;
-                    guard.grace_ts = 0;
                 }
+                // Grace timeout expired, reset grace counters
+                guard.granted_grace = false;
+                guard.grace_ts = 0;
             }
             return true;
         }
@@ -183,7 +171,7 @@ impl ProviderConfig {
     }
 
     #[inline]
-    pub(crate) async fn get_current_connections(&self) -> u16 {
+    pub(crate) async fn get_current_connections(&self) -> usize {
         self.connection.read().await.current_connections
     }
 

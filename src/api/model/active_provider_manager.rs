@@ -230,10 +230,12 @@ impl MultiProviderLineup {
                 }
             }
             ProviderPriorityGroup::MultiProviderGroup(index, pg) => {
-                let mut idx_guard = index.lock().await;
-                let mut idx = *idx_guard;
                 let provider_count = pg.len();
+                let mut idx = {
+                    *index.lock().await
+                };
                 let start = idx;
+
                 for _ in start..provider_count {
                     let p = pg.get(idx).unwrap();
                     idx = (idx + 1) % provider_count;
@@ -241,12 +243,12 @@ impl MultiProviderLineup {
                     match result {
                         ProviderAllocation::Exhausted => {}
                         ProviderAllocation::Available(_) | ProviderAllocation::GracePeriod(_) => {
-                            *idx_guard = idx;
+                            *index.lock().await = idx;
                             return result;
                         }
                     }
                 }
-                *idx_guard = idx;
+                *index.lock().await = idx;
             }
         }
         ProviderAllocation::Exhausted
@@ -520,8 +522,8 @@ impl ActiveProviderManager {
         }
     }
 
-    pub async fn active_connections(&self) -> Option<HashMap<String, u16>> {
-        let mut result = HashMap::<String, u16>::new();
+    pub async fn active_connections(&self) -> Option<HashMap<String, usize>> {
+        let mut result = HashMap::<String, usize>::new();
         let mut add_provider = async |provider: &ProviderConfig| {
             let count = provider.get_current_connections().await;
             if count > 0 {
