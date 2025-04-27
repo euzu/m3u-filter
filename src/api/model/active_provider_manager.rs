@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use crate::api::model::provider_config::{ProviderConfig, ProviderConfigWrapper};
+use crate::utils::default_utils::{default_grace_period_millis, default_grace_period_timeout_secs};
 
 pub struct ProviderConnectionGuard {
     manager: Arc<ActiveProviderManager>,
@@ -75,17 +76,17 @@ enum ProviderLineup {
 }
 
 impl ProviderLineup {
-    async fn get_next(&self) -> Option<Arc<ProviderConfig>> {
+    async fn get_next(&self, grace_period_timeout_secs: u64) -> Option<Arc<ProviderConfig>> {
         match self {
-            ProviderLineup::Single(lineup) => lineup.get_next().await,
-            ProviderLineup::Multi(lineup) => lineup.get_next().await,
+            ProviderLineup::Single(lineup) => lineup.get_next(grace_period_timeout_secs).await,
+            ProviderLineup::Multi(lineup) => lineup.get_next(grace_period_timeout_secs).await,
         }
     }
 
-    async fn acquire(&self) -> ProviderAllocation {
+    async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
         match self {
-            ProviderLineup::Single(lineup) => lineup.acquire().await,
-            ProviderLineup::Multi(lineup) => lineup.acquire().await,
+            ProviderLineup::Single(lineup) => lineup.acquire(grace_period_timeout_secs).await,
+            ProviderLineup::Multi(lineup) => lineup.acquire(grace_period_timeout_secs).await,
         }
     }
 
@@ -110,12 +111,12 @@ impl SingleProviderLineup {
         }
     }
 
-    async fn get_next(&self) -> Option<Arc<ProviderConfig>> {
-        self.provider.get_next(false).await
+    async fn get_next(&self, grace_period_timeout_secs: u64) -> Option<Arc<ProviderConfig>> {
+        self.provider.get_next(false, grace_period_timeout_secs).await
     }
 
-    async fn acquire(&self) -> ProviderAllocation {
-        self.provider.try_allocate(true).await
+    async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
+        self.provider.try_allocate(true, grace_period_timeout_secs).await
     }
 
     async fn release(&self, provider_name: &str) {
@@ -137,12 +138,12 @@ enum ProviderPriorityGroup {
 }
 
 impl ProviderPriorityGroup {
-    fn is_exhausted(&self) -> bool {
+    async fn is_exhausted(&self) -> bool {
         match self {
-            ProviderPriorityGroup::SingleProviderGroup(g) => g.is_exhausted(),
+            ProviderPriorityGroup::SingleProviderGroup(g) => g.is_exhausted().await,
             ProviderPriorityGroup::MultiProviderGroup(_, groups) => {
                 for g in groups {
-                    if !g.is_exhausted() {
+                    if !g.is_exhausted().await {
                         return false;
                     }
                 }
@@ -219,10 +220,10 @@ impl MultiProviderLineup {
     /// }
     /// }
     /// ```
-    async fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup, grace: bool) -> ProviderAllocation {
+    async fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup, grace: bool, grace_period_timeout_secs: u64) -> ProviderAllocation {
         match priority_group {
             ProviderPriorityGroup::SingleProviderGroup(p) => {
-                let result = p.try_allocate(grace).await;
+                let result = p.try_allocate(grace, grace_period_timeout_secs).await;
                 match result {
                     ProviderAllocation::Exhausted => {}
                     ProviderAllocation::Available(_) | ProviderAllocation::GracePeriod(_) => return result
@@ -236,7 +237,7 @@ impl MultiProviderLineup {
                 for _ in start..provider_count {
                     let p = pg.get(idx).unwrap();
                     idx = (idx + 1) % provider_count;
-                    let result = p.try_allocate(grace).await;
+                    let result = p.try_allocate(grace, grace_period_timeout_secs).await;
                     match result {
                         ProviderAllocation::Exhausted => {}
                         ProviderAllocation::Available(_) | ProviderAllocation::GracePeriod(_) => {
@@ -252,10 +253,10 @@ impl MultiProviderLineup {
     }
 
     // Used for redirect to cylce through provider
-    async fn get_next_provider_from_group(priority_group: &ProviderPriorityGroup, grace: bool) -> Option<Arc<ProviderConfig>> {
+    async fn get_next_provider_from_group(priority_group: &ProviderPriorityGroup, grace: bool, grace_period_timeout_secs: u64) -> Option<Arc<ProviderConfig>> {
         match priority_group {
             ProviderPriorityGroup::SingleProviderGroup(p) => {
-                return p.get_next(grace).await;
+                return p.get_next(grace, grace_period_timeout_secs).await;
             }
             ProviderPriorityGroup::MultiProviderGroup(index, pg) => {
                 let mut idx_guard = index.lock().await;
@@ -265,7 +266,7 @@ impl MultiProviderLineup {
                 for _ in start..provider_count {
                     let p = pg.get(idx).unwrap();
                     idx = (idx + 1) % provider_count;
-                    let result = p.get_next(grace).await;
+                    let result = p.get_next(grace, grace_period_timeout_secs).await;
                     if result.is_some() {
                         *idx_guard = idx;
                         return result;
@@ -302,16 +303,16 @@ impl MultiProviderLineup {
     ///    ProviderAllocation::GracePeriodprovider) =>  println!("Provider with grace period {}", provider.name),
     /// }
     /// ```
-    async fn acquire(&self) -> ProviderAllocation {
+    async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
         let main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
 
         for index in main_idx..provider_count {
             let priority_group = &self.providers[index];
             let allocation = {
-                let without_grace_allocation = Self::acquire_next_provider_from_group(priority_group, false).await;
+                let without_grace_allocation = Self::acquire_next_provider_from_group(priority_group, false, grace_period_timeout_secs).await;
                 if matches!(without_grace_allocation, ProviderAllocation::Exhausted) {
-                    Self::acquire_next_provider_from_group(priority_group, true).await
+                    Self::acquire_next_provider_from_group(priority_group, true, grace_period_timeout_secs).await
                 } else {
                     without_grace_allocation
                 }
@@ -320,7 +321,7 @@ impl MultiProviderLineup {
                 ProviderAllocation::Exhausted => {}
                 ProviderAllocation::Available(_) |
                 ProviderAllocation::GracePeriod(_) => {
-                    if priority_group.is_exhausted() {
+                    if priority_group.is_exhausted().await {
                         self.index.store((index + 1) % provider_count, Ordering::SeqCst);
                     }
                     return allocation;
@@ -332,16 +333,16 @@ impl MultiProviderLineup {
     }
 
     // it intended to use with redirects to cycle through provider
-    async fn get_next(&self) -> Option<Arc<ProviderConfig>> {
+    async fn get_next(&self, grace_period_timeout_secs: u64) -> Option<Arc<ProviderConfig>> {
         let main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
 
         for index in main_idx..provider_count {
             let priority_group = &self.providers[index];
             let allocation = {
-                let config = Self::get_next_provider_from_group(priority_group, false).await;
+                let config = Self::get_next_provider_from_group(priority_group, false, grace_period_timeout_secs).await;
                 if config.is_none() {
-                    Self::get_next_provider_from_group(priority_group, true).await
+                    Self::get_next_provider_from_group(priority_group, true, grace_period_timeout_secs).await
                 } else {
                     config
                 }
@@ -349,7 +350,7 @@ impl MultiProviderLineup {
             match allocation {
                 None => {}
                 Some(config) => {
-                    if priority_group.is_exhausted() {
+                    if priority_group.is_exhausted().await {
                         self.index.store((index + 1) % provider_count, Ordering::SeqCst);
                     }
                     return Some(config);
@@ -384,12 +385,20 @@ impl MultiProviderLineup {
 }
 
 pub struct ActiveProviderManager {
+    grace_period_millis: u64,
+    grace_period_timeout_secs: u64,
     providers: Arc<RwLock<Vec<ProviderLineup>>>,
 }
 
 impl ActiveProviderManager {
     pub async fn new(cfg: &Config) -> Self {
+        let (grace_period_millis, grace_period_timeout_secs) = cfg.reverse_proxy.as_ref()
+            .and_then(|r| r.stream.as_ref())
+            .map_or_else(|| (default_grace_period_millis(), default_grace_period_timeout_secs()), |s| (s.grace_period_millis, s.grace_period_timeout_secs));
+
         let mut this = Self {
+            grace_period_millis,
+            grace_period_timeout_secs,
             providers: Arc::new(RwLock::new(Vec::new())),
         };
         for source in &cfg.sources {
@@ -402,6 +411,8 @@ impl ActiveProviderManager {
 
     fn clone_inner(&self) -> Self {
         Self {
+            grace_period_millis: self.grace_period_millis,
+            grace_period_timeout_secs: self.grace_period_timeout_secs,
             providers: Arc::clone(&self.providers),
         }
     }
@@ -450,7 +461,7 @@ impl ActiveProviderManager {
         let providers = self.providers.read().await;
         let allocation = match Self::get_provider_config(provider_name, &providers) {
             None => ProviderAllocation::Exhausted, // No Name matched, we don't have this provider
-            Some((_lineup, config)) => config.force_allocate(),
+            Some((_lineup, config)) => config.force_allocate().await,
         };
 
         ProviderConnectionGuard {
@@ -464,7 +475,7 @@ impl ActiveProviderManager {
         let providers = self.providers.read().await;
         let allocation = match Self::get_provider_config(input_name, &providers) {
             None => ProviderAllocation::Exhausted, // No Name matched, we don't have this provider
-            Some((lineup, _config)) => lineup.acquire().await
+            Some((lineup, _config)) => lineup.acquire(self.grace_period_timeout_secs).await
         };
 
         if log_enabled!(log::Level::Debug) {
@@ -490,7 +501,7 @@ impl ActiveProviderManager {
         match Self::get_provider_config(input_name, &providers) {
             None => None,
             Some((lineup, _config)) => {
-                let cfg = lineup.get_next().await;
+                let cfg = lineup.get_next(self.grace_period_timeout_secs).await;
                 if log_enabled!(log::Level::Debug) {
                     if let Some(ref c) = cfg {
                         debug!("Using provider {}", c.name);
@@ -511,8 +522,8 @@ impl ActiveProviderManager {
 
     pub async fn active_connections(&self) -> Option<HashMap<String, u16>> {
         let mut result = HashMap::<String, u16>::new();
-        let mut add_provider = |provider: &ProviderConfig| {
-            let count = provider.get_current_connections();
+        let mut add_provider = async |provider: &ProviderConfig| {
+            let count = provider.get_current_connections().await;
             if count > 0 {
                 result.insert(provider.name.to_string(), count);
             }
@@ -521,17 +532,17 @@ impl ActiveProviderManager {
         for lineup in &*providers {
             match lineup {
                 ProviderLineup::Single(provider_lineup) => {
-                    add_provider(&provider_lineup.provider);
+                    add_provider(&provider_lineup.provider).await;
                 }
                 ProviderLineup::Multi(provider_lineup) => {
                     for provider_group in &provider_lineup.providers {
                         match provider_group {
                             ProviderPriorityGroup::SingleProviderGroup(provider) => {
-                                add_provider(provider);
+                                add_provider(provider).await;
                             }
                             ProviderPriorityGroup::MultiProviderGroup(_, providers) => {
                                 for provider in providers {
-                                    add_provider(provider);
+                                    add_provider(provider).await;
                                 }
                             }
                         }
@@ -549,7 +560,7 @@ impl ActiveProviderManager {
     pub async fn is_over_limit(&self, provider_name: &str) -> bool {
         let providers = self.providers.read().await;
         if let Some((_, config)) = Self::get_provider_config(provider_name, &providers) {
-            config.is_over_limit()
+            config.is_over_limit().await
         } else {
             false
         }
@@ -558,15 +569,16 @@ impl ActiveProviderManager {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::AtomicU16;
     use super::*;
-    use crate::model::config::InputFetchMethod;
+    use crate::model::config::{ConfigInputAlias, InputFetchMethod, InputType};
     use crate::Arc;
     use std::thread;
 
     macro_rules! should_available {
-        ($lineup:expr, $provider_id:expr) => {
+        ($lineup:expr, $provider_id:expr, $grace_period_timeout_secs: expr) => {
             thread::sleep(std::time::Duration::from_millis(200));
-            match $lineup.acquire() {
+            match $lineup.acquire($grace_period_timeout_secs).await {
                 ProviderAllocation::Exhausted => assert!(false, "Should available and not exhausted"),
                 ProviderAllocation::Available(provider) => assert_eq!(provider.id, $provider_id),
                 ProviderAllocation::GracePeriod(provider) => assert!(false, "Should available and not grace period: {}", provider.id),
@@ -574,9 +586,9 @@ mod tests {
         };
     }
     macro_rules! should_grace_period {
-        ($lineup:expr, $provider_id:expr) => {
+        ($lineup:expr, $provider_id:expr, $grace_period_timeout_secs: expr) => {
             thread::sleep(std::time::Duration::from_millis(200));
-            match $lineup.acquire() {
+            match $lineup.acquire($grace_period_timeout_secs).await {
                 ProviderAllocation::Exhausted => assert!(false, "Should grace period and not exhausted"),
                 ProviderAllocation::Available(provider) => assert!(false, "Should grace period and not available: {}", provider.id),
                 ProviderAllocation::GracePeriod(provider) => assert_eq!(provider.id, $provider_id),
@@ -585,9 +597,9 @@ mod tests {
     }
 
     macro_rules! should_exhausted {
-        ($lineup:expr) => {
+        ($lineup:expr, $grace_period_timeout_secs: expr) => {
             thread::sleep(std::time::Duration::from_millis(200));
-            match $lineup.acquire() {
+            match $lineup.acquire($grace_period_timeout_secs).await {
                 ProviderAllocation::Exhausted => {},
                 ProviderAllocation::Available(provider) => assert!(false, "Should exhausted and not available: {}", provider.id),
                 ProviderAllocation::GracePeriod(provider) => assert!(false, "Should exhausted and not grace period: {}", provider.id),
@@ -644,15 +656,19 @@ mod tests {
 
         // Create MultiProviderLineup with the provider and alias
         let lineup = MultiProviderLineup::new(&input);
+        let rt  = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+         // Test that the alias provider is available
+            should_available!(lineup, 1, 5);
+            // Try acquiring again
+            should_available!(lineup, 2, 5);
+            should_available!(lineup, 2, 5);
+            should_grace_period!(lineup, 1, 5);
+            should_grace_period!(lineup, 2, 5);
+            should_exhausted!(lineup, 5);
+            should_exhausted!(lineup, 5);
+        });
 
-        // Test that the alias provider is available
-        should_available!(lineup, 1);
-        // Try acquiring again
-        should_available!(lineup, 2);
-        should_available!(lineup, 2);
-        should_grace_period!(lineup, 1);
-        should_grace_period!(lineup, 2);
-        should_exhausted!(lineup);
     }
 
     // // Test acquiring from a MultiProviderLineup where the alias has a different priority
@@ -664,10 +680,13 @@ mod tests {
         input.aliases = Some(vec![alias]);
         let lineup = MultiProviderLineup::new(&input);
         // The alias has a higher priority, so the alias should be acquired first
-        for _ in 0..2 {
-            should_available!(lineup, 2);
-        }
-        should_available!(lineup, 1);
+        let rt  = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            for _ in 0..2 {
+                should_available!(lineup, 2, 5);
+            }
+            should_available!(lineup, 1, 5);
+        });
     }
 
     // Test provider when there are multiple aliases, all with distinct priorities
@@ -681,20 +700,22 @@ mod tests {
         input.aliases = Some(vec![alias1, alias2]);
 
         let lineup = MultiProviderLineup::new(&input);
+        let rt  = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            // The alias with priority 0 should be acquired first (higher priority)
+            should_available!(lineup, 3, 5);
+            // Acquire again, and provider should still be available (with remaining capacity)
+            should_available!(lineup, 1, 5);
+            // // Check that the second alias with priority 2 is considered next
+            should_available!(lineup, 2, 5);
+            should_available!(lineup, 2, 5);
 
-        // The alias with priority 0 should be acquired first (higher priority)
-        should_available!(lineup, 3);
-        // Acquire again, and provider should still be available (with remaining capacity)
-        should_available!(lineup, 1);
-        // // Check that the second alias with priority 2 is considered next
-        should_available!(lineup, 2);
-        should_available!(lineup, 2);
+            should_grace_period!(lineup, 3, 5);
+            should_grace_period!(lineup, 1, 5);
+            should_grace_period!(lineup, 2, 5);
 
-        should_grace_period!(lineup, 3);
-        should_grace_period!(lineup, 1);
-        should_grace_period!(lineup, 2);
-
-        should_exhausted!(lineup);
+            should_exhausted!(lineup, 5);
+        });
     }
 
 
@@ -709,23 +730,25 @@ mod tests {
         input.aliases = Some(vec![alias1, alias2]);
 
         let lineup = MultiProviderLineup::new(&input);
+        let rt  = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            // Acquire connection from alias2
+            should_available!(lineup, 3, 5);
+            // Acquire connection from provider1
+            should_available!(lineup, 1, 5);
+            // Acquire connection from alias1
+            should_available!(lineup, 2, 5);
 
-        // Acquire connection from alias2
-        should_available!(lineup, 3);
-        // Acquire connection from provider1
-        should_available!(lineup, 1);
-        // Acquire connection from alias1
-        should_available!(lineup, 2);
+            // Acquire connection from alias2
+            should_grace_period!(lineup, 3, 5);
+            // Acquire connection from provider1
+            should_grace_period!(lineup, 1, 5);
+            // Acquire connection from alias1
+            should_grace_period!(lineup, 2, 5);
 
-        // Acquire connection from alias2
-        should_grace_period!(lineup, 3);
-        // Acquire connection from provider1
-        should_grace_period!(lineup, 1);
-        // Acquire connection from alias1
-        should_grace_period!(lineup, 2);
-
-        // Now, all are exhausted
-        should_exhausted!(lineup);
+            // Now, all are exhausted
+            should_exhausted!(lineup, 5);
+        });
     }
 
     // Test acquiring a connection when there is available capacity
@@ -733,15 +756,17 @@ mod tests {
     fn test_acquire_when_capacity_available() {
         let cfg = create_config_input(1, "provider5_1", 1, 2);
         let lineup = SingleProviderLineup::new(&cfg);
-
-        // First acquire attempt should succeed
-        should_available!(lineup, 1);
-        // Second acquire attempt should succeed as well
-        should_available!(lineup, 1);
-        // Third with grace time
-        should_grace_period!(lineup, 1);
-        // Fourth acquire attempt should fail as the provider is exhausted
-        should_exhausted!(lineup);
+        let rt  = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            // First acquire attempt should succeed
+            should_available!(lineup, 1, 5);
+            // Second acquire attempt should succeed as well
+            should_available!(lineup, 1, 5);
+            // Third with grace time
+            should_grace_period!(lineup, 1, 5);
+            // Fourth acquire attempt should fail as the provider is exhausted
+            should_exhausted!(lineup, 5);
+        });
     }
 
 
@@ -750,19 +775,21 @@ mod tests {
     fn test_release_connection() {
         let cfg = create_config_input(1, "provider7_1", 1, 2);
         let lineup = SingleProviderLineup::new(&cfg);
-
-        // Acquire two connections
-        should_available!(lineup, 1);
-        should_available!(lineup, 1);
-        should_grace_period!(lineup, 1);
-        should_exhausted!(lineup);
-        lineup.release("provider7_1");
-        should_grace_period!(lineup, 1);
-        lineup.release("provider7_1");
-        lineup.release("provider7_1");
-        should_available!(lineup, 1);
-        should_grace_period!(lineup, 1);
-        should_exhausted!(lineup);
+        let rt  = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            // Acquire two connections
+            should_available!(lineup, 1, 5);
+            should_available!(lineup, 1, 5);
+            should_grace_period!(lineup, 1, 5);
+            should_exhausted!(lineup, 5);
+            lineup.release("provider7_1").await;
+            should_grace_period!(lineup, 1, 5);
+            lineup.release("provider7_1").await;
+            lineup.release("provider7_1").await;
+            should_available!(lineup, 1, 5);
+            should_grace_period!(lineup, 1, 5);
+            should_exhausted!(lineup, 5);
+        });
     }
 
     // Test acquiring with MultiProviderLineup and round-robin allocation
@@ -776,28 +803,31 @@ mod tests {
 
         // Create MultiProviderLineup with the provider and alias
         let lineup = MultiProviderLineup::new(&cfg1);
+        let rt  = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
 
-        // Test acquiring the first provider
-        should_available!(lineup, 1);
+            // Test acquiring the first provider
+            should_available!(lineup, 1, 5);
 
-        // Test acquiring the second provider
-        should_available!(lineup, 2);
+            // Test acquiring the second provider
+            should_available!(lineup, 2, 5);
 
-        // Test acquiring the first provider
-        should_available!(lineup, 1);
+            // Test acquiring the first provider
+            should_available!(lineup, 1, 5);
 
-        should_grace_period!(lineup, 1);
-        should_grace_period!(lineup, 2);
+            should_grace_period!(lineup, 1, 5);
+            should_grace_period!(lineup, 2, 5);
 
-        lineup.release("provider8_1");
-        lineup.release("alias_2");
-        lineup.release("provider8_1");
+            lineup.release("provider8_1").await;
+            lineup.release("alias_2").await;
+            lineup.release("provider8_1").await;
 
-        should_available!(lineup, 1);
-        should_grace_period!(lineup, 1);
-        should_grace_period!(lineup, 2);
+            should_available!(lineup, 1, 5);
+            should_grace_period!(lineup, 1, 5);
+            should_grace_period!(lineup, 2, 5);
 
-        should_exhausted!(lineup);
+            should_exhausted!(lineup, 5);
+        });
     }
 
     // Test concurrent access to `acquire` using multiple threads
@@ -805,8 +835,6 @@ mod tests {
     fn test_concurrent_acquire() {
         let cfg = create_config_input(1, "provider9_1", 1, 2);
         let lineup = Arc::new(SingleProviderLineup::new(&cfg));
-
-        let mut handles = vec![];
 
         let available_count = Arc::new(AtomicU16::new(2));
         let grace_period_count = Arc::new(AtomicU16::new(1));
@@ -817,22 +845,15 @@ mod tests {
             let available = Arc::clone(&available_count);
             let grace_period = Arc::clone(&grace_period_count);
             let exhausted = Arc::clone(&exhausted_count);
-            let handle = thread::spawn(move || {
-                // Each thread tries to acquire a connection
-                match lineup_clone.acquire() {
+            let rt  = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async move {
+                match lineup_clone.acquire(5).await {
                     ProviderAllocation::Exhausted => exhausted.fetch_sub(1, Ordering::SeqCst),
                     ProviderAllocation::Available(_) => available.fetch_sub(1, Ordering::SeqCst),
                     ProviderAllocation::GracePeriod(_) => grace_period.fetch_sub(1, Ordering::SeqCst),
                 }
             });
-            handles.push(handle);
         }
-
-        // Join all threads to ensure completion
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
         assert_eq!(exhausted_count.load(Ordering::SeqCst), 0);
         assert_eq!(available_count.load(Ordering::SeqCst), 0);
         assert_eq!(grace_period_count.load(Ordering::SeqCst), 0);
