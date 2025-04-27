@@ -5,37 +5,37 @@ use crate::utils::hash_utils::extract_id_from_url;
 use crate::utils::string_utils;
 
 #[inline]
-fn token_value(it: &mut std::str::Chars) -> String {
+fn token_value(stack: &mut String, it: &mut std::str::Chars) -> String {
     // Use .find() to skip until the first double quote (") character.
     if it.any(|ch| ch == '"') {
         // If a quote is found, call get_value to extract the value.
-        return get_value(it);
+        return get_value(stack, it);
     }
     // If no double quote is found, return an empty string.
     String::new()
 }
 
-fn get_value(it: &mut std::str::Chars) -> String {
-    let mut result = String::with_capacity(128);
-    for oc in it.by_ref() {
-        if oc == '"' {
+fn get_value(stack: &mut String, it: &mut std::str::Chars) -> String {
+    for c in it.skip_while(|c| c.is_whitespace()) {
+        if c == '"' {
             break;
         }
-        result.push(oc);
+        stack.push(c);
     }
-    result.shrink_to_fit();
+
+    let result = stack.to_string();
+    stack.clear();
     result
 }
 
-fn token_till(it: &mut std::str::Chars, stop_char: char, start_with_alpha: bool) -> Option<String> {
-    let mut result = String::with_capacity(128);
+fn token_till(stack: &mut String, it: &mut std::str::Chars, stop_char: char, start_with_alpha: bool) -> Option<String> {
     let mut skip_non_alpha = start_with_alpha;
 
     for ch in it.by_ref() {
         if ch == stop_char {
             break;
         }
-        if result.is_empty() && ch.is_whitespace() {
+        if stack.is_empty() && ch.is_whitespace() {
             continue;
         }
 
@@ -46,13 +46,14 @@ fn token_till(it: &mut std::str::Chars, stop_char: char, start_with_alpha: bool)
                 continue;
             }
         }
-        result.push(ch);
+        stack.push(ch);
     }
 
-    if result.is_empty() {
+    if stack.is_empty() {
         None
     } else {
-        result.shrink_to_fit();
+        let result = stack.to_string();
+        stack.clear();
         Some(result)
     }
 }
@@ -91,22 +92,27 @@ macro_rules! process_header_fields {
     };
 }
 
-fn process_header(input: &ConfigInput, video_suffixes: &[&str], content: &str, url: &str) -> PlaylistItemHeader {
-    let mut plih = create_empty_playlistitem_header(input.name.as_str(), url);
+fn process_header(input_name: &str, video_suffixes: &[&str], content: &str, url: &str) -> PlaylistItemHeader {
+    let mut plih = create_empty_playlistitem_header(input_name, url);
     let mut it = content.chars();
-    let line_token = token_till(&mut it, ':', false);
+    let mut stack  = String::with_capacity(64);
+    let line_token = token_till(&mut stack, &mut it, ':', false);
     if line_token.as_deref() == Some("#EXTINF") {
         let mut c = skip_digit(&mut it);
         loop {
             if c.is_none() {
                 break;
             }
-            if c.unwrap() == ',' {
-                plih.title = get_value(&mut it);
+            let chr = c.unwrap();
+            if chr.is_whitespace() {
+                // skip
+            } else if chr == ',' {
+                plih.title = get_value(&mut stack, &mut it);
             } else {
-                let token = token_till(&mut it, '=', true);
+                stack.push(chr);
+                let token = token_till(&mut stack, &mut it, '=', true);
                 if let Some(t) = token {
-                    let value = token_value(&mut it);
+                    let value = token_value(&mut stack, &mut it);
                     process_header_fields!(plih, t.to_lowercase().as_str(),
                         (id, "tvg-id"),
                         (group, "group-title"),
@@ -161,6 +167,7 @@ where
 {
     let mut header: Option<String> = None;
     let mut group: Option<String> = None;
+    let input_name = input.name.as_str();
 
     let video_suffixes = cfg.video.as_ref().unwrap().extensions.iter().map(String::as_str).collect::<Vec<&str>>();
     for line in lines {
@@ -176,7 +183,7 @@ where
             continue;
         }
         if let Some(header_value) = header {
-            let mut item = PlaylistItem { header: process_header(input, &video_suffixes, &header_value, line) };
+            let mut item = PlaylistItem { header: process_header(input_name, &video_suffixes, &header_value, line) };
             let header = &mut item.header;
             if header.group.is_empty() {
                 if let Some(group_value) = group {
@@ -222,9 +229,44 @@ where
         // create a group based on the first playlist item
         let channel = channels.first();
         let (cluster, group_title) = channel.map(|pli|
-                                                 (pli.header.xtream_cluster, &pli.header.group)).unwrap();
+            (pli.header.xtream_cluster, &pli.header.group)).unwrap();
         grp_id += 1;
         PlaylistGroup { id: grp_id, xtream_cluster: cluster, title: group_title.to_string(), channels }
     }).collect();
     result
+}
+
+#[cfg(test)]
+mod test {
+    use crate::processing::parser::m3u::process_header;
+
+    #[test]
+    fn test_process_header_1() {
+        let input: &str = "hello";
+        let video_suffixes = Vec::new();
+        let url = "http://hello.de/hello.ts";
+        let line =  r#"#EXTINF:-1 channel-id="abc-seven" tvg-id="abc-seven" tvg-logo="https://abc.nz/.images/seven.png" tvg-chno="7" group-title="Sydney" , Seven"#;
+
+        let pli = process_header(input, &video_suffixes, line, url);
+        assert_eq!(pli.title, "Seven");
+        assert_eq!(pli.id, "abc-seven");
+        assert_eq!(pli.logo, "https://abc.nz/.images/seven.png");
+        assert_eq!(pli.chno, "7");
+        assert_eq!(pli.group, "Sydney");
+    }
+
+    #[test]
+    fn test_process_header_2() {
+        let input: &str = "hello";
+        let video_suffixes = Vec::new();
+        let url = "http://hello.de/hello.ts";
+        let line =  r#"#EXTINF:-1 channel-id="abc-seven" tvg-id="abc-seven" tvg-logo="https://abc.nz/.images/seven.png" tvg-chno="7" group-title="Sydney", Seven"#;
+
+        let pli = process_header(input, &video_suffixes, line, url);
+        assert_eq!(pli.title, "Seven");
+        assert_eq!(pli.id, "abc-seven");
+        assert_eq!(pli.logo, "https://abc.nz/.images/seven.png");
+        assert_eq!(pli.chno, "7");
+        assert_eq!(pli.group, "Sydney");
+    }
 }
