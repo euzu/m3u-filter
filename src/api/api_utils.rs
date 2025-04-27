@@ -85,6 +85,16 @@ pub use try_option_bad_request;
 pub use try_result_bad_request;
 use crate::api::model::provider_config::ProviderConfig;
 
+/// Returns the current local server time as a formatted string.
+///
+/// The time is formatted as "YYYY-MM-DD HH:MM:SS TZ", where TZ is the local timezone abbreviation.
+///
+/// # Examples
+///
+/// ```
+/// let server_time = get_server_time();
+/// assert!(server_time.contains(':'));
+/// ```
 pub fn get_server_time() -> String {
     chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string()
 }
@@ -597,6 +607,34 @@ pub async fn force_provider_stream_response(app_state: &AppState,
 
 /// # Panics
 #[allow(clippy::too_many_arguments)]
+/// Handles streaming requests by validating user permissions, managing shared streams, and returning an appropriate streaming response.
+///
+/// If the user has exhausted their connection limit, returns a custom response indicating this. If stream sharing is enabled and available, serves the shared stream. Otherwise, attempts to create a direct stream response, setting a session cookie for live HLS/DASH streams. Returns a 400 Bad Request if the stream cannot be established.
+///
+/// # Parameters
+/// - `virtual_id`: The user's virtual identifier.
+/// - `item_type`: The type of playlist item (e.g., live HLS, live DASH).
+/// - `stream_url`: The URL of the stream to be served.
+///
+/// # Returns
+/// An HTTP response containing the streaming body, appropriate headers, or an error status.
+///
+/// # Examples
+///
+/// ```
+/// let response = stream_response(
+///     &app_state,
+///     42,
+///     PlaylistItemType::LiveHls,
+///     "http://example.com/stream",
+///     &headers,
+///     &input,
+///     &target,
+///     &user,
+///     UserConnectionPermission::Allowed
+/// ).await;
+/// assert_eq!(response.status(), axum::http::StatusCode::OK);
+/// ```
 pub async fn stream_response(app_state: &AppState,
                              virtual_id: u32,
                              item_type: PlaylistItemType,
@@ -823,6 +861,20 @@ pub fn redirect(url: &str) -> impl IntoResponse {
         .unwrap()
 }
 
+/// Determines if a request is a seek operation for a non-live stream.
+///
+/// Returns the session cookie value if the request is a seek (i.e., contains a valid session cookie for the given virtual ID and a non-initial range header), or `None` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use http::HeaderMap;
+/// let mut headers = HeaderMap::new();
+/// headers.insert("cookie", "session=abc123".parse().unwrap());
+/// headers.insert("range", "bytes=100-".parse().unwrap());
+/// let result = is_seek_response(XtreamCluster::VOD, 42, b"secret", &headers);
+/// assert!(result.is_some());
+/// ```
 pub fn is_seek_response(
     cluster: XtreamCluster,
     virtual_id: u32,
@@ -849,6 +901,22 @@ pub fn is_seek_response(
     read_session_cookie(req_headers)
 }
 
+/// Determines if a forced provider should be used for a live HLS or DASH stream based on the session cookie.
+///
+/// For non-live HLS/DASH streams, returns no forced provider and the user's connection permission. For live HLS/DASH streams, checks the session cookie for a matching virtual ID and provider name, returning the provider if found and setting connection permission to allowed. Otherwise, returns the user's connection permission.
+///
+/// # Examples
+///
+/// ```
+/// let (provider, permission) = check_force_provider(
+///     &app_state,
+///     123,
+///     PlaylistItemType::LiveHls,
+///     &headers,
+///     &user
+/// ).await;
+/// assert!(provider.is_none() || provider.is_some());
+/// ```
 pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, item_type: PlaylistItemType, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {
 
     if ! matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash) {

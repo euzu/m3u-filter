@@ -174,6 +174,21 @@ async fn get_user_info(user: &ProxyUserCredentials, app_state: &AppState) -> Xtr
     XtreamAuthorizationResponse::new(&server_info, user, active_connections, app_state.config.user_access_control)
 }
 
+/// Handles Xtream Codes API stream requests authenticated by username and password.
+///
+/// Authenticates the user, verifies permissions, and resolves the requested stream based on the provided context and stream ID. Supports live, movie, series, and timeshift streams. Handles seek requests, forced provider logic, connection limits, and stream redirection. Returns an HLS/DASH stream, a proxied stream response, or an appropriate HTTP error status.
+///
+/// # Examples
+///
+/// ```
+/// // Example usage within an Axum handler
+/// let response = xtream_player_api_stream(
+///     &req.headers(),
+///     &api_req,
+///     &app_state,
+///     stream_req,
+/// ).await;
+/// ```
 async fn xtream_player_api_stream(
     req_headers: &HeaderMap,
     api_req: &UserApiRequest,

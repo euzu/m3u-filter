@@ -61,6 +61,16 @@ async fn m3u_api_post(
     m3u_api(&api_req, &app_state).await.into_response()
 }
 
+/// Handles authenticated streaming requests for M3U playlist items.
+///
+/// Authenticates the user and target using provided credentials, validates permissions, and retrieves the requested playlist item and input configuration. Depending on the request type and user/target configuration, the function may return a direct stream, a forced provider stream, a custom response for exhausted connections, an HLS/DASH stream, or an HTTP redirect. Returns appropriate HTTP status codes for authentication, permission, or resource errors.
+///
+/// # Examples
+///
+/// ```
+/// // Example usage in an Axum router:
+/// // router.route("/live/m3u_stream/:username/:password/:stream_id", get(m3u_api_stream));
+/// ```
 async fn m3u_api_stream(
     req_headers: axum::http::HeaderMap,
     axum::extract::Query(api_req): axum::extract::Query<UserApiRequest>,

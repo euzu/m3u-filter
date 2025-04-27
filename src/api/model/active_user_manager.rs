@@ -28,6 +28,16 @@ struct UserConnectionData {
 }
 
 impl UserConnectionData {
+    /// Creates a new `UserConnectionData` instance with one active connection and no grace period granted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let data = UserConnectionData::new();
+    /// assert_eq!(data.connections, 1);
+    /// assert!(!data.granted_grace);
+    /// assert_eq!(data.grace_ts, 0);
+    /// ```
     fn new() -> Self {
         Self {
             connections: 1,
@@ -45,6 +55,16 @@ pub struct ActiveUserManager {
 }
 
 impl ActiveUserManager {
+    /// Creates a new `ActiveUserManager` using configuration settings.
+    ///
+    /// Initializes grace period durations and logging preferences from the provided `Config`. If grace period settings are not specified, default values are used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let config = Config::default();
+    /// let manager = ActiveUserManager::new(&config);
+    /// ```
     pub fn new(config: &Config) -> Self {
         let log_active_user = config.log.as_ref().is_some_and(|l| l.log_active_user);
         let (grace_period_millis, grace_period_timeout_secs) = config.reverse_proxy.as_ref()
@@ -59,6 +79,18 @@ impl ActiveUserManager {
         }
     }
 
+    /// Creates a shallow clone of the manager, sharing the same user map and configuration.
+    ///
+    /// The returned `ActiveUserManager` instance references the same underlying user connection data as the original.
+    /// Changes to user connections in either instance will be reflected in both.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let manager = ActiveUserManager::new(&config);
+    /// let cloned = manager.clone_inner();
+    /// assert_eq!(manager.active_users(), cloned.active_users());
+    /// ```
     fn clone_inner(&self) -> Self {
         Self {
             grace_period_millis: self.grace_period_millis,
@@ -68,6 +100,17 @@ impl ActiveUserManager {
         }
     }
 
+    /// Returns the number of active connections for the specified user.
+    ///
+    /// If the user does not exist, returns 0.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let manager = ActiveUserManager::new(&config);
+    /// let count = manager.user_connections("alice").await;
+    /// assert_eq!(count, 0);
+    /// ```
     pub async fn user_connections(&self, username: &str) -> u32 {
         if let Some(connection_data) = self.user.read().await.get(username) {
             return connection_data.connections;
@@ -75,6 +118,21 @@ impl ActiveUserManager {
         0
     }
 
+    /// Determines whether a user is permitted to establish a new connection based on the configured maximum and grace period settings.
+    ///
+    /// Returns `UserConnectionPermission::Allowed` if the user is under the connection limit, `GracePeriod` if a one-time grace period is granted, or `Exhausted` if the user has exceeded the limit and grace period has been used or expired.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let manager = ActiveUserManager::new(&config);
+    /// let permission = manager.connection_permission("alice", 3).await;
+    /// match permission {
+    ///     UserConnectionPermission::Allowed => println!("Connection permitted"),
+    ///     UserConnectionPermission::GracePeriod => println!("Grace period granted"),
+    ///     UserConnectionPermission::Exhausted => println!("Connection denied"),
+    /// }
+    /// ```
     pub async fn connection_permission(
         &self,
         username: &str,
@@ -123,6 +181,15 @@ impl ActiveUserManager {
     }
 
 
+    /// Returns the number of users with at least one active connection.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let manager = ActiveUserManager::new(&config);
+    /// let count = manager.active_users().await;
+    /// assert_eq!(count, 0);
+    /// ```
     pub async fn active_users(&self) -> usize {
         self.user.read().await.len()
     }
@@ -148,6 +215,19 @@ impl ActiveUserManager {
         }
     }
 
+    /// Decrements the active connection count for a user and removes the user if no connections remain.
+    ///
+    /// If the user's connection count reaches zero, the user is removed from the active user map. The grace period state is preserved and not reset by this operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `username` - The username whose connection count should be decremented.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// manager.remove_connection("alice").await;
+    /// ```
     async fn remove_connection(&self, username: &str) {
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {

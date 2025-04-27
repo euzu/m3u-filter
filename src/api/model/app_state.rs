@@ -21,10 +21,30 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Returns the number of active connections for the specified user.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let count = app_state.get_active_connections_for_user("alice").await;
+    /// assert_eq!(count, 0); // if user "alice" has no active connections
+    /// ```
     pub async fn get_active_connections_for_user(&self, username: &str) -> u32 {
         self.active_users.user_connections(username).await
     }
 
+    /// Determines whether a user is permitted to establish a new connection based on their current active connections and the specified maximum.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let permission = app_state.get_connection_permission("alice", 3).await;
+    /// match permission {
+    ///     UserConnectionPermission::Allowed => println!("Connection permitted"),
+    ///     UserConnectionPermission::Denied => println!("Connection denied"),
+    /// }
+    /// ```
+    pub async fn get_connection_permission(&self, username: &str, max_connections: u32) -> UserConnectionPermission {
     pub async fn get_connection_permission(&self, username: &str, max_connections: u32) -> UserConnectionPermission {
         self.active_users.connection_permission(username, max_connections).await
     }

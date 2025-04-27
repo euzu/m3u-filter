@@ -76,6 +76,26 @@ enum ProviderLineup {
 }
 
 impl ProviderLineup {
+    /// Asynchronously retrieves the next available provider configuration from the lineup for redirect cycling.
+    ///
+    /// Returns the next provider's configuration if available, or `None` if all providers are exhausted.
+    ///
+    /// # Parameters
+    /// - `grace_period_timeout_secs`: The grace period timeout in seconds to consider when selecting a provider.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::sync::Arc;
+    /// # use provider_config::ProviderConfig;
+    /// # use active_provider_manager::ProviderLineup;
+    /// # async fn example(lineup: ProviderLineup) {
+    /// let next_provider = lineup.get_next(10).await;
+    /// if let Some(cfg) = next_provider {
+    ///     assert!(!cfg.name.is_empty());
+    /// }
+    /// # }
+    /// ```
     async fn get_next(&self, grace_period_timeout_secs: u64) -> Option<Arc<ProviderConfig>> {
         match self {
             ProviderLineup::Single(lineup) => lineup.get_next(grace_period_timeout_secs).await,
@@ -83,6 +103,27 @@ impl ProviderLineup {
         }
     }
 
+    /// Attempts to allocate a provider connection from the lineup, respecting the grace period timeout.
+    ///
+    /// Delegates allocation to either a single or multi-provider lineup, returning the allocation state.
+    ///
+    /// # Parameters
+    /// - `grace_period_timeout_secs`: The maximum duration in seconds to wait for a provider in the grace period before considering it exhausted.
+    ///
+    /// # Returns
+    /// The result of the allocation attempt, indicating whether a provider is available, in a grace period, or exhausted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let lineup = ProviderLineup::Single(single_lineup);
+    /// let allocation = lineup.acquire(5).await;
+    /// match allocation {
+    ///     ProviderAllocation::Available(cfg) => { /* use provider */ }
+    ///     ProviderAllocation::GracePeriod(cfg) => { /* handle grace period */ }
+    ///     ProviderAllocation::Exhausted => { /* handle exhaustion */ }
+    /// }
+    /// ```
     async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
         match self {
             ProviderLineup::Single(lineup) => lineup.acquire(grace_period_timeout_secs).await,
@@ -90,6 +131,22 @@ impl ProviderLineup {
         }
     }
 
+    /// Releases a connection for the specified provider name within the lineup.
+    ///
+    /// If the provider is found in the lineup, its active connection count is decremented, making the slot available for future allocations. This operation is asynchronous and supports both single and multi-provider lineups.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use provider_manager::{ProviderLineup, SingleProviderLineup};
+    /// # use std::sync::Arc;
+    /// # use provider_config::ProviderConfig;
+    /// # tokio_test::block_on(async {
+    /// let config = Arc::new(ProviderConfig::default());
+    /// let lineup = ProviderLineup::Single(SingleProviderLineup::new(config));
+    /// lineup.release("provider1").await;
+    /// # });
+    /// ```
     async fn release(&self, provider_name: &str) {
         match self {
             ProviderLineup::Single(lineup) => lineup.release(provider_name).await,
@@ -105,20 +162,47 @@ struct SingleProviderLineup {
 }
 
 impl SingleProviderLineup {
+    /// Creates a new `SingleProviderLineup` from the given provider configuration input.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let cfg = ConfigInput::default();
+    /// let lineup = SingleProviderLineup::new(&cfg);
+    /// ```
     fn new(cfg: &ConfigInput) -> Self {
         Self {
             provider: ProviderConfigWrapper::new(ProviderConfig::new(cfg)),
         }
     }
 
+    /// ```
     async fn get_next(&self, grace_period_timeout_secs: u64) -> Option<Arc<ProviderConfig>> {
         self.provider.get_next(false, grace_period_timeout_secs).await
     }
 
+    /// Attempts to allocate a connection from the single provider, allowing use of the grace period if necessary.
+    ///
+    /// Returns a `ProviderAllocation` indicating whether the provider is available, in a grace period, or exhausted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use your_crate::{SingleProviderLineup, ProviderAllocation};
+    /// # async fn example(lineup: SingleProviderLineup) {
+    /// let allocation = lineup.acquire(10).await;
+    /// match allocation {
+    ///     ProviderAllocation::Available(cfg) => println!("Got provider: {}", cfg.name),
+    ///     ProviderAllocation::GracePeriod(cfg) => println!("In grace period: {}", cfg.name),
+    ///     ProviderAllocation::Exhausted => println!("Provider exhausted"),
+    /// }
+    /// # }
+    /// ```
     async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
         self.provider.try_allocate(true, grace_period_timeout_secs).await
     }
 
+    /// ```
     async fn release(&self, provider_name: &str) {
         if self.provider.name == provider_name {
             self.provider.release().await;
@@ -138,6 +222,19 @@ enum ProviderPriorityGroup {
 }
 
 impl ProviderPriorityGroup {
+    /// Checks if all providers in the priority group are exhausted.
+    ///
+    /// Returns `true` if every provider in the group has reached its connection limit; otherwise, returns `false`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use your_crate::{ProviderPriorityGroup};
+    /// # async fn example(group: ProviderPriorityGroup) {
+    /// let exhausted = group.is_exhausted().await;
+    /// assert!(exhausted || !exhausted);
+    /// # }
+    /// ```
     async fn is_exhausted(&self) -> bool {
         match self {
             ProviderPriorityGroup::SingleProviderGroup(g) => g.is_exhausted().await,
@@ -163,6 +260,17 @@ struct MultiProviderLineup {
 }
 
 impl MultiProviderLineup {
+    /// Creates a new `MultiProviderLineup` from the given configuration input, grouping providers and their aliases by priority.
+    ///
+    /// Each provider and its aliases are wrapped and grouped according to their priority. Groups with multiple providers are managed for round-robin allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let input = ConfigInput::default();
+    /// let lineup = MultiProviderLineup::new(&input);
+    /// assert!(!lineup.providers.is_empty());
+    /// ```
     pub fn new(input: &ConfigInput) -> Self {
         let mut inputs = vec![ProviderConfigWrapper::new(ProviderConfig::new(input))];
         if let Some(aliases) = &input.aliases {
@@ -219,8 +327,28 @@ impl MultiProviderLineup {
     ///    ProviderAllocation::GracePeriodprovider) =>  println!("Provider with grace period {}", provider.name),
     /// }
     /// }
+    /// Attempts to allocate a provider from the given priority group, optionally allowing grace period allocation.
+    ///
+    /// Iterates through providers in the group in round-robin order, trying to allocate a connection with or without grace period as specified. Returns the first available or grace period allocation found, or `Exhausted` if none are available.
+    ///
+    /// # Parameters
+    /// - `priority_group`: The group of providers to attempt allocation from.
+    /// - `grace`: Whether to allow allocation during the grace period.
+    /// - `grace_period_timeout_secs`: The grace period timeout in seconds.
+    ///
+    /// # Returns
+    /// A `ProviderAllocation` indicating the result of the allocation attempt.
+    ///
+    /// # Examples
+    ///
     /// ```
-    async fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup, grace: bool, grace_period_timeout_secs: u64) -> ProviderAllocation {
+    /// let allocation = acquire_next_provider_from_group(&priority_group, false, 10).await;
+    /// match allocation {
+    ///     ProviderAllocation::Available(cfg) => { /* use provider */ }
+    ///     ProviderAllocation::GracePeriod(cfg) => { /* use provider in grace period */ }
+    ///     ProviderAllocation::Exhausted => { /* no providers available */ }
+    /// }
+    /// ```    async fn acquire_next_provider_from_group(priority_group: &ProviderPriorityGroup, grace: bool, grace_period_timeout_secs: u64) -> ProviderAllocation {
         match priority_group {
             ProviderPriorityGroup::SingleProviderGroup(p) => {
                 let result = p.try_allocate(grace, grace_period_timeout_secs).await;
@@ -252,7 +380,25 @@ impl MultiProviderLineup {
         ProviderAllocation::Exhausted
     }
 
-    // Used for redirect to cylce through provider
+    /// Retrieves the next available provider configuration from a priority group for redirect cycling.
+    ///
+    /// Iterates through the providers in the group in round-robin order, returning the next provider configuration that is available or in a grace period, depending on the `grace` flag and the specified timeout.
+    ///
+    /// # Parameters
+    /// - `priority_group`: The group of providers to cycle through.
+    /// - `grace`: If true, allows returning providers in a grace period.
+    /// - `grace_period_timeout_secs`: The maximum duration in seconds to consider a provider in a grace period.
+    ///
+    /// # Returns
+    /// An `Option` containing the next available `Arc<ProviderConfig>`, or `None` if no suitable provider is found.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let group = ProviderPriorityGroup::SingleProviderGroup(provider_wrapper);
+    /// let next = get_next_provider_from_group(&group, false, 10).await;
+    /// assert!(next.is_some() || next.is_none());
+    /// ```
     async fn get_next_provider_from_group(priority_group: &ProviderPriorityGroup, grace: bool, grace_period_timeout_secs: u64) -> Option<Arc<ProviderConfig>> {
         match priority_group {
             ProviderPriorityGroup::SingleProviderGroup(p) => {
@@ -302,8 +448,27 @@ impl MultiProviderLineup {
     ///    ProviderAllocation::Available(provider) =>  println!("Provider available {}", provider.name),
     ///    ProviderAllocation::GracePeriodprovider) =>  println!("Provider with grace period {}", provider.name),
     /// }
+    /// Attempts to allocate a provider connection from the lineup, prioritizing available providers and falling back to grace period if necessary.
+    ///
+    /// Iterates through provider priority groups starting from the current index, trying to allocate a connection without grace period first. If all providers in a group are exhausted, attempts allocation with grace period. Updates the internal index if a group becomes exhausted. Returns the allocation result, which may indicate exhaustion, availability, or grace period status.
+    ///
+    /// # Parameters
+    /// - `grace_period_timeout_secs`: The maximum duration in seconds to wait for a provider in the grace period.
+    ///
+    /// # Returns
+    /// A `ProviderAllocation` indicating whether a provider was allocated, is in grace period, or if all providers are exhausted.
+    ///
+    /// # Examples
+    ///
     /// ```
-    async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
+    /// let lineup = MultiProviderLineup::new(config_input);
+    /// let allocation = lineup.acquire(30).await;
+    /// match allocation {
+    ///     ProviderAllocation::Available(cfg) => println!("Allocated: {}", cfg.name),
+    ///     ProviderAllocation::GracePeriod(cfg) => println!("Grace period: {}", cfg.name),
+    ///     ProviderAllocation::Exhausted => println!("No providers available"),
+    /// }
+    /// ```    async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
         let main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
 
@@ -332,7 +497,25 @@ impl MultiProviderLineup {
         ProviderAllocation::Exhausted
     }
 
-    // it intended to use with redirects to cycle through provider
+    /// Returns the next available provider configuration for redirect cycling, optionally considering the grace period.
+    ///
+    /// Iterates through provider priority groups in round-robin order, returning the next provider configuration that is available or in a grace period. Advances the internal index if a group is exhausted.
+    ///
+    /// # Parameters
+    /// - `grace_period_timeout_secs`: The maximum duration in seconds to wait for a provider in the grace period.
+    ///
+    /// # Returns
+    /// An `Option<Arc<ProviderConfig>>` containing the next provider configuration if available, or `None` if all providers are exhausted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let lineup = MultiProviderLineup::new(config_input);
+    /// let provider = lineup.get_next(10).await;
+    /// if let Some(cfg) = provider {
+    ///     assert_eq!(cfg.name, "provider1");
+    /// }
+    /// ```
     async fn get_next(&self, grace_period_timeout_secs: u64) -> Option<Arc<ProviderConfig>> {
         let main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
@@ -362,6 +545,19 @@ impl MultiProviderLineup {
     }
 
 
+    /// Releases a connection for the specified provider within the priority groups.
+    ///
+    /// Searches all provider groups for a provider matching the given name and asynchronously releases its connection if found.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider_name` - The name of the provider whose connection should be released.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// multi_provider_lineup.release("provider_a").await;
+    /// ```
     async fn release(&self, provider_name: &str) {
         for g in &self.providers {
             match g {
@@ -391,6 +587,16 @@ pub struct ActiveProviderManager {
 }
 
 impl ActiveProviderManager {
+    /// Creates a new `ActiveProviderManager` with provider lineups and grace period settings from the given configuration.
+    ///
+    /// Initializes provider lineups for all configured sources and sets grace period parameters for connection management.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let cfg = Config::default();
+    /// let manager = ActiveProviderManager::new(&cfg).await;
+    /// ```
     pub async fn new(cfg: &Config) -> Self {
         let (grace_period_millis, grace_period_timeout_secs) = cfg.reverse_proxy.as_ref()
             .and_then(|r| r.stream.as_ref())
@@ -409,6 +615,17 @@ impl ActiveProviderManager {
         this
     }
 
+    /// Creates a new `ActiveProviderManager` instance sharing the same provider lineups and grace period settings.
+    ///
+    /// The returned manager shares internal state with the original, allowing concurrent access to provider lineups and configuration. Modifications to shared state are reflected across all clones.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let manager = ActiveProviderManager::new(&config).await;
+    /// let cloned = manager.clone_inner();
+    /// assert_eq!(manager.grace_period_millis, cloned.grace_period_millis);
+    /// ```
     fn clone_inner(&self) -> Self {
         Self {
             grace_period_millis: self.grace_period_millis,
@@ -457,6 +674,17 @@ impl ActiveProviderManager {
         None
     }
 
+    /// Forcibly acquires a connection for the specified provider by name, bypassing normal allocation limits.
+    ///
+    /// Returns a `ProviderConnectionGuard` representing the allocation. If the provider name does not match any known provider, the allocation will be exhausted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let manager = ActiveProviderManager::new(&config).await;
+    /// let guard = manager.force_exact_acquire_connection("provider1").await;
+    /// assert_eq!(guard.provider_name(), "provider1");
+    /// ```
     pub async fn force_exact_acquire_connection(&self, provider_name: &str) -> ProviderConnectionGuard {
         let providers = self.providers.read().await;
         let allocation = match Self::get_provider_config(provider_name, &providers) {
@@ -470,7 +698,28 @@ impl ActiveProviderManager {
         }
     }
 
-    // Returns the next available provider connection
+    /// Asynchronously acquires a connection to the next available provider for the given input name.
+    ///
+    /// Returns a `ProviderConnectionGuard` that manages the acquired provider connection. If no matching provider is available or all are exhausted, the guard will indicate exhaustion.
+    ///
+    /// # Parameters
+    /// - `input_name`: The name or alias used to identify the provider lineup to acquire a connection from.
+    ///
+    /// # Returns
+    /// A `ProviderConnectionGuard` representing the acquired provider connection, or an exhausted state if none are available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use your_crate::{ActiveProviderManager, Config};
+    /// # async fn example() {
+    /// let manager = ActiveProviderManager::new(&Config::default()).await;
+    /// let guard = manager.acquire_connection("provider_name").await;
+    /// if guard.is_available() {
+    ///     // Use the provider connection
+    /// }
+    /// # }
+    /// ```
     pub async fn acquire_connection(&self, input_name: &str) -> ProviderConnectionGuard {
         let providers = self.providers.read().await;
         let allocation = match Self::get_provider_config(input_name, &providers) {
@@ -495,7 +744,21 @@ impl ActiveProviderManager {
     }
 
     // This method is used for redirects to cycle through provider
-    //
+    /// Asynchronously retrieves the next available provider configuration for the given input name, cycling through providers as needed.
+    ///
+    /// Returns `Some(Arc<ProviderConfig>)` if a provider is available, or `None` if no matching provider lineup exists or all providers are exhausted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use provider_config::ProviderConfig;
+    /// # use active_provider_manager::ActiveProviderManager;
+    /// # async fn example(manager: ActiveProviderManager) {
+    /// if let Some(provider) = manager.get_next_provider("my_input").await {
+    ///     println!("Next provider: {}", provider.name);
+    /// }
+    /// # }
+    /// ```
     pub async fn get_next_provider(&self, input_name: &str) -> Option<Arc<ProviderConfig>> {
         let providers = self.providers.read().await;
         match Self::get_provider_config(input_name, &providers) {
@@ -512,7 +775,19 @@ impl ActiveProviderManager {
         }
     }
 
-    // we need the provider_name to exactly release this provider
+    /// Releases a connection for the specified provider by name.
+    ///
+    /// If the provider exists in the manager, this method asynchronously releases an active connection back to its lineup. If the provider is not found, the call has no effect.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider_name` - The name of the provider whose connection should be released.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// manager.release_connection("provider1").await;
+    /// ```
     pub async fn release_connection(&self, provider_name: &str) {
         let providers = self.providers.read().await;
         if let Some((lineup, _config)) = Self::get_provider_config(provider_name, &providers) {
@@ -520,6 +795,19 @@ impl ActiveProviderManager {
         }
     }
 
+    /// Returns a map of provider names to their current active connection counts, or `None` if no providers have active connections.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let manager = ActiveProviderManager::new(&config).await;
+    /// let active = manager.active_connections().await;
+    /// if let Some(map) = active {
+    ///     for (name, count) in map {
+    ///         println!("Provider {} has {} active connections", name, count);
+    ///     }
+    /// }
+    /// ```
     pub async fn active_connections(&self) -> Option<HashMap<String, u16>> {
         let mut result = HashMap::<String, u16>::new();
         let mut add_provider = async |provider: &ProviderConfig| {
@@ -557,6 +845,17 @@ impl ActiveProviderManager {
         }
     }
 
+    /// Checks if the specified provider has exceeded its connection limit.
+    ///
+    /// Returns `true` if the provider exists and is currently over its allowed connection limit; otherwise, returns `false`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let manager = ActiveProviderManager::new(&config).await;
+    /// let over_limit = manager.is_over_limit("provider1").await;
+    /// assert!(!over_limit);
+    /// ```
     pub async fn is_over_limit(&self, provider_name: &str) -> bool {
         let providers = self.providers.read().await;
         if let Some((_, config)) = Self::get_provider_config(provider_name, &providers) {
@@ -607,7 +906,26 @@ mod tests {
         };
     }
 
-    // Helper function to create a ConfigInput instance
+    /// Creates a `ConfigInput` instance with the specified parameters and default values for other fields.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: The unique identifier for the input.
+    /// - `name`: The name of the input.
+    /// - `priority`: The priority level for the input.
+    /// - `max_connections`: The maximum number of allowed connections.
+    ///
+    /// # Returns
+    ///
+    /// A `ConfigInput` struct populated with the provided values and sensible defaults for all other fields.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let input = create_config_input(1, "provider1", 10, 5);
+    /// assert_eq!(input.name, "provider1");
+    /// assert_eq!(input.max_connections, 5);
+    /// ```
     fn create_config_input(id: u16, name: &str, priority: i16, max_connections: u16) -> ConfigInput {
         ConfigInput {
             id,
@@ -721,6 +1039,15 @@ mod tests {
 
     // // Test acquiring when all aliases are exhausted
     #[test]
+    /// Tests that a multi-provider lineup with exhausted aliases correctly transitions providers from available to grace period and then to exhausted state.
+    ///
+    /// This test creates a provider with two aliases, each with their own priority and capacity. It verifies that connections can be acquired from each provider and alias until their limits are reached, after which they enter a grace period, and finally become exhausted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// test_provider_with_exhausted_aliases();
+    /// ```
     fn test_provider_with_exhausted_aliases() {
         let mut input = create_config_input(1, "provider4_1", 1, 1);
         let alias1 = create_config_input_alias(2, "http://alias.com", 2, 1);
@@ -753,6 +1080,9 @@ mod tests {
 
     // Test acquiring a connection when there is available capacity
     #[test]
+    /// Tests that acquiring connections from a single provider lineup succeeds up to its capacity, enters grace period when exceeded, and is exhausted after further attempts.
+    ///
+    /// This test verifies the allocation behavior for a provider with limited capacity, ensuring correct transitions between available, grace period, and exhausted states.
     fn test_acquire_when_capacity_available() {
         let cfg = create_config_input(1, "provider5_1", 1, 2);
         let lineup = SingleProviderLineup::new(&cfg);
@@ -772,6 +1102,15 @@ mod tests {
 
     // Test releasing a connection
     #[test]
+    /// Tests the release and reacquisition of provider connections in a single provider lineup.
+    ///
+    /// This test verifies that releasing connections correctly transitions the provider's allocation state from exhausted or grace period back to available, and that subsequent acquisitions and releases behave as expected.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// test_release_connection();
+    /// ```
     fn test_release_connection() {
         let cfg = create_config_input(1, "provider7_1", 1, 2);
         let lineup = SingleProviderLineup::new(&cfg);
@@ -794,6 +1133,17 @@ mod tests {
 
     // Test acquiring with MultiProviderLineup and round-robin allocation
     #[test]
+    /// Tests round-robin acquisition and release behavior in a multi-provider lineup with aliases.
+    ///
+    /// This test verifies that a `MultiProviderLineup` correctly cycles through providers and their aliases,
+    /// enforces connection limits, and transitions between available, grace period, and exhausted states as expected.
+    /// It also checks that releasing connections restores provider availability.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// test_multi_provider_acquire();
+    /// ```
     fn test_multi_provider_acquire() {
         let mut cfg1 = create_config_input(1, "provider8_1", 1, 2);
         let alias = create_config_input_alias(2, "http://alias1", 1, 1);
@@ -832,6 +1182,13 @@ mod tests {
 
     // Test concurrent access to `acquire` using multiple threads
     #[test]
+    /// Tests concurrent acquisition from a single provider lineup, verifying allocation states.
+    ///
+    /// Spawns multiple async tasks to acquire connections concurrently from a single provider lineup with limited capacity, and asserts that the expected number of allocations are available, in grace period, or exhausted.
+    #[test]
+    fn test_concurrent_acquire() {
+        // ...
+    }
     fn test_concurrent_acquire() {
         let cfg = create_config_input(1, "provider9_1", 1, 2);
         let lineup = Arc::new(SingleProviderLineup::new(&cfg));

@@ -53,6 +53,17 @@ async fn healthcheck() -> impl axum::response::IntoResponse {
     axum::Json(create_healthcheck())
 }
 
+/// Initializes and returns the shared application state, including cache, HTTP client, download queue, stream manager, and active user/provider managers.
+///
+/// If reverse proxy caching is enabled in the configuration, sets up an LRU cache and spawns a background task to scan it. Also configures the HTTP client with an optional connection timeout.
+///
+/// # Examples
+///
+/// ```
+/// let cfg = Arc::new(Config::default());
+/// let app_state = tokio_test::block_on(create_shared_data(&cfg));
+/// assert!(app_state.http_client.clone().get("http://example.com").is_ok());
+/// ```
 async fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let lru_cache = cfg.reverse_proxy.as_ref().and_then(|r| r.cache.as_ref()).and_then(|c| if c.enabled {
         Some(Mutex::new(LRUResourceCache::new(c.t_size, &PathBuf::from(c.dir.as_ref().unwrap()))))

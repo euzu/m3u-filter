@@ -88,6 +88,18 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
     }
 }
 
+/// Handles incoming HLS API requests by authenticating the user, validating permissions, extracting stream information from the token, and serving the appropriate HLS playlist or stream response.
+///
+/// Returns an HTTP response containing the HLS playlist content if authentication and validation succeed, or an error response if any checks fail.
+///
+/// # Examples
+///
+/// ```
+/// // Example usage within an Axum router:
+/// let router = hls_api_register();
+/// // A GET request to /hls/{username}/{password}/{input_id}/{stream_id}/{token}
+/// // will be handled by this function.
+/// ```
 async fn hls_api_stream(
     req_headers: axum::http::HeaderMap,
     axum::extract::Path(params): axum::extract::Path<HlsApiPathParams>,
