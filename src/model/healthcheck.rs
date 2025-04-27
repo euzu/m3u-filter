@@ -23,5 +23,5 @@ pub struct StatusCheck {
     pub active_users: usize,
     pub active_user_connections: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_provider_connections: Option<BTreeMap<String, u16>>,
+    pub active_provider_connections: Option<BTreeMap<String, usize>>,
 }

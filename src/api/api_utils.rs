@@ -1,5 +1,5 @@
 use crate::api::endpoints::xtream_api::{get_xtream_player_api_stream_url, XtreamApiStreamContext};
-use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConfig, ProviderConnectionGuard};
+use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConnectionGuard};
 use crate::api::model::app_state::AppState;
 use crate::api::model::model_utils::get_stream_response_with_headers;
 use crate::api::model::request::UserApiRequest;
@@ -83,6 +83,7 @@ macro_rules! try_result_bad_request {
 
 pub use try_option_bad_request;
 pub use try_result_bad_request;
+use crate::api::model::provider_config::ProviderConfig;
 
 pub fn get_server_time() -> String {
     chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string()
@@ -652,8 +653,10 @@ pub async fn stream_response(app_state: &AppState,
             }
 
             if let Some(provider) = provider_name {
-                if let Some(cookie_value) = create_session_cookie_for_provider(&app_state.config.t_encrypt_secret, virtual_id, &provider, stream_url) {
-                    response = response.header(axum::http::header::SET_COOKIE, &cookie_value);
+                if matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash) {
+                    if let Some(cookie_value) = create_session_cookie_for_provider(&app_state.config.t_encrypt_secret, virtual_id, &provider, stream_url) {
+                        response = response.header(axum::http::header::SET_COOKIE, &cookie_value);
+                    }
                 }
             }
 
@@ -846,7 +849,11 @@ pub fn is_seek_response(
     read_session_cookie(req_headers)
 }
 
-pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {
+pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, item_type: PlaylistItemType, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {
+
+    if ! matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash) {
+        return (None, user.connection_permission(app_state).await);
+    }
 
     // if you have multi provider setup you need to delegate the same hls requests
     // to the same provider. Hls has alternating m3u8 and stream requests.

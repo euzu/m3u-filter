@@ -23,7 +23,7 @@ fn get_value(stack: &mut String, it: &mut std::str::Chars) -> String {
         stack.push(c);
     }
 
-    let result = stack.to_string();
+    let result = (*stack).to_string();
     stack.clear();
     result
 }
@@ -52,7 +52,7 @@ fn token_till(stack: &mut String, it: &mut std::str::Chars, stop_char: char, sta
     if stack.is_empty() {
         None
     } else {
-        let result = stack.to_string();
+        let result = (*stack).to_string();
         stack.clear();
         Some(result)
     }
