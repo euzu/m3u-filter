@@ -202,7 +202,7 @@ async fn xtream_player_api_stream(
         return force_provider_stream_response(app_state, &cookie, pli.virtual_id, pli.item_type, req_headers, input, &user).await.into_response()
     }
 
-    let (provider_name, connection_permission) = check_force_provider(app_state, virtual_id, req_headers, &user).await;
+    let (provider_name, connection_permission) = check_force_provider(app_state, virtual_id, pli.item_type, req_headers, &user).await;
     if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }

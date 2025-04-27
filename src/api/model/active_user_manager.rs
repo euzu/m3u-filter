@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::model::api_proxy::UserConnectionPermission;
 use jsonwebtoken::get_current_timestamp;
 use log::{debug, info};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::model::api_proxy::UserConnectionPermission;
 
 pub struct UserConnectionGuard {
     manager: Arc<ActiveUserManager>,
@@ -21,7 +21,7 @@ impl Drop for UserConnectionGuard {
 
 struct UserConnectionData {
     connections: u32,
-    granted_grace: u32,
+    granted_grace: bool,
     grace_ts: u64,
 }
 
@@ -29,7 +29,7 @@ impl UserConnectionData {
     fn new() -> Self {
         Self {
             connections: 1,
-            granted_grace: 0,
+            granted_grace: false,
             grace_ts: 0,
         }
     }
@@ -68,31 +68,58 @@ impl ActiveUserManager {
         0
     }
 
-    pub async fn connection_permission(&self, username: &str, max_connections: u32, grace_period: bool, grace_period_timeout_secs: u64) -> UserConnectionPermission {
+    pub async fn connection_permission(
+        &self,
+        username: &str,
+        max_connections: u32,
+        grace_period: bool,
+        grace_period_timeout_secs: u64,
+    ) -> UserConnectionPermission {
         if let Some(connection_data) = self.user.write().await.get_mut(username) {
             let current_connections = connection_data.connections;
-            if connection_data.granted_grace > 0 {
-                if (get_current_timestamp() - connection_data.grace_ts) <= grace_period_timeout_secs {
+            let now = get_current_timestamp();
+
+            if current_connections < max_connections {
+                // Reset grace period because user is back under max_connections
+                connection_data.granted_grace = false;
+                connection_data.grace_ts = 0;
+                return UserConnectionPermission::Allowed;
+            }
+
+            // Check if user already used grace period
+            if connection_data.granted_grace {
+                if now - connection_data.grace_ts <= grace_period_timeout_secs {
+                    // Grace timeout still active, deny connection
                     debug!("User access denied, grace exhausted, too many connections: {username}");
                     return UserConnectionPermission::Exhausted;
+                } else {
+                    // Grace timeout expired, reset grace counters
+                    connection_data.granted_grace = false;
+                    connection_data.grace_ts = 0;
                 }
-                connection_data.granted_grace = 0;
             }
-            let extra_con = u32::from(grace_period);
-            if current_connections < max_connections + extra_con {
-                connection_data.granted_grace += 1;
-                connection_data.grace_ts = get_current_timestamp();
+
+            if current_connections < max_connections {
+                // everything ok
+                return UserConnectionPermission::Allowed;
+            }
+
+            if grace_period && current_connections == max_connections {
+                // Allow grace period once
+                connection_data.granted_grace = true;
+                connection_data.grace_ts = now;
                 debug!("Granted grace period for user access: {username}");
                 return UserConnectionPermission::GracePeriod;
             }
-            if current_connections >= max_connections {
-                debug!("User access denied, too many connections: {username}");
-                return UserConnectionPermission::Exhausted;
-            }
-            connection_data.granted_grace = 0;
+
+            // Too many connections, no grace allowed
+            debug!("User access denied, too many connections: {username}");
+            return UserConnectionPermission::Exhausted;
         }
+
         UserConnectionPermission::Allowed
     }
+
 
     pub async fn active_users(&self) -> usize {
         self.user.read().await.len()
@@ -122,8 +149,13 @@ impl ActiveUserManager {
     async fn remove_connection(&self, username: &str) {
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {
-            connection_data.connections -= 1;
-            connection_data.granted_grace = 0;
+            if connection_data.connections > 0 {
+                connection_data.connections -= 1;
+            }
+
+            // DO NOT reset granted_grace or grace_ts here!
+            // We must preserve the grace period state until connection_permission() checks it.
+
             if connection_data.connections == 0 {
                 lock.remove(username);
             }

@@ -1,6 +1,5 @@
 use crate::api::api_utils::{bad_response_with_delete_cookie, check_force_provider, create_session_cookie_for_provider, force_provider_stream_response, get_stream_alternative_url};
 use crate::api::api_utils::{get_stream_info_from_crypted_cookie, try_option_bad_request};
-use crate::api::model::active_provider_manager::ProviderConfig;
 use crate::api::model::app_state::AppState;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
@@ -14,6 +13,7 @@ use axum::response::IntoResponse;
 use log::{debug, error};
 use serde::Deserialize;
 use std::sync::Arc;
+use crate::api::model::provider_config::ProviderConfig;
 
 #[derive(Debug, Deserialize)]
 struct HlsApiPathParams {
@@ -104,7 +104,7 @@ async fn hls_api_stream(
     let virtual_id = params.stream_id;
     let input = try_option_bad_request!(app_state.config.get_input_by_id(params.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
 
-    let (_provider_name, connection_permission) = check_force_provider(&app_state, virtual_id, &req_headers, &user).await;
+    let (_provider_name, connection_permission) = check_force_provider(&app_state, virtual_id, PlaylistItemType::LiveHls, &req_headers, &user).await;
     if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
