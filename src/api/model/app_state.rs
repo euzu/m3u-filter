@@ -8,7 +8,6 @@ use crate::model::api_proxy::UserConnectionPermission;
 use crate::model::config::{Config};
 use crate::model::hdhomerun_config::HdHomeRunDeviceConfig;
 use crate::tools::lru_cache::LRUResourceCache;
-use crate::utils::default_utils::{default_grace_period_millis, default_grace_period_timeout_secs};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -27,10 +26,7 @@ impl AppState {
     }
 
     pub async fn get_connection_permission(&self, username: &str, max_connections: u32) -> UserConnectionPermission {
-        let (grace_period_millis, grace_period_timeout_secs) = self.config.reverse_proxy.as_ref()
-            .and_then(|r| r.stream.as_ref())
-            .map_or_else(|| (default_grace_period_millis(), default_grace_period_timeout_secs()), |s| (s.grace_period_millis, s.grace_period_timeout_secs));
-        self.active_users.connection_permission(username, max_connections, grace_period_millis > 0, grace_period_timeout_secs).await
+        self.active_users.connection_permission(username, max_connections).await
     }
 }
 

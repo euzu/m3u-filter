@@ -1,9 +1,11 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::model::api_proxy::UserConnectionPermission;
 use jsonwebtoken::get_current_timestamp;
 use log::{debug, info};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::model::api_proxy::UserConnectionPermission;
+use crate::model::config::Config;
+use crate::utils::default_utils::{default_grace_period_millis, default_grace_period_timeout_secs};
 
 pub struct UserConnectionGuard {
     manager: Arc<ActiveUserManager>,
@@ -21,7 +23,7 @@ impl Drop for UserConnectionGuard {
 
 struct UserConnectionData {
     connections: u32,
-    granted_grace: u32,
+    granted_grace: bool,
     grace_ts: u64,
 }
 
@@ -29,26 +31,29 @@ impl UserConnectionData {
     fn new() -> Self {
         Self {
             connections: 1,
-            granted_grace: 0,
+            granted_grace: false,
             grace_ts: 0,
         }
     }
 }
 
 pub struct ActiveUserManager {
+    grace_period_millis: u64,
+    grace_period_timeout_secs: u64,
     log_active_user: bool,
     user: Arc<RwLock<HashMap<String, UserConnectionData>>>,
 }
 
-impl Default for ActiveUserManager {
-    fn default() -> Self {
-        Self::new(false)
-    }
-}
-
 impl ActiveUserManager {
-    pub fn new(log_active_user: bool) -> Self {
+    pub fn new(config: &Config) -> Self {
+        let log_active_user = config.log.as_ref().is_some_and(|l| l.log_active_user);
+        let (grace_period_millis, grace_period_timeout_secs) = config.reverse_proxy.as_ref()
+            .and_then(|r| r.stream.as_ref())
+            .map_or_else(|| (default_grace_period_millis(), default_grace_period_timeout_secs()), |s| (s.grace_period_millis, s.grace_period_timeout_secs));
+
         Self {
+            grace_period_millis,
+            grace_period_timeout_secs,
             log_active_user,
             user: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -56,6 +61,8 @@ impl ActiveUserManager {
 
     fn clone_inner(&self) -> Self {
         Self {
+            grace_period_millis: self.grace_period_millis,
+            grace_period_timeout_secs: self.grace_period_timeout_secs,
             log_active_user: self.log_active_user,
             user: Arc::clone(&self.user),
         }
@@ -68,31 +75,52 @@ impl ActiveUserManager {
         0
     }
 
-    pub async fn connection_permission(&self, username: &str, max_connections: u32, grace_period: bool, grace_period_timeout_secs: u64) -> UserConnectionPermission {
-        if let Some(connection_data) = self.user.write().await.get_mut(username) {
-            let current_connections = connection_data.connections;
-            if connection_data.granted_grace > 0 {
-                if (get_current_timestamp() - connection_data.grace_ts) <= grace_period_timeout_secs {
-                    debug!("User access denied, grace exhausted, too many connections: {username}");
-                    return UserConnectionPermission::Exhausted;
+    pub async fn connection_permission(
+        &self,
+        username: &str,
+        max_connections: u32,
+    ) -> UserConnectionPermission {
+        if max_connections > 0 {
+            if let Some(connection_data) = self.user.write().await.get_mut(username) {
+                let current_connections = connection_data.connections;
+
+                if current_connections < max_connections {
+                    // Reset grace period because user is back under max_connections
+                    connection_data.granted_grace = false;
+                    connection_data.grace_ts = 0;
+                    return UserConnectionPermission::Allowed;
                 }
-                connection_data.granted_grace = 0;
-            }
-            let extra_con = u32::from(grace_period);
-            if current_connections < max_connections + extra_con {
-                connection_data.granted_grace += 1;
-                connection_data.grace_ts = get_current_timestamp();
-                debug!("Granted grace period for user access: {username}");
-                return UserConnectionPermission::GracePeriod;
-            }
-            if current_connections >= max_connections {
+
+                let now = get_current_timestamp();
+                // Check if user already used grace period
+                if connection_data.granted_grace {
+                    if now - connection_data.grace_ts <= self.grace_period_timeout_secs {
+                        // Grace timeout still active, deny connection
+                        debug!("User access denied, grace exhausted, too many connections: {username}");
+                        return UserConnectionPermission::Exhausted;
+                    }
+                    // Grace timeout expired, reset grace counters
+                    connection_data.granted_grace = false;
+                    connection_data.grace_ts = 0;
+                }
+
+                if self.grace_period_millis > 0 && current_connections == max_connections {
+                    // Allow grace period once
+                    connection_data.granted_grace = true;
+                    connection_data.grace_ts = now;
+                    debug!("Granted grace period for user access: {username}");
+                    return UserConnectionPermission::GracePeriod;
+                }
+
+                // Too many connections, no grace allowed
                 debug!("User access denied, too many connections: {username}");
                 return UserConnectionPermission::Exhausted;
             }
-            connection_data.granted_grace = 0;
         }
+
         UserConnectionPermission::Allowed
     }
+
 
     pub async fn active_users(&self) -> usize {
         self.user.read().await.len()
@@ -122,8 +150,13 @@ impl ActiveUserManager {
     async fn remove_connection(&self, username: &str) {
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {
-            connection_data.connections -= 1;
-            connection_data.granted_grace = 0;
+            if connection_data.connections > 0 {
+                connection_data.connections -= 1;
+            }
+
+            // DO NOT reset granted_grace or grace_ts here!
+            // We must preserve the grace period state until connection_permission() checks it.
+
             if connection_data.connections == 0 {
                 lock.remove(username);
             }

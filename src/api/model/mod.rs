@@ -9,3 +9,4 @@ pub(crate) mod streams;
 pub(in crate::api) mod active_user_manager;
 pub(in crate::api) mod active_provider_manager;
 pub(in crate::api) mod stream;
+pub(in crate::api) mod provider_config;
