@@ -88,6 +88,8 @@ pub struct MappingCounterDefinition {
     pub modifier: CounterModifier,
     #[serde(default)]
     pub value: u32,
+    #[serde(default)]
+    pub padding: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +99,7 @@ pub struct MappingCounter {
     pub concat: String,
     pub modifier: CounterModifier,
     pub value: Arc<AtomicU32>,
+    pub padding: u8,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq)]
@@ -458,6 +461,7 @@ impl Mapping {
                             concat: def.concat.clone(),
                             modifier: def.modifier.clone(),
                             value: Arc::new(AtomicU32::new(def.value)),
+                            padding: def.padding,
                         });
                     }
                     Err(e) => return Err(info_err!(e.to_string()))

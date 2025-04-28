@@ -275,19 +275,23 @@ fn map_playlist_counter(target: &ConfigTarget, playlist: &mut [PlaylistGroup]) {
                         for channel in &mut plg.channels {
                             let provider = ValueProvider { pli: channel };
                             if counter.filter.filter(&provider, &mut mock_processor) {
-                                let cntval = counter.value.load(core::sync::atomic::Ordering::SeqCst);
-                                let new_value = if counter.modifier == CounterModifier::Assign {
+                                let cntval = counter.value.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+                                let padded_cntval = if counter.padding > 0 {
+                                    format!("{:0width$}", cntval, width = counter.padding as usize)
+                                } else {
                                     cntval.to_string()
+                                };
+                                let new_value = if counter.modifier == CounterModifier::Assign {
+                                    padded_cntval
                                 } else {
                                     let value = channel.header.get_field(&counter.field).map_or_else(String::new, |field_value| field_value.to_string());
                                     if counter.modifier == CounterModifier::Suffix {
-                                        format!("{value}{}{cntval}", counter.concat)
+                                        format!("{value}{}{padded_cntval}", counter.concat)
                                     } else {
-                                        format!("{cntval}{}{value}", counter.concat)
+                                        format!("{padded_cntval}{}{value}", counter.concat)
                                     }
                                 };
                                 channel.header.set_field(&counter.field, new_value.as_str());
-                                counter.value.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
                             }
                         }
                     }
