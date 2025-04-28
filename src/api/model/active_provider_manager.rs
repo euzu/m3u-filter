@@ -83,10 +83,10 @@ impl ProviderLineup {
         }
     }
 
-    async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
+    async fn acquire(&self, with_grace: bool, grace_period_timeout_secs: u64) -> ProviderAllocation {
         match self {
-            ProviderLineup::Single(lineup) => lineup.acquire(grace_period_timeout_secs).await,
-            ProviderLineup::Multi(lineup) => lineup.acquire(grace_period_timeout_secs).await,
+            ProviderLineup::Single(lineup) => lineup.acquire(with_grace, grace_period_timeout_secs).await,
+            ProviderLineup::Multi(lineup) => lineup.acquire(with_grace, grace_period_timeout_secs).await,
         }
     }
 
@@ -115,8 +115,8 @@ impl SingleProviderLineup {
         self.provider.get_next(false, grace_period_timeout_secs).await
     }
 
-    async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
-        self.provider.try_allocate(true, grace_period_timeout_secs).await
+    async fn acquire(&self, with_grace: bool, grace_period_timeout_secs: u64) -> ProviderAllocation {
+        self.provider.try_allocate(with_grace, grace_period_timeout_secs).await
     }
 
     async fn release(&self, provider_name: &str) {
@@ -305,7 +305,7 @@ impl MultiProviderLineup {
     ///    ProviderAllocation::GracePeriodprovider) =>  println!("Provider with grace period {}", provider.name),
     /// }
     /// ```
-    async fn acquire(&self, grace_period_timeout_secs: u64) -> ProviderAllocation {
+    async fn acquire(&self, with_grace: bool, grace_period_timeout_secs: u64) -> ProviderAllocation {
         let main_idx = self.index.load(Ordering::SeqCst);
         let provider_count = self.providers.len();
 
@@ -313,7 +313,7 @@ impl MultiProviderLineup {
             let priority_group = &self.providers[index];
             let allocation = {
                 let without_grace_allocation = Self::acquire_next_provider_from_group(priority_group, false, grace_period_timeout_secs).await;
-                if matches!(without_grace_allocation, ProviderAllocation::Exhausted) {
+                if with_grace && matches!(without_grace_allocation, ProviderAllocation::Exhausted) {
                     Self::acquire_next_provider_from_group(priority_group, true, grace_period_timeout_secs).await
                 } else {
                     without_grace_allocation
@@ -477,7 +477,7 @@ impl ActiveProviderManager {
         let providers = self.providers.read().await;
         let allocation = match Self::get_provider_config(input_name, &providers) {
             None => ProviderAllocation::Exhausted, // No Name matched, we don't have this provider
-            Some((lineup, _config)) => lineup.acquire(self.grace_period_timeout_secs).await
+            Some((lineup, _config)) => lineup.acquire(self.grace_period_millis > 0, self.grace_period_timeout_secs).await
         };
 
         if log_enabled!(log::Level::Debug) {
@@ -580,7 +580,7 @@ mod tests {
     macro_rules! should_available {
         ($lineup:expr, $provider_id:expr, $grace_period_timeout_secs: expr) => {
             thread::sleep(std::time::Duration::from_millis(200));
-            match $lineup.acquire($grace_period_timeout_secs).await {
+            match $lineup.acquire(true, $grace_period_timeout_secs).await {
                 ProviderAllocation::Exhausted => assert!(false, "Should available and not exhausted"),
                 ProviderAllocation::Available(provider) => assert_eq!(provider.id, $provider_id),
                 ProviderAllocation::GracePeriod(provider) => assert!(false, "Should available and not grace period: {}", provider.id),
@@ -590,7 +590,7 @@ mod tests {
     macro_rules! should_grace_period {
         ($lineup:expr, $provider_id:expr, $grace_period_timeout_secs: expr) => {
             thread::sleep(std::time::Duration::from_millis(200));
-            match $lineup.acquire($grace_period_timeout_secs).await {
+            match $lineup.acquire(true, $grace_period_timeout_secs).await {
                 ProviderAllocation::Exhausted => assert!(false, "Should grace period and not exhausted"),
                 ProviderAllocation::Available(provider) => assert!(false, "Should grace period and not available: {}", provider.id),
                 ProviderAllocation::GracePeriod(provider) => assert_eq!(provider.id, $provider_id),
@@ -601,7 +601,7 @@ mod tests {
     macro_rules! should_exhausted {
         ($lineup:expr, $grace_period_timeout_secs: expr) => {
             thread::sleep(std::time::Duration::from_millis(200));
-            match $lineup.acquire($grace_period_timeout_secs).await {
+            match $lineup.acquire(true, $grace_period_timeout_secs).await {
                 ProviderAllocation::Exhausted => {},
                 ProviderAllocation::Available(provider) => assert!(false, "Should exhausted and not available: {}", provider.id),
                 ProviderAllocation::GracePeriod(provider) => assert!(false, "Should exhausted and not grace period: {}", provider.id),
@@ -849,7 +849,7 @@ mod tests {
             let exhausted = Arc::clone(&exhausted_count);
             let rt  = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
-                match lineup_clone.acquire(5).await {
+                match lineup_clone.acquire(true,5).await {
                     ProviderAllocation::Exhausted => exhausted.fetch_sub(1, Ordering::SeqCst),
                     ProviderAllocation::Available(_) => available.fetch_sub(1, Ordering::SeqCst),
                     ProviderAllocation::GracePeriod(_) => grace_period.fetch_sub(1, Ordering::SeqCst),
