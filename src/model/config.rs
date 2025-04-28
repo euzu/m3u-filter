@@ -1268,6 +1268,8 @@ impl ConfigInput {
                             self.username = first.username.take();
                             self.password = first.password.take();
                             self.url = first.url.trim().to_string();
+                            self.max_connections = first.max_connections;
+                            self.priority = first.priority;
                             if self.name.is_empty() {
                                 self.name = first.name.to_string();
                             }

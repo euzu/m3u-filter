@@ -261,6 +261,7 @@ async fn get_streaming_options(app_state: &AppState, stream_url: &str, input: &C
     };
     let stream_response_params = match &*provider_connection_guard {
         ProviderAllocation::Exhausted => {
+            debug!("Input  {} is exhausted. No connections allowed.", input.name);
             let stream = create_provider_connections_exhausted_stream(&app_state.config, &[]);
             StreamingOption::Custom(stream)
         }
