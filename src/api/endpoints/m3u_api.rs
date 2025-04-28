@@ -85,7 +85,7 @@ async fn m3u_api_stream(
 
     let cluster = XtreamCluster::try_from(pli.item_type).unwrap_or(XtreamCluster::Live);
 
-    if let Some(cookie) = is_seek_response(cluster, pli.virtual_id, &app_state.config.t_encrypt_secret, &req_headers) {
+    if let Some(cookie) = is_seek_response(&app_state, cluster, pli.virtual_id, &req_headers, &user.username).await {
         // partial request means we are in reverse proxy mode, seek happened
         return force_provider_stream_response(&app_state, &cookie, pli.virtual_id, pli.item_type, &req_headers, input, &user).await.into_response()
     }

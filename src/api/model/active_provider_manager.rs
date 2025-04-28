@@ -14,6 +14,13 @@ pub struct ProviderConnectionGuard {
 }
 
 impl ProviderConnectionGuard {
+    pub fn new(manager: Arc<ActiveProviderManager>, allocation: ProviderAllocation) -> Self {
+        Self {
+            manager,
+            allocation,
+        }
+    }
+
     pub fn get_provider_name(&self) -> Option<String> {
         match self.allocation {
             ProviderAllocation::Exhausted => None,
@@ -466,10 +473,7 @@ impl ActiveProviderManager {
             Some((_lineup, config)) => config.force_allocate().await,
         };
 
-        ProviderConnectionGuard {
-            manager: Arc::new(self.clone_inner()),
-            allocation,
-        }
+        ProviderConnectionGuard::new(Arc::new(self.clone_inner()), allocation)
     }
 
     // Returns the next available provider connection
@@ -490,10 +494,7 @@ impl ActiveProviderManager {
             }
         }
 
-        ProviderConnectionGuard {
-            manager: Arc::new(self.clone_inner()),
-            allocation,
-        }
+        ProviderConnectionGuard::new(Arc::new(self.clone_inner()), allocation)
     }
 
     // This method is used for redirects to cycle through provider
@@ -658,7 +659,7 @@ mod tests {
 
         // Create MultiProviderLineup with the provider and alias
         let lineup = MultiProviderLineup::new(&input);
-        let rt  = tokio::runtime::Runtime::new().unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
             // Test that the alias provider is available
             should_available!(lineup, 1, 5);
@@ -732,7 +733,7 @@ mod tests {
         input.aliases = Some(vec![alias1, alias2]);
 
         let lineup = MultiProviderLineup::new(&input);
-        let rt  = tokio::runtime::Runtime::new().unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
             // Acquire connection from alias2
             should_available!(lineup, 3, 5);

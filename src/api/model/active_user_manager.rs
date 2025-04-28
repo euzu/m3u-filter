@@ -22,17 +22,21 @@ impl Drop for UserConnectionGuard {
 }
 
 struct UserConnectionData {
+    max_connections: u32,
     connections: u32,
     granted_grace: bool,
     grace_ts: u64,
+    token: Option<String>,
 }
 
 impl UserConnectionData {
-    fn new() -> Self {
+    fn new(max_connections: u32) -> Self {
         Self {
             connections: 1,
             granted_grace: false,
             grace_ts: 0,
+            token: None,
+            max_connections,
         }
     }
 }
@@ -130,12 +134,12 @@ impl ActiveUserManager {
         self.user.read().await.values().map(|c| c.connections as usize).sum()
     }
 
-    pub async fn add_connection(&self, username: &str) -> UserConnectionGuard {
+    pub async fn add_connection(&self, username: &str, max_connections: u32) -> UserConnectionGuard {
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {
             connection_data.connections += 1;
         } else {
-            lock.insert(username.to_string(), UserConnectionData::new());
+            lock.insert(username.to_string(), UserConnectionData::new(max_connections));
         }
         drop(lock);
 
@@ -159,6 +163,10 @@ impl ActiveUserManager {
 
             if connection_data.connections == 0 {
                 lock.remove(username);
+            } else {
+                if connection_data.connections < connection_data.max_connections {
+                    connection_data.token = None;
+                }
             }
         }
         drop(lock);
@@ -166,7 +174,29 @@ impl ActiveUserManager {
         self.log_active_user().await;
     }
 
-    async fn log_active_user(&self) {
+    pub async fn create_token(&self, username: &str) -> String {
+        let result = crate::utils::string_utils::generate_random_string(6);
+        let mut lock = self.user.write().await;
+        if let Some(connection_data) = lock.get_mut(username) {
+            connection_data.token =  Some(result.to_string());
+        }
+        drop(lock);
+        result
+    }
+
+    pub async fn get_token(&self, username: &str) -> Option<String> {
+        let mut lock = self.user.write().await;
+        if let Some(connection_data) = lock.get_mut(username) {
+            connection_data.token.clone()
+        } else {
+            None
+        }
+    }
+    pub async fn has_token(&self, username: &str, token: &str) -> bool {
+        self.get_token(username).await.is_some_and(|t| token == t)
+    }
+
+   async fn log_active_user(&self) {
         if self.log_active_user {
             let user_count = self.active_users().await;
             let user_connection_count = self.active_connections().await;

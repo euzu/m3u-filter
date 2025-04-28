@@ -482,16 +482,16 @@ fn create_session_cookie(cookie: &str) -> String {
     format!("{SESSION_COOKIE_NAME}{cookie}; Max-Age=10800; HttpOnly; SameSite=Strict")
 }
 
-pub fn create_token_for_provider(secret: &[u8], virtual_id: u32, provider_name: &str, stream_url: &str) -> Option<String> {
-    if let Ok(cookie_value) = obfuscate_text(secret, &format!("{virtual_id}:{provider_name}@{stream_url}")) {
+pub fn create_token_for_provider(secret: &[u8], token: &str, virtual_id: u32, provider_name: &str, stream_url: &str) -> Option<String> {
+    if let Ok(cookie_value) = obfuscate_text(secret, &format!("{virtual_id}:{token}:{provider_name}@{stream_url}")) {
         return Some(cookie_value);
     }
     None
 }
 
 
-pub fn create_session_cookie_for_provider(secret: &[u8], virtual_id: u32, provider_name: &str, stream_url: &str) -> Option<String> {
-    if let Some(cookie_value) = create_token_for_provider(secret, virtual_id, provider_name, stream_url) {
+pub fn create_session_cookie_for_provider(secret: &[u8], token: &str, virtual_id: u32, provider_name: &str, stream_url: &str) -> Option<String> {
+    if let Some(cookie_value) = create_token_for_provider(secret, token, virtual_id, provider_name, stream_url) {
         return Some(create_session_cookie(&cookie_value));
     }
     None
@@ -512,27 +512,30 @@ pub fn read_session_cookie(headers: &HeaderMap) -> Option<String> {
     None
 }
 
-pub fn get_stream_info_from_crypted_cookie(secret: &[u8], cookie: &str) -> Option<(u32, String, String)> {
+/// # Panics
+pub fn get_stream_info_from_crypted_cookie(secret: &[u8], cookie: &str) -> Option<(String, u32, String, String)> {
     if let Ok(decrypted) = deobfuscate_text(secret, cookie) {
         let (virtual_id_and_provider, stream_url) = decrypted.split_once('@')?;
-        let (virtual_id, provider_name) = virtual_id_and_provider.split_once(':')?;
-
-        if virtual_id.is_empty() || provider_name.is_empty() || stream_url.is_empty() {
+        let mut items: Vec<String> = virtual_id_and_provider.split(':').filter(|s| !s.is_empty()).map(ToString::to_string).collect();
+        if items.len() != 3 {
             return None;
         }
-
-        if let Ok(vid) = virtual_id.parse::<u32>() {
-            return Some((
-                vid,
-                provider_name.to_string(),
-                stream_url.to_string(),
-            ));
-        }
+        items.reverse();
+        let virtual_id = items.pop().unwrap();
+        let vid = virtual_id.parse::<u32>().ok()?;
+        let token = items.pop().unwrap();
+        let provider_name = items.pop().unwrap();
+        return Some((
+            token,
+            vid,
+            provider_name.to_string(),
+            stream_url.to_string(),
+        ));
     }
     None
 }
 
-pub fn get_stream_info_from_cookie(secret: &[u8], headers: &HeaderMap) -> Option<(u32, String, String)> {
+pub fn get_stream_info_from_cookie(secret: &[u8], headers: &HeaderMap) -> Option<(String, u32, String, String)> {
     let encrypted_cookie = read_session_cookie(headers)?;
     get_stream_info_from_crypted_cookie(secret, &encrypted_cookie)
 }
@@ -564,8 +567,8 @@ pub async fn force_provider_stream_response(app_state: &AppState,
                                             req_headers: &HeaderMap,
                                             input: &ConfigInput,
                                             user: &ProxyUserCredentials) -> impl axum::response::IntoResponse + Send {
-    if let Some((stream_virtual_id, provider_name, stream_url)) = get_stream_info_from_crypted_cookie(&app_state.config.t_encrypt_secret, cookie) {
-        if stream_virtual_id == virtual_id {
+    if let Some((stream_token, stream_virtual_id, provider_name, stream_url)) = get_stream_info_from_crypted_cookie(&app_state.config.t_encrypt_secret, cookie) {
+        if stream_virtual_id == virtual_id && app_state.active_users.has_token(&user.username, &stream_token).await {
             let stream_options = get_stream_options(app_state);
             let share_stream = false;
             let connection_permission = UserConnectionPermission::Allowed;
@@ -654,8 +657,9 @@ pub async fn stream_response(app_state: &AppState,
             }
 
             if let Some(provider) = provider_name {
-                if matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash) {
-                    if let Some(cookie_value) = create_session_cookie_for_provider(&app_state.config.t_encrypt_secret, virtual_id, &provider, stream_url) {
+                if matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash | PlaylistItemType::Video | PlaylistItemType::Series) {
+                    let grace_token = app_state.active_users.create_token(&user.username).await;
+                    if let Some(cookie_value) = create_session_cookie_for_provider(&app_state.config.t_encrypt_secret, &grace_token, virtual_id, &provider, stream_url) {
                         response = response.header(axum::http::header::SET_COOKIE, &cookie_value);
                     }
                 }
@@ -663,7 +667,6 @@ pub async fn stream_response(app_state: &AppState,
 
             let body_stream = prepare_body_stream(app_state, item_type, stream);
             response.body(body_stream).unwrap().into_response()
-            // if content_length > 0 { response_builder.body(SizedStream::new(content_length, stream)) } else { response_builder.streaming(stream) }
         };
 
         return stream_resp.into_response();
@@ -824,11 +827,12 @@ pub fn redirect(url: &str) -> impl IntoResponse {
         .unwrap()
 }
 
-pub fn is_seek_response(
+pub async fn is_seek_response(
+    app_state: &AppState,
     cluster: XtreamCluster,
     virtual_id: u32,
-    secret: &[u8],
     req_headers: &HeaderMap,
+    username: &str,
 ) -> Option<String> {
     // seek only for non-live streams
     if cluster == XtreamCluster::Live {
@@ -836,8 +840,12 @@ pub fn is_seek_response(
     }
 
     let cookie = read_session_cookie(req_headers)?;
-    match get_stream_info_from_crypted_cookie(secret, &cookie) {
-        Some((vid, _, _)) if vid == virtual_id => {}
+    match get_stream_info_from_crypted_cookie(&app_state.config.t_encrypt_secret, &cookie) {
+        Some((token, vid, _, _)) if vid == virtual_id => {
+            if !app_state.active_users.has_token(username, &token).await {
+                return None;
+            }
+        }
         _ => return None,
     }
 
@@ -852,22 +860,34 @@ pub fn is_seek_response(
 
 pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, item_type: PlaylistItemType, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {
 
-    if ! matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash) {
+    if ! matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash | PlaylistItemType::Series | PlaylistItemType::Video) {
         return (None, user.connection_permission(app_state).await);
     }
 
     // if you have multi provider setup you need to delegate the same hls requests
     // to the same provider. Hls has alternating m3u8 and stream requests.
     let mut provider_name = None;
-    if let Some((stream_virtual_id, stream_provider_name, _stream_url)) = get_stream_info_from_cookie(&app_state.config.t_encrypt_secret, req_headers) {
-        if stream_virtual_id == virtual_id {
+    if let Some((stream_token, stream_virtual_id, stream_provider_name, _stream_url)) = get_stream_info_from_cookie(&app_state.config.t_encrypt_secret, req_headers) {
+        if stream_virtual_id == virtual_id && app_state.active_users.has_token(&user.username, &stream_token).await {
             provider_name = Some(stream_provider_name);
         }
     }
 
     let connection_permission = match provider_name {
-        None => user.connection_permission(app_state).await,
-        Some(_) => UserConnectionPermission::Allowed
+        Some(_) => UserConnectionPermission::Allowed,
+        None => {
+            let permission = user.connection_permission(app_state).await;
+            match permission {
+                UserConnectionPermission::GracePeriod => {
+                    if app_state.active_users.get_token(&user.username).await.is_some() {
+                        UserConnectionPermission::Exhausted
+                    } else {
+                        UserConnectionPermission::GracePeriod
+                    }
+                }
+                _ => permission,
+            }
+        }
     };
 
     (provider_name, connection_permission)

@@ -780,26 +780,11 @@ mod tests {
         data: String,
     }
 
-    use crate::utils::time_utils::current_time_secs;
-
-    fn generate_random_string(length: usize) -> String {
-        let mut rng = current_time_secs();
-        let charset = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-        let mut random_string = String::with_capacity(length);
-        for _ in 0..length {
-            rng = rng.wrapping_add(1);
-            let idx = (rng % charset.len() as u64) as usize;
-            random_string.push(charset[idx] as char);
-        }
-
-        random_string
-    }
 
     #[test]
     fn insert_test() -> io::Result<()> {
         let test_size = 500;
-        let content = generate_random_string(1024);
+        let content = crate::utils::string_utils::generate_random_string(1024);
         let mut tree = BPlusTree::<u32, Record>::new();
         for i in 0u32..=test_size {
             tree.insert(i, Record {

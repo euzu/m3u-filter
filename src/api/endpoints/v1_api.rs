@@ -325,7 +325,6 @@ async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
         cache,
     }
 }
-#[axum::debug_handler]
 async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> axum::response::Response {
     let status = create_status_check(&app_state).await;
     match serde_json::to_string_pretty(&status) {

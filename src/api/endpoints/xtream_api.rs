@@ -197,7 +197,7 @@ async fn xtream_player_api_stream(
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
     let cluster = pli.xtream_cluster;
 
-    if let Some(cookie) = is_seek_response(cluster, pli.virtual_id, &app_state.config.t_encrypt_secret, req_headers) {
+    if let Some(cookie) = is_seek_response(app_state, cluster, pli.virtual_id, req_headers, &user.username).await {
         // partial request means we are in reverse proxy mode, seek happened
         return force_provider_stream_response(app_state, &cookie, pli.virtual_id, pli.item_type, req_headers, input, &user).await.into_response()
     }
