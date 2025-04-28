@@ -1,0 +1,16 @@
+.status-view {
+  display: flex;
+  flex-flow: column;
+  gap: 4px;
+  &__content {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+  }
+  &__col-label {
+    color: var(--label-color);
+  }
+  &__col-value {
+
+  }
+}

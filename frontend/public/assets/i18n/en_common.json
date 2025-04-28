@@ -96,7 +96,14 @@
     "SECRET":  "Secret",
     "USERFILE": "Userfile",
     "UI_ENABLED": "UI",
-    "PLAYER_SERVER": "Player Server"
+    "PLAYER_SERVER": "Player Server",
+    "VERSION": "Version",
+    "SERVER_TIME": "Server time",
+    "BUILD_TIME": "Build time",
+    "MEMORY": "Memory",
+    "ACTIVE_USERS": "Active users",
+    "ACTIVE_USER_CONNECTIONS": "Active user conn.",
+    "ACTIVE_PROVIDER_CONNECTIONS": "Active provider conn."
 },
   "TITLE": {
     "USER_BOUQUET_EDITOR": "User group editor"

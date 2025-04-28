@@ -8,12 +8,14 @@ import {getIconByName} from "../../icons/icons";
 import Panel from "../panel/panel";
 import MainConfigView from "../main-config-view/main-config-view";
 import useTranslator from "../../hook/use-translator";
+import StatusView from "../status-view/status-view";
 
 enum SidebarAction {
     Update = 'update',
     User = 'user',
     ApiServer = 'api_server',
-    MainConfig = 'main_config'
+    MainConfig = 'main_config',
+    Status = 'status',
 }
 
 const SIDEBAR_ACTIONS: { action: SidebarAction, icon: string, label: string }[] = [
@@ -21,6 +23,7 @@ const SIDEBAR_ACTIONS: { action: SidebarAction, icon: string, label: string }[] 
     {action: SidebarAction.User, icon: 'User', label: 'LABEL.USER'},
     {action: SidebarAction.ApiServer, icon: 'ApiServer', label: 'LABEL.PROXY'},
     {action: SidebarAction.MainConfig, icon: 'Config', label: 'LABEL.CONFIG'},
+    {action: SidebarAction.Status, icon: 'Status', label: 'LABEL.STATUS'},
 ];
 
 interface PreferencesProps {
@@ -60,6 +63,9 @@ export default function Preferences(props: PreferencesProps) {
                 </Panel>
                 <Panel value={SidebarAction.MainConfig} active={activePage}>
                     <div className={'card'}><MainConfigView config={config}></MainConfigView></div>
+                </Panel>
+                <Panel value={SidebarAction.Status} active={activePage}>
+                    <div className={'card'}><StatusView></StatusView></div>
                 </Panel>
             </div>
             <div className={'preferences__sidebar'}></div>

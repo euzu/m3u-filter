@@ -3,6 +3,7 @@ import PlaylistService from "./playlist-service";
 import FileService from "./file-service";
 import AuthService from "./auth-service";
 import UserConfigService from "./user-config-service";
+import ServerStatusService from "./server-status-service";
 
 export interface Services {
     config(): ConfigService;
@@ -14,6 +15,8 @@ export interface Services {
     auth(): AuthService;
 
     userConfig(): UserConfigService;
+
+    status(): ServerStatusService;
 }
 
 class ServiceContextImpl implements Services {
@@ -23,6 +26,7 @@ class ServiceContextImpl implements Services {
     private readonly _fileService: FileService = new FileService();
     private readonly _authService: AuthService = new AuthService();
     private readonly _userConfigService: UserConfigService = new UserConfigService();
+    private readonly _statusService: ServerStatusService = new ServerStatusService();
 
     config() {
         return this._configService;
@@ -42,6 +46,10 @@ class ServiceContextImpl implements Services {
 
     userConfig(): UserConfigService {
         return this._userConfigService;
+    }
+
+    status(): ServerStatusService {
+        return this._statusService;
     }
 }
 
