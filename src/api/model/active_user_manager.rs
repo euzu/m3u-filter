@@ -138,6 +138,7 @@ impl ActiveUserManager {
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {
             connection_data.connections += 1;
+            connection_data.max_connections = max_connections;
         } else {
             lock.insert(username.to_string(), UserConnectionData::new(max_connections));
         }
@@ -163,10 +164,8 @@ impl ActiveUserManager {
 
             if connection_data.connections == 0 {
                 lock.remove(username);
-            } else {
-                if connection_data.connections < connection_data.max_connections {
-                    connection_data.token = None;
-                }
+            } else if connection_data.connections < connection_data.max_connections {
+                connection_data.token = None;
             }
         }
         drop(lock);
@@ -174,11 +173,17 @@ impl ActiveUserManager {
         self.log_active_user().await;
     }
 
-    pub async fn create_token(&self, username: &str) -> String {
-        let result = crate::utils::string_utils::generate_random_string(6);
+    pub async fn get_or_create_token(&self, username: &str) -> Option<String> {
+        let token = crate::utils::string_utils::generate_random_string(6);
+        let mut result = None;
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {
-            connection_data.token =  Some(result.to_string());
+            result = if connection_data.token.is_some() {
+                connection_data.token.clone()
+            } else {
+                connection_data.token = Some(token.to_string());
+                Some(token)
+            };
         }
         drop(lock);
         result
@@ -226,6 +231,8 @@ impl ActiveUserManager {
 //             })
 //             .collect();
 //
+
+
 //         for handle in handles {
 //             handle.join().unwrap();
 //         }

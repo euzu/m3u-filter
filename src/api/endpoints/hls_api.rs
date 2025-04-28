@@ -45,12 +45,12 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
     let url = replace_url_extension(hls_url, HLS_EXT);
     let server_info = app_state.config.get_user_server_info(user).await;
 
-    let grace_token = app_state.active_users.create_token(&user.username).await;
+    let grace_token = app_state.active_users.get_or_create_token(&user.username).await;
     let create_stream_and_cookie = |provider_cfg: &Arc<ProviderConfig>| {
         let stream_url = get_stream_alternative_url(&url, input, provider_cfg);
         let cookie = create_session_cookie_for_provider(
             &app_state.config.t_encrypt_secret,
-            &grace_token,
+            &grace_token.clone().unwrap_or_default(),
             virtual_id,
             &provider_cfg.name,
             &stream_url,
@@ -79,7 +79,7 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
                 virtual_id,
                 input_id: input.id,
                 provider_name: provider.unwrap_or_default(), // this should not happen
-                user_token: grace_token
+                user_token: grace_token.unwrap_or_default().to_string(),
             };
             let hls_content = rewrite_hls(user, &rewrite_hls_props);
             hls_response(hls_content, cookie).into_response()

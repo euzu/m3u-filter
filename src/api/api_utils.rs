@@ -658,9 +658,10 @@ pub async fn stream_response(app_state: &AppState,
 
             if let Some(provider) = provider_name {
                 if matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash | PlaylistItemType::Video | PlaylistItemType::Series) {
-                    let grace_token = app_state.active_users.create_token(&user.username).await;
-                    if let Some(cookie_value) = create_session_cookie_for_provider(&app_state.config.t_encrypt_secret, &grace_token, virtual_id, &provider, stream_url) {
-                        response = response.header(axum::http::header::SET_COOKIE, &cookie_value);
+                    if let Some(grace_token) = app_state.active_users.get_or_create_token(&user.username).await {
+                        if let Some(cookie_value) = create_session_cookie_for_provider(&app_state.config.t_encrypt_secret, &grace_token, virtual_id, &provider, stream_url) {
+                            response = response.header(axum::http::header::SET_COOKIE, &cookie_value);
+                        }
                     }
                 }
             }
@@ -859,8 +860,7 @@ pub async fn is_seek_response(
 }
 
 pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, item_type: PlaylistItemType, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {
-
-    if ! matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash | PlaylistItemType::Series | PlaylistItemType::Video) {
+    if !matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash | PlaylistItemType::Series | PlaylistItemType::Video) {
         return (None, user.connection_permission(app_state).await);
     }
 
@@ -873,20 +873,17 @@ pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, item_ty
         }
     }
 
-    let connection_permission = match provider_name {
-        Some(_) => UserConnectionPermission::Allowed,
-        None => {
-            let permission = user.connection_permission(app_state).await;
-            match permission {
-                UserConnectionPermission::GracePeriod => {
-                    if app_state.active_users.get_token(&user.username).await.is_some() {
-                        UserConnectionPermission::Exhausted
-                    } else {
-                        UserConnectionPermission::GracePeriod
-                    }
+    let connection_permission = if provider_name.is_some() { UserConnectionPermission::Allowed } else {
+        let permission = user.connection_permission(app_state).await;
+        match permission {
+            UserConnectionPermission::GracePeriod => {
+                if app_state.active_users.get_token(&user.username).await.is_some() {
+                    UserConnectionPermission::Exhausted
+                } else {
+                    UserConnectionPermission::GracePeriod
                 }
-                _ => permission,
             }
+            _ => permission,
         }
     };
 

@@ -145,6 +145,12 @@ impl ProviderConfig {
         let mut guard = self.connection.write().await;
         let connections = guard.current_connections;
         if connections < self.max_connections || (grace && connections <= self.max_connections) {
+            if connections < self.max_connections {
+                guard.granted_grace = false;
+                guard.grace_ts = 0;
+                guard.current_connections += 1;
+            }
+
             let now = get_current_timestamp();
             if guard.granted_grace {
                 if now - guard.grace_ts <= grace_period_timeout_secs {
