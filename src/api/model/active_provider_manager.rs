@@ -660,7 +660,7 @@ mod tests {
         let lineup = MultiProviderLineup::new(&input);
         let rt  = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
-         // Test that the alias provider is available
+            // Test that the alias provider is available
             should_available!(lineup, 1, 5);
             // Try acquiring again
             should_available!(lineup, 2, 5);
@@ -861,4 +861,3 @@ mod tests {
         assert_eq!(grace_period_count.load(Ordering::SeqCst), 0);
     }
 }
-
