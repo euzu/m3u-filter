@@ -59,59 +59,6 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
     Some(new_playlist)
 }
 
-// fn playlist_comparator(sequence: Option<&Vec<regex::Regex>>, order: &SortOrder, value_a: &str, value_b: &str) -> Ordering {
-//     if let Some(regex_list) = sequence {
-//         for (i, regex) in regex_list.iter().enumerate() {
-//             let cap_a = regex.captures(value_a);
-//             let cap_b = regex.captures(value_b);
-//
-//             match (cap_a, cap_b) {
-//                 (Some(captured_a), Some(captured_b)) => {
-//                     // both match regex → compare capture order: c1, c2, ...
-//                     let mut result = Ordering::Equal;
-//
-//                     // sort captures nach c1, c2, c3...
-//                     let mut named: Vec<_> = regex
-//                         .capture_names()
-//                         .flatten()
-//                         .filter(|name| name.starts_with('c'))
-//                         .collect();
-//
-//                     // Sort by number (c2 < c10)
-//                     named.sort_by_key(|name| name[1..].parse::<u32>().unwrap_or(0));
-//
-//                     for name in named {
-//                         let va = captured_a.name(name).map(|m| m.as_str());
-//                         let vb = captured_b.name(name).map(|m| m.as_str());
-//                         if let (Some(va), Some(vb)) = (va, vb) {
-//                             let o = va.cmp(vb);
-//                             if o != Ordering::Equal {
-//                                 result = o;
-//                                 break;
-//                             }
-//                         }
-//                     }
-//
-//                     return match order {
-//                         Asc => result,
-//                         Desc => result.reverse(),
-//                     };
-//                 }
-//                 (Some(_), None) => return Ordering::Less,
-//                 (None, Some(_)) => return Ordering::Greater,
-//                 (None, None) => {},
-//             }
-//         }
-//     }
-//
-//     // No Regex-Match → fallback lexicographically match
-//     let ordering = value_a.partial_cmp(value_b).unwrap_or(Ordering::Equal);
-//     match order {
-//         Asc => ordering,
-//         Desc => ordering.reverse(),
-//     }
-// }
-
 fn playlist_comparator(
     sequence: Option<&Vec<regex::Regex>>,
     order: &SortOrder,
@@ -134,7 +81,7 @@ fn playlist_comparator(
                 }
             }
 
-            // Wenn beide Matches gefunden sind → break
+            // If both matches found → break
             if match_a.is_some() && match_b.is_some() {
                 break;
             }
@@ -142,7 +89,7 @@ fn playlist_comparator(
 
         match (match_a, match_b) {
             (Some((idx_a, caps_a)), Some((idx_b, caps_b))) => {
-                // Unterschiedliche Regex-Indizes → nach Reihenfolge sortieren
+                // Different regex indices → sort by their sequence order.
                 if idx_a != idx_b {
                     return match order {
                         SortOrder::Asc => idx_a.cmp(&idx_b),
@@ -150,7 +97,7 @@ fn playlist_comparator(
                     };
                 }
 
-                // Gleiches Regex → sortiere nach Captures (c1, c2, …)
+                // Same regex → sort by captures (c1, c2, …)
                 let mut named: Vec<_> = regex_list[idx_a]
                     .capture_names()
                     .flatten()
@@ -178,7 +125,7 @@ fn playlist_comparator(
             (Some(_), None) => Ordering::Less,
             (None, Some(_)) => Ordering::Greater,
             (None, None) => {
-                // Kein Match → Fallback
+                // NP match → fallback
                 let o = value_a.cmp(value_b);
                 match order {
                     SortOrder::Asc => o,
@@ -187,7 +134,7 @@ fn playlist_comparator(
             }
         }
     } else {
-        // Kein Regex-Sequence definiert → fallback
+        // No Regex-Sequence defined → fallback
         let o = value_a.cmp(value_b);
         match order {
             SortOrder::Asc => o,
