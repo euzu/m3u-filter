@@ -1,35 +1,35 @@
-use crate::{Config};
-use crate::model::config::{ConfigInput, ConfigRename};
+use crate::model::config::{ConfigInput, ConfigRename, SortOrder};
 use crate::utils::network::epg;
 use crate::utils::network::m3u;
 use crate::utils::network::xtream;
+use crate::Config;
 use core::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc};
-use tokio::sync::Mutex;
+use std::sync::Arc;
 use std::thread;
+use tokio::sync::Mutex;
 
-use log::{debug, error, info, log_enabled, trace, warn, Level};
-use std::time::Instant;
-use deunicode::deunicode;
 use crate::foundation::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, get_errors_notify_message, notify_err};
+use crate::m3u_filter_error::{get_errors_notify_message, notify_err, M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{send_message, MsgKind};
 use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, InputType,
-                           ItemField, ProcessTargets, ProcessingOrder, SortOrder::{Asc, Desc}};
+                           ItemField, ProcessTargets, ProcessingOrder};
 use crate::model::mapping::{CounterModifier, Mapping, MappingValueProcessor};
 use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor, PlaylistEntry, PlaylistGroup, PlaylistItem, UUIDType, XtreamCluster};
 use crate::model::stats::{InputStats, PlaylistStats, SourceStats, TargetStats};
-use crate::processing::processor::affix::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
+use crate::processing::processor::affix::apply_affixes;
 use crate::processing::processor::xtream_series::playlist_resolve_series;
 use crate::processing::processor::xtream_vod::playlist_resolve_vod;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
-use crate::utils::{debug_if_enabled};
+use crate::utils::debug_if_enabled;
+use deunicode::deunicode;
+use log::{debug, error, info, log_enabled, trace, warn, Level};
+use std::time::Instant;
 
-use crate::model::xmltv::{Epg};
+use crate::model::xmltv::Epg;
 use crate::processing::parser::xmltv::flatten_tvguide;
 use crate::processing::processor::epg::process_playlist_epg;
 use crate::utils::step_measure::StepMeasure;
@@ -59,55 +59,115 @@ fn filter_playlist(playlist: &mut [PlaylistGroup], target: &ConfigTarget) -> Opt
     Some(new_playlist)
 }
 
-fn playlistgroup_comparator(a: &PlaylistGroup, b: &PlaylistGroup, group_sort: &ConfigSortGroup, match_as_ascii: bool) -> Ordering {
-    let value_a = if match_as_ascii { deunicode(&a.title) } else { a.title.to_string() };
-    let value_b = if match_as_ascii { deunicode(&b.title) } else { b.title.to_string() };
-    let ordering = value_a.partial_cmp(&value_b).unwrap();
-    match group_sort.order {
-        Asc => ordering,
-        Desc => ordering.reverse()
+fn playlist_comparator(
+    sequence: Option<&Vec<regex::Regex>>,
+    order: &SortOrder,
+    value_a: &str,
+    value_b: &str,
+) -> Ordering {
+    if let Some(regex_list) = sequence {
+        let mut match_a = None;
+        let mut match_b = None;
+
+        for (i, regex) in regex_list.iter().enumerate() {
+            if match_a.is_none() {
+                if let Some(caps) = regex.captures(value_a) {
+                    match_a = Some((i, caps));
+                }
+            }
+            if match_b.is_none() {
+                if let Some(caps) = regex.captures(value_b) {
+                    match_b = Some((i, caps));
+                }
+            }
+
+            // If both matches found → break
+            if match_a.is_some() && match_b.is_some() {
+                break;
+            }
+        }
+
+        match (match_a, match_b) {
+            (Some((idx_a, caps_a)), Some((idx_b, caps_b))) => {
+                // Different regex indices → sort by their sequence order.
+                if idx_a != idx_b {
+                    return match order {
+                        SortOrder::Asc => idx_a.cmp(&idx_b),
+                        SortOrder::Desc => idx_b.cmp(&idx_a),
+                    };
+                }
+
+                // Same regex → sort by captures (c1, c2, …)
+                let mut named: Vec<_> = regex_list[idx_a]
+                    .capture_names()
+                    .flatten()
+                    .filter(|name| name.starts_with('c'))
+                    .collect();
+
+                named.sort_by_key(|name| name[1..].parse::<u32>().unwrap_or(0));
+
+                for name in named {
+                    let va = caps_a.name(name).map(|m| m.as_str());
+                    let vb = caps_b.name(name).map(|m| m.as_str());
+                    if let (Some(va), Some(vb)) = (va, vb) {
+                        let o = va.cmp(vb);
+                        if o != Ordering::Equal {
+                            return match order {
+                                SortOrder::Asc => o,
+                                SortOrder::Desc => o.reverse(),
+                            };
+                        }
+                    }
+                }
+
+                Ordering::Equal
+            }
+            (Some(_), None) => match order {
+                SortOrder::Asc => Ordering::Less,
+                SortOrder::Desc => Ordering::Greater,
+            },
+            (None, Some(_)) => match order {
+                SortOrder::Asc => Ordering::Greater,
+                SortOrder::Desc => Ordering::Less,
+            },
+            (None, None) => {
+                // NP match → fallback
+                let o = value_a.cmp(value_b);
+                match order {
+                    SortOrder::Asc => o,
+                    SortOrder::Desc => o.reverse(),
+                }
+            }
+        }
+    } else {
+        // No Regex-Sequence defined → fallback
+        let o = value_a.cmp(value_b);
+        match order {
+            SortOrder::Asc => o,
+            SortOrder::Desc => o.reverse(),
+        }
     }
 }
 
-fn playlistitem_comparator(a: &PlaylistItem, b: &PlaylistItem, channel_sort: &ConfigSortChannel, match_as_ascii: bool) -> Ordering {
+fn playlistgroup_comparator(a: &PlaylistGroup, b: &PlaylistGroup, group_sort: &ConfigSortGroup, match_as_ascii: bool) -> Ordering {
+    let value_a = if match_as_ascii { deunicode(&a.title) } else { a.title.to_string() };
+    let value_b = if match_as_ascii { deunicode(&b.title) } else { b.title.to_string() };
+
+    playlist_comparator(group_sort.t_sequence.as_ref(), &group_sort.order, &value_a, &value_b)
+}
+
+fn playlistitem_comparator(
+    a: &PlaylistItem,
+    b: &PlaylistItem,
+    channel_sort: &ConfigSortChannel,
+    match_as_ascii: bool,
+) -> Ordering {
     let raw_value_a = get_field_value(a, &channel_sort.field);
     let raw_value_b = get_field_value(b, &channel_sort.field);
     let value_a = if match_as_ascii { deunicode(&raw_value_a) } else { raw_value_a };
     let value_b = if match_as_ascii { deunicode(&raw_value_b) } else { raw_value_b };
-    channel_sort.sequence.as_ref().map_or_else(|| {
-        let ordering = value_a.partial_cmp(&value_b).unwrap();
-        match channel_sort.order {
-            Asc => ordering,
-            Desc => ordering.reverse()
-        }
-    }, |custom_order| {
-        // Check indices in the custom order vector
-        let index_a = custom_order.iter().position(|s| s == &value_a);
-        let index_b = custom_order.iter().position(|s| s == &value_b);
 
-        match (index_a, index_b) {
-            (Some(idx_a), Some(idx_b)) => {
-                // Both items found in custom order, compare indices
-                idx_a.cmp(&idx_b)
-            }
-            (Some(_), None) => {
-                // Only 'a' found in custom order, it comes first
-                Ordering::Less
-            }
-            (None, Some(_)) => {
-                // Only 'b' found in custom order, it comes first
-                Ordering::Greater
-            }
-            (None, None) => {
-                // Neither found, fall back to default ordering
-                let ordering = value_a.partial_cmp(&value_b).unwrap();
-                match channel_sort.order {
-                    Asc => ordering,
-                    Desc => ordering.reverse(),
-                }
-            }
-        }
-    })
+    playlist_comparator(channel_sort.t_sequence.as_ref(), &channel_sort.order, &value_a, &value_b)
 }
 
 fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
@@ -133,7 +193,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
 fn channel_no_playlist(new_playlist: &mut [PlaylistGroup]) {
     let assigned_chnos: HashSet<u32> = new_playlist.iter().flat_map(|g| &g.channels)
         .filter(|c| !c.header.chno.is_empty())
-        .map(|c|c.header.chno.as_str())
+        .map(|c| c.header.chno.as_str())
         .flat_map(str::parse::<u32>).collect();
     let mut chno = 1;
     for group in new_playlist {
@@ -209,11 +269,10 @@ fn map_channel(mut channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
         let ref_chan = &mut channel;
         let mut mock_processor = MockValueProcessor {};
         for m in &mapping.mapper {
-            let provider = ValueProvider { pli:  &ref_chan.clone() };
+            let provider = ValueProvider { pli: &ref_chan.clone() };
             let mut processor = MappingValueProcessor { pli: ref_chan, mapper: m };
             match &m.t_filter {
                 Some(filter) => {
-
                     if filter.filter(&provider, &mut mock_processor) {
                         apply_pattern!(&m.t_pattern, &provider, &mut processor);
                     }
@@ -360,7 +419,7 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
             }
             let elapsed = start_time.elapsed().as_secs();
             input_stats.insert(input_name.to_string(), create_input_stat(group_count, channel_count, error_list.len(),
-                                                           input.input_type, input_name, elapsed));
+                                                                         input.input_type, input_name, elapsed));
         }
     }
     if source_playlists.is_empty() {
@@ -428,7 +487,7 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
             let handles = &mut handle_list;
             let process = move || {
                 // TODO better way ?
-                let rt  = tokio::runtime::Runtime::new().unwrap();
+                let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
                     let (input_stats, target_stats, mut res_errors) = process_source(Arc::clone(&http_client), cfg, index, usr_trgts).await;
                     shared_errors.lock().await.append(&mut res_errors);
@@ -572,7 +631,6 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
 }
 
 fn process_epg(processed_fetched_playlists: &mut Vec<FetchedPlaylist>) -> (Vec<Epg>, Vec<PlaylistGroup>) {
-
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
 
@@ -625,16 +683,47 @@ pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, tar
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test() {
-        let data = [("yessport5", "heyessport5gold"), ("yessport5", "heyesport5gold")];
+    // #[test]
+    // fn test_jaro_winkeler() {
+    //     let data = [("yessport5", "heyessport5gold"), ("yessport5", "heyesport5gold")];
+    //
+    //     data.iter().for_each(|(first, second)|
+    //     println!("jaro_winkler {} = {} => {}", first, second, strsim::jaro_winkler(first, second)));
+    //     // println!("jaro {}", strsim::jaro(data.0, data.1));
+    //     // println!("levenhstein {}", strsim::levenshtein(data.0, data.1));
+    //     // println!("damerau_levenshtein {:?}", strsim::damerau_levenshtein(data.0, data.1));
+    //     // println!("osa distance {:?}", strsim::osa_distance(data.0, data.1));
+    //     // println!("sorensen dice {:?}", strsim::sorensen_dice(data.0, data.1));
+    // }
 
-        data.iter().for_each(|(first, second)|
-        println!("jaro_winkler {} = {} => {}", first, second, strsim::jaro_winkler(first, second)));
-        // println!("jaro {}", strsim::jaro(data.0, data.1));
-        // println!("levenhstein {}", strsim::levenshtein(data.0, data.1));
-        // println!("damerau_levenshtein {:?}", strsim::damerau_levenshtein(data.0, data.1));
-        // println!("osa distance {:?}", strsim::osa_distance(data.0, data.1));
-        // println!("sorensen dice {:?}", strsim::sorensen_dice(data.0, data.1));
+    use crate::model::config::{ConfigSortChannel, ItemField, SortOrder};
+    use crate::model::playlist::{PlaylistItem, PlaylistItemHeader};
+    use crate::processing::processor::playlist::playlistitem_comparator;
+    use regex::Regex;
+
+    #[test]
+    fn test_sort() {
+        let mut channels: Vec<PlaylistItem> = vec![
+            ("D", "HD"), ("A", "FHD"), ("Z", "HD"), ("K", "HD"), ("B", "HD"), ("A", "HD"),
+            ("K", "UHD"), ("C", "HD"), ("L", "FHD"), ("R", "UHD"), ("T", "SD"), ("A", "FHD"),
+        ].into_iter().map(|(name, quality)| PlaylistItem { header: PlaylistItemHeader { title: format!("Chanel {name} [{quality}]"), ..Default::default() } }).collect::<Vec<PlaylistItem>>().into();
+
+        let channel_sort = ConfigSortChannel {
+            field: ItemField::Caption,
+            group_pattern: ".*".to_string(),
+            order: SortOrder::Asc,
+            sequence: None,
+            t_sequence: Some(vec![
+                Regex::new(r"(?P<c1>.*?)\bUHD\b").unwrap(),
+                Regex::new(r"(?P<c1>.*?)\bFHD\b").unwrap(),
+                Regex::new(r"(?P<c1>.*?)\bHD\b").unwrap(),
+            ]),
+            t_re_group_pattern: Some(Regex::new(".*").unwrap()),
+        };
+
+        channels.sort_by(|chan1, chan2| playlistitem_comparator(chan1, chan2, &channel_sort, true));
+        let expected = vec!["Chanel K [UHD]", "Chanel R [UHD]", "Chanel A [FHD]", "Chanel A [FHD]", "Chanel L [FHD]", "Chanel A [HD]", "Chanel B [HD]", "Chanel C [HD]", "Chanel D [HD]", "Chanel K [HD]", "Chanel Z [HD]", "Chanel T [SD]"];
+        let sorted = channels.into_iter().map(|pli| pli.header.title.clone()).collect::<Vec<String>>();
+        assert_eq!(expected, sorted);
     }
 }
