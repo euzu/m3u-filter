@@ -1,9 +1,9 @@
 use crate::api::model::active_provider_manager::ProviderAllocation;
 use crate::model::config::{ConfigInput, ConfigInputAlias, InputType, InputUserInfo};
-use std::ops::Deref;
-use std::sync::Arc;
 use jsonwebtoken::get_current_timestamp;
 use log::debug;
+use std::ops::Deref;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Debug)]
@@ -83,12 +83,26 @@ impl ProviderConfig {
     }
 
     #[inline]
-    pub async fn is_over_limit(&self) -> bool {
+    pub async fn is_over_limit(&self, grace_period_timeout_secs: u64) -> bool {
         let max = self.max_connections;
         if max == 0 {
             return false;
         }
-        self.connection.read().await.current_connections > max
+        let mut guard = self.connection.write().await;
+        if guard.current_connections < self.max_connections {
+            guard.granted_grace = false;
+            guard.grace_ts = 0;
+        }
+
+        if guard.granted_grace {
+            let now = get_current_timestamp();
+            if now - guard.grace_ts <= grace_period_timeout_secs {
+                // Grace timeout still active, deny connection
+                debug!("Provider access denied, grace exhausted, too many connections: {}", self.name);
+                return true;
+            }
+        }
+        guard.current_connections > max
     }
 
     //
@@ -132,7 +146,7 @@ impl ProviderConfig {
             guard.granted_grace = true;
             guard.grace_ts = now;
             guard.current_connections += 1;
-            return ProviderConfigAllocation::GracePeriod
+            return ProviderConfigAllocation::GracePeriod;
         }
         ProviderConfigAllocation::Exhausted
     }

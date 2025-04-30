@@ -1,11 +1,13 @@
 use crate::model::api_proxy::UserConnectionPermission;
+use crate::model::config::Config;
+use crate::utils::default_utils::{default_grace_period_millis, default_grace_period_timeout_secs};
+use crate::utils::time_utils::current_time_secs;
 use jsonwebtoken::get_current_timestamp;
 use log::{debug, info};
+use rand::RngCore;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::model::config::Config;
-use crate::utils::default_utils::{default_grace_period_millis, default_grace_period_timeout_secs};
 
 pub struct UserConnectionGuard {
     manager: Arc<ActiveUserManager>,
@@ -21,22 +23,32 @@ impl Drop for UserConnectionGuard {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct UserSession {
+    pub token: u32,
+    pub virtual_id: u32,
+    pub provider: String,
+    pub stream_url: String,
+    pub ts: u64,
+    pub permission: UserConnectionPermission,
+}
+
 struct UserConnectionData {
     max_connections: u32,
     connections: u32,
     granted_grace: bool,
     grace_ts: u64,
-    token: Option<String>,
+    sessions: Vec<UserSession>,
 }
 
 impl UserConnectionData {
     fn new(max_connections: u32) -> Self {
         Self {
+            max_connections,
             connections: 1,
             granted_grace: false,
             grace_ts: 0,
-            token: None,
-            max_connections,
+            sessions: Vec::new(),
         }
     }
 }
@@ -79,6 +91,42 @@ impl ActiveUserManager {
         0
     }
 
+    async fn check_connection_permission(&self, username: &str, connection_data: &mut UserConnectionData) -> UserConnectionPermission {
+            let current_connections = connection_data.connections;
+
+            if current_connections < connection_data.max_connections {
+                // Reset grace period because user is back under max_connections
+                connection_data.granted_grace = false;
+                connection_data.grace_ts = 0;
+                return UserConnectionPermission::Allowed;
+            }
+
+            let now = get_current_timestamp();
+            // Check if user already used grace period
+            if connection_data.granted_grace {
+                if now - connection_data.grace_ts <= self.grace_period_timeout_secs {
+                    // Grace timeout still active, deny connection
+                    debug!("User access denied, grace exhausted, too many connections: {username}");
+                    return UserConnectionPermission::Exhausted;
+                }
+                // Grace timeout expired, reset grace counters
+                connection_data.granted_grace = false;
+                connection_data.grace_ts = 0;
+            }
+
+            if self.grace_period_millis > 0 && current_connections == connection_data.max_connections {
+                // Allow grace period once
+                connection_data.granted_grace = true;
+                connection_data.grace_ts = now;
+                debug!("Granted grace period for user access: {username}");
+                return UserConnectionPermission::GracePeriod;
+            }
+
+            // Too many connections, no grace allowed
+            debug!("User access denied, too many connections: {username}");
+            UserConnectionPermission::Exhausted
+    }
+
     pub async fn connection_permission(
         &self,
         username: &str,
@@ -86,42 +134,9 @@ impl ActiveUserManager {
     ) -> UserConnectionPermission {
         if max_connections > 0 {
             if let Some(connection_data) = self.user.write().await.get_mut(username) {
-                let current_connections = connection_data.connections;
-
-                if current_connections < max_connections {
-                    // Reset grace period because user is back under max_connections
-                    connection_data.granted_grace = false;
-                    connection_data.grace_ts = 0;
-                    return UserConnectionPermission::Allowed;
-                }
-
-                let now = get_current_timestamp();
-                // Check if user already used grace period
-                if connection_data.granted_grace {
-                    if now - connection_data.grace_ts <= self.grace_period_timeout_secs {
-                        // Grace timeout still active, deny connection
-                        debug!("User access denied, grace exhausted, too many connections: {username}");
-                        return UserConnectionPermission::Exhausted;
-                    }
-                    // Grace timeout expired, reset grace counters
-                    connection_data.granted_grace = false;
-                    connection_data.grace_ts = 0;
-                }
-
-                if self.grace_period_millis > 0 && current_connections == max_connections {
-                    // Allow grace period once
-                    connection_data.granted_grace = true;
-                    connection_data.grace_ts = now;
-                    debug!("Granted grace period for user access: {username}");
-                    return UserConnectionPermission::GracePeriod;
-                }
-
-                // Too many connections, no grace allowed
-                debug!("User access denied, too many connections: {username}");
-                return UserConnectionPermission::Exhausted;
+                return self.check_connection_permission(username, connection_data).await;
             }
         }
-
         UserConnectionPermission::Allowed
     }
 
@@ -158,50 +173,87 @@ impl ActiveUserManager {
             if connection_data.connections > 0 {
                 connection_data.connections -= 1;
             }
-
             // DO NOT reset granted_grace or grace_ts here!
             // We must preserve the grace period state until connection_permission() checks it.
 
-            if connection_data.connections == 0 {
-                lock.remove(username);
-            } else if connection_data.connections < connection_data.max_connections {
-                connection_data.token = None;
-            }
+            // if connection_data.connections == 0 {
+            //     lock.remove(username);
+            // } else
+            // if connection_data.connections < connection_data.max_connections {
+            //     connection_data.token = None;
+            // }
         }
         drop(lock);
 
         self.log_active_user().await;
     }
 
-    pub async fn get_or_create_token(&self, username: &str) -> Option<String> {
-        let token = crate::utils::string_utils::generate_random_string(6);
-        let mut result = None;
+    fn find_user_session(token: u32, sessions: &[UserSession]) -> Option<&UserSession> {
+        for session in sessions {
+            if session.token == token {
+                return Some(session);
+            }
+        }
+        None
+    }
+
+    pub async fn create_user_session(&self, username: &str, virtual_id: u32, provider: &str, stream_url: &str, connection_permission: UserConnectionPermission) -> Option<u32> {
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {
-            result = if connection_data.token.is_some() {
-                connection_data.token.clone()
-            } else {
-                connection_data.token = Some(token.to_string());
-                Some(token)
+            let session_token = rand::rng().next_u32();
+            let session = UserSession {
+                token: session_token,
+                virtual_id,
+                provider: provider.to_string(),
+                stream_url: stream_url.to_string(),
+                ts: current_time_secs(),
+                permission: connection_permission,
             };
+            connection_data.sessions.push(session);
+            return Some(session_token);
         }
         drop(lock);
-        result
+        None
     }
 
-    pub async fn get_token(&self, username: &str) -> Option<String> {
+    pub async fn get_user_session(&self, username: &str, token: u32) -> Option<UserSession> {
+        self.update_user_session(username, token).await
+        // let mut lock = self.user.write().await;
+        // lock.get_mut(username)
+        //     .and_then(|conn| Self::find_user_session(token, &conn.sessions))
+        //     .cloned() // owned copy
+    }
+
+    async fn update_user_session(&self, username: &str, token: u32) -> Option<UserSession> {
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(username) {
-            connection_data.token.clone()
-        } else {
-            None
+            if connection_data.max_connections == 0 {
+                return Self::find_user_session(token, &connection_data.sessions).cloned();
+            }
+
+            // Separate mutable borrow of the session
+            let mut found_session_index = None;
+            for (i, session) in connection_data.sessions.iter().enumerate() {
+                if session.token == token {
+                    found_session_index = Some(i);
+                    break;
+                }
+            }
+
+            if let Some(index) = found_session_index {
+                let session_permission = connection_data.sessions[index].permission.clone();
+                if session_permission == UserConnectionPermission::GracePeriod {
+                    let new_permission = self.check_connection_permission(username, connection_data).await;
+                    connection_data.sessions[index].permission = new_permission;
+                }
+                return Some(connection_data.sessions[index].clone());
+            }
         }
-    }
-    pub async fn has_token(&self, username: &str, token: &str) -> bool {
-        self.get_token(username).await.is_some_and(|t| token == t)
+        None
     }
 
-   async fn log_active_user(&self) {
+
+    async fn log_active_user(&self) {
         if self.log_active_user {
             let user_count = self.active_users().await;
             let user_connection_count = self.active_connections().await;

@@ -19,13 +19,12 @@ use crate::model::playlist::{PlaylistEntry, PlaylistItemType, XtreamCluster};
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::tools::lru_cache::LRUResourceCache;
 use crate::utils::constants::{DASH_EXT, HLS_EXT};
-use crate::utils::crypto_utils::{deobfuscate_text, obfuscate_text};
 use crate::utils::default_utils::default_grace_period_millis;
 use crate::utils::file::file_utils::create_new_file_for_write;
 use crate::utils::network::request;
 use crate::utils::network::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info};
 use crate::utils::size_utils::human_readable_byte_size;
-use crate::utils::{debug_if_enabled, sys_utils, trace_if_enabled};
+use crate::utils::{debug_if_enabled, hash_utils, sys_utils, trace_if_enabled};
 use crate::BUILD_TIMESTAMP;
 use axum::body::Body;
 use axum::http::HeaderMap;
@@ -83,7 +82,9 @@ macro_rules! try_result_bad_request {
 
 pub use try_option_bad_request;
 pub use try_result_bad_request;
+use crate::api::model::active_user_manager::UserSession;
 use crate::api::model::provider_config::ProviderConfig;
+use crate::utils::hash_utils::base64_to_u32;
 
 pub fn get_server_time() -> String {
     chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string()
@@ -473,31 +474,16 @@ fn is_throttled_stream(item_type: PlaylistItemType, throttle_kbps: usize) -> boo
 
 const SESSION_COOKIE_NAME: &str = "m3uflt_session=";
 
-fn create_delete_session_cookie() -> String {
-    format!("{SESSION_COOKIE_NAME}; Max-Age=0; Path=/; HttpOnly")
+// fn create_delete_session_cookie() -> String {
+//     format!("{SESSION_COOKIE_NAME}; Max-Age=0; Path=/; HttpOnly")
+// }
+
+pub fn create_session_cookie(token: u32) -> String {
+    let cookie = hash_utils::u32_to_base64(token);
+    format!("{SESSION_COOKIE_NAME}{cookie}; Path=/; HttpOnly; SameSite=Lax")
 }
 
-fn create_session_cookie(cookie: &str) -> String {
-    // 3 hours should be enough
-    format!("{SESSION_COOKIE_NAME}{cookie}; Max-Age=10800; HttpOnly; SameSite=Strict")
-}
-
-pub fn create_token_for_provider(secret: &[u8], token: &str, virtual_id: u32, provider_name: &str, stream_url: &str) -> Option<String> {
-    if let Ok(cookie_value) = obfuscate_text(secret, &format!("{virtual_id}:{token}:{provider_name}@{stream_url}")) {
-        return Some(cookie_value);
-    }
-    None
-}
-
-
-pub fn create_session_cookie_for_provider(secret: &[u8], token: &str, virtual_id: u32, provider_name: &str, stream_url: &str) -> Option<String> {
-    if let Some(cookie_value) = create_token_for_provider(secret, token, virtual_id, provider_name, stream_url) {
-        return Some(create_session_cookie(&cookie_value));
-    }
-    None
-}
-
-pub fn read_session_cookie(headers: &HeaderMap) -> Option<String> {
+pub fn read_session_token(headers: &HeaderMap) -> Option<u32> {
     if let Some(cookie_header) = headers.get(axum::http::header::COOKIE) {
         let cookie_value = cookie_header.to_str().unwrap_or_default();
         if let Some(cookie) = cookie_value.split(';')
@@ -506,38 +492,10 @@ pub fn read_session_cookie(headers: &HeaderMap) -> Option<String> {
             .and_then(|p| {
                 p.strip_prefix(SESSION_COOKIE_NAME).map(str::trim)
             }) {
-            return Some(cookie.to_string());
+            return base64_to_u32(cookie);
         }
     }
     None
-}
-
-/// # Panics
-pub fn get_stream_info_from_crypted_cookie(secret: &[u8], cookie: &str) -> Option<(String, u32, String, String)> {
-    if let Ok(decrypted) = deobfuscate_text(secret, cookie) {
-        let (virtual_id_and_provider, stream_url) = decrypted.split_once('@')?;
-        let mut items: Vec<String> = virtual_id_and_provider.split(':').filter(|s| !s.is_empty()).map(ToString::to_string).collect();
-        if items.len() != 3 {
-            return None;
-        }
-        items.reverse();
-        let virtual_id = items.pop().unwrap();
-        let vid = virtual_id.parse::<u32>().ok()?;
-        let token = items.pop().unwrap();
-        let provider_name = items.pop().unwrap();
-        return Some((
-            token,
-            vid,
-            provider_name.to_string(),
-            stream_url.to_string(),
-        ));
-    }
-    None
-}
-
-pub fn get_stream_info_from_cookie(secret: &[u8], headers: &HeaderMap) -> Option<(String, u32, String, String)> {
-    let encrypted_cookie = read_session_cookie(headers)?;
-    get_stream_info_from_crypted_cookie(secret, &encrypted_cookie)
 }
 
 fn prepare_body_stream(app_state: &AppState, item_type: PlaylistItemType, stream: ActiveClientStream) -> Body {
@@ -550,53 +508,38 @@ fn prepare_body_stream(app_state: &AppState, item_type: PlaylistItemType, stream
     body_stream
 }
 
-pub fn bad_response_with_delete_cookie() -> impl IntoResponse + Send {
-    error!("Cant open provider forced stream, cookie invalid");
-    if let Ok(delete_cookie_header) = axum::http::header::HeaderValue::from_str(&create_delete_session_cookie()) {
-        ([(axum::http::header::SET_COOKIE, delete_cookie_header)], StatusCode::BAD_REQUEST).into_response()
-    } else {
-        StatusCode::BAD_REQUEST.into_response()
-    }
-}
 
 /// # Panics
 pub async fn force_provider_stream_response(app_state: &AppState,
-                                            cookie: &str,
-                                            virtual_id: u32,
+                                            user_session: &UserSession,
                                             item_type: PlaylistItemType,
                                             req_headers: &HeaderMap,
                                             input: &ConfigInput,
                                             user: &ProxyUserCredentials) -> impl axum::response::IntoResponse + Send {
-    if let Some((stream_token, stream_virtual_id, provider_name, stream_url)) = get_stream_info_from_crypted_cookie(&app_state.config.t_encrypt_secret, cookie) {
-        if stream_virtual_id == virtual_id && app_state.active_users.has_token(&user.username, &stream_token).await {
-            let stream_options = get_stream_options(app_state);
-            let share_stream = false;
-            let connection_permission = UserConnectionPermission::Allowed;
+    let stream_options = get_stream_options(app_state);
+    let share_stream = false;
+    let connection_permission = UserConnectionPermission::Allowed;
 
-            let mut stream_details =
-                create_stream_response_details(app_state, &stream_options, &stream_url, req_headers, input, item_type, share_stream, connection_permission.clone(), Some(&provider_name)).await;
+    let mut stream_details =
+        create_stream_response_details(app_state, &stream_options, &user_session.stream_url, req_headers, input, item_type, share_stream, connection_permission.clone(), Some(&user_session.provider)).await;
 
-            if stream_details.has_stream() {
-                let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
-                let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
+    if stream_details.has_stream() {
+        let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
+        let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
 
-                let (status_code, header_map) = get_stream_response_with_headers(provider_response);
-                let mut response = axum::response::Response::builder()
-                    .status(status_code);
-                for (key, value) in &header_map {
-                    response = response.header(key, value);
-                }
-
-                response = response.header(axum::http::header::SET_COOKIE, create_session_cookie(cookie));
-
-                let body_stream = prepare_body_stream(app_state, item_type, stream);
-                debug_if_enabled!("Streaming provider forced stream request from {}", sanitize_sensitive_info(&stream_url));
-                return response.body(body_stream).unwrap().into_response();
-            }
-            drop(stream_details.provider_connection_guard.take());
+        let (status_code, header_map) = get_stream_response_with_headers(provider_response);
+        let mut response = axum::response::Response::builder()
+            .status(status_code);
+        for (key, value) in &header_map {
+            response = response.header(key, value);
         }
+
+        let body_stream = prepare_body_stream(app_state, item_type, stream);
+        debug_if_enabled!("Streaming provider forced stream request from {}", sanitize_sensitive_info(&user_session.stream_url));
+        return response.body(body_stream).unwrap().into_response();
     }
-    bad_response_with_delete_cookie().into_response()
+    drop(stream_details.provider_connection_guard.take());
+    StatusCode::BAD_REQUEST.into_response()
 }
 
 /// # Panics
@@ -631,7 +574,7 @@ pub async fn stream_response(app_state: &AppState,
         let provider_response = stream_details.stream_info.as_ref().map(|(h, sc)| (h.clone(), *sc));
         let provider_name = stream_details.provider_connection_guard.as_ref().and_then(ProviderConnectionGuard::get_provider_name);
 
-        let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
+        let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission.clone()).await;
         let stream_resp = if share_stream {
             debug_if_enabled!("Streaming shared stream request from {}", sanitize_sensitive_info(stream_url));
             // Shared Stream response
@@ -658,10 +601,8 @@ pub async fn stream_response(app_state: &AppState,
 
             if let Some(provider) = provider_name {
                 if matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash | PlaylistItemType::Video | PlaylistItemType::Series) {
-                    if let Some(grace_token) = app_state.active_users.get_or_create_token(&user.username).await {
-                        if let Some(cookie_value) = create_session_cookie_for_provider(&app_state.config.t_encrypt_secret, &grace_token, virtual_id, &provider, stream_url) {
-                            response = response.header(axum::http::header::SET_COOKIE, &cookie_value);
-                        }
+                    if let Some(token) = app_state.active_users.create_user_session(&user.username, virtual_id, &provider, &stream_url, connection_permission).await {
+                        response = response.header(axum::http::header::SET_COOKIE, &create_session_cookie(token));
                     }
                 }
             }
@@ -828,68 +769,30 @@ pub fn redirect(url: &str) -> impl IntoResponse {
         .unwrap()
 }
 
-pub async fn is_seek_response(
-    app_state: &AppState,
+pub async fn is_seek_request<'a>(
     cluster: XtreamCluster,
-    virtual_id: u32,
     req_headers: &HeaderMap,
-    username: &str,
-) -> Option<String> {
+) -> bool {
     // seek only for non-live streams
     if cluster == XtreamCluster::Live {
-        return None;
+        return false;
     }
 
-    let cookie = read_session_cookie(req_headers)?;
-    match get_stream_info_from_crypted_cookie(&app_state.config.t_encrypt_secret, &cookie) {
-        Some((token, vid, _, _)) if vid == virtual_id => {
-            if !app_state.active_users.has_token(username, &token).await {
-                return None;
-            }
+    // seek requests contains range header
+    let range = req_headers
+        .get("range")
+        .and_then(|h| h.to_str().ok())
+        .map(ToString::to_string);
+
+    if let Some(range) = range {
+        if range.starts_with("bytes=0-") {
+            return false;
         }
-        _ => return None,
-    }
-
-    // seek requests contain range header
-    let range = req_headers.get("range")?.to_str().ok()?;
-    if range.starts_with("bytes=0-") {
-        return None;
-    }
-
-    read_session_cookie(req_headers)
-}
-
-pub async fn check_force_provider(app_state: &AppState, virtual_id: u32, item_type: PlaylistItemType, req_headers: &HeaderMap, user: &ProxyUserCredentials) -> (Option<String>, UserConnectionPermission) {
-    if !matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash | PlaylistItemType::Series | PlaylistItemType::Video) {
-        return (None, user.connection_permission(app_state).await);
-    }
-
-    // if you have multi provider setup you need to delegate the same hls requests
-    // to the same provider. Hls has alternating m3u8 and stream requests.
-    let mut provider_name = None;
-    if let Some((stream_token, stream_virtual_id, stream_provider_name, _stream_url)) = get_stream_info_from_cookie(&app_state.config.t_encrypt_secret, req_headers) {
-        if stream_virtual_id == virtual_id && app_state.active_users.has_token(&user.username, &stream_token).await {
-            provider_name = Some(stream_provider_name);
+        if range.starts_with("bytes=") {
+            return true;
         }
     }
-
-    let connection_permission = if provider_name.is_some() { UserConnectionPermission::Allowed } else {
-        let permission = user.connection_permission(app_state).await;
-        match permission {
-            UserConnectionPermission::GracePeriod => {
-                if app_state.active_users.get_token(&user.username).await.is_some() {
-                    UserConnectionPermission::Exhausted
-                } else {
-                    UserConnectionPermission::GracePeriod
-                }
-            }
-            _ => permission,
-        }
-    };
-
-    (provider_name, connection_permission)
-}
-
+    false}
 
 #[cfg(test)]
 mod tests {

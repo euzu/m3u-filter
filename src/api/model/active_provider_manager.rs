@@ -563,7 +563,7 @@ impl ActiveProviderManager {
     pub async fn is_over_limit(&self, provider_name: &str) -> bool {
         let providers = self.providers.read().await;
         if let Some((_, config)) = Self::get_provider_config(provider_name, &providers) {
-            config.is_over_limit().await
+            config.is_over_limit(self.grace_period_timeout_secs).await
         } else {
             false
         }

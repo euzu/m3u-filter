@@ -21,7 +21,7 @@ use crate::api::model::stream::ProviderStreamResponse;
 pub enum CustomVideoStreamType {
     ChannelUnavailable,
     UserConnectionsExhausted,
-    // ProviderConnectionsExhausted,
+    ProviderConnectionsExhausted,
 }
 
 fn create_video_stream(video: Option<&Arc<Vec<u8>>>, headers: &[(String, String)], log_message: &str) -> ProviderStreamResponse {
@@ -53,7 +53,7 @@ pub fn create_custom_video_stream_response(config: &Config, video_response: &Cus
     if let (Some(stream), Some((headers, status_code))) = match video_response {
         CustomVideoStreamType::ChannelUnavailable => create_channel_unavailable_stream(config, &[], StatusCode::BAD_REQUEST),
         CustomVideoStreamType::UserConnectionsExhausted => create_user_connections_exhausted_stream(config, &[]),
-        // CustomVideoStreamType::ProviderConnectionsExhausted => create_provider_connections_exhausted_stream(config, &[]),
+        CustomVideoStreamType::ProviderConnectionsExhausted => create_provider_connections_exhausted_stream(config, &[]),
     } {
         let mut builder = axum::response::Response::builder()
             .status(status_code);
