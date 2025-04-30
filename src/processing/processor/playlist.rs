@@ -1,35 +1,35 @@
-use crate::{Config};
 use crate::model::config::{ConfigInput, ConfigRename, SortOrder};
 use crate::utils::network::epg;
 use crate::utils::network::m3u;
 use crate::utils::network::xtream;
+use crate::Config;
 use core::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc};
-use tokio::sync::Mutex;
+use std::sync::Arc;
 use std::thread;
+use tokio::sync::Mutex;
 
-use log::{debug, error, info, log_enabled, trace, warn, Level};
-use std::time::Instant;
-use deunicode::deunicode;
 use crate::foundation::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, get_errors_notify_message, notify_err};
+use crate::m3u_filter_error::{get_errors_notify_message, notify_err, M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{send_message, MsgKind};
 use crate::model::config::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, InputType,
                            ItemField, ProcessTargets, ProcessingOrder};
 use crate::model::mapping::{CounterModifier, Mapping, MappingValueProcessor};
 use crate::model::playlist::{FetchedPlaylist, FieldGetAccessor, FieldSetAccessor, PlaylistEntry, PlaylistGroup, PlaylistItem, UUIDType, XtreamCluster};
 use crate::model::stats::{InputStats, PlaylistStats, SourceStats, TargetStats};
-use crate::processing::processor::affix::apply_affixes;
 use crate::processing::playlist_watch::process_group_watch;
+use crate::processing::processor::affix::apply_affixes;
 use crate::processing::processor::xtream_series::playlist_resolve_series;
 use crate::processing::processor::xtream_vod::playlist_resolve_vod;
 use crate::repository::playlist_repository::persist_playlist;
 use crate::utils::default_utils::default_as_default;
-use crate::utils::{debug_if_enabled};
+use crate::utils::debug_if_enabled;
+use deunicode::deunicode;
+use log::{debug, error, info, log_enabled, trace, warn, Level};
+use std::time::Instant;
 
-use crate::model::xmltv::{Epg};
+use crate::model::xmltv::Epg;
 use crate::processing::parser::xmltv::flatten_tvguide;
 use crate::processing::processor::epg::process_playlist_epg;
 use crate::utils::step_measure::StepMeasure;
@@ -122,8 +122,14 @@ fn playlist_comparator(
 
                 Ordering::Equal
             }
-            (Some(_), None) => Ordering::Less,
-            (None, Some(_)) => Ordering::Greater,
+            (Some(_), None) => match order {
+                SortOrder::Asc => Ordering::Less,
+                SortOrder::Desc => Ordering::Greater,
+            },
+            (None, Some(_)) => match order {
+                SortOrder::Asc => Ordering::Greater,
+                SortOrder::Desc => Ordering::Less,
+            },
             (None, None) => {
                 // NP match → fallback
                 let o = value_a.cmp(value_b);
@@ -187,7 +193,7 @@ fn sort_playlist(target: &ConfigTarget, new_playlist: &mut [PlaylistGroup]) {
 fn channel_no_playlist(new_playlist: &mut [PlaylistGroup]) {
     let assigned_chnos: HashSet<u32> = new_playlist.iter().flat_map(|g| &g.channels)
         .filter(|c| !c.header.chno.is_empty())
-        .map(|c|c.header.chno.as_str())
+        .map(|c| c.header.chno.as_str())
         .flat_map(str::parse::<u32>).collect();
     let mut chno = 1;
     for group in new_playlist {
@@ -263,11 +269,10 @@ fn map_channel(mut channel: PlaylistItem, mapping: &Mapping) -> PlaylistItem {
         let ref_chan = &mut channel;
         let mut mock_processor = MockValueProcessor {};
         for m in &mapping.mapper {
-            let provider = ValueProvider { pli:  &ref_chan.clone() };
+            let provider = ValueProvider { pli: &ref_chan.clone() };
             let mut processor = MappingValueProcessor { pli: ref_chan, mapper: m };
             match &m.t_filter {
                 Some(filter) => {
-
                     if filter.filter(&provider, &mut mock_processor) {
                         apply_pattern!(&m.t_pattern, &provider, &mut processor);
                     }
@@ -414,7 +419,7 @@ async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_i
             }
             let elapsed = start_time.elapsed().as_secs();
             input_stats.insert(input_name.to_string(), create_input_stat(group_count, channel_count, error_list.len(),
-                                                           input.input_type, input_name, elapsed));
+                                                                         input.input_type, input_name, elapsed));
         }
     }
     if source_playlists.is_empty() {
@@ -482,7 +487,7 @@ async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user
             let handles = &mut handle_list;
             let process = move || {
                 // TODO better way ?
-                let rt  = tokio::runtime::Runtime::new().unwrap();
+                let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
                     let (input_stats, target_stats, mut res_errors) = process_source(Arc::clone(&http_client), cfg, index, usr_trgts).await;
                     shared_errors.lock().await.append(&mut res_errors);
@@ -626,7 +631,6 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
 }
 
 fn process_epg(processed_fetched_playlists: &mut Vec<FetchedPlaylist>) -> (Vec<Epg>, Vec<PlaylistGroup>) {
-
     let mut new_playlist = vec![];
     let mut new_epg = vec![];
 
@@ -692,17 +696,17 @@ mod tests {
     //     // println!("sorensen dice {:?}", strsim::sorensen_dice(data.0, data.1));
     // }
 
-    use regex::Regex;
     use crate::model::config::{ConfigSortChannel, ItemField, SortOrder};
     use crate::model::playlist::{PlaylistItem, PlaylistItemHeader};
     use crate::processing::processor::playlist::playlistitem_comparator;
+    use regex::Regex;
 
     #[test]
     fn test_sort() {
         let mut channels: Vec<PlaylistItem> = vec![
             ("D", "HD"), ("A", "FHD"), ("Z", "HD"), ("K", "HD"), ("B", "HD"), ("A", "HD"),
             ("K", "UHD"), ("C", "HD"), ("L", "FHD"), ("R", "UHD"), ("T", "SD"), ("A", "FHD"),
-        ].into_iter().map(|(name, quality)| PlaylistItem {header: PlaylistItemHeader {title: format!("Chanel {name} [{quality}]"),.. Default::default()},}).collect::<Vec<PlaylistItem>>().into();
+        ].into_iter().map(|(name, quality)| PlaylistItem { header: PlaylistItemHeader { title: format!("Chanel {name} [{quality}]"), ..Default::default() } }).collect::<Vec<PlaylistItem>>().into();
 
         let channel_sort = ConfigSortChannel {
             field: ItemField::Caption,
@@ -718,7 +722,7 @@ mod tests {
         };
 
         channels.sort_by(|chan1, chan2| playlistitem_comparator(chan1, chan2, &channel_sort, true));
-        let expected = vec! ["Chanel K [UHD]", "Chanel R [UHD]", "Chanel A [FHD]", "Chanel A [FHD]", "Chanel L [FHD]", "Chanel A [HD]", "Chanel B [HD]", "Chanel C [HD]", "Chanel D [HD]", "Chanel K [HD]", "Chanel Z [HD]", "Chanel T [SD]"];
+        let expected = vec!["Chanel K [UHD]", "Chanel R [UHD]", "Chanel A [FHD]", "Chanel A [FHD]", "Chanel L [FHD]", "Chanel A [HD]", "Chanel B [HD]", "Chanel C [HD]", "Chanel D [HD]", "Chanel K [HD]", "Chanel Z [HD]", "Chanel T [SD]"];
         let sorted = channels.into_iter().map(|pli| pli.header.title.clone()).collect::<Vec<String>>();
         assert_eq!(expected, sorted);
     }
