@@ -1,4 +1,4 @@
-use crate::model::api_proxy::UserConnectionPermission;
+use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::Config;
 use crate::utils::default_utils::{default_grace_period_millis, default_grace_period_timeout_secs};
 use crate::utils::time_utils::current_time_secs;
@@ -7,6 +7,7 @@ use log::{debug, info};
 use rand::RngCore;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::RwLock;
 
 pub struct UserConnectionGuard {
@@ -42,10 +43,10 @@ struct UserConnectionData {
 }
 
 impl UserConnectionData {
-    fn new(max_connections: u32) -> Self {
+    fn new(connections: u32, max_connections: u32) -> Self {
         Self {
             max_connections,
-            connections: 1,
+            connections,
             granted_grace: false,
             grace_ts: 0,
             sessions: Vec::new(),
@@ -58,6 +59,7 @@ pub struct ActiveUserManager {
     grace_period_timeout_secs: u64,
     log_active_user: bool,
     user: Arc<RwLock<HashMap<String, UserConnectionData>>>,
+    gc_ts: Option<AtomicU64>,
 }
 
 impl ActiveUserManager {
@@ -72,6 +74,7 @@ impl ActiveUserManager {
             grace_period_timeout_secs,
             log_active_user,
             user: Arc::new(RwLock::new(HashMap::new())),
+            gc_ts: Some(AtomicU64::new(current_time_secs())),
         }
     }
 
@@ -81,6 +84,7 @@ impl ActiveUserManager {
             grace_period_timeout_secs: self.grace_period_timeout_secs,
             log_active_user: self.log_active_user,
             user: Arc::clone(&self.user),
+            gc_ts: None,
         }
     }
 
@@ -91,40 +95,40 @@ impl ActiveUserManager {
         0
     }
 
-    async fn check_connection_permission(&self, username: &str, connection_data: &mut UserConnectionData) -> UserConnectionPermission {
-            let current_connections = connection_data.connections;
+    fn check_connection_permission(&self, username: &str, connection_data: &mut UserConnectionData) -> UserConnectionPermission {
+        let current_connections = connection_data.connections;
 
-            if current_connections < connection_data.max_connections {
-                // Reset grace period because user is back under max_connections
-                connection_data.granted_grace = false;
-                connection_data.grace_ts = 0;
-                return UserConnectionPermission::Allowed;
+        if current_connections < connection_data.max_connections {
+            // Reset grace period because user is back under max_connections
+            connection_data.granted_grace = false;
+            connection_data.grace_ts = 0;
+            return UserConnectionPermission::Allowed;
+        }
+
+        let now = get_current_timestamp();
+        // Check if user already used grace period
+        if connection_data.granted_grace {
+            if now - connection_data.grace_ts <= self.grace_period_timeout_secs {
+                // Grace timeout still active, deny connection
+                debug!("User access denied, grace exhausted, too many connections: {username}");
+                return UserConnectionPermission::Exhausted;
             }
+            // Grace timeout expired, reset grace counters
+            connection_data.granted_grace = false;
+            connection_data.grace_ts = 0;
+        }
 
-            let now = get_current_timestamp();
-            // Check if user already used grace period
-            if connection_data.granted_grace {
-                if now - connection_data.grace_ts <= self.grace_period_timeout_secs {
-                    // Grace timeout still active, deny connection
-                    debug!("User access denied, grace exhausted, too many connections: {username}");
-                    return UserConnectionPermission::Exhausted;
-                }
-                // Grace timeout expired, reset grace counters
-                connection_data.granted_grace = false;
-                connection_data.grace_ts = 0;
-            }
+        if self.grace_period_millis > 0 && current_connections == connection_data.max_connections {
+            // Allow grace period once
+            connection_data.granted_grace = true;
+            connection_data.grace_ts = now;
+            debug!("Granted grace period for user access: {username}");
+            return UserConnectionPermission::GracePeriod;
+        }
 
-            if self.grace_period_millis > 0 && current_connections == connection_data.max_connections {
-                // Allow grace period once
-                connection_data.granted_grace = true;
-                connection_data.grace_ts = now;
-                debug!("Granted grace period for user access: {username}");
-                return UserConnectionPermission::GracePeriod;
-            }
-
-            // Too many connections, no grace allowed
-            debug!("User access denied, too many connections: {username}");
-            UserConnectionPermission::Exhausted
+        // Too many connections, no grace allowed
+        debug!("User access denied, too many connections: {username}");
+        UserConnectionPermission::Exhausted
     }
 
     pub async fn connection_permission(
@@ -134,7 +138,7 @@ impl ActiveUserManager {
     ) -> UserConnectionPermission {
         if max_connections > 0 {
             if let Some(connection_data) = self.user.write().await.get_mut(username) {
-                return self.check_connection_permission(username, connection_data).await;
+                return self.check_connection_permission(username, connection_data);
             }
         }
         UserConnectionPermission::Allowed
@@ -155,7 +159,7 @@ impl ActiveUserManager {
             connection_data.connections += 1;
             connection_data.max_connections = max_connections;
         } else {
-            lock.insert(username.to_string(), UserConnectionData::new(max_connections));
+            lock.insert(username.to_string(), UserConnectionData::new(1, max_connections));
         }
         drop(lock);
 
@@ -189,39 +193,42 @@ impl ActiveUserManager {
     }
 
     fn find_user_session(token: u32, sessions: &[UserSession]) -> Option<&UserSession> {
-        for session in sessions {
-            if session.token == token {
-                return Some(session);
-            }
-        }
-        None
+        sessions.iter().find(|&session| session.token == token)
     }
 
-    pub async fn create_user_session(&self, username: &str, virtual_id: u32, provider: &str, stream_url: &str, connection_permission: UserConnectionPermission) -> Option<u32> {
-        let mut lock = self.user.write().await;
-        if let Some(connection_data) = lock.get_mut(username) {
-            let session_token = rand::rng().next_u32();
-            let session = UserSession {
-                token: session_token,
-                virtual_id,
-                provider: provider.to_string(),
-                stream_url: stream_url.to_string(),
-                ts: current_time_secs(),
-                permission: connection_permission,
-            };
-            connection_data.sessions.push(session);
-            return Some(session_token);
+    fn new_user_session(virtual_id: u32, provider: &str, stream_url: &str, connection_permission: UserConnectionPermission) -> UserSession {
+        let session_token = rand::rng().next_u32();
+        UserSession {
+            token: session_token,
+            virtual_id,
+            provider: provider.to_string(),
+            stream_url: stream_url.to_string(),
+            ts: current_time_secs(),
+            permission: connection_permission,
         }
-        drop(lock);
-        None
+    }
+
+    pub async fn create_user_session(&self, user: &ProxyUserCredentials, virtual_id: u32, provider: &str, stream_url: &str, connection_permission: UserConnectionPermission) -> Option<u32> {
+        let mut lock = self.user.write().await;
+        if let Some(connection_data) = lock.get_mut(&user.username) {
+            let session = Self::new_user_session(virtual_id, provider, stream_url, connection_permission);
+            self.gc().await;
+            let token = session.token;
+            connection_data.sessions.push(session);
+            Some(token)
+        } else {
+            let mut connection_data = UserConnectionData::new(0, user.max_connections);
+            let session = Self::new_user_session(virtual_id, provider, stream_url, connection_permission);
+            self.gc().await;
+            let token = session.token;
+            connection_data.sessions.push(session);
+            lock.insert(user.username.to_string(), connection_data);
+            Some(token)
+        }
     }
 
     pub async fn get_user_session(&self, username: &str, token: u32) -> Option<UserSession> {
         self.update_user_session(username, token).await
-        // let mut lock = self.user.write().await;
-        // lock.get_mut(username)
-        //     .and_then(|conn| Self::find_user_session(token, &conn.sessions))
-        //     .cloned() // owned copy
     }
 
     async fn update_user_session(&self, username: &str, token: u32) -> Option<UserSession> {
@@ -243,7 +250,7 @@ impl ActiveUserManager {
             if let Some(index) = found_session_index {
                 let session_permission = connection_data.sessions[index].permission.clone();
                 if session_permission == UserConnectionPermission::GracePeriod {
-                    let new_permission = self.check_connection_permission(username, connection_data).await;
+                    let new_permission = self.check_connection_permission(username, connection_data);
                     connection_data.sessions[index].permission = new_permission;
                 }
                 return Some(connection_data.sessions[index].clone());
@@ -252,12 +259,23 @@ impl ActiveUserManager {
         None
     }
 
-
     async fn log_active_user(&self) {
         if self.log_active_user {
             let user_count = self.active_users().await;
             let user_connection_count = self.active_connections().await;
             info!("Active Users: {user_count}, Active User Connections: {user_connection_count}");
+        }
+    }
+
+    async fn gc(&self) {
+        if let Some(gc_ts) = &self.gc_ts {
+            let ts = gc_ts.load(Ordering::SeqCst);
+            if current_time_secs() - ts > 10_800 { // 3 hours
+                let mut lock = self.user.write().await;
+                for (_, connection_data) in lock.iter_mut() {
+                    connection_data.sessions.retain(|s| current_time_secs() - s.ts < 10_800);
+                }
+            }
         }
     }
 }

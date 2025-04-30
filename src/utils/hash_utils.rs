@@ -28,11 +28,11 @@ pub fn generate_playlist_uuid(key: &str, provider_id: &str, item_type: PlaylistI
 pub fn u32_to_base64(value: u32) -> String {
     // big-endian is safer and more portable when you care about consistent ordering or cross-platform data
     let bytes = value.to_be_bytes();
-    general_purpose::STANDARD.encode(&bytes)
+    general_purpose::URL_SAFE_NO_PAD.encode(bytes)
 }
 
 pub fn base64_to_u32(encoded: &str) -> Option<u32> {
-    let decoded = general_purpose::STANDARD.decode(encoded).ok()?;
+    let decoded = general_purpose::URL_SAFE_NO_PAD.decode(encoded).ok()?;
 
     if decoded.len() != 4 {
         return None;

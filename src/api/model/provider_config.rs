@@ -152,6 +152,7 @@ impl ProviderConfig {
     }
 
     // is intended to use with redirects, to cycle through provider
+    // do not increment and connection counter!
     async fn get_next(&self, grace: bool, grace_period_timeout_secs: u64) -> bool {
         if self.max_connections == 0 {
             return true;
@@ -162,7 +163,6 @@ impl ProviderConfig {
             if connections < self.max_connections {
                 guard.granted_grace = false;
                 guard.grace_ts = 0;
-                guard.current_connections += 1;
             }
 
             let now = get_current_timestamp();

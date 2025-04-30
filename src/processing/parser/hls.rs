@@ -28,7 +28,7 @@ pub struct RewriteHlsProps<'a> {
     pub hls_url: String,
     pub virtual_id: u32,
     pub input_id: u16,
-    pub user_token: u32,
+    pub user_token: Option<u32>,
 }
 
 fn rewrite_hls_url(input: &str, replacement: &str) -> String {
@@ -51,8 +51,10 @@ fn rewrite_uri_attrib(line: &str, props: &RewriteHlsProps) -> String {
     if let Some(caps) = CONSTANTS.re_hls_uri.captures(line) {
         let uri = &caps[1];
         let target_url = &rewrite_hls_url(&props.hls_url, uri);
-        if let Some(token) = create_hls_session_token_and_url(props.secret, props.user_token, target_url) {
-            return CONSTANTS.re_hls_uri.replace(line, format!(r#"URI="{token}""#)).to_string();
+        if let Some(user_token) = &props.user_token {
+            if let Some(token) = create_hls_session_token_and_url(props.secret, *user_token, target_url) {
+                return CONSTANTS.re_hls_uri.replace(line, format!(r#"URI="{token}""#)).to_string();
+            }
         }
     }
     line.to_string()
@@ -76,17 +78,19 @@ pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> Stri
         } else {
             rewrite_hls_url(&props.hls_url, line)
         };
-        if let Some(token) = create_hls_session_token_and_url(props.secret, props.user_token, &target_url) {
-            let url = format!(
-                "{}/{HLS_PREFIX}/{}/{}/{}/{}/{}",
-                props.base_url,
-                username,
-                password,
-                props.input_id,
-                props.virtual_id,
-                token
-            );
-            result.push(url);
+        if let Some(user_token) = &props.user_token {
+            if let Some(token) = create_hls_session_token_and_url(props.secret, *user_token, &target_url) {
+                let url = format!(
+                    "{}/{HLS_PREFIX}/{}/{}/{}/{}/{}",
+                    props.base_url,
+                    username,
+                    password,
+                    props.input_id,
+                    props.virtual_id,
+                    token
+                );
+                result.push(url);
+            }
         }
     }
     result.push("\r\n".to_string());

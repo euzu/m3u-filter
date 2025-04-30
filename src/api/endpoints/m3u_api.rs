@@ -102,7 +102,7 @@ async fn m3u_api_stream(
             // partial request means we are in reverse proxy mode, seek happened
             return force_provider_stream_response(&app_state, session, pli.item_type, &req_headers, input, &user).await.into_response()
         }
-    };
+    }
 
     let connection_permission = user.connection_permission(&app_state).await;
     if connection_permission == UserConnectionPermission::Exhausted {

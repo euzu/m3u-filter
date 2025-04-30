@@ -601,8 +601,8 @@ pub async fn stream_response(app_state: &AppState,
 
             if let Some(provider) = provider_name {
                 if matches!(item_type, PlaylistItemType::LiveHls  | PlaylistItemType::LiveDash | PlaylistItemType::Video | PlaylistItemType::Series) {
-                    if let Some(token) = app_state.active_users.create_user_session(&user.username, virtual_id, &provider, &stream_url, connection_permission).await {
-                        response = response.header(axum::http::header::SET_COOKIE, &create_session_cookie(token));
+                    if let Some(token) = app_state.active_users.create_user_session(user, virtual_id, &provider, stream_url, connection_permission).await {
+                        response = response.header(axum::http::header::SET_COOKIE, create_session_cookie(token));
                     }
                 }
             }
@@ -769,7 +769,7 @@ pub fn redirect(url: &str) -> impl IntoResponse {
         .unwrap()
 }
 
-pub async fn is_seek_request<'a>(
+pub async fn is_seek_request(
     cluster: XtreamCluster,
     req_headers: &HeaderMap,
 ) -> bool {
