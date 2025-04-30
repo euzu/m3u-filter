@@ -1,11 +1,11 @@
-use crate::api::api_utils::{bad_response_with_delete_cookie, check_force_provider, create_session_cookie_for_provider, force_provider_stream_response, get_stream_alternative_url};
-use crate::api::api_utils::{get_stream_info_from_crypted_cookie, try_option_bad_request};
+use crate::api::api_utils::{create_session_cookie, force_provider_stream_response, get_stream_alternative_url, is_seek_request, read_session_token};
+use crate::api::api_utils::{try_option_bad_request};
 use crate::api::model::app_state::AppState;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
 use crate::model::config::ConfigInput;
 use crate::model::playlist::{PlaylistItemType, XtreamCluster};
-use crate::processing::parser::hls::{rewrite_hls, RewriteHlsProps};
+use crate::processing::parser::hls::{get_hls_session_token_and_url_from_token, rewrite_hls, RewriteHlsProps};
 use crate::utils::constants::HLS_EXT;
 use crate::utils::network::request;
 use crate::utils::network::request::{is_hls_url, replace_url_extension, sanitize_sensitive_info};
@@ -13,7 +13,7 @@ use axum::response::IntoResponse;
 use log::{debug, error};
 use serde::Deserialize;
 use std::sync::Arc;
-use crate::api::model::provider_config::ProviderConfig;
+use crate::api::model::active_user_manager::UserSession;
 
 #[derive(Debug, Deserialize)]
 struct HlsApiPathParams {
@@ -38,33 +38,34 @@ fn hls_response(hls_content: String, cookie: Option<String>) -> impl IntoRespons
 
 pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
                                                       user: &ProxyUserCredentials,
-                                                      provider_name: Option<String>,
+                                                      user_session: Option<&UserSession>,
                                                       hls_url: &str,
                                                       virtual_id: u32,
-                                                      input: &ConfigInput) -> impl IntoResponse + Send {
+                                                      input: &ConfigInput,
+                                                      connection_permission: UserConnectionPermission) -> impl IntoResponse + Send {
     let url = replace_url_extension(hls_url, HLS_EXT);
     let server_info = app_state.config.get_user_server_info(user).await;
 
-    let create_stream_and_cookie = |provider_cfg: &Arc<ProviderConfig>| {
-        let stream_url = get_stream_alternative_url(&url, input, provider_cfg);
-        let cookie = create_session_cookie_for_provider(
-            &app_state.config.t_encrypt_secret,
-            virtual_id,
-            &provider_cfg.name,
-            &stream_url,
-        );
-        (stream_url, Some(provider_cfg.name.to_string()), cookie)
-    };
-
-    let (request_url, provider, cookie) = match provider_name {
-        None => match app_state.active_provider.get_next_provider(&input.name).await {
-            Some(provider_cfg) => create_stream_and_cookie(&provider_cfg),
-            None => (url, None, None),
+    let (request_url, session_token) = match user_session {
+        Some(session) => {
+            match app_state.active_provider.force_exact_acquire_connection(&session.provider).await.get_provider_config() {
+                Some(provider_cfg) => {
+                    let stream_url = get_stream_alternative_url(&url, input, &provider_cfg);
+                    (stream_url, Some(session.token))
+                },
+                None => (url, None),
+            }
         },
-        Some(provider) => match app_state.active_provider.force_exact_acquire_connection(&provider).await.get_provider_config() {
-            Some(provider_cfg) => create_stream_and_cookie(&provider_cfg),
-            None => (url, None, None),
-        },
+        None => {
+            match app_state.active_provider.get_next_provider(&input.name).await {
+                Some(provider_cfg) => {
+                    let stream_url = get_stream_alternative_url(&url, input, &provider_cfg);
+                    let session_token= app_state.active_users.create_user_session(user, virtual_id, &provider_cfg.name, &stream_url, connection_permission).await;
+                    (stream_url, session_token)
+                },
+                None => (url, None),
+            }
+        }
     };
 
     match request::download_text_content(Arc::clone(&app_state.http_client), input, &request_url, None).await {
@@ -76,10 +77,10 @@ pub(in crate::api) async fn handle_hls_stream_request(app_state: &Arc<AppState>,
                 hls_url: response_url,
                 virtual_id,
                 input_id: input.id,
-                provider_name: provider.unwrap_or_default(), // this should not happen
+                user_token: session_token,
             };
             let hls_content = rewrite_hls(user, &rewrite_hls_props);
-            hls_response(hls_content, cookie).into_response()
+            hls_response(hls_content, session_token.map(create_session_cookie)).into_response()
         }
         Err(err) => {
             error!("Failed to download m3u8 {}", sanitize_sensitive_info(err.to_string().as_str()));
@@ -104,32 +105,59 @@ async fn hls_api_stream(
     let virtual_id = params.stream_id;
     let input = try_option_bad_request!(app_state.config.get_input_by_id(params.input_id), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", XtreamCluster::Live));
 
-    let (_provider_name, connection_permission) = check_force_provider(&app_state, virtual_id, PlaylistItemType::LiveHls, &req_headers, &user).await;
-    if connection_permission == UserConnectionPermission::Exhausted {
-        return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
-    }
-
-    let Some((stream_virtual_id, stream_provider_name, hls_url)) = get_stream_info_from_crypted_cookie(&app_state.config.t_encrypt_secret, &params.token)
-    else {
-        return bad_response_with_delete_cookie().into_response();
+    let mut user_session = match read_session_token(&req_headers) {
+        None => None,
+        Some(token) => app_state.active_users.get_user_session(&user.username, token).await,
     };
 
-    if stream_virtual_id != virtual_id {
-        return bad_response_with_delete_cookie().into_response();
+    if let Some(session)  = &mut user_session {
+        if session.permission == UserConnectionPermission::Exhausted {
+            return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+        }
+
+        if app_state.active_provider.is_over_limit(&session.provider).await {
+            return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::ProviderConnectionsExhausted).into_response();
+        }
+
+        // let hls_url = if let Some((session_token_opt, hls_url)) = get_hls_session_token_and_url_from_token(&app_state.config.t_encrypt_secret, &params.token) {
+        //     if let Some(session_token) = session_token_opt {
+        //         if session.token != session_token {
+        //             return axum::http::StatusCode::BAD_REQUEST.into_response();
+        //         }
+        //     }
+        //     hls_url
+        // } else {
+        //     return axum::http::StatusCode::BAD_REQUEST.into_response();
+        // };
+
+        let hls_url = match get_hls_session_token_and_url_from_token(&app_state.config.t_encrypt_secret, &params.token) {
+            Some((Some(session_token), hls_url)) if session_token == session.token => hls_url,
+            _ => return axum::http::StatusCode::BAD_REQUEST.into_response(),
+        };
+
+        session.stream_url = hls_url;
+        if session.virtual_id == virtual_id {
+            if is_seek_request(XtreamCluster::Live, &req_headers).await {
+                // partial request means we are in reverse proxy mode, seek happened
+                return force_provider_stream_response(&app_state, session, PlaylistItemType::LiveHls, &req_headers, input, &user).await.into_response()
+            }
+        } else {
+            return axum::http::StatusCode::BAD_REQUEST.into_response();
+        }
+
+        let connection_permission = user.connection_permission(&app_state).await;
+        if connection_permission == UserConnectionPermission::Exhausted {
+            return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+        }
+
+        if is_hls_url(&session.stream_url) {
+            return handle_hls_stream_request(&app_state, &user, Some(session), &session.stream_url, virtual_id, input, connection_permission).await.into_response();
+        }
+
+        force_provider_stream_response(&app_state, session, PlaylistItemType::LiveHls, &req_headers, input, &user).await.into_response()
+    } else {
+        axum::http::StatusCode::BAD_REQUEST.into_response()
     }
-
-    let provider_name = Some(stream_provider_name);
-
-    if is_hls_url(&hls_url) {
-        return handle_hls_stream_request(&app_state, &user, provider_name, &hls_url, virtual_id, input).await.into_response();
-    }
-
-    // if provider_name.is_some() {
-    // TODO we decode twice the cookie, one time to check for connection permission and one time in force_provider_stream_response
-    force_provider_stream_response(&app_state, &params.token, virtual_id, PlaylistItemType::LiveHls, &req_headers, input, &user).await.into_response()
-    // } else {
-    //     stream_response(&app_state, virtual_id, PlaylistItemType::LiveHls, &hls_url, &req_headers, input, target, &user, connection_permission).await.into_response()
-    // }
 }
 
 pub fn hls_api_register() -> axum::Router<Arc<AppState>> {

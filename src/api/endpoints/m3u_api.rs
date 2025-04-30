@@ -1,4 +1,4 @@
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_response, redirect, redirect_response, resource_response, force_provider_stream_response, separate_number_and_remainder, stream_response, try_option_bad_request, try_result_bad_request, RedirectParams, check_force_provider};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_request, redirect, redirect_response, resource_response, force_provider_stream_response, separate_number_and_remainder, stream_response, try_option_bad_request, try_result_bad_request, RedirectParams, read_session_token};
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
@@ -74,7 +74,7 @@ async fn m3u_api_stream(
 
     let target_name = &target.name;
     if !target.has_output(&TargetType::M3u) {
-        debug!("Target has no m3u output {target_name}");
+        debug!("Target has no m3u playlist {target_name}");
         return StatusCode::BAD_REQUEST.into_response();
     }
 
@@ -85,12 +85,26 @@ async fn m3u_api_stream(
 
     let cluster = XtreamCluster::try_from(pli.item_type).unwrap_or(XtreamCluster::Live);
 
-    if let Some(cookie) = is_seek_response(cluster, pli.virtual_id, &app_state.config.t_encrypt_secret, &req_headers) {
-        // partial request means we are in reverse proxy mode, seek happened
-        return force_provider_stream_response(&app_state, &cookie, pli.virtual_id, pli.item_type, &req_headers, input, &user).await.into_response()
+    let user_session = match read_session_token(&req_headers) {
+        None => None,
+        Some(token) => app_state.active_users.get_user_session(&user.username, token).await,
+    };
+
+    if let Some(session)  = &user_session {
+        if session.permission == UserConnectionPermission::Exhausted {
+            return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+        }
+
+        if app_state.active_provider.is_over_limit(&session.provider).await {
+            return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::ProviderConnectionsExhausted).into_response();
+        }
+        if session.virtual_id == virtual_id  && is_seek_request(cluster, &req_headers).await {
+            // partial request means we are in reverse proxy mode, seek happened
+            return force_provider_stream_response(&app_state, session, pli.item_type, &req_headers, input, &user).await.into_response()
+        }
     }
 
-    let (provider_name, connection_permission) = check_force_provider(&app_state, virtual_id, pli.item_type, &req_headers, &user).await;
+    let connection_permission = user.connection_permission(&app_state).await;
     if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
@@ -120,7 +134,7 @@ async fn m3u_api_stream(
     let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || pli.item_type == PlaylistItemType::LiveDash || extension == HLS_EXT;
     // Reverse proxy mode
     if is_hls_request {
-        return handle_hls_stream_request(&app_state, &user, provider_name, &pli.url, pli.virtual_id, input).await.into_response();
+        return handle_hls_stream_request(&app_state, &user, user_session.as_ref(), &pli.url, pli.virtual_id, input, connection_permission).await.into_response();
     }
 
     stream_response(&app_state, pli.virtual_id, pli.item_type, pli.url.as_str(), &req_headers, input, target, &user, connection_permission).await.into_response()
@@ -134,13 +148,15 @@ async fn m3u_api_resource(
 ) -> impl axum::response::IntoResponse + Send {
     let Ok(m3u_stream_id) = stream_id.parse::<u32>() else { return axum::http::StatusCode::BAD_REQUEST.into_response() };
     let Some((user, target)) = get_user_target_by_credentials(&username, &password, &api_req, &app_state).await
-    else { return axum::http::StatusCode::BAD_REQUEST.into_response() };
+    else { return StatusCode::BAD_REQUEST.into_response() };
     if user.permission_denied(&app_state) {
-        return axum::http::StatusCode::FORBIDDEN.into_response();
+        return StatusCode::FORBIDDEN.into_response();
     }
 
+    let target_name = &target.name;
     if !target.has_output(&TargetType::M3u) {
-        return axum::http::StatusCode::BAD_REQUEST.into_response();
+        debug!("Target has no m3u playlist {target_name}");
+        return StatusCode::BAD_REQUEST.into_response();
     }
     let m3u_item = match m3u_get_item_for_stream_id(m3u_stream_id, &app_state.config, target).await {
         Ok(item) => item,

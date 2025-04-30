@@ -1,13 +1,14 @@
 // https://github.com/tellytv/go.xtream-codes/blob/master/structs.go
 
 use crate::api::api_utils;
-use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_response, redirect_response, resource_response, force_provider_stream_response, separate_number_and_remainder, serve_file, stream_response, RedirectParams, check_force_provider};
+use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_seek_request, redirect_response, resource_response, force_provider_stream_response, separate_number_and_remainder, serve_file, stream_response, RedirectParams, read_session_token};
 use crate::api::api_utils::{redirect, try_option_bad_request, try_result_bad_request};
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::endpoints::xmltv_api::get_empty_epg_response;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
-use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
+use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType}
+;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
 use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::m3u_filter_error::info_err;
@@ -187,7 +188,7 @@ async fn xtream_player_api_stream(
 
     let target_name = &target.name;
     if !target.has_output(&TargetType::Xtream) {
-        debug!("Target has no xtream output {target_name}");
+        debug!("Target has no xtream codes playlist {target_name}");
         return StatusCode::BAD_REQUEST.into_response();
     }
 
@@ -197,12 +198,27 @@ async fn xtream_player_api_stream(
     let input = try_option_bad_request!(app_state.config.get_input_by_name(pli.input_name.as_str()), true, format!("Cant find input for target {target_name}, context {}, stream_id {virtual_id}", stream_req.context));
     let cluster = pli.xtream_cluster;
 
-    if let Some(cookie) = is_seek_response(cluster, pli.virtual_id, &app_state.config.t_encrypt_secret, req_headers) {
-        // partial request means we are in reverse proxy mode, seek happened
-        return force_provider_stream_response(app_state, &cookie, pli.virtual_id, pli.item_type, req_headers, input, &user).await.into_response()
+    let user_session = match read_session_token(req_headers) {
+        None => None,
+        Some(token) => app_state.active_users.get_user_session(&user.username, token).await,
+    };
+
+    if let Some(session)  = &user_session {
+        if session.permission == UserConnectionPermission::Exhausted {
+           return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
+        }
+
+        if app_state.active_provider.is_over_limit(&session.provider).await {
+            return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::ProviderConnectionsExhausted).into_response();
+        }
+
+        if session.virtual_id == virtual_id  && is_seek_request(cluster, req_headers).await {
+            // partial request means we are in reverse proxy mode, seek happened
+            return force_provider_stream_response(app_state, session, pli.item_type, req_headers, input, &user).await.into_response()
+        }
     }
 
-    let (provider_name, connection_permission) = check_force_provider(app_state, virtual_id, pli.item_type, req_headers, &user).await;
+    let connection_permission = user.connection_permission(app_state).await;
     if connection_permission == UserConnectionPermission::Exhausted {
         return create_custom_video_stream_response(&app_state.config, &CustomVideoStreamType::UserConnectionsExhausted).into_response();
     }
@@ -240,7 +256,7 @@ async fn xtream_player_api_stream(
     let is_hls_request = pli.item_type == PlaylistItemType::LiveHls || pli.item_type == PlaylistItemType::LiveDash || extension == HLS_EXT;
     // Reverse proxy mode
     if is_hls_request {
-        return handle_hls_stream_request(app_state, &user, provider_name, &stream_url, pli.virtual_id, input).await.into_response();
+        return handle_hls_stream_request(app_state, &user, user_session.as_ref(), &stream_url, pli.virtual_id, input, connection_permission).await.into_response();
     }
 
     stream_response(app_state, pli.virtual_id, pli.item_type, &stream_url, req_headers, input, target, &user, connection_permission).await.into_response()
@@ -285,7 +301,7 @@ async fn xtream_player_api_stream_with_token(
 
         // Reverse proxy mode
         if is_hls_request {
-            return handle_hls_stream_request(app_state, &user, None, &pli.url, pli.virtual_id, input).await.into_response();
+            return handle_hls_stream_request(app_state, &user, None, &pli.url, pli.virtual_id, input, UserConnectionPermission::Allowed).await.into_response();
         }
 
         let extension = stream_ext.unwrap_or_else(

@@ -41,7 +41,7 @@ impl ActiveClientStream {
         }
         let grant_user_grace_period = connection_permission == UserConnectionPermission::GracePeriod;
         let username = user.username.as_str();
-        let user_connection_guard = Some(active_user.add_connection(username).await);
+        let user_connection_guard = Some(active_user.add_connection(username, user.max_connections).await);
         let grace_stop_flag = Self::stream_grace_period(&stream_details, &active_provider, grant_user_grace_period, user, &active_user);
         Self {
             inner: stream_details.stream.take().unwrap(),

@@ -9,5 +9,5 @@ pub const fn default_resolve_delay_secs() -> u16 { 2 }
 // Default grace values to accommodate rapid channel changes and seek requests,
 // helping avoid triggering hard max_connection enforcement.
 pub const fn default_grace_period_millis() -> u64 { 500 }
-pub const fn default_grace_period_timeout_secs() -> u64 { 10 }
+pub const fn default_grace_period_timeout_secs() -> u64 { 2 }
 pub const fn default_connect_timeout_secs() -> u32 { 6 }
