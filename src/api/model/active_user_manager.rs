@@ -209,17 +209,16 @@ impl ActiveUserManager {
     }
 
     pub async fn create_user_session(&self, user: &ProxyUserCredentials, virtual_id: u32, provider: &str, stream_url: &str, connection_permission: UserConnectionPermission) -> Option<u32> {
+        self.gc().await;
         let mut lock = self.user.write().await;
         if let Some(connection_data) = lock.get_mut(&user.username) {
             let session = Self::new_user_session(virtual_id, provider, stream_url, connection_permission);
-            self.gc().await;
             let token = session.token;
             connection_data.sessions.push(session);
             Some(token)
         } else {
             let mut connection_data = UserConnectionData::new(0, user.max_connections);
             let session = Self::new_user_session(virtual_id, provider, stream_url, connection_permission);
-            self.gc().await;
             let token = session.token;
             connection_data.sessions.push(session);
             lock.insert(user.username.to_string(), connection_data);
@@ -275,6 +274,7 @@ impl ActiveUserManager {
                 for (_, connection_data) in lock.iter_mut() {
                     connection_data.sessions.retain(|s| current_time_secs() - s.ts < 10_800);
                 }
+                gc_ts.store(current_time_secs(), Ordering::SeqCst);
             }
         }
     }
