@@ -16,7 +16,7 @@ use url::Url;
 
 use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{ConfigInput, InputFetchMethod};
+use crate::model::config::{ConfigInput, ConfigProxy, InputFetchMethod};
 use crate::model::stats::format_elapsed_time;
 use crate::repository::storage::{get_input_storage_path, short_hash};
 use crate::repository::storage_const;
@@ -494,6 +494,31 @@ pub fn get_base_url_from_str(url: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+pub fn create_client(proxy_config: Option<&ConfigProxy>) -> reqwest::ClientBuilder {
+    let client = reqwest::Client::builder();
+    if let Some(proxy_cfg) = proxy_config {
+        let proxy = match reqwest::Proxy::all(&proxy_cfg.url) {
+            Ok(proxy) => {
+                if let (Some(username), Some(password)) = (&proxy_cfg.username, &proxy_cfg.password) {
+                    Some(proxy.basic_auth(username, password))
+                } else {
+                    Some(proxy)
+                }
+            }
+            Err(err) => {
+                error!("Failed to create proxy {}, {err}", &proxy_cfg.url);
+                None
+            }
+        };
+        return if let Some(prxy) = proxy {
+            client.proxy(prxy)
+        } else {
+            client
+        };
+    }
+    client
 }
 
 #[cfg(test)]

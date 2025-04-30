@@ -1,6 +1,6 @@
 use crate::api::model::app_state::AppState;
 use crate::api::model::download::{DownloadQueue, FileDownload, FileDownloadRequest};
-use crate::model::config::VideoDownloadConfig;
+use crate::model::config::{ConfigProxy, VideoDownloadConfig};
 use crate::utils::network::request;
 use tokio::sync::RwLock;
 use futures::stream::TryStreamExt;
@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::{fs};
 use axum::response::IntoResponse;
 use crate::m3u_filter_error::to_io_error;
+use crate::utils::network::request::create_client;
 
 async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwest::Client) -> Result<(), String> {
     let file_download = { active.read().await.as_ref().unwrap().clone() };
@@ -61,13 +62,14 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
     }
 }
 
-async fn run_download_queue(download_cfg: &VideoDownloadConfig, download_queue: &Arc<DownloadQueue>) -> Result<(), String> {
+async fn run_download_queue(proxy_config: Option<&ConfigProxy>, download_cfg: &VideoDownloadConfig, download_queue: &Arc<DownloadQueue>) -> Result<(), String> {
     let next_download = download_queue.as_ref().queue.lock().await.pop_front();
     if next_download.is_some() {
         { *download_queue.as_ref().active.write().await = next_download; }
         let headers = request::get_request_headers(Some(&download_cfg.headers), None);
         let dq = Arc::clone(download_queue);
-        match reqwest::Client::builder().default_headers(headers).build() {
+
+        match create_client(proxy_config).default_headers(headers).build() {
             Ok(client) => {
                 tokio::spawn(async move {
                     loop {
@@ -121,7 +123,7 @@ pub async fn queue_download_file(
             Some(file_download) => {
                 app_state.downloads.queue.lock().await.push_back(file_download.clone());
                 if app_state.downloads.active.read().await.is_none() {
-                    match run_download_queue(download_cfg, &app_state.downloads).await {
+                    match run_download_queue(app_state.config.proxy.as_ref(), download_cfg, &app_state.downloads).await {
                         Ok(()) => {}
                         Err(err) => return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": err}))).into_response(),
                     }

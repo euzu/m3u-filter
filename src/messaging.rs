@@ -1,6 +1,7 @@
-use crate::model::config::MessagingConfig;
+use std::sync::Arc;
+use crate::model::config::{MessagingConfig};
 use log::{debug, error};
-use reqwest::header;
+use reqwest::{header};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub enum MsgKind {
@@ -18,13 +19,13 @@ fn is_enabled(kind: &MsgKind, cfg: &MessagingConfig) -> bool {
     cfg.notify_on.contains(kind)
 }
 
-fn send_http_post_request(msg: &str, messaging: &MessagingConfig) {
+fn send_http_post_request(client: &Arc<reqwest::Client>, msg: &str, messaging: &MessagingConfig) {
     if let Some(rest) = &messaging.rest {
         let url = rest.url.clone();
         let data = msg.to_owned();
+        let the_client = Arc::clone(client);
         tokio::spawn(async move {
-            let client = reqwest::Client::new();
-            match client
+            match the_client
                 .post(&url)
                 .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string())
                 .body(data)
@@ -39,6 +40,7 @@ fn send_http_post_request(msg: &str, messaging: &MessagingConfig) {
 }
 
 fn send_telegram_message(msg: &str, messaging: &MessagingConfig) {
+    // TODO use proxy settings
     if let Some(telegram) = &messaging.telegram {
         for chat_id in &telegram.chat_ids {
             let bot = rustelebot::create_instance(&telegram.bot_token, chat_id);
@@ -50,7 +52,7 @@ fn send_telegram_message(msg: &str, messaging: &MessagingConfig) {
     }
 }
 
-fn send_pushover_message(msg: &str, messaging: &MessagingConfig) {
+fn send_pushover_message(client: &Arc<reqwest::Client>, msg: &str, messaging: &MessagingConfig) {
     if let Some(pushover) = &messaging.pushover {
         let url = pushover.url.as_deref().unwrap_or("https://api.pushover.net/1/messages.json").to_string();
         let encoded_message: String = url::form_urlencoded::Serializer::new(String::new())
@@ -58,10 +60,9 @@ fn send_pushover_message(msg: &str, messaging: &MessagingConfig) {
             .append_pair("user", pushover.user.as_str())
             .append_pair("message", msg)
             .finish();
-
+        let the_client = Arc::clone(client);
         tokio::spawn(async move {
-            let client = reqwest::Client::new();
-            match client
+            match the_client
                 .post(url)
                 .header(header::CONTENT_TYPE, mime::APPLICATION_WWW_FORM_URLENCODED.to_string())
                 .body(encoded_message)
@@ -81,12 +82,12 @@ fn send_pushover_message(msg: &str, messaging: &MessagingConfig) {
     }
 }
 
-pub fn send_message(kind: &MsgKind, cfg: Option<&MessagingConfig>, msg: &str) {
+pub fn send_message(client: &Arc<reqwest::Client>, kind: &MsgKind, cfg: Option<&MessagingConfig>, msg: &str) {
     if let Some(messaging) = cfg {
         if is_enabled(kind, messaging) {
             send_telegram_message(msg, messaging);
-            send_http_post_request(msg, messaging);
-            send_pushover_message(msg, messaging);
+            send_http_post_request(client, msg, messaging);
+            send_pushover_message(client, msg, messaging);
         }
     }
 }

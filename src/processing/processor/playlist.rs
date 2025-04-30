@@ -563,7 +563,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
         step.tick("Assigned channel counter");
         map_playlist_counter(target, &mut flat_new_playlist);
         step.tick("Processed group watches");
-        process_watch(target, cfg, &flat_new_playlist);
+        process_watch(&client, target, cfg, &flat_new_playlist);
         step.tick("Persisting playlists");
         let result = persist_playlist(&mut flat_new_playlist, flatten_tvguide(&new_epg).as_ref(), target, cfg).await;
         step.stop();
@@ -585,7 +585,7 @@ fn process_epg(processed_fetched_playlists: &mut Vec<FetchedPlaylist>) -> (Vec<E
     (new_epg, new_playlist)
 }
 
-fn process_watch(target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<PlaylistGroup>) {
+fn process_watch(client: &Arc<reqwest::Client>, target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<PlaylistGroup>) {
     if target.t_watch_re.is_some() {
         if default_as_default().eq_ignore_ascii_case(&target.name) {
             error!("cant watch a target with no unique name");
@@ -593,7 +593,7 @@ fn process_watch(target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<Playlis
             let watch_re = target.t_watch_re.as_ref().unwrap();
             for pl in new_playlist {
                 if watch_re.iter().any(|r| r.is_match(&pl.title)) {
-                    process_group_watch(cfg, &target.name, pl);
+                    process_group_watch(client, cfg, &target.name, pl);
                 }
             }
         }
@@ -602,7 +602,7 @@ fn process_watch(target: &ConfigTarget, cfg: &Config, new_playlist: &Vec<Playlis
 
 pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let start_time = Instant::now();
-    let (stats, errors) = process_sources(client, cfg.clone(), targets.clone()).await;
+    let (stats, errors) = process_sources(Arc::clone(&client), cfg.clone(), targets.clone()).await;
     // log errors
     for err in &errors {
         error!("{}", err.message);
@@ -611,12 +611,12 @@ pub async fn exec_processing(client: Arc<reqwest::Client>, cfg: Arc<Config>, tar
         // print stats
         info!("{stats_msg}");
         // send stats
-        send_message(&MsgKind::Stats, cfg.messaging.as_ref(), stats_msg.as_str());
+        send_message(&client, &MsgKind::Stats, cfg.messaging.as_ref(), stats_msg.as_str());
     }
     // send errors
     if let Some(message) = get_errors_notify_message!(errors, 255) {
         if let Ok(error_msg) = serde_json::to_string(&serde_json::Value::Object(serde_json::map::Map::from_iter([("errors".to_string(), serde_json::Value::String(message))]))) {
-            send_message(&MsgKind::Error, cfg.messaging.as_ref(), error_msg.as_str());
+            send_message(&client, &MsgKind::Error, cfg.messaging.as_ref(), error_msg.as_str());
         }
     }
     let elapsed = start_time.elapsed().as_secs();

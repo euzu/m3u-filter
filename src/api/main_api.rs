@@ -27,6 +27,7 @@ use axum::Router;
 use tokio::sync::Mutex;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
 use crate::api::api_utils::{get_build_time, get_server_time};
+use crate::utils::network::request::create_client;
 use crate::VERSION;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {
@@ -71,7 +72,7 @@ async fn create_shared_data(cfg: &Arc<Config>) -> AppState {
     let active_users = Arc::new(ActiveUserManager::new(cfg));
     let active_provider = Arc::new(ActiveProviderManager::new(cfg).await);
 
-    let mut builder = Client::builder().http1_only();
+    let mut builder = create_client(cfg.proxy.as_ref()).http1_only();
     if cfg.connect_timeout_secs > 0 {
         builder = builder.connect_timeout(Duration::from_secs(u64::from(cfg.connect_timeout_secs)));
     }
