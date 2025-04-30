@@ -1767,6 +1767,38 @@ impl WebUiConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
+pub struct ConfigProxy {
+    pub url: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
+impl ConfigProxy {
+    fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        if self.username.is_some() || self.password.is_some() {
+            if let (Some(username), Some(password)) = (self.username.as_ref(), self.password.as_ref()) {
+                let uname = username.trim();
+                let pwd = password.trim();
+                if uname.is_empty() || pwd.is_empty() {
+                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info,"Proxy credentials missing".to_string()));
+                }
+                self.username = Some(uname.to_string());
+                self.password = Some(pwd.to_string());
+            } else {
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info,"Proxy credentials missing".to_string()));
+            }
+        }
+
+        self.url = self.url.trim().to_string();
+        if self.url.is_empty() {
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Info,"Proxy url missing".to_string()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
     pub threads: u8,
@@ -1801,6 +1833,8 @@ pub struct Config {
     pub reverse_proxy: Option<ReverseProxyConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hdhomerun: Option<HdHomeRunConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ConfigProxy>,
     #[serde(skip)]
     pub t_api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
     #[serde(skip)]
@@ -2073,6 +2107,9 @@ impl Config {
         self.prepare_directories();
         if let Some(reverse_proxy) = self.reverse_proxy.as_mut() {
             reverse_proxy.prepare(&self.working_dir)?;
+        }
+        if let Some(proxy) = &mut self.proxy {
+            proxy.prepare()?;
         }
         self.prepare_hdhomerun()?;
         self.api.prepare();

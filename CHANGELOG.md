@@ -99,6 +99,13 @@ hdhomerun:
 If `caption` is provided, its value is read from `title` if available, otherwise from `name`. 
 When setting `caption`, both `title` and `name` are updated.”
 - Counter has now an attribute padding. Which fills the number like 001.
+- Added proxy configuration for all outgoing requests in `config.yml`. supported http, https, socks5 proxies.
+```yaml
+proxy:
+  url: socks5://192.168.1.6:8123
+  username: uname  # <- optional basic auth
+  password: secret # <- optional basic auth
+```
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

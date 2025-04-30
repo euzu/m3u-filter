@@ -1,4 +1,4 @@
-#![warn(clippy::all,clippy::pedantic)]
+#![warn(clippy::all, clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::return_self_not_must_use)]
@@ -9,21 +9,21 @@ mod modules;
 
 include_modules!();
 
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use chrono::{DateTime, Utc};
 use crate::auth::password::generate_password;
 use crate::model::config::{validate_targets, Config, HealthcheckConfig, LogLevelConfig, ProcessTargets};
 use crate::model::healthcheck::Healthcheck;
 use crate::processing::processor::playlist;
-use utils::file::config_reader;
+use crate::utils::file::config_reader::config_file_reader;
 use crate::utils::file::file_utils;
-use crate::utils::network::request::set_sanitize_sensitive_info;
+use crate::utils::network::request::{create_client, set_sanitize_sensitive_info};
+use chrono::{DateTime, Utc};
 use clap::Parser;
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
-use crate::utils::file::config_reader::config_file_reader;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use utils::file::config_reader;
 
 const LOG_ERROR_LEVEL_MOD: &[&str] = &[
     "reqwest::async_impl::client",
@@ -80,7 +80,7 @@ struct Args {
 
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const BUILD_TIMESTAMP:&str = env!("VERGEN_BUILD_TIMESTAMP");
+const BUILD_TIMESTAMP: &str = env!("VERGEN_BUILD_TIMESTAMP");
 
 // #[cfg(not(target_env = "msvc"))]
 // #[global_allocator]
@@ -150,13 +150,13 @@ fn main() {
     //     info!("Channel unavailable video loaded from {:?}", cfg.channel_unavailable_file.as_ref().map_or("?", |v| v.as_str()));
     // }
 
-    let rt  = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
     let () = rt.block_on(async {
         if args.server {
             match config_reader::read_api_proxy_config(args.api_proxy, &mut cfg).await {
                 Ok(Some(api_proxy_file)) => {
                     info!("Api Proxy File: {api_proxy_file:?}");
-                },
+                }
                 Ok(None) => {}
                 Err(err) => exit!("{err}"),
             }
@@ -197,8 +197,11 @@ fn create_directories(cfg: &Config, temp_path: &Path) {
 }
 
 async fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
-    let client = Arc::new(reqwest::Client::new());
-    playlist::exec_processing(client, cfg, targets).await;
+    let client = create_client(cfg.proxy.as_ref()).build().unwrap_or_else(|err| {
+        error!("Failed to build cient {err}");
+        reqwest::Client::new()
+    });
+    playlist::exec_processing(Arc::new(client), cfg, targets).await;
 }
 
 async fn start_in_server_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {

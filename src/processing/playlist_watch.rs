@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::path::{Path};
+use std::sync::Arc;
 use log::{error, info};
 use crate::messaging::{MsgKind, send_message};
 use crate::model::config::Config;
@@ -8,7 +9,7 @@ use crate::utils::bincode_utils::{bincode_deserialize, bincode_serialize};
 use crate::utils::file::file_utils;
 use crate::utils::file::file_utils::sanitize_filename;
 
-pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) {
+pub fn process_group_watch(client: &Arc<reqwest::Client>, cfg: &Config, target_name: &str, pl: &PlaylistGroup) {
     let mut new_tree = BTreeSet::new();
     pl.channels.iter().for_each(|chan| {
         let header = &chan.header;
@@ -28,7 +29,7 @@ pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) 
                     let removed_difference: BTreeSet<String> = loaded_tree.difference(&new_tree).cloned().collect();
                     if !added_difference.is_empty() || !removed_difference.is_empty() {
                         changed = true;
-                        handle_watch_notification(cfg, &added_difference, &removed_difference, target_name, &pl.title);
+                        handle_watch_notification(client, cfg, &added_difference, &removed_difference, target_name, &pl.title);
                     }
                 } else {
                     error!("failed to load watch_file {}", &path.to_str().unwrap_or_default());
@@ -52,7 +53,7 @@ pub fn process_group_watch(cfg: &Config, target_name: &str, pl: &PlaylistGroup) 
     }
 }
 
-fn handle_watch_notification(cfg: &Config, added: &BTreeSet<String>, removed: &BTreeSet<String>, target_name: &str, group_name: &str) {
+fn handle_watch_notification(client: &Arc<reqwest::Client>, cfg: &Config, added: &BTreeSet<String>, removed: &BTreeSet<String>, target_name: &str, group_name: &str) {
     let added_entries = added.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n\t");
     let removed_entries = removed.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n\t");
 
@@ -71,7 +72,7 @@ fn handle_watch_notification(cfg: &Config, added: &BTreeSet<String>, removed: &B
     if !message.is_empty() {
         let msg = format!("Changes {}/{}\n{}", target_name, group_name, message.join(""));
         info!("{}", &msg);
-        send_message(&MsgKind::Watch, cfg.messaging.as_ref(), &msg);
+        send_message(client, &MsgKind::Watch, cfg.messaging.as_ref(), &msg);
     }
 }
 
