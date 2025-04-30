@@ -106,6 +106,32 @@ proxy:
   username: uname  # <- optional basic auth
   password: secret # <- optional basic auth
 ```
+- Added support for regular expression-based sequence sorting.
+  You can now sort both groups and channels using custom regex sequences.
+```yaml
+sort:
+  groups:
+  order: asc
+  sequence:
+  - '^Freetv'
+  - '^Shopping'
+  - '^Entertainment'
+  - '^Sunrise'
+  channels:
+  - field: caption
+    group_pattern: '^Freetv'
+    order: asc
+    sequence:
+    - '(?P<c1>.*?)\bUHD\b'
+    - '(?P<c1>.*?)\bFHD\b'
+    - '(?P<c1>.*?)\bHD\b'
+    - '(?P<c1>.*?)\bSD\b'
+```
+In the example above, groups are sorted based on the specified sequence.
+Channels within the `Freetv` group are first sorted by `quality` (as matched by the regex sequence), and then by the `captured prefix`.
+
+To sort by specific parts of the content, use named capture groups such as `c1`, `c2`, `c3`, etc.
+The numeric suffix indicates the priority: `c1` is evaluated first, followed by `c2`, and so on.
 
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search

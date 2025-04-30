@@ -3,13 +3,13 @@ use bitflags::bitflags;
 use enum_iterator::Sequence;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::fmt;
 use tokio::sync::RwLock;
 
 use crate::auth::user::UserCredential;
@@ -240,6 +240,18 @@ impl ProcessTargets {
     }
 }
 
+fn compile_regex_vec(patterns: Option<&Vec<String>>) -> Result<Option<Vec<Regex>>, M3uFilterError> {
+    patterns.as_ref()
+        .map(|seq| {
+            seq.iter()
+                .map(|s| Regex::new(s).map_err(|err| {
+                    create_m3u_filter_error!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", s)
+                }))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose() // convert Option<Result<...>> to Result<Option<...>>
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigSortGroup {
@@ -247,7 +259,16 @@ pub struct ConfigSortGroup {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sequence: Option<Vec<String>>,
     #[serde(default, skip)]
-    pub t_sequence: Option<Vec<String>>,
+    pub t_sequence: Option<Vec<Regex>>,
+}
+
+
+impl ConfigSortGroup {
+    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        // Compile sequence patterns, if any
+        self.t_sequence = compile_regex_vec(self.sequence.as_ref())?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -276,16 +297,7 @@ impl ConfigSortChannel {
         );
 
         // Compile sequence patterns, if any
-        self.t_sequence = self.sequence.as_ref()
-            .map(|seq| {
-                seq.iter()
-                    .map(|s| Regex::new(s).map_err(|err| {
-                        create_m3u_filter_error!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", s)
-                    }))
-                    .collect::<Result<Vec<_>, _>>()
-            })
-            .transpose()?; // convert Option<Result<...>> to Result<Option<...>>
-
+        self.t_sequence = compile_regex_vec(self.sequence.as_ref())?;
         Ok(())
     }
 }
@@ -303,6 +315,9 @@ pub struct ConfigSort {
 
 impl ConfigSort {
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+        if let Some(group) = self.groups.as_mut() {
+            group.prepare()?;
+        }
         if let Some(channels) = self.channels.as_mut() {
             handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, channels.iter_mut().map(ConfigSortChannel::prepare));
         }
@@ -1780,18 +1795,18 @@ impl ConfigProxy {
                 let uname = username.trim();
                 let pwd = password.trim();
                 if uname.is_empty() || pwd.is_empty() {
-                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info,"Proxy credentials missing".to_string()));
+                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Proxy credentials missing".to_string()));
                 }
                 self.username = Some(uname.to_string());
                 self.password = Some(pwd.to_string());
             } else {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info,"Proxy credentials missing".to_string()));
+                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Proxy credentials missing".to_string()));
             }
         }
 
         self.url = self.url.trim().to_string();
         if self.url.is_empty() {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Info,"Proxy url missing".to_string()));
+            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Proxy url missing".to_string()));
         }
         Ok(())
     }
