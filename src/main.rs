@@ -198,7 +198,7 @@ fn create_directories(cfg: &Config, temp_path: &Path) {
 
 async fn start_in_cli_mode(cfg: Arc<Config>, targets: Arc<ProcessTargets>) {
     let client = create_client(cfg.proxy.as_ref()).build().unwrap_or_else(|err| {
-        error!("Failed to build cient {err}");
+        error!("Failed to build client {err}");
         reqwest::Client::new()
     });
     playlist::exec_processing(Arc::new(client), cfg, targets).await;
