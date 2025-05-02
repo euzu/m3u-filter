@@ -12,16 +12,16 @@ use crate::tools::atomic_once_flag::AtomicOnceFlag;
 
 pub(in crate::api::model) struct BufferedStream {
     stream: ReceiverStream<Result<bytes::Bytes, StreamError>>,
-    close_signal: Arc<AtomicOnceFlag>
+    continue_signal: Arc<AtomicOnceFlag>
 }
 
 impl BufferedStream {
-    pub fn new(stream: BoxedProviderStream, buffer_size: usize, client_close_signal: Arc<AtomicOnceFlag>, _url: &str) -> Self {
+    pub fn new(stream: BoxedProviderStream, buffer_size: usize, continue_signal: Arc<AtomicOnceFlag>, _url: &str) -> Self {
         let (tx, rx) = channel(min(buffer_size, 1024));
-        tokio::spawn(Self::buffer_stream(tx, stream, Arc::clone(&client_close_signal)));
+        tokio::spawn(Self::buffer_stream(tx, stream, Arc::clone(&continue_signal)));
         Self {
             stream: ReceiverStream::new(rx),
-            close_signal: client_close_signal,
+            continue_signal,
         }
     }
 
@@ -65,7 +65,7 @@ impl Stream for BufferedStream {
     type Item = Result<bytes::Bytes, StreamError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.close_signal.is_active() {
+        if self.continue_signal.is_active() {
             Pin::new(&mut self.get_mut().stream).poll_next(cx)
         } else {
             Poll::Ready(None)
