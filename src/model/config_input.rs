@@ -1,15 +1,15 @@
+use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result_list, info_err, M3uFilterError, M3uFilterErrorKind};
+use crate::model::EpgConfig;
+use crate::utils::config_reader::csv_read_inputs;
 use crate::utils::default_as_true;
+use crate::utils::get_trimmed_string;
+use crate::utils::request::{get_base_url_from_str, get_credentials_from_url, get_credentials_from_url_str};
+use enum_iterator::Sequence;
+use log::{debug, warn};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
-use enum_iterator::Sequence;
-use log::{debug, warn};
 use url::Url;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result, handle_m3u_filter_error_result_list, info_err};
-use crate::model::{EpgConfig};
-use crate::utils::config_reader::csv_read_inputs;
-use crate::utils::request::{get_base_url_from_str, get_credentials_from_url, get_credentials_from_url_str};
-use crate::utils::get_trimmed_string;
 
 macro_rules! check_input_credentials {
     ($this:ident, $input_type:expr) => {
@@ -89,6 +89,10 @@ impl FromStr for InputType {
             Ok(Self::M3u)
         } else if s.eq(Self::XTREAM) {
             Ok(Self::Xtream)
+        } else if s.eq(Self::M3U_BATCH) {
+            Ok(Self::M3uBatch)
+        } else if s.eq(Self::XTREAM_BATCH) {
+            Ok(Self::XtreamBatch)
         } else {
             create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown InputType: {}", s)
         }
@@ -373,13 +377,13 @@ impl ConfigInput {
     }
 
     pub fn get_matched_config_by_url<'a>(&'a self, url: &str) -> Option<(&'a str, Option<&'a String>, Option<&'a String>)> {
-        if url.contains(&self.t_base_url) {
+        if url.starts_with(&self.t_base_url) {
             return Some((&self.t_base_url, self.username.as_ref(), self.password.as_ref()));
         }
 
         if let Some(aliases) = &self.aliases {
             for alias in aliases {
-                if url.contains(&alias.t_base_url) {
+                if url.starts_with(&alias.t_base_url) {
                     return Some((&alias.t_base_url, alias.username.as_ref(), alias.password.as_ref()));
                 }
             }

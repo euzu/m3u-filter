@@ -1,14 +1,14 @@
-use std::fmt::Display;
-use enum_iterator::Sequence;
 use crate::foundation::filter::{get_filter, Filter, MockValueProcessor, PatternTemplate, ValueProvider};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list, info_err};
+use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, handle_m3u_filter_error_result_list, info_err, M3uFilterError, M3uFilterErrorKind};
 use crate::model::cluster_flags::ClusterFlags;
 use crate::model::config_rename::ConfigRename;
 use crate::model::config_sort::ConfigSort;
 use crate::model::mapping::Mapping;
-use crate::model::PlaylistItemType;
 use crate::model::processing_order::ProcessingOrder;
+use crate::model::PlaylistItemType;
 use crate::utils::{default_as_default, default_as_true, default_resolve_delay_secs};
+use enum_iterator::Sequence;
+use std::fmt::Display;
 
 
 #[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, Sequence, PartialEq, Eq, Hash)]
@@ -221,7 +221,11 @@ impl ConfigTarget {
                     if strm_output.directory.trim().is_empty() {
                         return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "directory is required for strm type: {}", self.name);
                     }
-                    let has_username = if let Some(username) = &strm_output.username { !username.trim().is_empty() } else { false };
+                    if let Some(username) = &mut strm_output.username {
+                        *username = username.trim().to_string();
+                    }
+                    let has_username = strm_output.username.as_ref().is_some_and(|u| !u.is_empty());
+
                     if has_username {
                         strm_needs_xtream = true;
                     }

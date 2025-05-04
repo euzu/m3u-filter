@@ -36,6 +36,7 @@ impl WebAuthConfig {
         if let Ok(file) = File::open(&userfile_path) {
             let mut users = vec![];
             let reader = file_reader(file);
+            // TODO maybe print out errors
             for credentials in reader.lines().map_while(Result::ok) {
                 let mut parts = credentials.split(':');
                 if let (Some(username), Some(password)) = (parts.next(), parts.next()) {

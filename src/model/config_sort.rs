@@ -15,7 +15,7 @@ fn compile_regex_vec(patterns: Option<&Vec<String>>) -> Result<Option<Vec<Regex>
         .map(|seq| {
             seq.iter()
                 .map(|s| Regex::new(s).map_err(|err| {
-                    create_m3u_filter_error!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", s)
+                    create_m3u_filter_error!(M3uFilterErrorKind::Info, "cant parse regex: {s} {err}")
                 }))
                 .collect::<Result<Vec<_>, _>>()
         })

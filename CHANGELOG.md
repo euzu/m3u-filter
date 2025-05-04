@@ -133,6 +133,19 @@ Channels within the `Freetv` group are first sorted by `quality` (as matched by 
 To sort by specific parts of the content, use named capture groups such as `c1`, `c2`, `c3`, etc.
 The numeric suffix indicates the priority: `c1` is evaluated first, followed by `c2`, and so on.
 
+- Added ip check config
+   - url # URL that may return both IPv4 and IPv6 in one response
+   - url_ipv4 # Dedicated URL to fetch only IPv4
+   - url_ipv6 # Dedicated URL to fetch only IPv6 
+   - pattern_ipv4 # Optional regex pattern to extract IPv4
+   - pattern_ipv6 # Optional regex pattern to extract IPv6
+
+```yaml
+ipcheck:
+  url_ipv4: https://ipinfo.io/ip
+```
+
+
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search
 - added `web_ui_path` to `config.yml`

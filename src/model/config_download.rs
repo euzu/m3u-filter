@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::borrow::BorrowMut;
+use crate::m3u_filter_error::{create_m3u_filter_error_result, M3uFilterError, M3uFilterErrorKind};
 use regex::Regex;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result};
+use std::borrow::BorrowMut;
+use std::collections::HashMap;
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (AppleTV; U; CPU OS 14_2 like Mac OS X; en-us) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Safari/605.1.15";
 
@@ -36,7 +36,12 @@ impl VideoConfig {
     ///
     /// Will panic if default `RegEx` gets invalid
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
-        self.extensions = ["mkv", "avi", "mp4", "mpeg", "divx", "mov"].iter().map(|&arg| arg.to_string()).collect();
+        if self.extensions.is_empty() {
+            self.extensions = ["mkv", "avi", "mp4", "mpeg", "divx", "mov"]
+                .iter()
+                .map(|&arg| arg.to_string())
+                .collect();
+        }
         match &mut self.download {
             None => {}
             Some(downl) => {

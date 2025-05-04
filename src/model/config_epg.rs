@@ -150,7 +150,7 @@ pub struct EpgConfig {
 impl EpgConfig {
     pub fn prepare(&mut self, include_computed: bool) -> Result<(), M3uFilterError> {
         if include_computed {
-            self.t_urls = self.url.take().map_or_else(Vec::new, |epg_url| {
+            self.t_urls = self.url.as_ref().map_or_else(Vec::new, |epg_url| {
                 match epg_url {
                     EpgUrl::Single(url) => if url.trim().is_empty() {
                         vec![]
@@ -158,8 +158,7 @@ impl EpgConfig {
                         vec![url.trim().to_string()]
                     },
                     EpgUrl::Multi(urls) =>
-                        urls.into_iter()
-                            .map(|url| url.trim().to_string())
+                        urls.iter().map(|url| url.trim().to_string())
                             .filter(|s| !s.is_empty())
                             .collect()
                 }
