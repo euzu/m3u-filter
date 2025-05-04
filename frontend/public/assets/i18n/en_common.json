@@ -102,9 +102,17 @@
     "BUILD_TIME": "Build time",
     "MEMORY": "Memory",
     "ACTIVE_USERS": "Active users",
-    "ACTIVE_USER_CONNECTIONS": "Active user conn.",
-    "ACTIVE_PROVIDER_CONNECTIONS": "Active provider conn."
-},
+    "ACTIVE_USER_CONNECTIONS": "Active user conn...",
+    "ACTIVE_PROVIDER_CONNECTIONS": "Active provider conn...",
+    "IP_CHECK": "IP Check",
+    "URL_IPV4": "Url IPv4",
+    "URL_IPV6": "Url IPv6",
+    "PATTERN_IPV4": "Pattern IPv4",
+    "PATTERN_IPV6": "Pattern IPv6",
+    "IPv4": "IPv4",
+    "IPv6": "IPv6",
+    "IP": "IP"
+  },
   "TITLE": {
     "USER_BOUQUET_EDITOR": "User group editor"
   },

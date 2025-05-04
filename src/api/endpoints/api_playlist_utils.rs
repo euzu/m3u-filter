@@ -6,8 +6,8 @@ use crate::utils::{m3u, xtream};
 use axum::response::IntoResponse;
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use std::sync::Arc;
+use indexmap::IndexMap;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct PlaylistResponseGroup {
@@ -32,7 +32,7 @@ fn group_playlist_items<T>(
 where
     T: Serialize,
 {
-    let mut groups: HashMap<String, Vec<T>> = HashMap::new();
+    let mut groups: IndexMap<String, Vec<T>> = IndexMap::new();
 
     for item in iter {
         let group_key = get_group(&item);

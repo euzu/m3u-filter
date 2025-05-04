@@ -1,8 +1,8 @@
-use std::cmp::Ordering;
-use deunicode::deunicode;
 use crate::foundation::filter::get_field_value;
 use crate::model::{ConfigSortChannel, ConfigSortGroup, ConfigTarget, SortOrder};
 use crate::model::{PlaylistGroup, PlaylistItem};
+use deunicode::deunicode;
+use std::cmp::Ordering;
 
 fn playlist_comparator(
     sequence: Option<&Vec<regex::Regex>>,
@@ -137,11 +137,10 @@ pub(in crate::processing::processor) fn sort_playlist(target: &ConfigTarget, new
 
 #[cfg(test)]
 mod tests {
-
     use crate::model::{ConfigSortChannel, ItemField, SortOrder};
     use crate::model::{PlaylistItem, PlaylistItemHeader};
-    use regex::Regex;
     use crate::processing::processor::sort::playlistitem_comparator;
+    use regex::Regex;
 
     #[test]
     fn test_sort() {
@@ -166,6 +165,59 @@ mod tests {
         channels.sort_by(|chan1, chan2| playlistitem_comparator(chan1, chan2, &channel_sort, true));
         let expected = vec!["Chanel K [UHD]", "Chanel R [UHD]", "Chanel A [FHD]", "Chanel A [FHD]", "Chanel L [FHD]", "Chanel A [HD]", "Chanel B [HD]", "Chanel C [HD]", "Chanel D [HD]", "Chanel K [HD]", "Chanel Z [HD]", "Chanel T [SD]"];
         let sorted = channels.into_iter().map(|pli| pli.header.title.clone()).collect::<Vec<String>>();
+        assert_eq!(expected, sorted);
+    }
+
+    #[test]
+    fn test_sort2() {
+        let mut channels: Vec<PlaylistItem> = vec![
+            "US| EAST [FHD] abc",
+            "US| EAST [FHD] def",
+            "US| EAST [FHD] ghi",
+            "US| EAST [HD] jkl",
+            "US| EAST [HD] mno",
+            "US| EAST [HD] pqrs",
+            "US| EAST [HD] tuv",
+            "US| EAST [HD] wxy",
+            "US| EAST [HD] z",
+            "US| EAST [SD] a",
+            "US| EAST [FHD] bc",
+            "US| EAST [FHD] de",
+            "US| EAST [HD] f",
+            "US| EAST [HD] h",
+            "US| EAST [SD] ijk",
+            "US| EAST [SD] l",
+            "US| EAST [UHD] m",
+            "US| WEST [FHD] no",
+            "US| WEST [HD] qrst",
+            "US| WEST [HD] uvw",
+            "US| (West) xv",
+            "US| East d",
+            "US| West e",
+            "US| West f",
+        ].into_iter().map(|name| PlaylistItem { header: PlaylistItemHeader { title: name.to_string(), ..Default::default() } }).collect::<Vec<PlaylistItem>>().into();
+
+        let channel_sort = ConfigSortChannel {
+            field: ItemField::Caption,
+            group_pattern: ".*US.*".to_string(),
+            order: SortOrder::Asc,
+            sequence: None,
+            t_sequence: Some(vec![
+                Regex::new(r"^US\| EAST.*?\[\bUHD\b\](?P<c1>.*)").unwrap(),
+                Regex::new(r"^US\| EAST.*?\[\bFHD\b\](?P<c1>.*)").unwrap(),
+                Regex::new(r"^US\| EAST.*?\[\bHD\b\](?P<c1>.*)").unwrap(),
+                Regex::new(r"^US\| EAST.*?\[\bSD\b\](?P<c1>.*)").unwrap(),
+                Regex::new(r"^US\| WEST.*?\[\bUHD\b\](?P<c1>.*)").unwrap(),
+                Regex::new(r"^US\| WEST.*?\[\bFHD\b\](?P<c1>.*)").unwrap(),
+                Regex::new(r"^US\| WEST.*?\[\bHD\b\](?P<c1>.*)").unwrap(),
+                Regex::new(r"^US\| WEST.*?\[\bSD\b\](?P<c1>.*)").unwrap(),
+            ]),
+            t_re_group_pattern: Some(Regex::new(".*").unwrap()),
+        };
+
+        channels.sort_by(|chan1, chan2| playlistitem_comparator(chan1, chan2, &channel_sort, true));
+        let sorted = channels.into_iter().map(|pli| pli.header.title.clone()).collect::<Vec<String>>();
+        let expected = vec!["US| EAST [UHD] m", "US| EAST [FHD] abc", "US| EAST [FHD] bc", "US| EAST [FHD] de", "US| EAST [FHD] def", "US| EAST [FHD] ghi", "US| EAST [HD] f", "US| EAST [HD] h", "US| EAST [HD] jkl", "US| EAST [HD] mno", "US| EAST [HD] pqrs", "US| EAST [HD] tuv", "US| EAST [HD] wxy", "US| EAST [HD] z", "US| EAST [SD] a", "US| EAST [SD] ijk", "US| EAST [SD] l", "US| WEST [FHD] no", "US| WEST [HD] qrst", "US| WEST [HD] uvw", "US| (West) xv", "US| East d", "US| West e", "US| West f"];
         assert_eq!(expected, sorted);
     }
 }

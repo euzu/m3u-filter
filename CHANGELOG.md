@@ -145,7 +145,6 @@ ipcheck:
   url_ipv4: https://ipinfo.io/ip
 ```
 
-
 # 2.2.5 (2025-03-27)
 - fixed web ui playlist regexp search
 - added `web_ui_path` to `config.yml`

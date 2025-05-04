@@ -19,7 +19,7 @@ use crate::utils::file_utils;
 use crate::utils::{parse_size_base_2, parse_to_kbps};
 use crate::utils::exit;
 use crate::m3u_filter_error::{ create_m3u_filter_error_result};
-use crate::model::{ConfigInput, ConfigInputOptions, ConfigIpCheck, ConfigProxy, ConfigSource, ConfigTarget, HdHomeRunConfig, LogConfig, MessagingConfig, ProcessTargets, TargetOutput, VideoConfig, WebUiConfig};
+use crate::model::{ConfigInput, ConfigInputOptions, IpCheckConfig, ProxyConfig, ConfigSource, ConfigTarget, HdHomeRunConfig, LogConfig, MessagingConfig, ProcessTargets, TargetOutput, VideoConfig, WebUiConfig};
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8192byte chunks and 2Mbit/s approx 8MB
 
@@ -132,6 +132,10 @@ pub struct ConfigDto {
     pub web_ui: Option<WebUiConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reverse_proxy: Option<ReverseProxyConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<ProxyConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ipcheck: Option<IpCheckConfig>,
 }
 
 impl ConfigDto {
@@ -366,9 +370,9 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hdhomerun: Option<HdHomeRunConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub proxy: Option<ConfigProxy>,
+    pub proxy: Option<ProxyConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ipcheck: Option<ConfigIpCheck>,
+    pub ipcheck: Option<IpCheckConfig>,
     #[serde(skip)]
     pub t_api_proxy: Arc<RwLock<Option<ApiProxyConfig>>>,
     #[serde(skip)]

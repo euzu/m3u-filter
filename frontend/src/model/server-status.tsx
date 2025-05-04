@@ -9,3 +9,8 @@ export interface ServerStatus {
     active_user_connections: number,
     active_provider_connections: Record<string, number>,
 }
+
+export interface ServerIpCheck {
+    ipv4?: string,
+    ipv6?: string,
+}

@@ -2,13 +2,13 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-pub struct ConfigProxy {
+pub struct ProxyConfig {
     pub url: String,
     pub username: Option<String>,
     pub password: Option<String>,
 }
 
-impl ConfigProxy {
+impl ProxyConfig {
     pub(crate) fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if self.username.is_some() || self.password.is_some() {
             if let (Some(username), Some(password)) = (self.username.as_ref(), self.password.as_ref()) {
