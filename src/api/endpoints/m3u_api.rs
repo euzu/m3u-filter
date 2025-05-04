@@ -184,7 +184,7 @@ macro_rules! register_m3u_stream_routes {
     ($router:expr, [$($path:expr),*]) => {{
         $router
         $(
-        .route(&format!("/{}/{}/{{username}}/{{password}}/{{stream_id}}", $path, storage_const::M3U_STREAM_PATH), axum::routing::get(m3u_api_stream))
+        .route(&format!("/{}/{}/{{username}}/{{password}}/{{stream_id}}", storage_const::M3U_STREAM_PATH, $path), axum::routing::get(m3u_api_stream))
             // $cfg.service(web::resource(format!("/{M3U_STREAM_PATH}/{}/{{username}}/{{password}}/{{stream_id}}", $path)).route(web::get().to(m3u_api_stream)));
         )*
     }};
