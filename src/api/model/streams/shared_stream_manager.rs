@@ -2,7 +2,7 @@ use crate::api::model::app_state::AppState;
 use crate::api::model::streams::provider_stream_factory::STREAM_QUEUE_SIZE;
 use crate::api::model::stream_error::StreamError;
 use crate::utils::debug_if_enabled;
-use crate::utils::network::request::sanitize_sensitive_info;
+use crate::utils::request::sanitize_sensitive_info;
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};

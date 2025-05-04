@@ -1,7 +1,7 @@
 use crate::api::model::app_state::AppState;
 use crate::api::model::download::{DownloadQueue, FileDownload, FileDownloadRequest};
-use crate::model::config::{ConfigProxy, VideoDownloadConfig};
-use crate::utils::network::request;
+use crate::model::{ConfigProxy, VideoDownloadConfig};
+use crate::utils::request;
 use tokio::sync::RwLock;
 use futures::stream::TryStreamExt;
 use log::info;
@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::{fs};
 use axum::response::IntoResponse;
 use crate::m3u_filter_error::to_io_error;
-use crate::utils::network::request::create_client;
+use crate::utils::request::create_client;
 
 async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwest::Client) -> Result<(), String> {
     let file_download = { active.read().await.as_ref().unwrap().clone() };

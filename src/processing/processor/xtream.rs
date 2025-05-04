@@ -1,7 +1,7 @@
 use crate::m3u_filter_error::{info_err, notify_err};
 use crate::m3u_filter_error::{str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigInput};
-use crate::model::playlist::{FetchedPlaylist, PlaylistEntry, PlaylistItem, PlaylistItemType, XtreamCluster};
+use crate::model::{Config, ConfigInput};
+use crate::model::{FetchedPlaylist, PlaylistEntry, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::storage::get_input_storage_path;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -9,12 +9,11 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
-use crate::model::xtream_const;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage_const;
 use crate::repository::xtream_repository::xtream_get_record_file_path;
-use crate::utils::file::file_utils::append_or_crate_file;
-use crate::utils::network::xtream;
+use crate::utils::file_utils::append_or_crate_file;
+use crate::utils::xtream;
 
 pub(in crate::processing) async fn playlist_resolve_download_playlist_item(client: Arc<reqwest::Client>, pli: &PlaylistItem, input: &ConfigInput, errors: &mut Vec<M3uFilterError>, resolve_delay: u16, cluster: XtreamCluster) -> Option<String> {
     let mut result = None;
@@ -47,7 +46,7 @@ pub(in crate::processing) fn write_info_content_to_wal_file(writer: &mut BufWrit
 pub(in crate::processing) fn create_resolve_episode_wal_files(cfg: &Config, input: &ConfigInput) -> Option<(File, PathBuf)> {
     match get_input_storage_path(&input.name, &cfg.working_dir) {
         Ok(storage_path) => {
-            let info_path = storage_path.join(format!("{}.{}", xtream_const::XC_FILE_SERIES_EPISODE_RECORD, storage_const::FILE_SUFFIX_WAL));
+            let info_path = storage_path.join(format!("{}.{}", crate::model::XC_FILE_SERIES_EPISODE_RECORD, storage_const::FILE_SUFFIX_WAL));
             let info_file = append_or_crate_file(&info_path).ok()?;
             Some((info_file, info_path))
         }
@@ -60,8 +59,8 @@ pub(in crate::processing) fn create_resolve_info_wal_files(cfg: &Config, input: 
         Ok(storage_path) => {
             if let Some(file_prefix) = match cluster {
                 XtreamCluster::Live => None,
-                XtreamCluster::Video => Some(xtream_const::XC_FILE_VOD_INFO),
-                XtreamCluster::Series => Some(xtream_const::XC_FILE_SERIES_INFO)
+                XtreamCluster::Video => Some(crate::model::XC_FILE_VOD_INFO),
+                XtreamCluster::Series => Some(crate::model::XC_FILE_SERIES_INFO)
             } {
                 let content_path = storage_path.join(format!("{file_prefix}_content.{}", storage_const::FILE_SUFFIX_WAL));
                 let info_path = storage_path.join(format!("{file_prefix}_record.{}", storage_const::FILE_SUFFIX_WAL));

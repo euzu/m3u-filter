@@ -1,6 +1,6 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigTarget, InputType};
-use crate::model::playlist::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
+use crate::model::{Config, ConfigTarget, InputType};
+use crate::model::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::processing::processor::playlist::ProcessingPipe;
 use crate::processing::parser::xtream::parse_xtream_series_info;
 use crate::processing::processor::xtream::{create_resolve_episode_wal_files, create_resolve_info_wal_files, playlist_resolve_download_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
@@ -15,10 +15,9 @@ use std::io::{BufWriter, Write};
 use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
-use crate::model::xtream::{XtreamSeriesEpisode, XtreamSeriesInfoEpisode};
-use crate::model::xtream_const;
-use crate::utils::bincode_utils::bincode_serialize;
-use crate::utils::file::file_utils::file_writer;
+use crate::model::{XtreamSeriesEpisode, XtreamSeriesInfoEpisode};
+use crate::utils::bincode_serialize;
+use crate::utils::file_utils::file_writer;
 
 create_resolve_options_function_for_xtream_target!(series);
 
@@ -52,7 +51,7 @@ fn write_series_episode_record_to_wal_file(
 }
 
 fn should_update_series_info(pli: &mut PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
-    should_update_info(pli, processed_provider_ids, xtream_const::XC_TAG_SERIES_INFO_LAST_MODIFIED)
+    should_update_info(pli, processed_provider_ids, crate::model::XC_TAG_SERIES_INFO_LAST_MODIFIED)
 }
 
 async fn playlist_resolve_series_info(client: Arc<reqwest::Client>, cfg: &Config, errors: &mut Vec<M3uFilterError>,

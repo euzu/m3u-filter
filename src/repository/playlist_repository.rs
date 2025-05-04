@@ -1,16 +1,16 @@
 use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigTarget, TargetOutput};
-use crate::model::playlist::{PlaylistGroup, PlaylistItemType};
-use crate::model::xmltv::Epg;
+use crate::model::{Config, ConfigTarget, TargetOutput};
+use crate::model::{PlaylistGroup, PlaylistItemType};
+use crate::model::Epg;
 use crate::repository::epg_repository::epg_write;
 use crate::repository::kodi_repository::kodi_write_strm_playlist;
 use crate::repository::m3u_repository::m3u_write_playlist;
 use crate::repository::storage::{ensure_target_storage_path, get_target_id_mapping_file};
 use crate::repository::target_id_mapping::TargetIdMapping;
 use crate::repository::xtream_repository::xtream_write_playlist;
-use crate::utils::file::file_lock_manager::FileWriteGuard;
-use crate::utils::network::request::{is_dash_url, is_hls_url};
+use crate::utils::file_lock_manager::FileWriteGuard;
+use crate::utils::request::{is_dash_url, is_hls_url};
 use std::path::Path;
 
 pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,

@@ -1,6 +1,6 @@
 use crate::m3u_filter_error::{notify_err, M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigTarget, TargetOutput};
-use crate::model::xmltv::Epg;
+use crate::model::{Config, ConfigTarget, TargetOutput};
+use crate::model::Epg;
 use crate::repository::m3u_repository::m3u_get_epg_file_path;
 use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
 use crate::utils::debug_if_enabled;

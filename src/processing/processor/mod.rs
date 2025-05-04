@@ -4,6 +4,7 @@ mod affix;
 mod xtream_vod;
 mod xtream_series;
 pub mod epg;
+mod sort;
 
 #[macro_export]
 macro_rules! handle_error {

@@ -1,11 +1,11 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ConfigTarget, InputType};
-use crate::model::playlist::{FetchedPlaylist, PlaylistItem, PlaylistItemType, XtreamCluster};
+use crate::model::{Config, ConfigTarget, InputType};
+use crate::model::{FetchedPlaylist, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::processing::processor::xtream::{create_resolve_info_wal_files, playlist_resolve_download_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
 use crate::repository::xtream_repository::{xtream_update_input_info_file, xtream_update_input_vod_record_from_wal_file, InputVodInfoRecord};
 use crate::m3u_filter_error::{notify_err};
 use crate::processing::processor::{handle_error, handle_error_and_return, create_resolve_options_function_for_xtream_target};
-use crate::utils::json_utils::{get_u32_from_serde_value, get_u64_from_serde_value};
+use crate::utils::{get_u32_from_serde_value, get_u64_from_serde_value};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -13,8 +13,7 @@ use std::io::{BufWriter, Write};
 use std::sync::Arc;
 use std::time::Instant;
 use log::{info, log_enabled, Level};
-use crate::model::xtream_const;
-use crate::utils::file::file_utils::file_writer;
+use crate::utils::file_utils::file_writer;
 
 create_resolve_options_function_for_xtream_target!(vod);
 
@@ -25,18 +24,18 @@ async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterErr
 fn extract_info_record_from_vod_info(content: &str) -> Option<(u32, InputVodInfoRecord)> {
     let doc = serde_json::from_str::<Map<String, Value>>(content).ok()?;
 
-    let movie_data = doc.get(xtream_const::XC_TAG_VOD_INFO_MOVIE_DATA)?.as_object()?;
+    let movie_data = doc.get(crate::model::XC_TAG_VOD_INFO_MOVIE_DATA)?.as_object()?;
     let provider_id = get_u32_from_serde_value(
-        movie_data.get(xtream_const::XC_TAG_VOD_INFO_STREAM_ID)?,
+        movie_data.get(crate::model::XC_TAG_VOD_INFO_STREAM_ID)?,
     )?;
 
     let added = movie_data
-        .get(xtream_const::XC_TAG_VOD_INFO_ADDED)
+        .get(crate::model::XC_TAG_VOD_INFO_ADDED)
         .and_then(get_u64_from_serde_value)
         .unwrap_or(0);
 
-    let tmdb_id = doc.get(xtream_const::XC_TAG_VOD_INFO_INFO)?.as_object()
-        .and_then(|info| info.get(xtream_const::XC_TAG_VOD_INFO_TMDB_ID))
+    let tmdb_id = doc.get(crate::model::XC_TAG_VOD_INFO_INFO)?.as_object()
+        .and_then(|info| info.get(crate::model::XC_TAG_VOD_INFO_TMDB_ID))
         .and_then(get_u32_from_serde_value)
         .unwrap_or(0);
 
@@ -58,7 +57,7 @@ fn write_vod_info_record_to_wal_file(
 }
 
 fn should_update_vod_info(pli: &mut PlaylistItem, processed_provider_ids: &HashMap<u32, u64>) -> (bool, u32, u64) {
-    should_update_info(pli, processed_provider_ids, xtream_const::XC_TAG_VOD_INFO_ADDED)
+    should_update_info(pli, processed_provider_ids, crate::model::XC_TAG_VOD_INFO_ADDED)
 }
 
 pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget, errors: &mut Vec<M3uFilterError>, fpl: &mut FetchedPlaylist<'_>) {

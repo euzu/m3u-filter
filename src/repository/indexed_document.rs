@@ -5,13 +5,13 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery};
-use crate::utils::file::file_utils;
+use crate::utils::file_utils;
 use log::error;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use crate::m3u_filter_error::{str_to_io_error, to_io_error};
-use crate::utils::bincode_utils::{bincode_deserialize, bincode_serialize};
-use crate::utils::file::file_utils::{create_new_file_for_read_write, file_reader, file_writer, open_read_write_file, open_readonly_file, rename_or_copy};
+use crate::utils::{bincode_deserialize, bincode_serialize};
+use crate::utils::file_utils::{create_new_file_for_read_write, file_reader, file_writer, open_read_write_file, open_readonly_file, rename_or_copy};
 
 const BLOCK_SIZE: usize = 4096;
 const LEN_SIZE: usize = 4;
@@ -512,10 +512,10 @@ mod tests {
     use std::path::PathBuf;
 
     use serde::{Deserialize, Serialize};
-    use crate::model::playlist::XtreamPlaylistItem;
-    // use crate::model::playlist::XtreamPlaylistItem;
+    use crate::model::XtreamPlaylistItem;
+    // use crate::model::XtreamPlaylistItem;
     use crate::repository::indexed_document::{IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
-    use crate::utils::file::config_reader::resolve_env_var;
+    use crate::utils::config_reader::resolve_env_var;
 
     // Example usage with a simple struct
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

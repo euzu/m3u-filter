@@ -96,7 +96,7 @@ pub fn parse_to_kbps(input: &str) ->  Result<u64, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::size_utils::parse_to_kbps;
+    use crate::utils::parse_to_kbps;
 
     #[test]
     fn test_parse_kpbs() {

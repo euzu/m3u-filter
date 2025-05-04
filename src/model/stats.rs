@@ -1,6 +1,6 @@
 use std::fmt::{Display};
 use serde::{Serialize, Serializer};
-use crate::model::config::InputType;
+use crate::model::InputType;
 
 pub fn format_elapsed_time(seconds: u64) -> String {
     if seconds < 60 {

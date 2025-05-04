@@ -1,10 +1,10 @@
 use std::sync::Arc;
 use crate::m3u_filter_error::M3uFilterError;
-use crate::model::config::{Config, ConfigInput};
-use crate::model::playlist::PlaylistGroup;
+use crate::model::{Config, ConfigInput};
+use crate::model::PlaylistGroup;
 use crate::processing::parser::m3u;
-use crate::utils::file::file_utils::prepare_file_path;
-use crate::utils::network::request;
+use crate::utils::file_utils::prepare_file_path;
+use crate::utils::request;
 
 pub async fn get_m3u_playlist(client: Arc<reqwest::Client>, cfg: &Config, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
     let url = input.url.clone();

@@ -1,14 +1,14 @@
 use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTarget, ConfigTargetOptions, TargetType};
-use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType, XtreamCluster};
+use crate::model::{ProxyType, ProxyUserCredentials};
+use crate::model::{Config, ConfigTarget, ConfigTargetOptions, TargetType};
+use crate::model::{M3uPlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::indexed_document::IndexedDocumentIterator;
 use crate::repository::m3u_repository::m3u_get_file_paths;
 use crate::repository::storage::ensure_target_storage_path;
 use crate::repository::storage_const;
 use crate::repository::user_repository::user_get_bouquet_filter;
-use crate::utils::file::file_lock_manager::FileReadGuard;
+use crate::utils::file_lock_manager::FileReadGuard;
 use std::collections::HashSet;
 
 #[allow(clippy::struct_excessive_bools)]

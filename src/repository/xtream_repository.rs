@@ -1,9 +1,8 @@
 use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err, str_to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ProxyUserCredentials};
-use crate::model::config::{Config, ConfigInput, ConfigTarget, XtreamTargetOutput};
-use crate::model::playlist::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::{rewrite_doc_urls, PlaylistXtreamCategory, XtreamMappingOptions, XtreamSeriesEpisode};
-use crate::model::xtream_const;
+use crate::model::{ProxyUserCredentials};
+use crate::model::{Config, ConfigInput, ConfigTarget, XtreamTargetOutput};
+use crate::model::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
+use crate::model::{rewrite_doc_urls, PlaylistXtreamCategory, XtreamMappingOptions, XtreamSeriesEpisode};
 use crate::repository::bplustree::{BPlusTree, BPlusTreeQuery, BPlusTreeUpdate};
 use crate::repository::indexed_document::{IndexedDocumentDirectAccess, IndexedDocumentGarbageCollector, IndexedDocumentIterator, IndexedDocumentWriter};
 use crate::repository::playlist_repository::get_target_id_mapping;
@@ -12,12 +11,12 @@ use crate::repository::storage::{get_input_storage_path, get_target_id_mapping_f
 use crate::repository::storage_const;
 use crate::repository::target_id_mapping::VirtualIdRecord;
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistJsonIterator;
-use crate::utils::bincode_utils::bincode_deserialize;
-use crate::utils::file::file_lock_manager::FileReadGuard;
-use crate::utils::file::file_utils::file_reader;
-use crate::utils::file::file_utils::open_readonly_file;
-use crate::utils::hash_utils::generate_playlist_uuid;
-use crate::utils::json_utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
+use crate::utils::bincode_deserialize;
+use crate::utils::file_lock_manager::FileReadGuard;
+use crate::utils::file_utils::file_reader;
+use crate::utils::file_utils::open_readonly_file;
+use crate::utils::generate_playlist_uuid;
+use crate::utils::{get_u32_from_serde_value, json_iter_array, json_write_documents_to_file};
 use bytes::Bytes;
 use futures::{stream, Stream, StreamExt};
 use log::error;
@@ -146,9 +145,9 @@ fn load_old_category_ids(path: &Path) -> (u32, HashMap<String, u32>) {
             if let Ok(file) = File::open(col_path) {
                 let reader = file_reader(file);
                 for entry in json_iter_array::<Value, BufReader<File>>(reader).flatten() {
-                    if let Some(category_id) = entry.get(xtream_const::XC_TAG_CATEGORY_ID).and_then(get_u32_from_serde_value) {
+                    if let Some(category_id) = entry.get(crate::model::XC_TAG_CATEGORY_ID).and_then(get_u32_from_serde_value) {
                         if let Value::Object(item) = entry {
-                            if let Some(category_name) = get_map_item_as_str(&item, xtream_const::XC_TAG_CATEGORY_NAME) {
+                            if let Some(category_name) = get_map_item_as_str(&item, crate::model::XC_TAG_CATEGORY_NAME) {
                                 result.insert(format!("{cluster}{category_name}"), category_id);
                                 max_id = max_id.max(category_id);
                             }
@@ -228,9 +227,9 @@ pub async fn xtream_write_playlist(
                 XtreamCluster::Series => &mut cat_series_col,
                 XtreamCluster::Video => &mut cat_vod_col,
             }.push(json!({
-              xtream_const::XC_TAG_CATEGORY_ID: format!("{}", &cat_id),
-              xtream_const::XC_TAG_CATEGORY_NAME: plg.title.clone(),
-              xtream_const::XC_TAG_PARENT_ID: 0
+              crate::model::XC_TAG_CATEGORY_ID: format!("{}", &cat_id),
+              crate::model::XC_TAG_CATEGORY_NAME: plg.title.clone(),
+              crate::model::XC_TAG_PARENT_ID: 0
             }));
 
             for pli in &mut plg.channels {
@@ -529,31 +528,31 @@ async fn rewrite_xtream_vod_info<P>(
 {
     // we need to update the info data.
     if config.is_reverse_proxy_resource_rewrite_enabled() {
-        if let Some(Value::Object(info_data)) = doc.get_mut(xtream_const::XC_TAG_INFO_DATA) {
+        if let Some(Value::Object(info_data)) = doc.get_mut(crate::model::XC_TAG_INFO_DATA) {
             let item_type = pli.get_item_type();
             if user.proxy.is_reverse(item_type) && !target.is_force_redirect(item_type) {
                 let server_info = config.get_user_server_info(user).await;
                 let url = server_info.get_base_url();
                 let resource_url = Some(format!("{url}/resource/movie/{}/{}/{}", user.username, user.password, pli.get_virtual_id()));
-                rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, xtream_const::XC_INFO_RESOURCE_PREFIX);
+                rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, crate::model::XC_INFO_RESOURCE_PREFIX);
                 // doc.insert(TAG_INFO_DATA, Value::Object(info_data));
             }
         }
     }
 
     // we need to update the movie data with virtual ids.
-    if let Some(Value::Object(movie_data)) = doc.get_mut(xtream_const::XC_TAG_MOVIE_DATA) {
+    if let Some(Value::Object(movie_data)) = doc.get_mut(crate::model::XC_TAG_MOVIE_DATA) {
         let stream_id = pli.get_virtual_id();
         let category_id = pli.get_category_id().unwrap_or(0);
-        movie_data.insert(xtream_const::XC_TAG_STREAM_ID.to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
-        movie_data.insert(xtream_const::XC_TAG_CATEGORY_ID.to_string(), Value::Number(serde_json::value::Number::from(category_id)));
-        movie_data.insert(xtream_const::XC_TAG_CATEGORY_IDS.to_string(), Value::Array(vec![Value::Number(serde_json::value::Number::from(category_id))]));
+        movie_data.insert(crate::model::XC_TAG_STREAM_ID.to_string(), Value::Number(serde_json::value::Number::from(stream_id)));
+        movie_data.insert(crate::model::XC_TAG_CATEGORY_ID.to_string(), Value::Number(serde_json::value::Number::from(category_id)));
+        movie_data.insert(crate::model::XC_TAG_CATEGORY_IDS.to_string(), Value::Array(vec![Value::Number(serde_json::value::Number::from(category_id))]));
         let options = XtreamMappingOptions::from_target_options(target, xtream_output, config);
         if options.skip_video_direct_source {
-            movie_data.insert(xtream_const::XC_TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
+            movie_data.insert(crate::model::XC_TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
         } else {
             movie_data.insert(
-                xtream_const::XC_TAG_DIRECT_SOURCE.to_string(),
+                crate::model::XC_TAG_DIRECT_SOURCE.to_string(),
                 Value::String(pli.get_provider_url().to_string()),
             );
         }
@@ -618,14 +617,14 @@ async fn rewrite_xtream_series_info<P>(
     };
     if resource_url.is_some() {
         // we need to update the info data.
-        if let Some(Value::Object(info_data)) = doc.get_mut(xtream_const::XC_TAG_INFO_DATA) {
-            rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, xtream_const::XC_INFO_RESOURCE_PREFIX);
+        if let Some(Value::Object(info_data)) = doc.get_mut(crate::model::XC_TAG_INFO_DATA) {
+            rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, crate::model::XC_INFO_RESOURCE_PREFIX);
         }
-        if let Some(Value::Array(seasons_data)) = doc.get_mut(xtream_const::XC_TAG_SEASONS_DATA) {
+        if let Some(Value::Array(seasons_data)) = doc.get_mut(crate::model::XC_TAG_SEASONS_DATA) {
             for season_value in seasons_data {
                 if let Value::Object(season_doc) = season_value {
-                    if let Some(season_provider_id) = season_doc.get(xtream_const::XC_TAG_ID).and_then(get_u32_from_serde_value) {
-                        let field_prefix = format!("{}{season_provider_id}_", xtream_const::XC_SEASON_RESOURCE_PREFIX);
+                    if let Some(season_provider_id) = season_doc.get(crate::model::XC_TAG_ID).and_then(get_u32_from_serde_value) {
+                        let field_prefix = format!("{}{season_provider_id}_", crate::model::XC_SEASON_RESOURCE_PREFIX);
                         rewrite_doc_urls(resource_url.as_ref(), season_doc, storage_const::INFO_REWRITE_FIELDS, &field_prefix);
                     }
                 }
@@ -633,7 +632,7 @@ async fn rewrite_xtream_series_info<P>(
         }
     }
 
-    let episodes = doc.get_mut(xtream_const::XC_TAG_EPISODES).and_then(Value::as_object_mut).ok_or_else(|| str_to_io_error("No episodes found in content"))?;
+    let episodes = doc.get_mut(crate::model::XC_TAG_EPISODES).and_then(Value::as_object_mut).ok_or_else(|| str_to_io_error("No episodes found in content"))?;
 
     let virtual_id = pli.get_virtual_id();
     {
@@ -643,7 +642,7 @@ async fn rewrite_xtream_series_info<P>(
         let provider_url = pli.get_provider_url();
         for episode_list in episodes.values_mut().filter_map(Value::as_array_mut) {
             for episode in episode_list.iter_mut().filter_map(Value::as_object_mut) {
-                if let Some(episode_provider_id) = episode.get(xtream_const::XC_TAG_ID).and_then(get_u32_from_serde_value)
+                if let Some(episode_provider_id) = episode.get(crate::model::XC_TAG_ID).and_then(get_u32_from_serde_value)
                 {
                     let uuid = generate_playlist_uuid(&hex_encode(&pli.get_uuid()), &episode_provider_id.to_string(), PlaylistItemType::Series, &provider_url);
                     let episode_virtual_id = target_id_mapping.get_and_update_virtual_id(
@@ -652,17 +651,17 @@ async fn rewrite_xtream_series_info<P>(
                         PlaylistItemType::Series,
                         virtual_id,
                     );
-                    episode.insert(xtream_const::XC_TAG_ID.to_string(), Value::String(episode_virtual_id.to_string()));
+                    episode.insert(crate::model::XC_TAG_ID.to_string(), Value::String(episode_virtual_id.to_string()));
                     if resource_url.is_some() {
                         // we need to update the info data.
-                        if let Some(Value::Object(info_data)) = episode.get_mut(xtream_const::XC_TAG_INFO_DATA) {
-                            let field_prefix = format!("{}{episode_provider_id}_", xtream_const::XC_INFO_RESOURCE_PREFIX_EPISODE);
+                        if let Some(Value::Object(info_data)) = episode.get_mut(crate::model::XC_TAG_INFO_DATA) {
+                            let field_prefix = format!("{}{episode_provider_id}_", crate::model::XC_INFO_RESOURCE_PREFIX_EPISODE);
                             rewrite_doc_urls(resource_url.as_ref(), info_data, storage_const::INFO_REWRITE_FIELDS, &field_prefix);
                         }
                     }
                 }
                 if options.skip_series_direct_source {
-                    episode.insert(xtream_const::XC_TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
+                    episode.insert(crate::model::XC_TAG_DIRECT_SOURCE.to_string(), Value::String(String::new()));
                 }
             }
         }

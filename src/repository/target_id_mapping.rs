@@ -7,7 +7,7 @@ use chrono::Local;
 use log::error;
 use serde::{Deserialize, Serialize};
 
-use crate::model::playlist::{PlaylistItemType, UUIDType};
+use crate::model::{PlaylistItemType, UUIDType};
 use crate::repository::bplustree::BPlusTree;
 
 // TODO make configurable

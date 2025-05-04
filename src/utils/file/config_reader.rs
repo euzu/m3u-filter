@@ -1,12 +1,12 @@
 use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err, str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::ApiProxyConfig;
-use crate::model::config::{Config, ConfigDto, ConfigInput, ConfigInputAlias, InputType};
-use crate::model::mapping::Mappings;
-use crate::utils::constants::CONSTANTS;
-use crate::utils::file::env_resolving_reader::EnvResolvingReader;
-use crate::utils::file::file_utils::{file_reader, resolve_relative_path};
-use crate::utils::file::{file_utils, multi_file_reader};
-use crate::utils::network::request::{get_credentials_from_url, get_local_file_content};
+use crate::model::ApiProxyConfig;
+use crate::model::{Config, ConfigDto, ConfigInput, ConfigInputAlias, InputType};
+use crate::model::Mappings;
+use crate::utils::CONSTANTS;
+use crate::utils::env_resolving_reader::EnvResolvingReader;
+use crate::utils::file_utils::{file_reader, resolve_relative_path};
+use crate::utils::{file_utils, multi_file_reader};
+use crate::utils::request::{get_credentials_from_url, get_local_file_content};
 use crate::utils::sys_utils::exit;
 use chrono::Local;
 use log::{debug, error, info, warn};
@@ -353,8 +353,8 @@ fn get_csv_file_path(file_uri: &String) -> Result<PathBuf, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::config::InputType;
-    use crate::utils::file::config_reader::{csv_read_inputs_from_reader, resolve_env_var};
+    use crate::model::InputType;
+    use crate::utils::config_reader::{csv_read_inputs_from_reader, resolve_env_var};
     use std::io::{BufReader, Cursor};
     const M3U_BATCH: &str = r#"
 #url;name;max_connections;priority

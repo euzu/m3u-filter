@@ -2,7 +2,7 @@ use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 use flate2::bufread::{GzDecoder, ZlibDecoder};
 use crate::utils::compression::compression_utils::{is_deflate, is_gzip};
-use crate::utils::file::file_utils::{file_reader, open_readonly_file};
+use crate::utils::file_utils::{file_reader, open_readonly_file};
 
 pub struct CompressedFileReader {
     reader: BufReader<Box<dyn Read>>,

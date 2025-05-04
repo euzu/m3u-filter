@@ -10,12 +10,12 @@ mod modules;
 include_modules!();
 
 use crate::auth::password::generate_password;
-use crate::model::config::{validate_targets, Config, HealthcheckConfig, LogLevelConfig, ProcessTargets};
-use crate::model::healthcheck::Healthcheck;
+use crate::model::{validate_targets, Config, HealthcheckConfig, Healthcheck, ProcessTargets, LogLevelConfig};
 use crate::processing::processor::playlist;
-use crate::utils::file::config_reader::config_file_reader;
-use crate::utils::file::file_utils;
-use crate::utils::network::request::{create_client, set_sanitize_sensitive_info};
+use crate::utils::config_reader::config_file_reader;
+use utils::config_reader;
+use crate::utils::file_utils;
+use crate::utils::request::{create_client, set_sanitize_sensitive_info};
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use env_logger::Builder;
@@ -23,7 +23,6 @@ use log::{error, info, LevelFilter};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use utils::file::config_reader;
 
 const LOG_ERROR_LEVEL_MOD: &[&str] = &[
     "reqwest::async_impl::client",

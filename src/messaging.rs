@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::model::config::{MessagingConfig};
+use crate::model::{MessagingConfig};
 use log::{debug, error};
 use reqwest::{header};
 

@@ -1,12 +1,12 @@
 use crate::api::model::app_state::HdHomerunAppState;
 use crate::auth::auth_basic::AuthBasic;
-use crate::model::api_proxy::ProxyUserCredentials;
-use crate::model::config::{Config, ConfigTarget, TargetType};
-use crate::model::playlist::{M3uPlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
+use crate::model::ProxyUserCredentials;
+use crate::model::{Config, ConfigTarget, TargetType};
+use crate::model::{M3uPlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
 use crate::processing::parser::xtream::get_xtream_url;
 use crate::repository::m3u_playlist_iterator::M3uPlaylistIterator;
 use crate::repository::xtream_playlist_iterator::XtreamPlaylistIterator;
-use crate::utils::json_utils::get_string_from_serde_value;
+use crate::utils::get_string_from_serde_value;
 use axum::response::IntoResponse;
 use bytes::Bytes;
 use futures::{stream, Stream, StreamExt};

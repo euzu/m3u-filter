@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc};
 use tower::Service;
-use crate::utils::constants::CONSTANTS;
+use crate::utils::CONSTANTS;
 
 fn no_web_auth_token() -> impl axum::response::IntoResponse + Send {
     axum::Json(HashMap::from([("token", "authorized")])).into_response()

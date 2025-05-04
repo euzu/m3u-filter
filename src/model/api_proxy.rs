@@ -1,9 +1,9 @@
 use crate::api::model::app_state::AppState;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config, ClusterFlags};
+use crate::model::{Config, ClusterFlags};
 use crate::repository::user_repository::{backup_api_user_db_file, get_api_user_db_path, load_api_user, merge_api_user};
-use crate::utils::default_utils::default_as_true;
-use crate::utils::file::config_reader;
+use crate::utils::default_as_true;
+use crate::utils::config_reader;
 use chrono::Local;
 use enum_iterator::Sequence;
 use log::debug;
@@ -13,7 +13,7 @@ use std::fmt::Display;
 use std::fs;
 use std::str::FromStr;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use crate::model::playlist::PlaylistItemType;
+use crate::model::PlaylistItemType;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub enum UserConnectionPermission {
@@ -311,7 +311,8 @@ pub struct ApiProxyServerInfo {
     pub name: String,
     pub protocol: String,
     pub host: String,
-    pub port: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<String>,
     pub timezone: String,
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -333,15 +334,15 @@ impl ApiProxyServerInfo {
        if self.host.is_empty() {
            return Err(info_err!("host cant be empty for api server config".to_string()));
        }
-       self.port = self.port.trim().to_string();
-       if self.port.is_empty() {
-           if self.protocol == "http" {
-               self.port = "80".to_string();
+       if let Some(port)= self.port.as_ref() {
+           let port = port.trim().to_string();
+           if port.is_empty() {
+               self.port = None;
+           } else if port.parse::<u16>().is_err() {
+               return Err(info_err!("invalid port for api server config".to_string()));
            } else {
-               self.port = "443".to_string();
+               self.port = Some(port);
            }
-       } else if self.port.parse::<u16>().is_err() {
-           return Err(info_err!("invalid port for api server config".to_string()));
        }
 
        self.timezone = self.timezone.trim().to_string();
@@ -373,10 +374,10 @@ impl ApiProxyServerInfo {
     }
 
     pub fn get_base_url(&self) -> String {
-        let base_url = if self.port.is_empty() {
-            format!("{}://{}", self.protocol, self.host)
+        let base_url = if let Some(port) = self.port.as_ref() {
+            format!("{}://{}:{port}", self.protocol, self.host)
         } else {
-            format!("{}://{}:{}", self.protocol, self.host, self.port)
+            format!("{}://{}", self.protocol, self.host)
         };
 
         match &self.path {

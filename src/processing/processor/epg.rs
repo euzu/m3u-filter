@@ -1,6 +1,6 @@
-use crate::model::config::{EpgConfig, EpgSmartMatchConfig};
-use crate::model::playlist::{FetchedPlaylist, PlaylistItem, XtreamCluster};
-use crate::model::xmltv::{Epg, XmlTag, EPG_ATTRIB_ID};
+use crate::model::{EpgConfig, EpgSmartMatchConfig};
+use crate::model::{FetchedPlaylist, PlaylistItem, XtreamCluster};
+use crate::model::{Epg, XmlTag, EPG_ATTRIB_ID};
 use crate::processing::parser::xmltv::normalize_channel_name;
 use log::debug;
 use rphonetic::{DoubleMetaphone, Encoder};

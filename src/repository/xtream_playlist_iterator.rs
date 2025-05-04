@@ -2,14 +2,14 @@ use std::collections::HashSet;
 use log::error;
 use crate::m3u_filter_error::info_err;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ProxyUserCredentials};
-use crate::model::config::{Config, ConfigTarget, TargetType};
-use crate::model::playlist::{XtreamCluster, XtreamPlaylistItem};
-use crate::model::xtream::XtreamMappingOptions;
+use crate::model::{ProxyUserCredentials};
+use crate::model::{Config, ConfigTarget, TargetType};
+use crate::model::{XtreamCluster, XtreamPlaylistItem};
+use crate::model::XtreamMappingOptions;
 use crate::repository::indexed_document::{IndexedDocumentIterator};
 use crate::repository::user_repository::user_get_bouquet_filter;
 use crate::repository::xtream_repository::{xtream_get_file_paths, xtream_get_storage_path};
-use crate::utils::file::file_lock_manager::FileReadGuard;
+use crate::utils::file_lock_manager::FileReadGuard;
 
 pub struct XtreamPlaylistIterator {
     reader: IndexedDocumentIterator<u32, XtreamPlaylistItem>,

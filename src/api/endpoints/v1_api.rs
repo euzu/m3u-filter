@@ -1,3 +1,4 @@
+use crate::api::endpoints::api_playlist_utils::{get_playlist, get_playlist_for_target};
 use crate::api::endpoints::download_api;
 use crate::api::endpoints::user_api::user_api_register;
 use crate::api::model::app_state::AppState;
@@ -6,21 +7,21 @@ use crate::api::model::request::{PlaylistRequest, PlaylistRequestType};
 use crate::auth::access_token::create_access_token;
 use crate::auth::authenticator::validator_admin;
 use crate::m3u_filter_error::M3uFilterError;
-use crate::model::api_proxy::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, TargetUser};
-use crate::model::config::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
-use crate::model::playlist::{XtreamPlaylistItem};
+use crate::model::StatusCheck;
+use crate::model::XtreamPlaylistItem;
+use crate::model::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
+use crate::model::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, TargetUser};
 use crate::processing::processor::playlist;
 use crate::repository::user_repository::store_api_user;
-use crate::utils::file::config_reader;
-use crate::utils::network::request::sanitize_sensitive_info;
+use crate::utils::config_reader;
+use crate::utils::ip_checker::get_ips;
+use crate::utils::request::sanitize_sensitive_info;
+use crate::VERSION;
 use axum::response::IntoResponse;
 use log::error;
-use serde_json::{json};
+use serde_json::json;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
-use crate::api::endpoints::api_playlist_utils::{get_playlist, get_playlist_for_target};
-use crate::model::healthcheck::StatusCheck;
-use crate::VERSION;
 
 fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
@@ -299,6 +300,23 @@ async fn config(
 }
 
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
+struct IpCheck {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ipv4: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ipv6: Option<String>,
+}
+
+async fn create_ipinfo_check(app_state: &Arc<AppState>) -> Option<(Option<String>, Option<String>)> {
+    if let Some(ipcheck) = app_state.config.ipcheck.as_ref() {
+        if let Ok(check) = get_ips(&app_state.http_client, ipcheck).await {
+            return Some(check);
+        }
+    }
+    None
+}
+
 async fn create_status_check(app_state: &Arc<AppState>) -> StatusCheck {
     let cache = match app_state.cache.as_ref().as_ref() {
         None => None,
@@ -334,6 +352,22 @@ async fn status(axum::extract::State(app_state): axum::extract::State<Arc<AppSta
     }
 }
 
+async fn ipinfo(axum::extract::State(app_state): axum::extract::State<Arc<AppState>>) -> axum::response::Response {
+    if let Some((ipv4, ipv6)) = create_ipinfo_check(&app_state).await {
+        let ipcheck = IpCheck {
+            ipv4,
+            ipv6,
+        };
+        return  match serde_json::to_string(&ipcheck) {
+            Ok(json) => axum::response::Response::builder().status(axum::http::StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, mime::APPLICATION_JSON.to_string()).body(json).unwrap().into_response(),
+            Err(_) => axum::Json(ipcheck).into_response(),
+        }
+    }
+    axum::http::StatusCode::BAD_REQUEST.into_response()
+}
+
+
 pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>, web_ui_path: &str) -> axum::Router<Arc<AppState>> {
     let mut router = axum::Router::new();
     router = router
@@ -347,6 +381,9 @@ pub fn v1_api_register(web_auth_enabled: bool, app_state: Arc<AppState>, web_ui_
         .route("/playlist", axum::routing::post(playlist_content))
         .route("/file/download", axum::routing::post(download_api::queue_download_file))
         .route("/file/download/info", axum::routing::get(download_api::download_file_info));
+    if app_state.config.ipcheck.is_some() {
+        router = router.route("/ipinfo", axum::routing::get(ipinfo));
+    }
     if web_auth_enabled {
         router = router.route_layer(axum::middleware::from_fn_with_state(Arc::clone(&app_state), validator_admin));
     }

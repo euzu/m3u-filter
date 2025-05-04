@@ -12,13 +12,13 @@ use std::sync::Arc;
 use crate::api::api_utils::{get_user_target, serve_file};
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
-use crate::model::api_proxy::ProxyUserCredentials;
-use crate::model::config::{Config, ConfigTarget, TargetOutput};
+use crate::model::ProxyUserCredentials;
+use crate::model::{Config, ConfigTarget, TargetOutput};
 use crate::repository::m3u_repository::m3u_get_epg_file_path;
 use crate::repository::storage::get_target_storage_path;
 use crate::repository::xtream_repository::{xtream_get_epg_file_path, xtream_get_storage_path};
-use crate::utils::file::file_utils;
-use crate::utils::file::file_utils::file_reader;
+use crate::utils::file_utils;
+use crate::utils::file_utils::file_reader;
 
 pub fn get_empty_epg_response() -> impl axum::response::IntoResponse + Send {
     axum::response::Response::builder()

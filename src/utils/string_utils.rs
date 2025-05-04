@@ -61,7 +61,7 @@ pub fn generate_random_string(length: usize) -> String {
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
-    use crate::utils::string_utils::generate_random_string;
+    use crate::utils::generate_random_string;
 
     #[test]
     fn test_generate_random_string() {

@@ -2,7 +2,7 @@ use reqwest::{StatusCode};
 use std::collections::{HashSet};
 use std::str::FromStr;
 use reqwest::header::HeaderMap;
-use crate::utils::constants::{MEDIA_STREAM_HEADERS};
+use crate::utils::{MEDIA_STREAM_HEADERS};
 
 pub fn get_response_headers(headers: &HeaderMap) -> Vec<(String, String)> {
     let response_headers: Vec<(String, String)> = headers.iter()

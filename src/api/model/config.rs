@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::model::api_proxy::ApiProxyConfig;
-use crate::model::config::{LogConfig, ProcessingOrder, ReverseProxyConfig, ScheduleConfig, WebUiConfig};
-use crate::model::config::{ConfigApi, ConfigRename, ConfigSort, ConfigTargetOptions, InputType, MessagingConfig, TargetOutput, VideoConfig};
+use crate::model::{ApiProxyConfig, ConfigApi, InputType, LogConfig, MessagingConfig, ProcessingOrder, ReverseProxyConfig, ScheduleConfig, VideoConfig, ConfigRename, ConfigSort, ConfigTargetOptions, TargetOutput, WebUiConfig};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ServerInputConfig {

@@ -5,11 +5,11 @@ use crate::api::model::streams::buffered_stream::BufferedStream;
 use crate::api::model::streams::client_stream::ClientStream;
 use crate::api::model::streams::provider_stream::{create_channel_unavailable_stream, get_header_filter_for_item_type};
 use crate::api::model::streams::timed_client_stream::{TimeoutClientStream};
-use crate::model::config::{Config};
-use crate::model::playlist::PlaylistItemType;
+use crate::model::{Config};
+use crate::model::PlaylistItemType;
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::utils::debug_if_enabled;
-use crate::utils::network::request::{classify_content_type, get_request_headers, sanitize_sensitive_info, MimeCategory};
+use crate::utils::request::{classify_content_type, get_request_headers, sanitize_sensitive_info, MimeCategory};
 use futures::stream::{self};
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, warn};
@@ -420,7 +420,7 @@ pub async fn create_provider_stream(cfg: &Config,
 //     use actix_web::{HttpRequest, HttpResponse};
 //     use futures::StreamExt;
 //     use std::sync::Arc;
-//     use crate::model::config::Config;
+//     use crate::model::Config;
 //
 //     #[tokio::test]
 //     async fn test_stream() {

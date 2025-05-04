@@ -7,12 +7,12 @@ use pest::iterators::Pair;
 use pest::Parser;
 
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::ItemField;
-use crate::model::playlist::{PlaylistItem, PlaylistItemType};
+use crate::model::ItemField;
+use crate::model::{PlaylistItem, PlaylistItemType};
 use crate::tools::directed_graph::DirectedGraph;
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err};
-use crate::utils::constants::CONSTANTS;
-use crate::utils::sys_utils::exit;
+use crate::utils::CONSTANTS;
+use crate::utils::exit;
 
 pub fn get_field_value(pli: &PlaylistItem, field: &ItemField) -> String {
     let header = &pli.header;
@@ -564,8 +564,8 @@ pub fn apply_templates_to_pattern(pattern: &str, templates: &Vec<PatternTemplate
 #[cfg(test)]
 mod tests {
     use crate::foundation::filter::{get_filter, MockValueProcessor, ValueProvider};
-    use crate::model::playlist::{PlaylistItem, PlaylistItemHeader};
-    use crate::utils::constants::CONSTANTS;
+    use crate::model::{PlaylistItem, PlaylistItemHeader};
+    use crate::utils::CONSTANTS;
 
     fn create_mock_pli(name: &str, group: &str) -> PlaylistItem {
         PlaylistItem {

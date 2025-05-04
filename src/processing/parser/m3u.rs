@@ -1,8 +1,7 @@
 use std::borrow::BorrowMut;
-use crate::model::config::{Config, ConfigInput};
-use crate::model::playlist::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
-use crate::utils::hash_utils::extract_id_from_url;
-use crate::utils::string_utils;
+use crate::model::{Config, ConfigInput};
+use crate::model::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
+use crate::utils::{extract_id_from_url, get_title_group};
 
 #[inline]
 fn token_value(stack: &mut String, it: &mut std::str::Chars) -> String {
@@ -190,7 +189,7 @@ where
                     header.group = group_value;
                 } else {
                     let current_title = header.title.clone();
-                    header.group = string_utils::get_title_group(current_title.as_str());
+                    header.group = get_title_group(current_title.as_str());
                 }
             }
             visit(item);

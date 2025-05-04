@@ -11,8 +11,8 @@ use crate::api::model::app_state::{AppState, HdHomerunAppState};
 use crate::api::model::download::DownloadQueue;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::scheduler::start_scheduler;
-use crate::model::config::{validate_targets, Config, ProcessTargets, RateLimitConfig, ScheduleConfig};
-use crate::model::healthcheck::{Healthcheck};
+use crate::model::{validate_targets, Config, ProcessTargets, RateLimitConfig, ScheduleConfig};
+use crate::model::{Healthcheck};
 use crate::processing::processor::playlist;
 use crate::tools::lru_cache::LRUResourceCache;
 use log::{error, info};
@@ -27,7 +27,7 @@ use axum::Router;
 use tokio::sync::Mutex;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
 use crate::api::api_utils::{get_build_time, get_server_time};
-use crate::utils::network::request::create_client;
+use crate::utils::request::create_client;
 use crate::VERSION;
 
 fn get_web_dir_path(web_ui_enabled: bool, web_root: &str) -> Result<PathBuf, std::io::Error> {

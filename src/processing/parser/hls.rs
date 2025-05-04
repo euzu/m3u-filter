@@ -1,11 +1,10 @@
-use crate::model::api_proxy::ProxyUserCredentials;
-use crate::utils::constants::{CONSTANTS, HLS_PREFIX};
-use crate::utils::crypto_utils::{deobfuscate_text, obfuscate_text};
-use crate::utils::hash_utils;
+use crate::model::ProxyUserCredentials;
+use crate::utils::{CONSTANTS, HLS_PREFIX};
+use crate::utils::{deobfuscate_text, obfuscate_text, u32_to_base64, base64_to_u32};
 use std::str;
 
 fn create_hls_session_token_and_url(secret: &[u8], session_token: u32, stream_url: &str) -> Option<String> {
-    let token = hash_utils::u32_to_base64(session_token);
+    let token = u32_to_base64(session_token);
     if let Ok(cookie_value) = obfuscate_text(secret, &format!("{token}{stream_url}")) {
         return Some(cookie_value);
     }
@@ -17,7 +16,7 @@ pub fn get_hls_session_token_and_url_from_token(secret: &[u8], token: &str) -> O
     if let Ok(decrypted) = deobfuscate_text(secret, token) {
         let session_token: String = decrypted.chars().take(TOKEN_LEN).collect();
         let stream_url: String = decrypted.chars().skip(TOKEN_LEN).collect();
-        return Some((hash_utils::base64_to_u32(&session_token), stream_url));
+        return Some((base64_to_u32(&session_token), stream_url));
     }
     None
 }
@@ -102,13 +101,13 @@ pub fn rewrite_hls(user: &ProxyUserCredentials, props: &RewriteHlsProps) -> Stri
 #[cfg(test)]
 mod test {
     use rand::RngCore;
-    use crate::utils::hash_utils;
+    use crate::utils::u32_to_base64;
 
     #[test]
     fn test_token_size() {
         for _i in 0..10_000 {
             let session_token = rand::rng().next_u32();
-            assert_eq!(hash_utils::u32_to_base64(session_token).len(), 6);
+            assert_eq!(u32_to_base64(session_token).len(), 6);
         }
     }
 

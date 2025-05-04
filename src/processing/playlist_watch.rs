@@ -3,11 +3,11 @@ use std::path::{Path};
 use std::sync::Arc;
 use log::{error, info};
 use crate::messaging::{MsgKind, send_message};
-use crate::model::config::Config;
-use crate::model::playlist::PlaylistGroup;
-use crate::utils::bincode_utils::{bincode_deserialize, bincode_serialize};
-use crate::utils::file::file_utils;
-use crate::utils::file::file_utils::sanitize_filename;
+use crate::model::Config;
+use crate::model::PlaylistGroup;
+use crate::utils::{bincode_deserialize, bincode_serialize};
+use crate::utils::file_utils;
+use crate::utils::file_utils::sanitize_filename;
 
 pub fn process_group_watch(client: &Arc<reqwest::Client>, cfg: &Config, target_name: &str, pl: &PlaylistGroup) {
     let mut new_tree = BTreeSet::new();
