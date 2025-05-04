@@ -1,6 +1,6 @@
 use base64::Engine;
 use base64::engine::general_purpose;
-use crate::model::playlist::{PlaylistItemType, UUIDType};
+use crate::model::{PlaylistItemType, UUIDType};
 use crate::repository::storage::hash_string;
 
 pub fn extract_id_from_url(url: &str) -> Option<String> {

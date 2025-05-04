@@ -2,11 +2,11 @@ use crate::api::api_utils::{get_user_target, get_user_target_by_credentials, is_
 use crate::api::endpoints::hls_api::handle_hls_stream_request;
 use crate::api::model::app_state::AppState;
 use crate::api::model::request::UserApiRequest;
-use crate::model::api_proxy::{UserConnectionPermission};
-use crate::model::config::{TargetType};
-use crate::model::playlist::{FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster};
+use crate::model::{UserConnectionPermission};
+use crate::model::{TargetType};
+use crate::model::{FieldGetAccessor, PlaylistEntry, PlaylistItemType, XtreamCluster};
 use crate::repository::m3u_repository::{m3u_get_item_for_stream_id, m3u_load_rewrite_playlist};
-use crate::utils::network::request::{extract_extension_from_url, sanitize_sensitive_info};
+use crate::utils::request::{extract_extension_from_url, sanitize_sensitive_info};
 use axum::response::IntoResponse;
 use bytes::Bytes;
 use futures::stream;
@@ -16,7 +16,7 @@ use axum::http::StatusCode;
 use crate::api::endpoints::xtream_api::XtreamApiStreamContext;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType};
 use crate::repository::storage_const;
-use crate::utils::constants::{HLS_EXT};
+use crate::utils::{HLS_EXT};
 
 async fn m3u_api(
     api_req: &UserApiRequest,

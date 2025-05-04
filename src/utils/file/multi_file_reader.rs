@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io::{self, ErrorKind, Read};
 use std::path::{PathBuf};
-use crate::utils::file::env_resolving_reader::EnvResolvingReader;
-use crate::utils::file::file_utils::file_reader;
+use crate::utils::env_resolving_reader::EnvResolvingReader;
+use crate::utils::file_utils::file_reader;
 
 pub struct MultiFileReader {
     files: Vec<File>,

@@ -1,8 +1,8 @@
-use crate::model::config::{EpgNamePrefix, EpgSmartMatchConfig};
-use crate::model::xmltv::{Epg, TVGuide, XmlTag, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_CHANNEL, EPG_TAG_DISPLAY_NAME, EPG_TAG_ICON, EPG_TAG_PROGRAMME, EPG_TAG_TV};
+use crate::model::{EpgNamePrefix, EpgSmartMatchConfig};
+use crate::model::{Epg, TVGuide, XmlTag, EPG_ATTRIB_CHANNEL, EPG_ATTRIB_ID, EPG_TAG_CHANNEL, EPG_TAG_DISPLAY_NAME, EPG_TAG_ICON, EPG_TAG_PROGRAMME, EPG_TAG_TV};
 use crate::processing::processor::epg::EpgIdCache;
-use crate::utils::compression::compressed_file_reader::CompressedFileReader;
-use crate::utils::constants::CONSTANTS;
+use crate::utils::compressed_file_reader::CompressedFileReader;
+use crate::utils::CONSTANTS;
 use deunicode::deunicode;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
@@ -439,7 +439,7 @@ pub fn flatten_tvguide(tv_guides: &[Epg]) -> Option<Epg> {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::config::{EpgNamePrefix, EpgSmartMatchConfig};
+    use crate::model::{EpgNamePrefix, EpgSmartMatchConfig};
     use crate::processing::parser::xmltv::normalize_channel_name;
 
     #[test]

@@ -1,6 +1,6 @@
 use crate::repository::storage::hash_string_as_hex;
-use crate::utils::file::file_utils::traverse_dir;
-use crate::utils::size_utils::human_readable_byte_size;
+use crate::utils::file_utils::traverse_dir;
+use crate::utils::human_readable_byte_size;
 use log::{debug, error, info, trace};
 use std::collections::{HashMap, VecDeque};
 use std::fs;

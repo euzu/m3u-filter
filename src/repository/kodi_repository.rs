@@ -1,19 +1,19 @@
 use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials};
-use crate::model::config::{ClusterFlags, Config, ConfigTarget, StrmTargetOutput};
-use crate::model::playlist::{
+use crate::model::{ApiProxyServerInfo, ProxyUserCredentials};
+use crate::model::{ClusterFlags, Config, ConfigTarget, StrmTargetOutput};
+use crate::model::{
     FieldGetAccessor, PlaylistGroup, PlaylistItem, PlaylistItemType, UUIDType,
 };
-use crate::model::xtream::XtreamSeriesEpisode;
+use crate::model::XtreamSeriesEpisode;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage::{ensure_target_storage_path, get_input_storage_path, hash_bytes};
 use crate::repository::storage_const;
 use crate::repository::xtream_repository::{xtream_get_record_file_path, InputVodInfoRecord};
-use crate::utils::constants::{KodiStyle, CONSTANTS};
-use crate::utils::file::file_lock_manager::FileReadGuard;
-use crate::utils::file::file_utils;
-use crate::utils::network::request::extract_extension_from_url;
+use crate::utils::{KodiStyle, CONSTANTS};
+use crate::utils::file_lock_manager::FileReadGuard;
+use crate::utils::file_utils;
+use crate::utils::request::extract_extension_from_url;
 use chrono::Datelike;
 use filetime::{set_file_times, FileTime};
 use log::{error, trace};

@@ -6,7 +6,7 @@ use std::path::Path;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Deserializer, Value};
-use crate::utils::file::file_utils::{file_reader, file_writer};
+use crate::utils::file_utils::{file_reader, file_writer};
 
 fn read_skipping_ws(mut reader: impl Read) -> io::Result<u8> {
     loop {

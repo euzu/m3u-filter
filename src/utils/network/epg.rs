@@ -1,10 +1,10 @@
 use crate::m3u_filter_error::M3uFilterError;
-use crate::model::config::{Config, ConfigInput};
-use crate::model::xmltv::TVGuide;
+use crate::model::{Config, ConfigInput};
+use crate::model::TVGuide;
 use crate::repository::storage::short_hash;
-use crate::utils::file::file_utils;
-use crate::utils::file::file_utils::prepare_file_path;
-use crate::utils::network::request;
+use crate::utils::file_utils;
+use crate::utils::file_utils::prepare_file_path;
+use crate::utils::request;
 use log::debug;
 use std::path::PathBuf;
 use std::sync::Arc;

@@ -11,11 +11,22 @@ use std::sync::Arc;
 use crate::foundation::filter::{apply_templates_to_pattern, get_filter, prepare_templates, Filter, PatternTemplate, RegexWithCaptures, ValueProcessor};
 use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err};
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::valid_property;
-use crate::model::config::{ItemField, AFFIX_FIELDS, COUNTER_FIELDS, MAPPER_ATTRIBUTE_FIELDS};
-use crate::model::playlist::{FieldGetAccessor, FieldSetAccessor, PlaylistItem};
-use crate::utils::constants::CONSTANTS;
-use crate::utils::string_utils::Capitalize;
+use crate::model::valid_property;
+use crate::model::{ItemField};
+use crate::model::{FieldGetAccessor, FieldSetAccessor, PlaylistItem};
+use crate::utils::CONSTANTS;
+use crate::utils::Capitalize;
+
+pub const COUNTER_FIELDS: &[&str] = &["name", "title", "caption", "chno"];
+
+pub const AFFIX_FIELDS: &[&str] = &["name", "title", "caption", "group"];
+
+pub const MAPPER_ATTRIBUTE_FIELDS: &[&str] = &[
+    "name", "title", "caption", "group", "id", "chno", "logo",
+    "logo_small", "parent_code", "audio_track",
+    "time_shift", "rec", "url", "epg_channel_id", "epg_id"
+];
+
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct MappingTag {

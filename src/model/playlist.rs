@@ -1,16 +1,16 @@
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use crate::model::api_proxy::ProxyUserCredentials;
-use crate::model::config::{ConfigInput, ConfigTargetOptions};
-use crate::model::xmltv::TVGuide;
+use crate::model::ProxyUserCredentials;
+use crate::model::{ConfigInput, ConfigTargetOptions};
+use crate::model::TVGuide;
 use crate::model::xtream_const;
 use crate::model::xtream::{xtream_playlistitem_to_document, XtreamMappingOptions};
-use crate::utils::json_utils::{get_string_from_serde_value, get_u64_from_serde_value};
+use crate::utils::{get_string_from_serde_value, get_u64_from_serde_value};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use crate::utils::hash_utils::{generate_playlist_uuid, get_provider_id};
-use crate::utils::network::request::extract_extension_from_url;
+use crate::utils::{generate_playlist_uuid, get_provider_id};
+use crate::utils::request::extract_extension_from_url;
 // https://de.wikipedia.org/wiki/M3U
 // https://siptv.eu/howto/playlist.html
 

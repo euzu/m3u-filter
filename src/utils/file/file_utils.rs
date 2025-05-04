@@ -8,7 +8,7 @@ use crate::m3u_filter_error::str_to_io_error;
 use crate::utils::debug_if_enabled;
 use log::{debug, error};
 use path_clean::PathClean;
-use crate::utils::constants::{API_PROXY_FILE, CONFIG_FILE, CONFIG_PATH, MAPPING_FILE, SOURCE_FILE, USER_FILE};
+use crate::utils::{API_PROXY_FILE, CONFIG_FILE, CONFIG_PATH, MAPPING_FILE, SOURCE_FILE, USER_FILE};
 
 pub fn file_writer<W>(w: W) -> BufWriter<W>
 where
@@ -89,7 +89,7 @@ pub fn get_default_api_proxy_config_path(config_path: &str) -> String {
 }
 
 pub fn get_working_path(wd: &str) -> String {
-    let current_dir = std::env::current_dir().unwrap();
+    let current_dir = std::env::current_dir().unwrap_or_default();
     if wd.is_empty() {
         String::from(current_dir.to_str().unwrap_or("."))
     } else {

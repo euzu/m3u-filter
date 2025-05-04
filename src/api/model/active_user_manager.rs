@@ -1,7 +1,6 @@
-use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
-use crate::model::config::Config;
-use crate::utils::default_utils::{default_grace_period_millis, default_grace_period_timeout_secs};
-use crate::utils::time_utils::current_time_secs;
+use crate::model::{ProxyUserCredentials, UserConnectionPermission};
+use crate::model::Config;
+use crate::utils::{current_time_secs, default_grace_period_millis, default_grace_period_timeout_secs};
 use jsonwebtoken::get_current_timestamp;
 use log::{debug, info};
 use rand::RngCore;

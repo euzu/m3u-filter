@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::fmt::Write;
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{Config};
-use crate::model::playlist::UUIDType;
+use crate::model::{Config};
+use crate::model::UUIDType;
 use crate::m3u_filter_error::{notify_err};
 use crate::repository::storage_const;
-use crate::utils::file::file_utils;
+use crate::utils::file_utils;
 
 #[inline]
 pub fn hash_bytes(bytes: &[u8]) -> UUIDType {

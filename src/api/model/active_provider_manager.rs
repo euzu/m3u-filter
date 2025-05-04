@@ -1,4 +1,4 @@
-use crate::model::config::{Config, ConfigInput};
+use crate::model::{Config, ConfigInput};
 use log::{debug, log_enabled};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use crate::api::model::provider_config::{ProviderConfig, ProviderConfigWrapper};
-use crate::utils::default_utils::{default_grace_period_millis, default_grace_period_timeout_secs};
+use crate::utils::{default_grace_period_millis, default_grace_period_timeout_secs};
 
 pub struct ProviderConnectionGuard {
     manager: Arc<ActiveProviderManager>,
@@ -574,7 +574,7 @@ impl ActiveProviderManager {
 mod tests {
     use std::sync::atomic::AtomicU16;
     use super::*;
-    use crate::model::config::{ConfigInputAlias, InputFetchMethod, InputType};
+    use crate::model::{ConfigInputAlias, InputFetchMethod, InputType};
     use crate::Arc;
     use std::thread;
 

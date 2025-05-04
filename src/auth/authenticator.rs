@@ -2,7 +2,7 @@ use std::sync::Arc;
 use chrono::{Local, Duration};
 use jsonwebtoken::{Algorithm, DecodingKey, encode, decode, EncodingKey, Header, Validation, TokenData};
 use crate::api::api_utils::get_username_from_auth_header;
-use crate::model::config::WebAuthConfig;
+use crate::model::WebAuthConfig;
 use crate::api::model::app_state::AppState;
 use crate::auth::auth_bearer::AuthBearer;
 use crate::m3u_filter_error::to_io_error;

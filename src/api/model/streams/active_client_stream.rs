@@ -6,7 +6,7 @@ use crate::api::model::app_state::AppState;
 use crate::api::model::stream::BoxedProviderStream;
 use crate::api::model::stream_error::StreamError;
 use crate::api::model::streams::chunked_buffer::ChunkedBuffer;
-use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
+use crate::model::{ProxyUserCredentials, UserConnectionPermission};
 use bytes::Bytes;
 use futures::Stream;
 use log::{error, info};

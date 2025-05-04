@@ -13,18 +13,18 @@ use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::model::streams::throttled_stream::ThrottledStream;
 use crate::auth::authenticator::Claims;
-use crate::model::api_proxy::{ProxyUserCredentials, UserConnectionPermission};
-use crate::model::config::{ConfigInput, ConfigTarget, InputFetchMethod, TargetType};
-use crate::model::playlist::{PlaylistEntry, PlaylistItemType, XtreamCluster};
+use crate::model::{ProxyUserCredentials, UserConnectionPermission};
+use crate::model::{ConfigInput, ConfigTarget, InputFetchMethod, TargetType};
+use crate::model::{PlaylistEntry, PlaylistItemType, XtreamCluster};
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
 use crate::tools::lru_cache::LRUResourceCache;
-use crate::utils::constants::{DASH_EXT, HLS_EXT};
-use crate::utils::default_utils::default_grace_period_millis;
-use crate::utils::file::file_utils::create_new_file_for_write;
-use crate::utils::network::request;
-use crate::utils::network::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info};
-use crate::utils::size_utils::human_readable_byte_size;
-use crate::utils::{debug_if_enabled, hash_utils, sys_utils, trace_if_enabled};
+use crate::utils::{DASH_EXT, HLS_EXT};
+use crate::utils::default_grace_period_millis;
+use crate::utils::file_utils::create_new_file_for_write;
+use crate::utils::request;
+use crate::utils::request::{extract_extension_from_url, replace_url_extension, sanitize_sensitive_info};
+use crate::utils::human_readable_byte_size;
+use crate::utils::{debug_if_enabled, trace_if_enabled};
 use crate::BUILD_TIMESTAMP;
 use axum::body::Body;
 use axum::http::HeaderMap;
@@ -84,7 +84,7 @@ pub use try_option_bad_request;
 pub use try_result_bad_request;
 use crate::api::model::active_user_manager::UserSession;
 use crate::api::model::provider_config::ProviderConfig;
-use crate::utils::hash_utils::base64_to_u32;
+use crate::utils::base64_to_u32;
 
 pub fn get_server_time() -> String {
     chrono::offset::Local::now().with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S %Z").to_string()
@@ -95,7 +95,7 @@ pub fn get_build_time() -> Option<String> {
 }
 
 pub fn get_memory_usage() -> String {
-    sys_utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size)
+    crate::utils::get_memory_usage().map_or(String::from("?"), human_readable_byte_size)
 }
 
 
@@ -479,7 +479,7 @@ const SESSION_COOKIE_NAME: &str = "m3uflt_session=";
 // }
 
 pub fn create_session_cookie(token: u32) -> String {
-    let cookie = hash_utils::u32_to_base64(token);
+    let cookie = crate::utils::u32_to_base64(token);
     format!("{SESSION_COOKIE_NAME}{cookie}; Path=/; HttpOnly; SameSite=Lax")
 }
 

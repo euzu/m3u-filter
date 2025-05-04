@@ -4,9 +4,7 @@ use crate::api::model::active_provider_manager::ActiveProviderManager;
 use crate::api::model::active_user_manager::ActiveUserManager;
 use crate::api::model::download::DownloadQueue;
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
-use crate::model::api_proxy::UserConnectionPermission;
-use crate::model::config::{Config};
-use crate::model::hdhomerun_config::HdHomeRunDeviceConfig;
+use crate::model::{Config, UserConnectionPermission, HdHomeRunDeviceConfig};
 use crate::tools::lru_cache::LRUResourceCache;
 
 #[derive(Clone)]

@@ -1,7 +1,7 @@
-use crate::model::api_proxy::{ApiProxyServerInfo, ProxyUserCredentials, ProxyUserStatus};
+use crate::model::{ApiProxyServerInfo, ProxyUserCredentials, ProxyUserStatus};
 use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
-use crate::utils::constants::CONSTANTS;
+use crate::utils::CONSTANTS;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct XtreamUserInfoResponse {
@@ -93,8 +93,8 @@ impl XtreamAuthorizationResponse {
             },
             server_info: XtreamServerInfoResponse {
                 url: server_info.host.clone(),
-                port: if server_info.protocol == "http" { server_info.port.clone() } else { String::from("80") },
-                https_port: if server_info.protocol == "https" { server_info.port.clone() } else { String::from("443") },
+                port: if server_info.protocol == "http" { server_info.port.as_ref().map_or("80", |v| v.as_str()).to_string() } else { String::from("80") },
+                https_port: if server_info.protocol == "https" { server_info.port.as_ref().map_or("443", |v| v.as_str()).to_string() } else { String::from("443") },
                 server_protocol: server_info.protocol.clone(),
                 rtmp_port: String::new(),
                 timezone: server_info.timezone.to_string(),

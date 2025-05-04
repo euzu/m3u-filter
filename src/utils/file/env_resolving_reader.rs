@@ -1,5 +1,5 @@
 use std::io::{self, BufRead, BufReader, Read, Cursor};
-use crate::utils::file::config_reader::resolve_env_var;
+use crate::utils::config_reader::resolve_env_var;
 
 pub struct EnvResolvingReader<R: Read> {
     inner: BufReader<R>,

@@ -1,13 +1,13 @@
-use crate::model::api_proxy::{ProxyType, ProxyUserCredentials, ProxyUserStatus, TargetUser};
-use crate::model::config::{Config, TargetType};
-use crate::model::playlist::XtreamCluster;
-use crate::model::playlist_categories::{PlaylistBouquetDto, TargetBouquetDto};
-use crate::model::xtream::PlaylistXtreamCategory;
+use crate::model::{ProxyType, ProxyUserCredentials, ProxyUserStatus, TargetUser};
+use crate::model::{Config, TargetType};
+use crate::model::XtreamCluster;
+use crate::model::{PlaylistBouquetDto, TargetBouquetDto};
+use crate::model::PlaylistXtreamCategory;
 use crate::repository::bplustree::BPlusTree;
 use crate::repository::storage_const;
 use crate::repository::xtream_repository::xtream_get_playlist_categories;
-use crate::utils::file::file_utils;
-use crate::utils::json_utils::json_write_documents_to_file;
+use crate::utils::file_utils;
+use crate::utils::json_write_documents_to_file;
 use chrono::Local;
 use log::error;
 use std::collections::{HashMap, HashSet};
@@ -332,7 +332,7 @@ pub async fn user_get_bouquet_filter(config: &Config, username: &str, category_i
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::api_proxy::{ProxyType, ProxyUserStatus};
+    use crate::model::{ProxyType, ProxyUserStatus};
     use std::env::temp_dir;
 
 

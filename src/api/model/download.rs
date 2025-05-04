@@ -6,9 +6,9 @@ use std::sync::Arc;
 use deunicode::deunicode;
 use serde::{Deserialize, Serialize};
 
-use crate::model::config::VideoDownloadConfig;
+use crate::model::{VideoDownloadConfig};
 use crate::repository::storage::hash_string_as_hex;
-use crate::utils::constants::{CONSTANTS, FILENAME_TRIM_PATTERNS};
+use crate::utils::{CONSTANTS, FILENAME_TRIM_PATTERNS};
 
 /// File-Download information.
 #[derive(Clone)]

@@ -3,7 +3,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -16,14 +16,14 @@ use url::Url;
 
 use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
-use crate::model::config::{ConfigInput, ConfigProxy, InputFetchMethod};
-use crate::model::stats::format_elapsed_time;
+use crate::model::format_elapsed_time;
+use crate::model::{ConfigInput, ConfigProxy, InputFetchMethod};
 use crate::repository::storage::{get_input_storage_path, short_hash};
 use crate::repository::storage_const;
 use crate::utils::compression::compression_utils::{is_deflate, is_gzip};
-use crate::utils::constants::{CONSTANTS, DASH_EXT, DASH_EXT_FRAGMENT, DASH_EXT_QUERY, ENCODING_DEFLATE, ENCODING_GZIP, HLS_EXT, HLS_EXT_FRAGMENT, HLS_EXT_QUERY};
 use crate::utils::debug_if_enabled;
-use crate::utils::file::file_utils::{get_file_path, persist_file};
+use crate::utils::file_utils::{get_file_path, persist_file};
+use crate::utils::{CONSTANTS, DASH_EXT, DASH_EXT_FRAGMENT, DASH_EXT_QUERY, ENCODING_DEFLATE, ENCODING_GZIP, HLS_EXT, HLS_EXT_FRAGMENT, HLS_EXT_QUERY};
 
 pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
@@ -121,34 +121,34 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
     }
 }
 
-pub fn get_client_request(client: &Arc<reqwest::Client>,
-                          method: InputFetchMethod,
-                          headers: Option<&HashMap<String, String>>,
-                          url: &Url,
-                          custom_headers: Option<&HashMap<String, Vec<u8>>>) -> reqwest::RequestBuilder {
+pub fn get_client_request<S: ::std::hash::BuildHasher + Default>(client: &Arc<reqwest::Client>,
+                                                                 method: InputFetchMethod,
+                                                                 headers: Option<&HashMap<String, String, S>>,
+                                                                 url: &Url,
+                                                                 custom_headers: Option<&HashMap<String, Vec<u8>, S>>) -> reqwest::RequestBuilder {
     let request = match method {
         InputFetchMethod::GET => client.get(url.clone()),
         InputFetchMethod::POST => {
             // let base_url = url[..url::Position::BeforePath].to_string() + url.path();
-            let mut params = HashMap::new();
+            let mut params: HashMap<String, String, S> = HashMap::default();
             for (key, value) in url.query_pairs() {
                 params.insert(key.to_string(), value.to_string());
             }
             // we could cut the params but we leave them as query and add them as form.
             client.post(url.clone()).form(&params)
-        },
+        }
     };
     let headers = get_request_headers(headers, custom_headers);
     request.headers(headers)
 }
 
-pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, custom_headers: Option<&HashMap<String, Vec<u8>>>) -> HeaderMap {
-    let mut headers = HeaderMap::new();
+pub fn get_request_headers<S: ::std::hash::BuildHasher + Default>(defined_headers: Option<&HashMap<String, String, S>>, custom_headers: Option<&HashMap<String, Vec<u8>, S>>) -> HeaderMap {
+    let mut headers = HeaderMap::default();
     if let Some(def_headers) = defined_headers {
         for (key, value) in def_headers {
-            headers.insert(
-                HeaderName::from_bytes(key.as_bytes()).unwrap(),
-                HeaderValue::from_bytes(value.as_bytes()).unwrap());
+            if let (Ok(key), Ok(value)) = (HeaderName::from_bytes(key.as_bytes()), HeaderValue::from_bytes(value.as_bytes())) {
+                headers.insert(key, value);
+            }
         }
     }
     if let Some(custom) = custom_headers {
@@ -157,10 +157,8 @@ pub fn get_request_headers(defined_headers: Option<&HashMap<String, String>>, cu
             let key_lc = key.to_lowercase();
             if "host" == key_lc || header_keys.contains(key_lc.as_str()) {
                 // debug_if_enabled!("Ignoring request header '{}={}'", key_lc, String::from_utf8_lossy(value));
-            } else {
-                headers.insert(
-                    HeaderName::from_bytes(key.as_bytes()).unwrap(),
-                    HeaderValue::from_bytes(value).unwrap());
+            } else if let (Ok(key), Ok(value)) = (HeaderName::from_bytes(key.as_bytes()), HeaderValue::from_bytes(value)) {
+                headers.insert(key, value);
             }
         }
     }
@@ -185,7 +183,7 @@ pub fn get_local_file_content(file_path: &PathBuf) -> Result<String, Error> {
                     Err(err) => Err(str_to_io_error(&format!("failed to decode gzip content {err}")))
                 };
             }
-            return Ok(String::from_utf8_lossy(&content).parse().unwrap());
+            return Ok(String::from_utf8_lossy(&content).parse().unwrap_or_default());
         }
     }
     let file_str = file_path.to_str().unwrap_or("?");
@@ -326,7 +324,7 @@ pub async fn download_text_content(client: Arc<reqwest::Client>, input: &ConfigI
     if let Ok(url) = url_str.parse::<url::Url>() {
         let result = if url.scheme() == "file" {
             url.to_file_path().map_or_else(|()| Err(str_to_io_error(&format!("Unknown file {}", sanitize_sensitive_info(url_str)))), |file_path|
-                get_local_file_content(&file_path).map(|c| (c, url.to_string()))
+                get_local_file_content(&file_path).map(|c| (c, url.to_string())),
             )
         } else {
             get_remote_content(client, input, &url).await
@@ -523,7 +521,7 @@ pub fn create_client(proxy_config: Option<&ConfigProxy>) -> reqwest::ClientBuild
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::network::request::{get_base_url_from_str, replace_url_extension, sanitize_sensitive_info};
+    use crate::utils::request::{get_base_url_from_str, replace_url_extension, sanitize_sensitive_info};
 
     #[test]
     fn test_url_mask() {
