@@ -1,12 +1,22 @@
 .status-view {
   display: flex;
   flex-flow: column;
-  gap: 4px;
+  gap: 12px;
+
   &__content {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 10px;
   }
+
+  &__section-title {
+    color: var(--title-label-color);
+    font-weight: bold;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 4px;
+    margin: 8px 0;
+  }
+
   &__col-label {
     color: var(--label-color);
   }

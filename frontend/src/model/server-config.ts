@@ -236,6 +236,20 @@ export interface WebUiConfig {
     player_server?: string,
 }
 
+export interface ProxyConfig {
+    url: string,
+    username?: string,
+    password?: string,
+}
+
+export interface IpCheckConfig {
+    url?: string,
+    url_ipv4?: string,
+    url_ipv6?: string,
+    pattern_ipv4?: string,
+    pattern_ipv6?: string,
+}
+
 export interface ServerMainConfig {
     threads: number;
     api: ServerApiConfig;
@@ -248,6 +262,8 @@ export interface ServerMainConfig {
     update_on_boot: boolean,
     web_ui?: WebUiConfig,
     reverse_proxy?: ReverseProxyConfig,
+    proxy?: ProxyConfig,
+    ipcheck?: IpCheckConfig,
 }
 
 export default interface ServerConfig extends ServerMainConfig {

@@ -1,6 +1,6 @@
 use crate::api::model::app_state::AppState;
 use crate::api::model::download::{DownloadQueue, FileDownload, FileDownloadRequest};
-use crate::model::{ConfigProxy, VideoDownloadConfig};
+use crate::model::{ProxyConfig, VideoDownloadConfig};
 use crate::utils::request;
 use tokio::sync::RwLock;
 use futures::stream::TryStreamExt;
@@ -62,7 +62,7 @@ async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwe
     }
 }
 
-async fn run_download_queue(proxy_config: Option<&ConfigProxy>, download_cfg: &VideoDownloadConfig, download_queue: &Arc<DownloadQueue>) -> Result<(), String> {
+async fn run_download_queue(proxy_config: Option<&ProxyConfig>, download_cfg: &VideoDownloadConfig, download_queue: &Arc<DownloadQueue>) -> Result<(), String> {
     let next_download = download_queue.as_ref().queue.lock().await.pop_front();
     if next_download.is_some() {
         { *download_queue.as_ref().active.write().await = next_download; }

@@ -17,7 +17,7 @@ use url::Url;
 use crate::m3u_filter_error::create_m3u_filter_error_result;
 use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::format_elapsed_time;
-use crate::model::{ConfigInput, ConfigProxy, InputFetchMethod};
+use crate::model::{ConfigInput, ProxyConfig, InputFetchMethod};
 use crate::repository::storage::{get_input_storage_path, short_hash};
 use crate::repository::storage_const;
 use crate::utils::compression::compression_utils::{is_deflate, is_gzip};
@@ -494,7 +494,7 @@ pub fn get_base_url_from_str(url: &str) -> Option<String> {
     }
 }
 
-pub fn create_client(proxy_config: Option<&ConfigProxy>) -> reqwest::ClientBuilder {
+pub fn create_client(proxy_config: Option<&ProxyConfig>) -> reqwest::ClientBuilder {
     let client = reqwest::Client::builder();
     if let Some(proxy_cfg) = proxy_config {
         let proxy = match reqwest::Proxy::all(&proxy_cfg.url) {

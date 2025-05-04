@@ -278,6 +278,8 @@ async fn config(
         messaging: config.messaging.clone(),
         video: config.video.clone(),
         sources: config.sources.iter().map(map_source).collect(),
+        proxy: config.proxy.clone(),
+        ipcheck: config.ipcheck.clone(),
         api_proxy: config_reader::read_api_proxy(config, app_state.config.t_api_proxy_file_path.as_str(), false),
     };
 

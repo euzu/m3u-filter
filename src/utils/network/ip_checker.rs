@@ -1,5 +1,5 @@
 use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
-use crate::model::ConfigIpCheck;
+use crate::model::IpCheckConfig;
 use regex::Regex;
 use reqwest::Client;
 use std::sync::Arc;
@@ -27,7 +27,7 @@ async fn fetch_ip(client: &Arc<Client>, url: &str, regex: Option<&Regex>) -> Res
 }
 
 /// Fetch both IPs from a shared URL (if both regex patterns are available)
-async fn fetch_combined_ips(client: &Arc<Client>, config: &ConfigIpCheck, url: &str) -> (Option<String>, Option<String>) {
+async fn fetch_combined_ips(client: &Arc<Client>, config: &IpCheckConfig, url: &str) -> (Option<String>, Option<String>) {
     let response = client.get(url).send().await.ok();
     let text = match response {
         Some(r) => r.text().await.ok(),
@@ -55,7 +55,7 @@ async fn fetch_combined_ips(client: &Arc<Client>, config: &ConfigIpCheck, url: &
 
 
 /// Fetch both IPv4 and IPv6 addresses, using separate or combined URL(s)
-pub async fn get_ips(client: &Arc<Client>, config: &ConfigIpCheck) -> Result<(Option<String>, Option<String>), M3uFilterError> {
+pub async fn get_ips(client: &Arc<Client>, config: &IpCheckConfig) -> Result<(Option<String>, Option<String>), M3uFilterError> {
     match (&config.url_ipv4, &config.url_ipv6, &config.url) {
         // Both dedicated URLs provided
         (Some(url_v4), Some(url_v6), _) => {

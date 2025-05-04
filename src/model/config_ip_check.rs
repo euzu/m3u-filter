@@ -3,7 +3,7 @@ use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-pub struct ConfigIpCheck {
+pub struct IpCheckConfig {
     /// URL that may return both IPv4 and IPv6 in one response
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
@@ -30,7 +30,7 @@ pub struct ConfigIpCheck {
     pub t_pattern_ipv6: Option<Regex>,
 }
 
-impl ConfigIpCheck {
+impl IpCheckConfig {
     pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
         if let Some(url) = &self.url {
             let url = url.trim();

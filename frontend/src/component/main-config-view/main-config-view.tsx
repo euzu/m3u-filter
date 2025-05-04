@@ -1,9 +1,9 @@
 import React, {useCallback, useMemo, useState} from "react";
 import './main-config-view.scss';
 import ServerConfig, {
-    CacheConfig,
+    CacheConfig, IpCheckConfig,
     LogConfig,
-    MessagingConfig,
+    MessagingConfig, ProxyConfig,
     PushoverConfig,
     RateLimitConfig,
     RestConfig,
@@ -43,6 +43,9 @@ const getObject = (value: any): any => {
         return undefined;
     }
     if (Object.keys(value).length === 0) {
+        return undefined;
+    }
+    if (Object.values(value).filter(Boolean).length === 0) {
         return undefined;
     }
     return value;
@@ -166,11 +169,27 @@ const TABS = [
     {label: 'LABEL.API', key: 'api'},
     {label: 'LABEL.MAIN', key: 'main'},
     {label: 'LABEL.WEB_UI', key: 'web_ui'},
+    {label: 'LABEL.PROXY', key: 'proxy'},
     {label: 'LABEL.SCHEDULES', key: 'schedules'},
     {label: 'LABEL.REVERSE_PROXY', key: 'reverseProxy'},
     {label: 'LABEL.MESSAGING', key: 'messaging'},
     {label: 'LABEL.VIDEO', key: 'video'}
 ];
+
+const CONFIG_PROXY_FIELDS = [
+    {name: 'url', label: 'LABEL.URL', fieldType: FormFieldType.TEXT},
+    {name: 'username', label: 'LABEL.USERNAME', fieldType: FormFieldType.TEXT},
+    {name: 'password', label: 'LABEL.PASSWORD', fieldType: FormFieldType.TEXT},
+];
+
+const CONFIG_IP_CHECK_FIELDS = [
+    {name: 'url', label: 'LABEL.URL', fieldType: FormFieldType.TEXT},
+    {name: 'url_ipv4', label: 'LABEL.URL_IPV4', fieldType: FormFieldType.TEXT},
+    {name: 'pattern_ipv4', label: 'LABEL.PATTERN_IPV4', fieldType: FormFieldType.TEXT},
+    {name: 'url_ipv6', label: 'LABEL.URL_IPV6', fieldType: FormFieldType.TEXT},
+    {name: 'pattern_ipv6', label: 'LABEL.PATTERN_IPV6', fieldType: FormFieldType.TEXT},
+];
+
 
 // const translateLabels = (config: any, translateFunc: any) => config.map((c: any) => ({
 //     ...c,
@@ -205,6 +224,8 @@ export default function MainConfigView(props: MainConfigViewProps) {
     const reverseProxyCacheConfig = useMemo<CacheConfig>(() => config?.reverse_proxy?.cache || {} as any, [config]);
     const reverseProxyRateLimitConfig = useMemo<RateLimitConfig>(() => config?.reverse_proxy?.rate_limit || {} as any, [config]);
     const logConfig = useMemo<LogConfig>(() => config?.log || {} as any, [config]);
+    const proxyConfig = useMemo<ProxyConfig>(() => config?.proxy || {} as any, [config]);
+    const ipCheckConfig = useMemo<IpCheckConfig>(() => config?.ipcheck || {} as any, [config]);
     const configs = useMemo(() => {
         CONFIG_WEB_UI_FIELDS.forEach(def => {
             const serverOptions = config?.api_proxy?.server?.map(serverInfo => ({
@@ -233,6 +254,8 @@ export default function MainConfigView(props: MainConfigViewProps) {
             pushover_fields: translateLabels(CONFIG_PUSHOVER_FIELDS, translate),
             video_fields: translateLabels(CONFIG_VIDEO_FIELDS, translate),
             video_download_fields: translateLabels(CONFIG_VIDEO_DOWNLOAD_FIELDS, translate),
+            proxy_config_fields: translateLabels(CONFIG_PROXY_FIELDS, translate),
+            ipcheck_config_fields: translateLabels(CONFIG_IP_CHECK_FIELDS, translate),
             tabs: translateLabels(TABS, translate),
         }
         return translations;
@@ -286,6 +309,20 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 auth: webAuthConfig,
             }
 
+            const cfgProxyConfig: ProxyConfig = {
+                url: proxyConfig.url,
+                username: proxyConfig.username,
+                password: proxyConfig.password,
+            }
+
+            const cfgIpCheckConfig: IpCheckConfig =  {
+                url: ipCheckConfig.url,
+                url_ipv4: ipCheckConfig.url_ipv4,
+                url_ipv6: ipCheckConfig.url_ipv6,
+                pattern_ipv4: ipCheckConfig.pattern_ipv4,
+                pattern_ipv6: ipCheckConfig.pattern_ipv6,
+            }
+
             const cfgVideo = getObject(videoConfig) && getObject(videoDownloadConfig) ? {
                 ...videoConfig,
                 download: getObject(videoDownloadConfig)
@@ -307,6 +344,8 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 log: getObject(cfgLog),
                 update_on_boot: mainConfig.update_on_boot,
                 web_ui: getObject(cfgWebUiConfig),
+                proxy: getObject(cfgProxyConfig),
+                ipcheck: getObject(cfgIpCheckConfig),
             };
 
             services.config().saveMainConfig(cfgMain).subscribe({
@@ -317,7 +356,7 @@ export default function MainConfigView(props: MainConfigViewProps) {
     }, [mainConfig, apiConfig, videoConfig, messagingConfig, telegramConfig, restConfig, pushoverConfig,
         videoDownloadConfig, reverseProxyConfig, enqueueSnackbar, services, logConfig,
         reverseProxyRateLimitConfig, reverseProxyCacheConfig, reverseProxyStreamConfig, reverseProxyStreamBufferConfig,
-        webUiConfig, webAuthConfig,
+        webUiConfig, webAuthConfig, proxyConfig, ipCheckConfig,
         translate]);
 
     const handleTabChange = useCallback((tab: string) => {
@@ -349,6 +388,12 @@ export default function MainConfigView(props: MainConfigViewProps) {
                 <FormView data={webUiConfig} fields={configs.web_ui_config_fields}></FormView>
                 <label className="main-config__content-form__section-title">{translate('LABEL.WEB_AUTH')}</label>
                 <FormView data={webAuthConfig} fields={configs.web_auth_config_fields}></FormView>
+            </div>
+            <div className={'main-config__content-form proxy__form' + ('proxy' !== activeTab ? ' hidden' : '')}>
+                <label className="main-config__content-form__section-title">{translate('LABEL.PROXY')}</label>
+                <FormView data={proxyConfig} fields={configs.proxy_config_fields}></FormView>
+                <label className="main-config__content-form__section-title">{translate('LABEL.IP_CHECK')}</label>
+                <FormView data={ipCheckConfig} fields={configs.ipcheck_config_fields}></FormView>
             </div>
             <div
                 className={'main-config__content-form schedules__form' + ('schedules' !== activeTab ? ' hidden' : '')}>
