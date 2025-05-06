@@ -1,6 +1,10 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
 
+.label {
+  color: var(--label-color);
+}
+
 .proxy-type {
   &-reverse {
   }
@@ -49,12 +53,8 @@
     }
     label {
       font-weight: bold;
-
-      &:not(.target-not-exists) {
-        color: var(--label-color);
-      }
-
-      &.target-not-exists {
+      color: var(--label-color);
+      span.target-not-exists {
         color: var(--attention-color);
       }
     }
@@ -88,6 +88,10 @@
         display: flex;
         flex-flow: row;
         padding: 8px;
+        gap: 12px;
+        span {
+          color: var(--label-color);
+        }
       }
 
       label {
@@ -143,6 +147,9 @@
       &-col-header {
         padding: 8px;
         background-color: var(--background-color);
+        &-tools {
+          width: 64px !important;
+        }
       }
 
       &-col {

@@ -61,9 +61,10 @@ impl IpCheckConfig {
             return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "No url provided!".to_owned()));
         }
 
-        if self.url.is_some() && (self.url_ipv4.is_some() || self.url_ipv6.is_some()) {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "url in combination with ipv4 and/or ipv6 url not allowed!".to_owned()));
-        }
+        // TODO allow or do not allow ?
+        // if self.url.is_some() && (self.url_ipv4.is_some() || self.url_ipv6.is_some()) {
+        //     return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "url in combination with ipv4 and/or ipv6 url not allowed!".to_owned()));
+        // }
 
         if let Some(p4) = &self.pattern_ipv4 {
             self.t_pattern_ipv4 = Some(

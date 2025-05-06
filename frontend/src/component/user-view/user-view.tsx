@@ -1,4 +1,4 @@
-import React, {JSX, ReactNode, useCallback, useEffect, useRef, useState} from "react";
+import React, {JSX, useCallback, useEffect, useRef, useState} from "react";
 import './user-view.scss';
 import ServerConfig, {Credentials, TargetUser} from "../../model/server-config";
 import {getIconByName} from "../../icons/icons";
@@ -9,7 +9,7 @@ import TabSet, {TabSetTab} from "../tab-set/tab-set";
 import useTranslator from "../../hook/use-translator";
 import DateUtils from "../../utils/date-utils";
 import PlaylistFilter from "../playlist-filter/playlist-filter";
-import UserEditor from "../user-editor/user-editor";
+import UserEditor, {STATUS_OPTIONS} from "../user-editor/user-editor";
 import TextGenerator from "../../utils/text-generator";
 
 const renderExpDate = (value: any, hidden?: boolean) => {
@@ -20,7 +20,8 @@ const renderExpDate = (value: any, hidden?: boolean) => {
 };
 
 const renderBool = (value: any, hidden?: boolean) => {
-   return <span className={'checkbox-' + (value ? 'checked' : 'unchecked') }>{getIconByName(value ? 'CheckMark' : 'Clear' )}</span>;
+    return <span
+        className={'checkbox-' + (value ? 'checked' : 'unchecked')}>{getIconByName(value ? 'CheckMark' : 'Clear')}</span>;
 };
 
 const renderMaxCon = (value: any, hidden?: boolean) => {
@@ -79,8 +80,8 @@ const prepareTargetUserForSave = (targetUser: TargetUser[]): TargetUser[] => {
     return targetUser.map((user) => {
         let storeUser = {...user, credentials: user.credentials.map(c => ({...c}))};
         storeUser.credentials.forEach((credential) => {
-             credential.exp_date = DateUtils.toUnixSeconds(credential.exp_date);
-             credential.created_at = DateUtils.toUnixSeconds(credential.created_at);
+            credential.exp_date = DateUtils.toUnixSeconds(credential.exp_date);
+            credential.created_at = DateUtils.toUnixSeconds(credential.created_at);
         });
         return storeUser;
     });
@@ -130,19 +131,19 @@ const createNewUser = (targets: TargetUser[]): Credentials => {
     }
     const created_at = Date.now();
     const exp_date = new Date();
-    exp_date.setFullYear(exp_date.getFullYear()+1);
+    exp_date.setFullYear(exp_date.getFullYear() + 1);
     return {
-            username,
-            password: TextGenerator.generatePassword(),
-            token: TextGenerator.generatePassword(),
-            proxy: 'reverse',
-            created_at,
-            exp_date: exp_date.getTime(),
-            max_connections: 1,
-            status: "Active",
-            ui_enabled: true,
-            // @ts-ignore
-            _ref: undefined, // an indicator for new user
+        username,
+        password: TextGenerator.generatePassword(),
+        token: TextGenerator.generatePassword(),
+        proxy: 'reverse',
+        created_at,
+        exp_date: exp_date.getTime(),
+        max_connections: 1,
+        status: "Active",
+        ui_enabled: true,
+        // @ts-ignore
+        _ref: undefined, // an indicator for new user
     };
 }
 
@@ -165,6 +166,7 @@ export default function UserView(props: UserViewProps) {
     const [filteredUser, setFilteredUser] = useState<Record<string, {
         filter: string,
         regexp: boolean,
+        status: undefined,
         user: Credentials[]
     }>>({});
 
@@ -291,32 +293,44 @@ export default function UserView(props: UserViewProps) {
         setShowHiddenFields((hiddenFields: any) => ({...hiddenFields, [key]: !hiddenFields[key]}));
     }, []);
 
-    const handleFilter = useCallback((filter: string, regexp: boolean): void => {
-        let filter_value = regexp ? filter : filter.toLowerCase();
-        const target = targets.find(t => t.target === activeTarget);
-
+    const filterTarget = useCallback((target: TargetUser, filter: string, regexp: boolean, filterForStatus: string): void => {
         if (target) {
-            if (filter_value?.length) {
-                const filtered = target.credentials.filter((credential: Credentials) => {
+            if (filter?.length) {
+                let filtered = target.credentials.filter((credential: Credentials) => {
                     if (regexp) {
                         // eslint-disable-next-line eqeqeq
-                        return credential.username.trim().match(filter_value) != undefined;
+                        return credential.username.trim().match(filter) != undefined;
                     } else {
-                        return (credential.username.trim().toLowerCase().indexOf(filter_value) > -1);
+                        return (credential.username.trim().toLowerCase().indexOf(filter) > -1);
                     }
                 }) ?? [];
+                if (filterForStatus) {
+                    filtered = filtered.filter((c: Credentials) => c.status === filterForStatus);
+                }
                 setFilteredUser((filteredUser: any) => ({
                     ...filteredUser,
-                    [activeTarget]: {filter, regexp, user: filtered}
+                    [target.target]: {filter, regexp, status: filterForStatus, user: filtered}
                 }));
             } else {
+                let filtered = undefined;
+                if (filterForStatus) {
+                    filtered = {filter: undefined, regexp: false, status: filterForStatus, user: target.credentials.filter((c: Credentials) => c.status === filterForStatus)};
+                }
                 setFilteredUser((filteredUser: any) => ({
-                    ...filteredUser, [activeTarget]: undefined
+                    ...filteredUser, [target.target]: filtered
                 }));
             }
-
         }
-    }, [activeTarget, targets]);
+    }, []);
+
+    const handleFilter = useCallback((filter: string, regexp: boolean): void => {
+        let filter_value = regexp ? filter : filter?.toLowerCase();
+        const target = targets.find(t => t.target === activeTarget);
+        if (target) {
+            let currentFilter = filteredUser[target.target];
+            filterTarget(target, filter_value, regexp, currentFilter?.status);
+        }
+    }, [activeTarget, targets, filterTarget, filteredUser]);
 
     const handleUserEditorSubmit = useCallback((user: Credentials, target_name: string): boolean => {
         const userRef = (user as any)._ref;
@@ -349,14 +363,25 @@ export default function UserView(props: UserViewProps) {
     const renderTargetOptions = useCallback((target: string): JSX.Element => {
         let options = targetOptions?.[target];
         if (options?.force_redirect?.length > 2) {
-            return <div className={'user__target-target-options'}>{translate('HINT.CONFIG.USER.TARGET_FORCE_REDIRECT')} {options.force_redirect}</div>;
+            return <div
+                className={'user__target-target-options'}>{translate('HINT.CONFIG.USER.TARGET_FORCE_REDIRECT')} {options.force_redirect}</div>;
         }
         return <></>;
     }, [targetOptions, translate]);
 
-    return <div className={'user'}>
+    const handleStatusFilter = useCallback((evt: any) => {
+        const target_name = evt.target.dataset.target;
+        let target = targets.find((t) => t.target === target_name);
+        if (target) {
+            let value = evt.target.value;
+            value = value?.length ? value : undefined;
+            let currentFilter = filteredUser[target_name];
+            filterTarget(target, currentFilter?.filter, !!currentFilter?.regexp, value)
+        }
+    }, [filteredUser, filterTarget, targets]);
 
-        <div className={'user__toolbar'}><label>{translate('LABEL.USER')}</label>
+    return <div className={'user'}>
+        <div className={'user__toolbar'}><label>{translate('LABEL.TARGETS')} / {translate('LABEL.USER')}</label>
             <PlaylistFilter onFilter={handleFilter} options={filteredUser[activeTarget]}></PlaylistFilter>
             <button data-tooltip='LABEL.SAVE' onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>
@@ -367,10 +392,18 @@ export default function UserView(props: UserViewProps) {
                     targets?.map(target => <div key={target.target}
                                                 className={'user__target' + (activeTarget !== target.target ? ' hidden' : '')}>
                         <div className={'user__target-target'}>
-                            <label className={(target as any).src ? '' : 'target-not-exists'}>
-                                {target.target}
+                            <label>
+                                {!(target as any).src &&
+                                    <span className={'target-not-exists'}>{translate('MESSAGES.TARGET_NOT_EXISTS')}</span>}
                                 {renderTargetOptions(target.target)}
                             </label>
+
+                            <div className={'label'}>{translate("LABEL.STATUS")}</div>
+                            <select data-target={target.target}  onChange={handleStatusFilter} defaultValue={undefined}>
+                                <option value={undefined}></option>
+                                {STATUS_OPTIONS.map(l => <option key={target.target + l.value} value={l.value}>{l.label}</option>)}
+                            </select>
+
                             <div className={'user__target-target-toolbar'}>
                                 <button data-tooltip={'New User'} data-target={target.target}
                                         onClick={handleUserAdd}>{getIconByName('PersonAdd')}</button>
@@ -380,14 +413,25 @@ export default function UserView(props: UserViewProps) {
                         <div className={'user__target-user-table-container'}>
                             <div className={'user__target-user-table'}>
                                 <div className={'user__target-user-row user__target-user-table-header'}>
+                                    <div
+                                        className={'user__target-user-col user__target-user-col-header user__target-user-col-header-tools'}></div>
                                     {COLUMNS.map(col => <div key={col.field}
                                                              className={'user__target-user-col user__target-user-col-header'}>
                                         <label>{translate(col.label)}</label></div>)}
-                                    <div className={'user__target-user-col user__target-user-col-header'}></div>
                                 </div>
 
                                 {(filteredUser[target.target]?.user ?? target.credentials).map((usr, idx) =>
                                     <div key={'credential' + idx} className={'user__target-user-row'}>
+                                        <div className={'user__target-user-col-toolbar'}>
+                                            <span data-target={target.target} data-user={usr.username}
+                                                  onClick={handleUserRemove}>
+                                                {getIconByName('PersonRemove')}
+                                            </span>
+                                            <span data-target={target.target} data-user={usr.username}
+                                                  onClick={handleUserEdit}>
+                                                {getIconByName('Edit')}
+                                            </span>
+                                        </div>
                                         {COLUMNS.map(c => <div
                                             key={'target_' + target.target + '_' + c.field + '_' + usr.username}
                                             className={'user__target-user-col'}>
@@ -402,16 +446,6 @@ export default function UserView(props: UserViewProps) {
                                             </div>
                                         </div>)
                                         }
-                                        <div className={'user__target-user-col-toolbar'}>
-                                            <span data-target={target.target} data-user={usr.username}
-                                                  onClick={handleUserRemove}>
-                                                {getIconByName('PersonRemove')}
-                                            </span>
-                                            <span data-target={target.target} data-user={usr.username}
-                                                  onClick={handleUserEdit}>
-                                                {getIconByName('Edit')}
-                                            </span>
-                                        </div>
                                     </div>
                                 )}
                             </div>

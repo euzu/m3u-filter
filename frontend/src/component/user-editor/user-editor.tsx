@@ -4,7 +4,7 @@ import {Credentials} from "../../model/server-config";
 import useTranslator from "../../hook/use-translator";
 import FormView, {FormFieldType} from "../form-view/from-view";
 
-const STATUS_OPTIONS = [
+export const STATUS_OPTIONS = [
     {value: 'Active', label: 'Active'},
     {value: 'Expired', label: 'Expired'},
     {value: 'Banned', label: 'Banned'},

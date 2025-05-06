@@ -34,10 +34,17 @@ export default function StatusView() {
     }, [services])
 
     useEffect(() => {
-        const sub = interval(REQUEST_INTERVAL).subscribe(() => services.status().getServerStatus().pipe(first()).subscribe((data: any) => setStatus(data)));
+        const fetchData = () => services.status().getServerStatus().pipe(first()).subscribe({
+            next: (data: any) => setStatus(data),
+            error: () => {
+            }
+        });
+        fetchData();
+        const sub = interval(REQUEST_INTERVAL).subscribe(fetchData);
         checkIp();
         return () => sub.unsubscribe();
-    }, [services, checkIp]);
+    }, [services, checkIp])
+
 
     return <div className={'status-view'}>
         {ipCheck && <>

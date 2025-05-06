@@ -20,7 +20,7 @@
     flex: 0 0 auto;
     box-sizing: border-box;
     overflow: hidden;
-    max-width: 100%;
+    max-width: var(--max-view-width);
     background-color: inherit;
 
     .source-selector {
