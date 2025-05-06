@@ -157,6 +157,7 @@ export interface Credentials {
     max_connections: number,
     status: string,
     ui_enabled: boolean,
+    comment: string,
 }
 
 export interface TargetUser {
