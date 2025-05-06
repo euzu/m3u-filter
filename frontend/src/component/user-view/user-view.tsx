@@ -24,6 +24,13 @@ const renderBool = (value: any, hidden?: boolean) => {
         className={'checkbox-' + (value ? 'checked' : 'unchecked')}>{getIconByName(value ? 'CheckMark' : 'Clear')}</span>;
 };
 
+const renderComment = (value: any, hidden?: boolean) => {
+    if (value?.length) {
+        return <span className={'visibility'}>{getIconByName('Visibility')}</span>;
+    }
+    return undefined;
+};
+
 const renderMaxCon = (value: any, hidden?: boolean) => {
     if (!value) {
         return getIconByName('Unlimited');
@@ -55,6 +62,7 @@ const COLUMNS = [
     {field: 'status', label: 'LABEL.STATUS', render: renderStatus},
     {field: 'exp_date', label: 'LABEL.EXP_DATE', render: renderExpDate},
     {field: 'ui_enabled', label: 'LABEL.UI_ENABLED', render: renderBool},
+    {field: 'comment', label: 'LABEL.COMMENT', render: renderComment, action: true},
 ]
 
 COLUMNS.forEach(col => {
@@ -142,6 +150,7 @@ const createNewUser = (targets: TargetUser[]): Credentials => {
         max_connections: 1,
         status: "Active",
         ui_enabled: true,
+        comment: undefined,
         // @ts-ignore
         _ref: undefined, // an indicator for new user
     };
@@ -314,7 +323,12 @@ export default function UserView(props: UserViewProps) {
             } else {
                 let filtered = undefined;
                 if (filterForStatus) {
-                    filtered = {filter: undefined, regexp: false, status: filterForStatus, user: target.credentials.filter((c: Credentials) => c.status === filterForStatus)};
+                    filtered = {
+                        filter: undefined,
+                        regexp: false,
+                        status: filterForStatus,
+                        user: target.credentials.filter((c: Credentials) => c.status === filterForStatus)
+                    };
                 }
                 setFilteredUser((filteredUser: any) => ({
                     ...filteredUser, [target.target]: filtered
@@ -380,6 +394,24 @@ export default function UserView(props: UserViewProps) {
         }
     }, [filteredUser, filterTarget, targets]);
 
+    const handleColumnAction = useCallback((evt: any) => {
+        const field = evt.target.dataset.field;
+        if (field === 'comment') {
+            const target_name = evt.target.dataset.target;
+            let target = targets.find((t) => t.target === target_name);
+            if (target) {
+                const username = evt.target.dataset.username;
+                const user = target.credentials.find(usr => usr.username === username);
+                if (user) {
+                    const dialog: any = document.getElementById("comment-dialog");
+                    const comment = document.getElementById("comment-text");
+                    comment.textContent = user.comment;
+                    dialog.showModal();
+                }
+            }
+        }
+    }, [targets]);
+
     return <div className={'user'}>
         <div className={'user__toolbar'}><label>{translate('LABEL.TARGETS')} / {translate('LABEL.USERS')}</label>
             <PlaylistFilter onFilter={handleFilter} options={filteredUser[activeTarget]}></PlaylistFilter>
@@ -394,14 +426,16 @@ export default function UserView(props: UserViewProps) {
                         <div className={'user__target-target'}>
                             <label>
                                 {!(target as any).src &&
-                                    <span className={'target-not-exists'}>{translate('MESSAGES.TARGET_NOT_EXISTS')}</span>}
+                                    <span
+                                        className={'target-not-exists'}>{translate('MESSAGES.TARGET_NOT_EXISTS')}</span>}
                                 {renderTargetOptions(target.target)}
                             </label>
 
                             <div className={'label'}>{translate("LABEL.STATUS")}</div>
-                            <select data-target={target.target}  onChange={handleStatusFilter} defaultValue={undefined}>
+                            <select data-target={target.target} onChange={handleStatusFilter} defaultValue={undefined}>
                                 <option value={undefined}></option>
-                                {STATUS_OPTIONS.map(l => <option key={target.target + l.value} value={l.value}>{l.label}</option>)}
+                                {STATUS_OPTIONS.map(l => <option key={target.target + l.value}
+                                                                 value={l.value}>{l.label}</option>)}
                             </select>
 
                             <div className={'user__target-target-toolbar'}>
@@ -438,7 +472,12 @@ export default function UserView(props: UserViewProps) {
                                             <div className={'user__target-user-col-label'}>
                                                 <label>{translate(c.label)}</label>
                                             </div>
-                                            <div className={'user__target-user-col-value'}>{c.hidden &&
+                                            <div
+                                                className={'user__target-user-col-value' + (c.action ? ' user__target-user-col-action' : '')}
+                                                data-username={usr.username}
+                                                data-field={c.field}
+                                                data-target={activeTarget}
+                                                onClick={c.action ? handleColumnAction : undefined}>{c.hidden &&
                                                 <span className={'visibility'} data-hiddenkey={usr.username + c.field}
                                                       onClick={handleVisibility}>
                                                 {getIconByName('Visibility')}</span>}
@@ -454,5 +493,10 @@ export default function UserView(props: UserViewProps) {
             </div>
         </div>
         <UserEditor onSubmit={handleUserEditorSubmit} ref={userEditorRef} serverOptions={serverOptions}></UserEditor>
+        <dialog id="comment-dialog" className={'comment-dialog'}>
+            <p id="comment-text"></p>
+            <button className={'button'}
+                    onClick={() => (document.getElementById("comment-dialog") as any).close()}>{translate('LABEL.CLOSE')}</button>
+        </dialog>
     </div>
 }

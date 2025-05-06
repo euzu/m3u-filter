@@ -7,6 +7,7 @@
     "SUBMIT": "Submit",
     "OK": "Ok",
     "CANCEL": "Cancel",
+    "CLOSE": "Close",
     "SHOW_SELECTED": "Show selected",
     "SELECT_ALL": "Select All",
     "DESELECT_ALL": "Deselect all",
@@ -114,7 +115,8 @@
     "IPv6": "IPv6",
     "IP": "IP",
     "TARGET": "Target",
-    "TARGETS": "Targets"
+    "TARGETS": "Targets",
+    "COMMENT": "Comment"
   },
   "TITLE": {
     "USER_BOUQUET_EDITOR": "User group editor"

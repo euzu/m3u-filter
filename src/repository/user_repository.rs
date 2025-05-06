@@ -14,6 +14,42 @@ use std::collections::{HashMap, HashSet};
 use std::io::Error;
 use std::path::{Path, PathBuf};
 
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct StoredProxyUserCredentialsDeprecated {
+    pub target: String,
+    pub username: String,
+    pub password: String,
+    pub token: Option<String>,
+    pub proxy: ProxyType,
+    pub server: Option<String>,
+    pub epg_timeshift: Option<String>,
+    pub created_at: Option<i64>,
+    pub exp_date: Option<i64>,
+    pub max_connections: Option<u32>,
+    pub status: Option<ProxyUserStatus>,
+    pub ui_enabled: bool,
+}
+
+impl StoredProxyUserCredentialsDeprecated {
+    fn to(stored: &StoredProxyUserCredentialsDeprecated) -> ProxyUserCredentials {
+        ProxyUserCredentials {
+            username: stored.username.clone(),
+            password: stored.password.clone(),
+            token: stored.token.clone(),
+            proxy: stored.proxy.clone(),
+            server: stored.server.clone(),
+            epg_timeshift: stored.epg_timeshift.clone(),
+            created_at: stored.created_at,
+            exp_date: stored.exp_date,
+            max_connections: stored.max_connections.unwrap_or_default(),
+            status: stored.status.clone(),
+            ui_enabled: stored.ui_enabled,
+            comment: None,
+        }
+    }
+}
+
 // This is a Helper class to store all user into one Database file.
 // For the Config files we keep the old structure where a user is assigned to a target.
 // But for storing inside one db file it is easier to store the target next to the user.
@@ -32,6 +68,7 @@ struct StoredProxyUserCredentials {
     pub max_connections: Option<u32>,
     pub status: Option<ProxyUserStatus>,
     pub ui_enabled: bool,
+    pub comment: Option<String>,
 }
 
 impl StoredProxyUserCredentials {
@@ -49,6 +86,7 @@ impl StoredProxyUserCredentials {
             max_connections: if proxy.max_connections > 0 { Some(proxy.max_connections) } else { None },
             status: proxy.status.clone(),
             ui_enabled: proxy.ui_enabled,
+            comment: proxy.comment.clone(),
         }
     }
 
@@ -65,6 +103,7 @@ impl StoredProxyUserCredentials {
             max_connections: stored.max_connections.unwrap_or_default(),
             status: stored.status.clone(),
             ui_enabled: stored.ui_enabled,
+            comment: stored.comment.clone(),
         }
     }
 }
@@ -117,10 +156,37 @@ pub fn store_api_user(cfg: &Config, target_users: &[TargetUser]) -> Result<u64, 
     user_tree.store(&path)
 }
 
+// TODO remove me if we get stable on user_db
+pub fn load_api_user_deprecated(cfg: &Config) -> Result<Vec<TargetUser>, Error> {
+    let path = get_api_user_db_path(cfg);
+    let lock = cfg.file_locks.read_lock(&path);
+    let user_tree = BPlusTree::<String, StoredProxyUserCredentialsDeprecated>::load(&path)?;
+    drop(lock);
+    let mut target_users: HashMap<String, TargetUser> = HashMap::new();
+    for (_uname, stored_user) in &user_tree {
+        let proxy_user: ProxyUserCredentials = StoredProxyUserCredentialsDeprecated::to(stored_user);
+        let target_name = stored_user.target.clone();
+        match target_users.entry(target_name) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                let target = entry.get_mut();
+                target.credentials.push(proxy_user);
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(TargetUser {
+                    target: stored_user.target.clone(),
+                    credentials: vec![proxy_user],
+                });
+            }
+        }
+    }
+    Ok(target_users.into_values().collect())
+}
+
+
 pub fn load_api_user(cfg: &Config) -> Result<Vec<TargetUser>, Error> {
     let path = get_api_user_db_path(cfg);
     let lock = cfg.file_locks.read_lock(&path);
-    let user_tree = BPlusTree::<String, StoredProxyUserCredentials>::load(&path)?;
+    let Ok(user_tree) = BPlusTree::<String, StoredProxyUserCredentials>::load(&path) else { return load_api_user_deprecated(cfg) };
     drop(lock);
     let mut target_users: HashMap<String, TargetUser> = HashMap::new();
     for (_uname, stored_user) in &user_tree {

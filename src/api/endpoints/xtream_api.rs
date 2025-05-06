@@ -293,6 +293,7 @@ async fn xtream_player_api_stream_with_token(
             max_connections: 0,
             status: None,
             ui_enabled: false,
+            comment: None,
         };
 
         // TODO how should we use fixed provider for hls in multi provider config?

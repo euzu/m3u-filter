@@ -1,6 +1,23 @@
 @use '../../scss/common';
 @use '../../scss/preferences';
 
+dialog:not([open]) {
+  display: none;
+}
+
+.comment-dialog {
+  display: flex;
+  flex-flow: column;
+  color: var(--text-color);
+  justify-content: space-between;
+
+  button {
+    @include common.textButton();
+  }
+  min-height: 200px;
+  min-width: 400px;
+}
+
 .label {
   color: var(--label-color);
 }
@@ -168,6 +185,15 @@
           flex-flow: row nowrap;
           align-items: center;
           gap: 4px;
+        }
+        &-action {
+          cursor: pointer;
+          span  {
+            pointer-events: none;
+          }
+          &:hover {
+            color: var(--icon-button-hover-background-color);
+          }
         }
 
         .visibility {

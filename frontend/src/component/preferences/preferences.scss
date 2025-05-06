@@ -4,7 +4,6 @@
   @include common.container_horz_no_padding();
   overflow: hidden;
   flex: 1 1 auto;
-  max-width: var(--max-view-width) !important;
 
   &__content {
     @include common.container_horz_nowrap(flex-start, 0);

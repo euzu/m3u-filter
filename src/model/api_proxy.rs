@@ -207,6 +207,8 @@ pub struct ProxyUserCredentials {
     pub status: Option<ProxyUserStatus>,
     #[serde(default = "default_as_true")]
     pub ui_enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
 }
 
 impl ProxyUserCredentials {
@@ -261,7 +263,7 @@ impl ProxyUserCredentials {
                     debug!("User access denied, status invalid: {status} for user: {}", self.username);
                     return false;
                 }
-            }
+            } // NO STATUS SET, ok admins fault, we take this as a valid status
         }
         true
     }
@@ -394,7 +396,6 @@ pub struct ApiProxyConfig {
     pub user: Vec<TargetUser>,
     #[serde(default)]
     pub use_user_db: bool,
-
 }
 
 impl ApiProxyConfig {
