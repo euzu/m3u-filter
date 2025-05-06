@@ -9,14 +9,14 @@ use crate::api::model::provider_config::{ProviderConfig, ProviderConfigWrapper};
 use crate::utils::{default_grace_period_millis, default_grace_period_timeout_secs};
 
 pub struct ProviderConnectionGuard {
-    manager: Arc<ActiveProviderManager>,
+    // manager: Arc<ActiveProviderManager>,
     allocation: ProviderAllocation,
 }
 
 impl ProviderConnectionGuard {
-    pub fn new(manager: Arc<ActiveProviderManager>, allocation: ProviderAllocation) -> Self {
+    pub fn new(_manager: Arc<ActiveProviderManager>, allocation: ProviderAllocation) -> Self {
         Self {
-            manager,
+            // manager,
             allocation,
         }
     }
@@ -54,10 +54,11 @@ impl Drop for ProviderConnectionGuard {
             ProviderAllocation::Exhausted => {}
             ProviderAllocation::Available(config) |
             ProviderAllocation::GracePeriod(config) => {
-                let manager = self.manager.clone();
+                // let manager = self.manager.clone();
                 let provider_config = Arc::clone(config);
                 tokio::spawn(async move {
-                    manager.release_connection(&provider_config.name).await;
+                    provider_config.release().await;
+                    // manager.release_connection(&provider_config.name).await;
                 });
             }
         }

@@ -184,10 +184,10 @@ impl ProviderConfig {
     pub async fn release(&self) {
         let mut guard = self.connection.write().await;
         if guard.current_connections > 0 {
-            // DO NOT reset granted_grace or grace_ts here!
-            // We must preserve the grace period state until allocate() checks it.
             guard.current_connections -= 1;
-        } else {
+        }
+
+        if guard.current_connections == 0  || guard.current_connections < self.max_connections {
             guard.granted_grace = false;
             guard.grace_ts = 0;
         }
