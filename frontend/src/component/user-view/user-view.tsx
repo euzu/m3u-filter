@@ -309,7 +309,7 @@ export default function UserView(props: UserViewProps) {
                 }
                 setFilteredUser((filteredUser: any) => ({
                     ...filteredUser,
-                    [activeTarget]: {filter, regexp, status: filterForStatus, user: filtered}
+                    [target.target]: {filter, regexp, status: filterForStatus, user: filtered}
                 }));
             } else {
                 let filtered = undefined;
@@ -317,11 +317,11 @@ export default function UserView(props: UserViewProps) {
                     filtered = {filter: undefined, regexp: false, status: filterForStatus, user: target.credentials.filter((c: Credentials) => c.status === filterForStatus)};
                 }
                 setFilteredUser((filteredUser: any) => ({
-                    ...filteredUser, [activeTarget]: filtered
+                    ...filteredUser, [target.target]: filtered
                 }));
             }
         }
-    }, [activeTarget]);
+    }, []);
 
     const handleFilter = useCallback((filter: string, regexp: boolean): void => {
         let filter_value = regexp ? filter : filter?.toLowerCase();
