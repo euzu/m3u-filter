@@ -381,7 +381,7 @@ export default function UserView(props: UserViewProps) {
     }, [filteredUser, filterTarget, targets]);
 
     return <div className={'user'}>
-        <div className={'user__toolbar'}><label>{translate('LABEL.TARGETS')} / {translate('LABEL.USER')}</label>
+        <div className={'user__toolbar'}><label>{translate('LABEL.TARGETS')} / {translate('LABEL.USERS')}</label>
             <PlaylistFilter onFilter={handleFilter} options={filteredUser[activeTarget]}></PlaylistFilter>
             <button data-tooltip='LABEL.SAVE' onClick={handleSave}>{translate('LABEL.SAVE')}</button>
         </div>

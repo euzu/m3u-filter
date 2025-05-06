@@ -20,7 +20,7 @@ enum SidebarAction {
 
 const SIDEBAR_ACTIONS: { action: SidebarAction, icon: string, label: string }[] = [
     {action: SidebarAction.Update, icon: 'Refresh', label: 'LABEL.REFRESH'},
-    {action: SidebarAction.User, icon: 'User', label: 'LABEL.USER'},
+    {action: SidebarAction.User, icon: 'User', label: 'LABEL.USERS'},
     {action: SidebarAction.ApiServer, icon: 'ApiServer', label: 'LABEL.PROXY'},
     {action: SidebarAction.MainConfig, icon: 'Config', label: 'LABEL.CONFIG'},
     {action: SidebarAction.Status, icon: 'Status', label: 'LABEL.STATUS'},
