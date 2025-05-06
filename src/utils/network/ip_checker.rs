@@ -53,7 +53,6 @@ async fn fetch_combined_ips(client: &Arc<Client>, config: &IpCheckConfig, url: &
     }
 }
 
-
 /// Fetch both IPv4 and IPv6 addresses, using separate or combined URL(s)
 pub async fn get_ips(client: &Arc<Client>, config: &IpCheckConfig) -> Result<(Option<String>, Option<String>), M3uFilterError> {
     match (&config.url_ipv4, &config.url_ipv6, &config.url) {
