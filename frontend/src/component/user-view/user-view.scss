@@ -157,6 +157,7 @@ dialog:not([open]) {
       &-row {
         display: table-row;
         width: auto;
+        height: 3rem;
         clear: both;
         border: 1px solid var(--table-border-color);
       }
@@ -186,6 +187,7 @@ dialog:not([open]) {
           align-items: center;
           gap: 4px;
         }
+
         &-action {
           cursor: pointer;
           span  {
@@ -194,6 +196,12 @@ dialog:not([open]) {
           &:hover {
             color: var(--icon-button-hover-background-color);
           }
+        }
+
+        &-comment {
+          max-width: 200px;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .visibility {
@@ -209,12 +217,12 @@ dialog:not([open]) {
             display: flex;
             flex-flow: row;
             align-items: flex-end;
-            justify-content: flex-end;
+            justify-content: flex-start;
             padding-left: 4px;
           }
           span {
             padding: 4px;
-            transform: scale(0.7) translateY(5px);
+            transform: scale(0.9) translateY(5px);
             @include common.iconButton();
           }
         }
@@ -240,6 +248,7 @@ dialog:not([open]) {
           display: flex;
           flex-flow: column;
           gap: 4px;
+          height: auto;
         }
 
         &-col-label {

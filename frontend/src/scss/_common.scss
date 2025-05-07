@@ -5,7 +5,12 @@ $media-size-mobile: 600px;
   justify-content: $justify-content;
   gap: 8px;
   box-sizing: border-box;
-  padding: $padding;
+  @media (max-width: $media-size-mobile) {
+    padding: $padding;
+  }
+  @media (min-width: $media-size-mobile) {
+    padding: 2px;
+  }
 }
 
 @mixin container_vert() {

@@ -44,6 +44,9 @@ button {
 
   border-radius:var(--border-radius);
 
+  @media (min-width: common.$media-size-mobile) {
+    padding: 2px;
+  }
 }
 
 .vert-group {

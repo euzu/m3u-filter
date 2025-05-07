@@ -26,6 +26,13 @@
   &__row {
     flex-flow: row nowrap;
     @include common.container_common(flex-start, 0);
+    @media (max-width: common.$media-size-mobile) {
+      flex-flow: column;
+      &:nth-child(even) {
+       background-color: var(--card-background-color-darker);
+        border-radius: var(--border-radius);
+      }
+    }
   }
 
   &__col {
@@ -35,9 +42,13 @@
 
     &-label {
       display: flex;
-      width: 7em;
-      justify-content: flex-end;
+      min-width: 10em;
+      width: 10em;
+      justify-content: flex-start;
       align-items: center;
+      @media (max-width: common.$media-size-mobile) {
+        justify-content: flex-start;
+      }
     }
 
     &-value {

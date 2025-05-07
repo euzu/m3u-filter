@@ -420,6 +420,7 @@ mod tests {
                         max_connections: 1,
                         status: Some(ProxyUserStatus::Active),
                         ui_enabled: true,
+                        comment: None,
                     },
                     ProxyUserCredentials {
                         username: "Test2".to_string(),
@@ -432,7 +433,8 @@ mod tests {
                         exp_date: Some(1672705545),
                         max_connections: 1,
                         status: Some(ProxyUserStatus::Expired),
-                        ui_enabled: true
+                        ui_enabled: true,
+                        comment: None,
                     },
                     ProxyUserCredentials {
                         username: "Test3".to_string(),
@@ -445,7 +447,8 @@ mod tests {
                         exp_date: Some(1672705545),
                         max_connections: 1,
                         status: Some(ProxyUserStatus::Expired),
-                        ui_enabled: true
+                        ui_enabled: true,
+                        comment: None,
                     },
                     ProxyUserCredentials {
                         username: "Test4".to_string(),
@@ -458,7 +461,8 @@ mod tests {
                         exp_date: Some(1672705545),
                         max_connections: 1,
                         status: Some(ProxyUserStatus::Expired),
-                        ui_enabled: true
+                        ui_enabled: true,
+                        comment: None,
                     }
                 ],
             };

@@ -23,7 +23,7 @@ const COLUMNS = [
     {name: 'status', label: 'LABEL.STATUS', fieldType: FormFieldType.SINGLE_SELECT, options: STATUS_OPTIONS},
     {name: 'exp_date', label: 'LABEL.EXP_DATE', fieldType: FormFieldType.DATE},
     {name: 'ui_enabled', label: 'LABEL.UI_ENABLED', fieldType: FormFieldType.CHECK},
-    {name: 'comment', label: 'LABEL.COMMENT', fieldType: FormFieldType.TEXT}
+    {name: 'comment', label: 'LABEL.NOTES', fieldType: FormFieldType.TEXT}
 ];
 
 interface UserViewProps {

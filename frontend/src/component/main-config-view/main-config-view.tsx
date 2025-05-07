@@ -72,7 +72,7 @@ const CONFIG_WEB_AUTH_FIELDS = [
         name: 'secret',
         label: 'LABEL.SECRET',
         fieldType: FormFieldType.TEXT,
-        action: {icon: 'Clear', handler: getRandomHex}
+        action: {icon: 'Refresh', handler: getRandomHex}
     },
     {name: 'userfile', label: 'LABEL.USERFILE', fieldType: FormFieldType.TEXT},
 ];

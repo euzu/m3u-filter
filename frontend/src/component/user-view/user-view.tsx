@@ -26,7 +26,7 @@ const renderBool = (value: any, hidden?: boolean) => {
 
 const renderComment = (value: any, hidden?: boolean) => {
     if (value?.length) {
-        return <span className={'visibility'}>{getIconByName('Visibility')}</span>;
+        return <span className={'user__target-user-col-comment'}>{value}</span>;
     }
     return undefined;
 };
@@ -62,7 +62,7 @@ const COLUMNS = [
     {field: 'status', label: 'LABEL.STATUS', render: renderStatus},
     {field: 'exp_date', label: 'LABEL.EXP_DATE', render: renderExpDate},
     {field: 'ui_enabled', label: 'LABEL.UI_ENABLED', render: renderBool},
-    {field: 'comment', label: 'LABEL.COMMENT', render: renderComment, action: true},
+    {field: 'comment', label: 'LABEL.NOTES', render: renderComment, action: true},
 ]
 
 COLUMNS.forEach(col => {
@@ -456,15 +456,17 @@ export default function UserView(props: UserViewProps) {
 
                                 {(filteredUser[target.target]?.user ?? target.credentials).map((usr, idx) =>
                                     <div key={'credential' + idx} className={'user__target-user-row'}>
-                                        <div className={'user__target-user-col-toolbar'}>
-                                            <span data-target={target.target} data-user={usr.username}
-                                                  onClick={handleUserRemove}>
-                                                {getIconByName('PersonRemove')}
-                                            </span>
-                                            <span data-target={target.target} data-user={usr.username}
-                                                  onClick={handleUserEdit}>
-                                                {getIconByName('Edit')}
-                                            </span>
+                                        <div className={'user__target-user-col'}>
+                                            <div className={'user__target-user-col-toolbar'}>
+                                                <span data-target={target.target} data-user={usr.username}
+                                                      onClick={handleUserRemove}>
+                                                    {getIconByName('PersonRemove')}
+                                                </span>
+                                                <span data-target={target.target} data-user={usr.username}
+                                                      onClick={handleUserEdit}>
+                                                    {getIconByName('Edit')}
+                                                </span>
+                                            </div>
                                         </div>
                                         {COLUMNS.map(c => <div
                                             key={'target_' + target.target + '_' + c.field + '_' + usr.username}

@@ -3,6 +3,7 @@ import './channel-view.scss';
 import React, {ReactNode, useCallback, useState} from "react";
 import {getIconByName} from "../../icons/icons";
 import useTranslator from "../../hook/use-translator";
+import {set} from "react-datepicker/dist/date_utils";
 
 const getLogo = (item: PlaylistItem): string | undefined => {
     if (item.logo_small && item.logo_small.length > 0) {
@@ -26,6 +27,7 @@ export default function ChannelView(props: ChannelViewProps) {
     const [selectedItem, setSelectedItem] = useState<PlaylistItem>();
     const [selectedGroup, setSelectedGroup] = useState<PlaylistGroup>();
     const [selectedCategory, setSelectedCategory] = useState<PlaylistCategory>(PlaylistCategory.LIVE);
+    const [openChannelList, setOpenChannelList] = useState<boolean>(true);
 
     const handleCategorySelect = useCallback((evt: any) => {
         let category = evt.target.dataset.category;
@@ -51,6 +53,17 @@ export default function ChannelView(props: ChannelViewProps) {
             onPlay?.(channel);
         }
     }, [onPlay]);
+
+    const handleCloseChannelViewState = useCallback(() => {
+         setOpenChannelList(false);
+    }, []);
+
+
+    const handleOpenChannelViewState = useCallback(() => {
+        if (!openChannelList) {
+            setOpenChannelList(true);
+        }
+    }, [openChannelList]);
 
     const handleBack = useCallback(() => {
         if (selectedGroup) {
@@ -122,15 +135,16 @@ export default function ChannelView(props: ChannelViewProps) {
     }, [data, selectedCategory, selectedGroup, selectedItem, renderSelectionContent, translate]);
 
     const renderMenu = useCallback((): ReactNode => {
-        return <div className={"channel-view__menu" + (selectedGroup ? '' : ' channel-view__menu-disabled')}
-                    onClick={handleBack}>
-            <div
-                className={"channel-view__menu-back" + (selectedGroup ? '' : ' channel-view__menu-back-disabled')}>{getIconByName('Back')}</div>
-            {selectedGroup?.name ?? ''}
+        return <div className={"channel-view__menu"}>
+            <div className={"channel-view__menu-back"}  onClick={handleCloseChannelViewState}>{getIconByName('Clear')}</div>
+            {selectedGroup &&
+                <div className={"channel-view__menu-back"} onClick={handleBack}>{getIconByName('Back')}</div>
+            }
+            <div className={"channel-view__menu-title"} onClick={handleBack}>{selectedGroup?.name ?? ''}</div>
         </div>
-    }, [selectedGroup, handleBack])
+    }, [selectedGroup, handleBack, handleCloseChannelViewState])
 
-    return <div className="channel-view">
+    return <div className={"channel-view" + (openChannelList ? '' : ' channel-view__closed') } onClick={handleOpenChannelViewState}>
         <div className="channel-view__header">
             {renderMenu()}
             {renderCategories()}
