@@ -16,11 +16,12 @@
 
   &__toolbar {
     display: flex;
-    flex-flow: row;
+    flex-flow: row wrap;
     flex: 0 0 auto;
     box-sizing: border-box;
     overflow: hidden;
     background-color: inherit;
+    gap: 12px;
 
     .source-selector {
       flex: 1 1 auto;

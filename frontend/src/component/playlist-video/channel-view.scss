@@ -1,6 +1,7 @@
 @use '../../scss/common';
 
 $menu-width: 300px;
+$menu-width-closed: -288px;
 $item-height: 48px;
 
 .playlist-video {
@@ -16,7 +17,6 @@ $item-height: 48px;
 .channel-view {
   display: flex;
   flex-flow: column;
-  border: 1px transparent;
   box-sizing: border-box;
   z-index: 2;
   font-size: 1rem;
@@ -26,28 +26,41 @@ $item-height: 48px;
   bottom: 0;
   overflow: hidden;
   gap: 4px;
-  transition: width 0.4s ease;
-  width: 12px;
-  height: 90%;
+  transition: left 0.4s ease;
+  width: $menu-width;
+  height: 100%;
   background-color: transparent;
+  border: 1px solid var(--border-color);
 
-  &:hover {
-    background-color: #00000088;
-    border: 1px solid var(--border-color);
-    width: $menu-width;
-    .channel-view__content,
-    .channel-view__header {
-      display: flex;
+  &__closed {
+    left: $menu-width-closed;
+    border: none;
+    cursor:pointer;
+    &:hover {
+      background-color: var(--card-background-color);
+    }
+    .channel-view__header,
+    .channel-view__content {
+      display: none;
     }
   }
 
+  //&:hover {
+  //  background-color: #00000088;
+  //  border: 1px solid var(--border-color);
+  //  width: $menu-width;
+  //  .channel-view__content,
+  //  .channel-view__header {
+  //    display: flex;
+  //  }
+  //}
+
   &__header {
-    display: none;
+    display: flex;
     flex-flow: row;
     align-items: center;
     box-sizing: border-box;
     height: $item-height;
-    border-bottom:1px solid var(--border-color)
   }
 
   &__menu {
@@ -59,13 +72,23 @@ $item-height: 48px;
     overflow: hidden;
     cursor: pointer;
 
-    &-disabled {
-      pointer-events: none;
+    &-title {
+       overflow: hidden;
+       white-space: nowrap;
     }
 
-    &:hover {
-      color: var(--icon-button-hover-color);
-      background-color: var(--icon-button-hover-background-color);
+    &-back,
+    &-title {
+      &:hover {
+        cursor: pointer;
+        color: var(--icon-button-hover-color);
+        background-color: var(--icon-button-hover-background-color);
+      }
+    }
+
+
+    &-disabled {
+      pointer-events: none;
     }
 
     &-back {
@@ -98,7 +121,7 @@ $item-height: 48px;
   }
 
   &__content {
-    display: none;
+    display: flex;
     flex-flow: column;
     box-sizing: border-box;
     overflow-x: hidden;

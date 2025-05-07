@@ -35,14 +35,6 @@
         padding-bottom: 4px;
         margin: 8px 0;
       }
-      .form-view__col-label {
-        width: 120px;
-        min-width: 120px;
-        max-width: 120px;
-        @media (max-width: common.$media-size-mobile) {
-          justify-content: flex-start;
-        }
-      }
     }
 
     &-help {
