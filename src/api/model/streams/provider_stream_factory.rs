@@ -19,7 +19,7 @@ use reqwest::StatusCode;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use url::Url;
 
 // TODO make this configurable
@@ -212,10 +212,6 @@ fn prepare_client(request_client: &Arc<reqwest::Client>, stream_options: &Provid
         headers.insert(axum::http::header::USER_AGENT, axum::http::header::HeaderValue::from_static(DEFAULT_USER_AGENT));
     }
 
-    if !headers.contains_key(axum::http::header::CONNECTION) {
-        headers.insert(axum::http::header::CONNECTION, axum::http::header::HeaderValue::from_static("keep-alive"));
-    }
-
     let partial = if let Some(range) = range_start {
         let range_header = format!("bytes={range}-");
         if let Ok(header_value) = axum::http::header::HeaderValue::from_str(&range_header) {
@@ -328,7 +324,7 @@ async fn get_provider_stream(cfg: &Config, client: Arc<reqwest::Client>, stream_
             break;
         }
         connect_err += 1;
-        // tokio::time::sleep(Duration::from_millis(50)).await;
+        tokio::time::sleep(Duration::from_millis(50)).await;
         debug_if_enabled!("Reconnecting stream {}", sanitize_sensitive_info(url.as_str()));
     }
     debug_if_enabled!("Stopped reconnecting stream {}", sanitize_sensitive_info(url.as_str()));
