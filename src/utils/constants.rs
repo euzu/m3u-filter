@@ -37,7 +37,7 @@ const SUPPORTED_RESPONSE_HEADERS: &[&str] = &[
     "content-range",
     "vary",
     "transfer-encoding",
-    "connection",
+    //"connection",
     "access-control-allow-origin",
     "access-control-allow-credentials",
     "icy-metadata",
@@ -54,7 +54,7 @@ pub fn filter_response_header(key: &str) -> bool {
 }
 
 pub fn filter_request_header(key: &str) -> bool {
-    if key == "host" {
+    if key == "host" || key == "connection" {
         return false;
     }
     true

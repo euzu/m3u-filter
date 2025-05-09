@@ -155,82 +155,6 @@ impl ProviderStreamFactoryOptions {
     }
 }
 
-//
-// #[derive(Debug, Clone)]
-// struct ProviderStreamOptions {
-//     buffer_size: usize,
-//     continue_flag: Arc<AtomicOnceFlag>,
-//     url: Url,
-//     pipe_stream: bool,
-//     reconnect: bool,
-//     reconnect_force_secs: u32,
-//     headers: HeaderMap,
-//     range_bytes: Arc<Option<AtomicUsize>>,
-// }
-//
-// impl ProviderStreamOptions {
-//     #[inline]
-//     pub fn is_piped(&self) -> bool {
-//         self.pipe_stream
-//     }
-//     #[inline]
-//     pub fn is_buffered(&self) -> bool {
-//         self.buffer_size > 0
-//     }
-//     #[inline]
-//     pub fn get_buffer_size(&self) -> usize {
-//         self.buffer_size
-//     }
-//     #[inline]
-//     pub fn get_continue_flag_clone(&self) -> Arc<AtomicOnceFlag> {
-//         Arc::clone(&self.continue_flag)
-//     }
-//
-//     // #[inline]
-//     // pub fn get_continue_flag(&self) -> &Arc<AtomicFlag> {
-//     //     &self.continue_flag
-//     // }
-//
-//     #[inline]
-//     pub fn cancel_reconnect(&self) {
-//         self.continue_flag.notify();
-//     }
-//
-//     #[inline]
-//     pub fn get_url(&self) -> &Url {
-//         &self.url
-//     }
-//
-//     #[inline]
-//     pub fn should_reconnect(&self) -> bool {
-//         self.reconnect
-//     }
-//
-//     #[inline]
-//     pub fn get_headers(&self) -> &HeaderMap {
-//         &self.headers
-//     }
-//
-//     #[inline]
-//     pub fn get_total_bytes_send(&self) -> Option<usize> {
-//         self.range_bytes.as_ref().as_ref().map(|atomic| atomic.load(Ordering::SeqCst))
-//     }
-//
-//     // pub fn get_range_bytes(&self) -> &Arc<Option<AtomicUsize>> {
-//     //     &self.range_bytes
-//     // }
-//
-//     #[inline]
-//     pub fn get_range_bytes_clone(&self) -> Arc<Option<AtomicUsize>> {
-//         Arc::clone(&self.range_bytes)
-//     }
-//
-//     #[inline]
-//     pub fn should_continue(&self) -> bool {
-//         self.continue_flag.is_active()
-//     }
-// }
-
 fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Option<usize> {
     // range header looks like  bytes=1234-5566/2345345 or bytes=0-
     if let Some(req_range) = req_headers.get(axum::http::header::RANGE.as_str()) {
@@ -248,13 +172,13 @@ fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Opti
     None
 }
 
-fn get_host_and_optional_port(url: &Url) -> Option<String> {
-    let host = url.host_str()?;
-    match url.port() {
-        Some(port) => Some(format!("{host}:{port}")),
-        None => Some(host.to_string()),
-    }
-}
+// fn get_host_and_optional_port(url: &Url) -> Option<String> {
+//     let host = url.host_str()?;
+//     match url.port() {
+//         Some(port) => Some(format!("{host}:{port}")),
+//         None => Some(host.to_string()),
+//     }
+// }
 
 
 fn prepare_client(request_client: &Arc<reqwest::Client>, stream_options: &ProviderStreamFactoryOptions) -> (reqwest::RequestBuilder, bool) {
@@ -279,6 +203,10 @@ fn prepare_client(request_client: &Arc<reqwest::Client>, stream_options: &Provid
     //         }
     //     }
     // }
+
+    if !headers.contains_key(axum::http::header::CONNECTION) {
+        headers.insert(axum::http::header::CONNECTION, axum::http::header::HeaderValue::from_static("keep-alive"));
+    }
 
     if !headers.contains_key(axum::http::header::USER_AGENT) {
         headers.insert(axum::http::header::USER_AGENT, axum::http::header::HeaderValue::from_static(DEFAULT_USER_AGENT));

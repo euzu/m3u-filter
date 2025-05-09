@@ -144,8 +144,8 @@ pub fn get_client_request<S: ::std::hash::BuildHasher + Default>(client: &Arc<re
 
 pub fn get_request_headers<S: ::std::hash::BuildHasher + Default>(request_headers: Option<&HashMap<String, String, S>>, custom_headers: Option<&HashMap<String, Vec<u8>, S>>) -> HeaderMap {
     let mut headers = HeaderMap::default();
-    if let Some(def_headers) = request_headers {
-        for (key, value) in def_headers {
+    if let Some(req_headers) = request_headers {
+        for (key, value) in req_headers {
             if let (Ok(key), Ok(value)) = (HeaderName::from_bytes(key.as_bytes()), HeaderValue::from_bytes(value.as_bytes())) {
                 if filter_request_header(key.as_str()) {
                     headers.insert(key, value);
@@ -157,10 +157,12 @@ pub fn get_request_headers<S: ::std::hash::BuildHasher + Default>(request_header
         let header_keys: HashSet<String> = headers.keys().map(|k| k.as_str().to_lowercase()).collect();
         for (key, value) in custom {
             let key_lc = key.to_lowercase();
-            if header_keys.contains(key_lc.as_str()) {
-                // debug_if_enabled!("Ignoring request header '{}={}'", key_lc, String::from_utf8_lossy(value));
-            } else if let (Ok(key), Ok(value)) = (HeaderName::from_bytes(key.as_bytes()), HeaderValue::from_bytes(value)) {
-                headers.insert(key, value);
+            if filter_request_header(key_lc.as_str()) {
+                if header_keys.contains(key_lc.as_str()) {
+                    // debug_if_enabled!("Ignoring request header '{}={}'", key_lc, String::from_utf8_lossy(value));
+                } else if let (Ok(key), Ok(value)) = (HeaderName::from_bytes(key.as_bytes()), HeaderValue::from_bytes(value)) {
+                    headers.insert(key, value);
+                }
             }
         }
     }
