@@ -2,11 +2,11 @@ use reqwest::{StatusCode};
 use std::collections::{HashSet};
 use std::str::FromStr;
 use reqwest::header::HeaderMap;
-use crate::utils::{MEDIA_STREAM_HEADERS};
+use crate::utils::{filter_response_header};
 
 pub fn get_response_headers(headers: &HeaderMap) -> Vec<(String, String)> {
     let response_headers: Vec<(String, String)> = headers.iter()
-        .filter(|(key, _)| MEDIA_STREAM_HEADERS.contains(&key.as_str()))
+        .filter(|(key, _)| filter_response_header(key.as_str()))
         .map(|(key, value)| (key.to_string(), value.to_str().unwrap().to_string())).collect();
     response_headers
 }
@@ -27,8 +27,7 @@ pub fn get_stream_response_with_headers(custom: Option<(Vec<(String, String)>, S
     }
 
     let default_headers = vec![
-        ("content-type", "application/octet-stream"),
-        ("connection", "keep-alive"),
+        ("content-type", "application/octet-stream")
     ];
 
     for (key, value) in default_headers {

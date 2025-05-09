@@ -94,7 +94,7 @@ impl ProviderConfig {
             guard.grace_ts = 0;
         }
 
-        if guard.granted_grace {
+        if guard.granted_grace && guard.current_connections > max {
             let now = get_current_timestamp();
             if now - guard.grace_ts <= grace_period_timeout_secs {
                 // Grace timeout still active, deny connection
@@ -133,8 +133,8 @@ impl ProviderConfig {
             }
 
             let now = get_current_timestamp();
-            if guard.granted_grace {
-                if now - guard.grace_ts <= grace_period_timeout_secs {
+            if guard.granted_grace  && now - guard.grace_ts <= grace_period_timeout_secs {
+                if guard.current_connections > self.max_connections && now - guard.grace_ts <= grace_period_timeout_secs {
                     // Grace timeout still active, deny connection
                     debug!("Provider access denied, grace exhausted, too many connections: {}", self.name);
                     return ProviderConfigAllocation::Exhausted;
@@ -167,7 +167,7 @@ impl ProviderConfig {
 
             let now = get_current_timestamp();
             if guard.granted_grace {
-                if now - guard.grace_ts <= grace_period_timeout_secs {
+                if connections > self.max_connections && now - guard.grace_ts <= grace_period_timeout_secs {
                     // Grace timeout still active, deny connection
                     debug!("Provider access denied, grace exhausted, too many connections: {}", self.name);
                     return false;
