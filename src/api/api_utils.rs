@@ -1,15 +1,14 @@
 use crate::api::endpoints::xtream_api::{get_xtream_player_api_stream_url, XtreamApiStreamContext};
 use crate::api::model::active_provider_manager::{ProviderAllocation, ProviderConnectionGuard};
 use crate::api::model::app_state::AppState;
-use crate::api::model::model_utils::get_stream_response_with_headers;
+use crate::api::model::model_utils::{ get_stream_response_with_headers};
 use crate::api::model::request::UserApiRequest;
 use crate::api::model::stream::{BoxedProviderStream, ProviderStreamInfo, ProviderStreamResponse};
 use crate::api::model::stream_error::StreamError;
 use crate::api::model::streams::active_client_stream::ActiveClientStream;
 use crate::api::model::streams::persist_pipe_stream::PersistPipeStream;
-use crate::api::model::streams::provider_stream;
-use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, create_provider_connections_exhausted_stream, CustomVideoStreamType};
-use crate::api::model::streams::provider_stream_factory::BufferStreamOptions;
+use crate::api::model::streams::provider_stream::{create_channel_unavailable_stream, create_custom_video_stream_response, create_provider_connections_exhausted_stream, CustomVideoStreamType};
+use crate::api::model::streams::provider_stream_factory::{create_provider_stream, ProviderStreamFactoryOptions};
 use crate::api::model::streams::shared_stream_manager::SharedStreamManager;
 use crate::api::model::streams::throttled_stream::ThrottledStream;
 use crate::auth::authenticator::Claims;
@@ -157,6 +156,25 @@ pub struct StreamOptions {
     pub pipe_provider_stream: bool,
 }
 
+/// Constructs a `StreamOptions` object based on the application's reverse proxy configuration.
+///
+/// This function retrieves streaming-related settings from the `AppState`:
+/// - `stream_retry`: whether retrying the stream is enabled,
+/// - `stream_force_retry_secs`: the number of seconds to wait before a forced retry,
+/// - `buffer_enabled`: whether stream buffering is enabled,
+/// - `buffer_size`: the size of the stream buffer.
+///
+/// If the reverse proxy or stream settings are not defined, default values are used:
+/// - retry: `false`
+/// - forced retry interval: `0`
+/// - buffering: `false`
+/// - buffer size: `0`
+///
+/// Additionally, it computes `pipe_provider_stream`, which is `true` only if
+/// both retry and buffering are disabled—indicating that the stream can be piped directly
+/// from the provider without additional handling.
+///
+/// Returns a `StreamOptions` instance with the resolved configuration.
 fn get_stream_options(app_state: &AppState) -> StreamOptions {
     let (stream_retry, stream_force_retry_secs, buffer_enabled, buffer_size) = app_state
         .config
@@ -214,7 +232,7 @@ async fn get_redirect_alternative_url<'a>(app_state: &AppState, redirect_url: &'
 type StreamUrl = String;
 type ProviderName = String;
 
-enum StreamingOption {
+enum ProviderStreamState {
     Custom(ProviderStreamResponse),
     Available(Option<ProviderName>, StreamUrl),
     GracePeriod(Option<ProviderName>, StreamUrl),
@@ -251,11 +269,31 @@ impl StreamDetails {
     }
 }
 
-/**
-* If successfully a provider connection is used, do not forget to release if unsuccessfully
-*/
-async fn get_streaming_options(app_state: &AppState, stream_url: &str, input: &ConfigInput, force_provider: Option<&str>)
-                               -> (Option<ProviderConnectionGuard>, StreamingOption, Option<HashMap<String, String>>) {
+struct StreamingStrategy {
+    provider_connection_guard: Option<ProviderConnectionGuard>,
+    provider_stream_state: ProviderStreamState,
+    input_headers: Option<HashMap<String, String>>,
+}
+
+/// Determines the appropriate streaming strategy for the given input and stream URL.
+///
+/// This function attempts to acquire a connection to a streaming provider, either using a forced provider
+/// (if specified), or based on the input name. It then selects a corresponding `StreamingOption`:
+///
+/// - If no connections are available (`Exhausted`), it returns a custom stream indicating exhaustion.
+/// - If a connection is available or in a grace period, it constructs a streaming URL accordingly:
+///   - If the provider was forced or matches the input, the original URL is reused.
+///   - Otherwise, an alternative URL is generated based on the provider and input.
+///
+/// The function returns:
+/// - an optional `ProviderConnectionGuard` to manage the connection's lifecycle,
+/// - a `ProviderStreamState` describing how the stream state is,
+/// - and optional HTTP headers to include in the request.
+///
+/// This logic helps abstract the decision-making behind provider selection and stream URL resolution.
+async fn resolve_streaming_strategy(app_state: &AppState, stream_url: &str, input: &ConfigInput, force_provider: Option<&str>)
+                                    -> StreamingStrategy {
+    // allocate a provider connection
     let provider_connection_guard = match force_provider {
         Some(provider) => app_state.active_provider.force_exact_acquire_connection(provider).await,
         None => app_state.active_provider.acquire_connection(&input.name).await
@@ -264,7 +302,7 @@ async fn get_streaming_options(app_state: &AppState, stream_url: &str, input: &C
         ProviderAllocation::Exhausted => {
             debug!("Input  {} is exhausted. No connections allowed.", input.name);
             let stream = create_provider_connections_exhausted_stream(&app_state.config, &[]);
-            StreamingOption::Custom(stream)
+            ProviderStreamState::Custom(stream)
         }
         ProviderAllocation::Available(ref provider)
         | ProviderAllocation::GracePeriod(ref provider) => {
@@ -277,19 +315,23 @@ async fn get_streaming_options(app_state: &AppState, stream_url: &str, input: &C
             };
 
             if matches!(&*provider_connection_guard, ProviderAllocation::Available(_)) {
-                StreamingOption::Available(Some(provider), url)
+                ProviderStreamState::Available(Some(provider), url)
             } else {
-                StreamingOption::GracePeriod(Some(provider), url)
+                ProviderStreamState::GracePeriod(Some(provider), url)
             }
         }
     };
-    (Some(provider_connection_guard), stream_response_params, Some(input.headers.clone()))
+    StreamingStrategy {
+        provider_connection_guard: Some(provider_connection_guard),
+        provider_stream_state: stream_response_params,
+        input_headers: Some(input.headers.clone())
+    }
 }
 
 
-fn get_grace_period_millis(connection_permission: &UserConnectionPermission, stream_response_params: &StreamingOption, config_grace_period_millis: u64) -> u64 {
+fn get_grace_period_millis(connection_permission: &UserConnectionPermission, stream_response_params: &ProviderStreamState, config_grace_period_millis: u64) -> u64 {
     if config_grace_period_millis > 0 &&
-        (matches!(stream_response_params, StreamingOption::GracePeriod(_, _)) // provider grace period
+        (matches!(stream_response_params, ProviderStreamState::GracePeriod(_, _)) // provider grace period
             || connection_permission == &UserConnectionPermission::GracePeriod // user grace period
         ) { config_grace_period_millis } else { 0 }
 }
@@ -304,13 +346,14 @@ async fn create_stream_response_details(app_state: &AppState,
                                         share_stream: bool,
                                         connection_permission: UserConnectionPermission,
                                         force_provider: Option<&str>) -> StreamDetails {
-    let (mut provider_connection_guard, stream_response_params, input_headers) =
-        get_streaming_options(app_state, stream_url, input, force_provider).await;
+    let mut streaming_strategy =
+        resolve_streaming_strategy(app_state, stream_url, input, force_provider).await;
     let config_grace_period_millis = app_state.config.reverse_proxy.as_ref()
         .and_then(|r| r.stream.as_ref()).map_or_else(default_grace_period_millis, |s| s.grace_period_millis);
-    let grace_period_millis = get_grace_period_millis(&connection_permission, &stream_response_params, config_grace_period_millis);
-    match stream_response_params {
-        StreamingOption::Custom(provider_stream) => {
+    let grace_period_millis = get_grace_period_millis(&connection_permission, &streaming_strategy.provider_stream_state, config_grace_period_millis);
+    match streaming_strategy.provider_stream_state {
+        // custom stream means we display our own stream like connection exhausted, channel unavailable...
+        ProviderStreamState::Custom(provider_stream) => {
             let (stream, stream_info) = provider_stream;
             StreamDetails {
                 stream,
@@ -318,28 +361,31 @@ async fn create_stream_response_details(app_state: &AppState,
                 input_name: None,
                 grace_period_millis,
                 reconnect_flag: None,
-                provider_connection_guard,
+                provider_connection_guard: streaming_strategy.provider_connection_guard.take(),
             }
         }
-        StreamingOption::Available(provider_name, request_url) |
-        StreamingOption::GracePeriod(provider_name, request_url) => {
+        ProviderStreamState::Available(provider_name, request_url) |
+        ProviderStreamState::GracePeriod(provider_name, request_url) => {
             let parsed_url = Url::parse(&request_url);
             let ((stream, stream_info), reconnect_flag) = if let Ok(url) = parsed_url {
-                if stream_options.pipe_provider_stream {
-                    (provider_stream::get_provider_pipe_stream(app_state, &url, req_headers, input_headers.as_ref(), item_type).await, None)
-                } else {
-                    let buffer_stream_options = BufferStreamOptions::new(item_type, share_stream, stream_options);
-                    let reconnect_flag = buffer_stream_options.get_reconnect_flag_clone();
-                    (provider_stream::get_provider_reconnect_buffered_stream(app_state, &url, req_headers, input_headers.as_ref(), buffer_stream_options).await,
-                     Some(reconnect_flag))
-                }
+                let provider_stream_factory_options = ProviderStreamFactoryOptions::new(item_type, share_stream, stream_options, &url, req_headers, streaming_strategy.input_headers.as_ref());
+                let reconnect_flag = provider_stream_factory_options.get_reconnect_flag_clone();
+                let provider_stream = match create_provider_stream(Arc::clone(&app_state.config), Arc::clone(&app_state.http_client), provider_stream_factory_options).await {
+                    None => (None, None),
+                    Some((stream, info)) => {
+                        (Some(stream), info)
+                    }
+                };
+                (provider_stream, Some(reconnect_flag))
             } else {
                 ((None, None), None)
             };
 
             // if we have no stream we should release the provider
             if stream.is_none() {
-                drop(provider_connection_guard.take());
+                if let Some(guard) = streaming_strategy.provider_connection_guard.take() {
+                    drop(guard);
+                }
                 error!("Cant open stream {}", sanitize_sensitive_info(&request_url));
             }
 
@@ -360,7 +406,7 @@ async fn create_stream_response_details(app_state: &AppState,
                 input_name: provider_name,
                 grace_period_millis,
                 reconnect_flag,
-                provider_connection_guard,
+                provider_connection_guard: streaming_strategy.provider_connection_guard.take(),
             }
         }
     }
@@ -480,7 +526,7 @@ const SESSION_COOKIE_NAME: &str = "m3uflt_session=";
 
 pub fn create_session_cookie(token: u32) -> String {
     let cookie = crate::utils::u32_to_base64(token);
-    format!("{SESSION_COOKIE_NAME}{cookie}; Path=/; HttpOnly; SameSite=Lax")
+    format!("{SESSION_COOKIE_NAME}{cookie}; Path=/; HttpOnly; SameSite=None")
 }
 
 pub fn read_session_token(headers: &HeaderMap) -> Option<u32> {
@@ -528,8 +574,7 @@ pub async fn force_provider_stream_response(app_state: &AppState,
         let stream = ActiveClientStream::new(stream_details, app_state, user, connection_permission).await;
 
         let (status_code, header_map) = get_stream_response_with_headers(provider_response);
-        let mut response = axum::response::Response::builder()
-            .status(status_code);
+        let mut response = axum::response::Response::builder().status(status_code);
         for (key, value) in &header_map {
             response = response.header(key, value);
         }
@@ -539,7 +584,14 @@ pub async fn force_provider_stream_response(app_state: &AppState,
         return response.body(body_stream).unwrap().into_response();
     }
     drop(stream_details.provider_connection_guard.take());
-    StatusCode::BAD_REQUEST.into_response()
+    if let (Some(stream), _stream_info) =
+        create_channel_unavailable_stream(&app_state.config, &[], StatusCode::BAD_GATEWAY)
+    {
+        debug!("Streaming custom stream");
+        axum::response::Response::builder().status(StatusCode::OK).body(Body::from_stream(stream)).unwrap().into_response()
+    } else {
+        StatusCode::BAD_REQUEST.into_response()
+    }
 }
 
 /// # Panics

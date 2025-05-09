@@ -29,10 +29,36 @@ pub const DASH_EXT_FRAGMENT: &str = ".mpd#";
 
 pub const FILENAME_TRIM_PATTERNS: &[char] = &['.', '-', '_'];
 
-pub const MEDIA_STREAM_HEADERS: &[&str] = &["accept", "content-type", "content-length", "connection",
-    "accept-ranges", "content-range", "vary", "transfer-encoding", "access-control-allow-origin",
-    "access-control-allow-credentials", "icy-metadata", "cache-control", "referer", "last-modified",
-    "etag", "expires"];
+const SUPPORTED_RESPONSE_HEADERS: &[&str] = &[
+    //"accept",
+    "accept-ranges",
+    "content-type",
+    "content-length",
+    "content-range",
+    "vary",
+    "transfer-encoding",
+    //"connection",
+    "access-control-allow-origin",
+    "access-control-allow-credentials",
+    "icy-metadata",
+    "referer",
+    "last-modified",
+    "cache-control",
+    "etag",
+    "expires"
+];
+
+
+pub fn filter_response_header(key: &str) -> bool {
+    SUPPORTED_RESPONSE_HEADERS.contains(&key)
+}
+
+pub fn filter_request_header(key: &str) -> bool {
+    if key == "host" || key == "connection" {
+        return false;
+    }
+    true
+}
 
 pub struct KodiStyle {
     pub year: Regex,

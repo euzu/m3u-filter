@@ -109,7 +109,7 @@ impl ActiveUserManager {
         let now = get_current_timestamp();
         // Check if user already used grace period
         if connection_data.granted_grace {
-            if now - connection_data.grace_ts <= self.grace_period_timeout_secs {
+            if current_connections > connection_data.max_connections && now - connection_data.grace_ts <= self.grace_period_timeout_secs {
                 // Grace timeout still active, deny connection
                 debug!("User access denied, grace exhausted, too many connections: {username}");
                 return UserConnectionPermission::Exhausted;

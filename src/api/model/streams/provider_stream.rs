@@ -1,21 +1,11 @@
-use std::collections::HashMap;
-use crate::api::api_utils::{get_headers_from_request, HeaderFilter};
-use crate::api::model::model_utils::get_response_headers;
-use crate::api::model::stream_error::StreamError;
+use crate::api::api_utils::{HeaderFilter};
 use crate::api::model::streams::custom_video_stream::CustomVideoStream;
-use crate::api::model::streams::provider_stream_factory::{create_provider_stream, BufferStreamOptions};
 use crate::model::{Config};
 use crate::model::PlaylistItemType;
-use crate::utils::debug_if_enabled;
-use crate::utils::request::{get_request_headers, sanitize_sensitive_info};
-use futures::TryStreamExt;
-use log::{error, trace};
+use log::{trace};
 use reqwest::StatusCode;
 use std::sync::Arc;
-use axum::http::HeaderMap;
 use axum::response::IntoResponse;
-use url::Url;
-use crate::api::model::app_state::AppState;
 use crate::api::model::stream::ProviderStreamResponse;
 
 pub enum CustomVideoStreamType {
@@ -70,56 +60,5 @@ pub fn get_header_filter_for_item_type(item_type: PlaylistItemType) -> HeaderFil
             Some(Box::new(|key| key != "accept-ranges" && key != "range" && key != "content-range"))
         }
         _ => None,
-    }
-}
-
-pub async fn get_provider_pipe_stream(app_state: &AppState,
-                                      stream_url: &Url,
-                                      req_headers: &HeaderMap,
-                                      input_headers: Option<&HashMap<String, String>>,
-                                      item_type: PlaylistItemType) -> ProviderStreamResponse {
-    let filter_header = get_header_filter_for_item_type(item_type);
-    let req_headers = get_headers_from_request(req_headers, &filter_header);
-    debug_if_enabled!("Stream requested with headers: {:?}", req_headers.iter().map(|header| (header.0, String::from_utf8_lossy(header.1))).collect::<Vec<_>>());
-    // These are the configured headers for this input.
-    // The stream url, we need to clone it because of move to async block.
-    // We merge configured input headers with the headers from the request.
-    let headers = get_request_headers(input_headers, Some(&req_headers));
-    let client = app_state.http_client.get(stream_url.clone()).headers(headers.clone());
-    match client.send().await {
-        Ok(response) => {
-            let response_headers = get_response_headers(response.headers());
-            // TODO hls handling if response gives us a m3u8 file, check content type
-            let status = response.status();
-            if status.is_success() {
-                (Some(Box::pin(response.bytes_stream().map_err(|err| StreamError::reqwest(&err)))), Some((response_headers, status)))
-            } else if let (Some(boxed_provider_stream), response_info) =  create_channel_unavailable_stream(&app_state.config, &response_headers, status) {
-                (Some(boxed_provider_stream), response_info)
-            } else {
-                (None, Some((response_headers, status)))
-            }
-        }
-        Err(err) => {
-            let masked_url = sanitize_sensitive_info(stream_url.as_str());
-            error!("Failed to open stream {masked_url} {err}");
-            if let (Some(boxed_provider_stream), response_info) = create_channel_unavailable_stream(&app_state.config, &get_response_headers(&headers), StatusCode::BAD_GATEWAY) {
-                (Some(boxed_provider_stream), response_info)
-            } else {
-                (None, None)
-            }
-        }
-    }
-}
-
-pub async fn get_provider_reconnect_buffered_stream(app_state: &AppState,
-                                                    stream_url: &Url,
-                                                    req_headers: &HeaderMap,
-                                                    input_headers: Option<&HashMap<String, String>>,
-                                                    options: BufferStreamOptions) -> ProviderStreamResponse {
-    match create_provider_stream(&app_state.config, Arc::clone(&app_state.http_client), stream_url, req_headers, input_headers, options).await {
-        None => (None, None),
-        Some((stream, info)) => {
-            (Some(stream), info)
-        }
     }
 }
