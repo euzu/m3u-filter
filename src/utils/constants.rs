@@ -30,7 +30,7 @@ pub const DASH_EXT_FRAGMENT: &str = ".mpd#";
 pub const FILENAME_TRIM_PATTERNS: &[char] = &['.', '-', '_'];
 
 const SUPPORTED_RESPONSE_HEADERS: &[&str] = &[
-    "accept",
+    //"accept",
     "accept-ranges",
     "content-type",
     "content-length",
@@ -47,6 +47,7 @@ const SUPPORTED_RESPONSE_HEADERS: &[&str] = &[
     "etag",
     "expires"
 ];
+
 
 pub fn filter_response_header(key: &str) -> bool {
     SUPPORTED_RESPONSE_HEADERS.contains(&key)

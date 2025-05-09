@@ -6,11 +6,11 @@ use crate::api::model::streams::buffered_stream::BufferedStream;
 use crate::api::model::streams::client_stream::ClientStream;
 use crate::api::model::streams::provider_stream::{create_channel_unavailable_stream, get_header_filter_for_item_type};
 use crate::api::model::streams::timed_client_stream::TimeoutClientStream;
-use crate::model::Config;
 use crate::model::PlaylistItemType;
+use crate::model::{Config, DEFAULT_USER_AGENT};
 use crate::tools::atomic_once_flag::AtomicOnceFlag;
-use crate::utils::debug_if_enabled;
 use crate::utils::request::{classify_content_type, get_request_headers, sanitize_sensitive_info, MimeCategory};
+use crate::utils::{debug_if_enabled, filter_request_header};
 use futures::stream::{self};
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, warn};
@@ -251,7 +251,7 @@ fn get_request_range_start_bytes(req_headers: &HashMap<String, Vec<u8>>) -> Opti
 fn get_host_and_optional_port(url: &Url) -> Option<String> {
     let host = url.host_str()?;
     match url.port() {
-        Some(port) => Some(format!("{}:{}", host, port)),
+        Some(port) => Some(format!("{host}:{port}")),
         None => Some(host.to_string()),
     }
 }
@@ -259,24 +259,33 @@ fn get_host_and_optional_port(url: &Url) -> Option<String> {
 
 fn prepare_client(request_client: &Arc<reqwest::Client>, stream_options: &ProviderStreamFactoryOptions) -> (reqwest::RequestBuilder, bool) {
     let url = stream_options.get_url();
-    let host = get_host_and_optional_port(url);
     let range_start = stream_options.get_total_bytes_send();
     let original_headers = stream_options.get_headers();
 
-    let mut headers = original_headers.clone();
+    debug!("original_headers {original_headers:?}");
 
-    if let Some(host_header) = host {
-        if let Ok(header_value) = axum::http::header::HeaderValue::from_str(&host_header) {
-            headers.insert(axum::http::header::HOST, header_value);
+
+    let mut headers = HeaderMap::default();
+    for (key, value) in original_headers {
+        if filter_request_header(key.as_str()) {
+            headers.insert(key.clone(), value.clone());
         }
     }
 
-    if !headers.contains_key(axum::http::header::TRANSFER_ENCODING) {
-        headers.insert(axum::http::header::TRANSFER_ENCODING, axum::http::header::HeaderValue::from_static("chunked"));
-    }
+    // if !headers.contains_key(axum::http::header::HOST) {
+    //     if let Some(host_header) = get_host_and_optional_port(url) {
+    //         if let Ok(header_value) = axum::http::header::HeaderValue::from_str(&host_header) {
+    //             headers.insert(axum::http::header::HOST, header_value);
+    //         }
+    //     }
+    // }
 
     if !headers.contains_key(axum::http::header::USER_AGENT) {
-        headers.insert(axum::http::header::USER_AGENT, axum::http::header::HeaderValue::from_static("Mozilla/5.0 (Linux; Android 10)"));
+        headers.insert(axum::http::header::USER_AGENT, axum::http::header::HeaderValue::from_static(DEFAULT_USER_AGENT));
+    }
+
+    if !headers.contains_key(axum::http::header::CONNECTION) {
+        headers.insert(axum::http::header::CONNECTION, axum::http::header::HeaderValue::from_static("keep-alive"));
     }
 
     let partial = if let Some(range) = range_start {

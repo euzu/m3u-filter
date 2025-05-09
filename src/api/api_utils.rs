@@ -585,7 +585,7 @@ pub async fn force_provider_stream_response(app_state: &AppState,
     }
     drop(stream_details.provider_connection_guard.take());
     if let (Some(stream), _stream_info) =
-        create_channel_unavailable_stream(&app_state.config, &vec![], StatusCode::BAD_GATEWAY)
+        create_channel_unavailable_stream(&app_state.config, &[], StatusCode::BAD_GATEWAY)
     {
         debug!("Streaming custom stream");
         axum::response::Response::builder().status(StatusCode::OK).body(Body::from_stream(stream)).unwrap().into_response()
