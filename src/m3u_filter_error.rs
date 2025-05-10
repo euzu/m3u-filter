@@ -43,23 +43,23 @@ pub use info_err;
 
 
 #[macro_export]
-macro_rules! create_m3u_filter_error {
+macro_rules! create_tuliprox_error {
      ($kind: expr, $($arg:tt)*) => {
         M3uFilterError::new($kind, format!($($arg)*))
     }
 }
-pub use create_m3u_filter_error;
+pub use create_tuliprox_error;
 
 #[macro_export]
-macro_rules! create_m3u_filter_error_result {
+macro_rules! create_tuliprox_error_result {
      ($kind: expr, $($arg:tt)*) => {
         Err(M3uFilterError::new($kind, format!($($arg)*)))
     }
 }
-pub use create_m3u_filter_error_result;
+pub use create_tuliprox_error_result;
 
 #[macro_export]
-macro_rules! handle_m3u_filter_error_result_list {
+macro_rules! handle_tuliprox_error_result_list {
     ($kind:expr, $result: expr) => {
         let errors = $result
             .filter_map(|result| {
@@ -76,10 +76,10 @@ macro_rules! handle_m3u_filter_error_result_list {
     }
 }
 
-pub use handle_m3u_filter_error_result_list;
+pub use handle_tuliprox_error_result_list;
 
 #[macro_export]
-macro_rules! handle_m3u_filter_error_result {
+macro_rules! handle_tuliprox_error_result {
     ($kind:expr, $result: expr) => {
         if let Err(err) = $result {
             return Err(M3uFilterError::new($kind, err.to_string()));
@@ -87,7 +87,7 @@ macro_rules! handle_m3u_filter_error_result {
     }
 }
 
-pub use handle_m3u_filter_error_result;
+pub use handle_tuliprox_error_result;
 
 
 #[derive(Debug, PartialEq, Eq)]

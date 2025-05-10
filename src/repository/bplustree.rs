@@ -3,7 +3,7 @@ use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::path::Path;
-use crate::m3u_filter_error::{str_to_io_error, to_io_error};
+use crate::tuliprox_error::{str_to_io_error, to_io_error};
 use crate::utils::file_utils::{file_reader, file_writer, open_read_write_file, rename_or_copy};
 use log::error;
 use ruzstd::decoding::StreamingDecoder;

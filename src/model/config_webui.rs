@@ -1,5 +1,5 @@
 use crate::utils::default_as_true;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::WebAuthConfig;
 
 const RESERVED_PATHS: &[&str] = &[

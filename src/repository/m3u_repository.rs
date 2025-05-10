@@ -1,5 +1,5 @@
-use crate::m3u_filter_error::{create_m3u_filter_error,info_err};
-use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error,info_err};
+use crate::tuliprox_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::ProxyUserCredentials;
 use crate::model::{Config, ConfigTarget, M3uTargetOutput};
 use crate::model::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
@@ -18,7 +18,7 @@ use crate::repository::storage_const;
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
-        create_m3u_filter_error!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
+        create_tuliprox_error!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
     }
 }
 

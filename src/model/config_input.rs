@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result_list, info_err, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, handle_tuliprox_error_result_list, info_err, M3uFilterError, M3uFilterErrorKind};
 use crate::model::EpgConfig;
 use crate::utils::config_reader::csv_read_inputs;
 use crate::utils::default_as_true;
@@ -94,7 +94,7 @@ impl FromStr for InputType {
         } else if s.eq(Self::XTREAM_BATCH) {
             Ok(Self::XtreamBatch)
         } else {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown InputType: {}", s)
+            create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown InputType: {}", s)
         }
     }
 }
@@ -139,7 +139,7 @@ impl FromStr for InputFetchMethod {
         } else if s.eq(Self::POST_METHOD) {
             Ok(Self::POST)
         } else {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown Fetch Method: {}", s)
+            create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown Fetch Method: {}", s)
         }
     }
 }
@@ -318,7 +318,7 @@ impl ConfigInput {
 
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;
-            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+1+(idx as u16), input_type)));
+            handle_tuliprox_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+1+(idx as u16), input_type)));
         }
         Ok(index + self.aliases.as_ref().map_or(0, std::vec::Vec::len) as u16)
     }

@@ -1,5 +1,5 @@
 use regex::Regex;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error, handle_m3u_filter_error_result_list};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind, create_tuliprox_error, handle_tuliprox_error_result_list};
 use crate::model::{ItemField};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -15,7 +15,7 @@ fn compile_regex_vec(patterns: Option<&Vec<String>>) -> Result<Option<Vec<Regex>
         .map(|seq| {
             seq.iter()
                 .map(|s| Regex::new(s).map_err(|err| {
-                    create_m3u_filter_error!(M3uFilterErrorKind::Info, "cant parse regex: {s} {err}")
+                    create_tuliprox_error!(M3uFilterErrorKind::Info, "cant parse regex: {s} {err}")
                 }))
                 .collect::<Result<Vec<_>, _>>()
         })
@@ -62,7 +62,7 @@ impl ConfigSortChannel {
         // Compile group_pattern
         self.t_re_group_pattern = Some(
             Regex::new(&self.group_pattern).map_err(|err| {
-                create_m3u_filter_error!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", &self.group_pattern)
+                create_tuliprox_error!(M3uFilterErrorKind::Info, "cant parse regex: {} {err}", &self.group_pattern)
             })?
         );
 
@@ -89,7 +89,7 @@ impl ConfigSort {
             group.prepare()?;
         }
         if let Some(channels) = self.channels.as_mut() {
-            handle_m3u_filter_error_result_list!(M3uFilterErrorKind::Info, channels.iter_mut().map(ConfigSortChannel::prepare));
+            handle_tuliprox_error_result_list!(M3uFilterErrorKind::Info, channels.iter_mut().map(ConfigSortChannel::prepare));
         }
         Ok(())
     }

@@ -1,9 +1,9 @@
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::{Config, ConfigTarget, InputType};
 use crate::model::{FetchedPlaylist, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::processing::processor::xtream::{create_resolve_info_wal_files, playlist_resolve_download_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
 use crate::repository::xtream_repository::{xtream_update_input_info_file, xtream_update_input_vod_record_from_wal_file, InputVodInfoRecord};
-use crate::m3u_filter_error::{notify_err};
+use crate::tuliprox_error::{notify_err};
 use crate::processing::processor::{handle_error, handle_error_and_return, create_resolve_options_function_for_xtream_target};
 use crate::utils::{get_u32_from_serde_value, get_u64_from_serde_value};
 use serde_json::{Map, Value};

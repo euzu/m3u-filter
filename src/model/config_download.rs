@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{create_m3u_filter_error_result, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, M3uFilterError, M3uFilterErrorKind};
 use regex::Regex;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
@@ -57,7 +57,7 @@ impl VideoConfig {
                                 downl.t_re_episode_pattern = Some(pattern);
                             }
                             Err(err) => {
-                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {episode_pattern} {err}");
+                                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {episode_pattern} {err}");
                             }
                         }
                     }

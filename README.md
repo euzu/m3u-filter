@@ -268,7 +268,7 @@ if set to true, an update is started when the application starts.
 - `sanitize_sensitive_info` default true
 - `active_clients` default false, if set to true reverse proxy client count is printed as info log.
 - `log_level` can be set to `trace`, `debug`, `info`, `warn` and `error`.
-  You can also set module based level like `hyper_util::client::legacy::connect=error,m3u_filter=debug`
+  You can also set module based level like `hyper_util::client::legacy::connect=error,tuliprox=debug`
 
 
 `log_level` priority  CLI-Argument, Env-Var, Config, Default(`info`).
@@ -291,7 +291,7 @@ web_ui_enabled: true
 web_auth:
   enabled: true
   secret: very.secret.secret
-  issuer: m3u_filter
+  issuer: tuliprox
   userfile: user.txt
 ```
 
@@ -1297,12 +1297,12 @@ Following log levels are supported:
 
 Use the `-l` or `--log-level` cli-argument to specify the log-level.
 
-The log level can be set through environment variable `M3U_FILTER_LOG`,
+The log level can be set through environment variable `TULIPROX_LOG`,
 or config.
 
 Precedence is cli-argument, env-var, config, default(`info`).
 
-Log Level has module support like `m3u_filter::util=error,m3u_filter::filter=debug,m3u_filter=debug`
+Log Level has module support like `tuliprox::util=error,tuliprox::filter=debug,tuliprox=debug`
 
 ## 6. Web-UI
 

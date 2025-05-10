@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use base64::{engine::general_purpose, Engine as _};
 use openssl::symm::{Cipher, Crypter, Mode};
 use rand::Rng;

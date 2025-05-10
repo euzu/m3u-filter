@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{create_m3u_filter_error_result, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, M3uFilterError, M3uFilterErrorKind};
 use crate::model::ConfigInput;
 use crate::model::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::model::{XtreamCategory, XtreamSeriesInfo, XtreamSeriesInfoEpisode, XtreamStream};
@@ -12,7 +12,7 @@ fn map_to_xtream_category(categories: &Value) -> Result<Vec<XtreamCategory>, M3u
     match serde_json::from_value::<Vec<XtreamCategory>>(categories.to_owned()) {
         Ok(xtream_categories) => Ok(xtream_categories),
         Err(err) => {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to process categories {}", &err)
+            create_tuliprox_error_result!(M3uFilterErrorKind::Notify, "Failed to process categories {}", &err)
         }
     }
 }
@@ -21,7 +21,7 @@ fn map_to_xtream_streams(xtream_cluster: XtreamCluster, streams: &Value) -> Resu
     match serde_json::from_value::<Vec<XtreamStream>>(streams.to_owned()) {
         Ok(stream_list) => Ok(stream_list),
         Err(err) => {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to map to xtream streams {:?}: {}", xtream_cluster, &err)
+            create_tuliprox_error_result!(M3uFilterErrorKind::Notify, "Failed to map to xtream streams {:?}: {}", xtream_cluster, &err)
         }
     }
 }
@@ -70,7 +70,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
             Ok(None)
         }
         Err(err) => {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to process series info for {series_name} {err}")
+            create_tuliprox_error_result!(M3uFilterErrorKind::Notify, "Failed to process series info for {series_name} {err}")
         }
     }
 }

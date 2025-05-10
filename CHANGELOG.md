@@ -16,7 +16,7 @@ web_ui:
   path:
   auth:
     enabled: true
-    issuer: m3u_filter
+    issuer: tuliprox
     secret: ef9ab256a8c0abe5de92c2e05ca92baa810472ab702ff1674e9248308ceeec92
     userfile: user.txt
 ```
@@ -70,7 +70,7 @@ url: 'https://localhost.com/epg.xml'
 ```
 ```yaml
 # multi local file  epg
-url: ['file:///${env:M3U_FILTER_HOME}/epg.xml', 'file:///${env:M3U_FILTER_HOME}/epg2.xml']
+url: ['file:///${env:TULIPROX_HOME}/epg.xml', 'file:///${env:TULIPROX_HOME}/epg2.xml']
 ```
 ```yaml
 # multi url  epg
@@ -510,8 +510,8 @@ reverse_proxy:
    - `secret` secret for jwt token
    - `userfile` optional userfile with generated userfile in format "username: password" per file, default name is user.txt in config path
 * Password generation argument --genpwd  to generate passwords for userfile. 
-* Added env var `M3U_FILTER_LOG` for log level
-* Log Level has now module support like `m3u_filter::util=error,m3u_filter::filter=debug,m3u_filter=debug`
+* Added env var `TULIPROX_LOG` for log level
+* Log Level has now module support like `tuliprox::util=error,tuliprox::filter=debug,tuliprox=debug`
 * Multiple Xtream Sources merging into one target is now supported
 
 # v1.1.8(2024-03-06)

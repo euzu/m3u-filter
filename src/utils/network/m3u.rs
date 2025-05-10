@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::m3u_filter_error::M3uFilterError;
+use crate::tuliprox_error::M3uFilterError;
 use crate::model::{Config, ConfigInput};
 use crate::model::PlaylistGroup;
 use crate::processing::parser::m3u;

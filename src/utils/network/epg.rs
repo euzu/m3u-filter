@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::M3uFilterError;
+use crate::tuliprox_error::M3uFilterError;
 use crate::model::{Config, ConfigInput};
 use crate::model::TVGuide;
 use crate::repository::storage::short_hash;

@@ -11,14 +11,14 @@ use path_clean::PathClean;
 use rand::Rng;
 
 use crate::foundation::filter::{prepare_templates,  PatternTemplate};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, Mappings};
 use crate::utils::{default_as_default, default_connect_timeout_secs, default_grace_period_millis, default_grace_period_timeout_secs};
 use crate::utils::file_lock_manager::FileLockManager;
 use crate::utils::file_utils;
 use crate::utils::{parse_size_base_2, parse_to_kbps};
 use crate::utils::exit;
-use crate::m3u_filter_error::{ create_m3u_filter_error_result};
+use crate::tuliprox_error::{ create_tuliprox_error_result};
 use crate::model::{ConfigInput, ConfigInputOptions, IpCheckConfig, ProxyConfig, ConfigSource, ConfigTarget, HdHomeRunConfig, LogConfig, MessagingConfig, ProcessTargets, TargetOutput, VideoConfig, WebUiConfig};
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8192byte chunks and 2Mbit/s approx 8MB
@@ -407,10 +407,10 @@ impl Config {
         if let Some(username) = output_username {
             if let Some((_, config_target)) = self.get_target_for_username(username).await {
                 if config_target.name != target_name {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "User:{username} does not belong to target: {}", target_name);
+                    return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "User:{username} does not belong to target: {}", target_name);
                 }
             } else {
-                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "User: {username} does not exist");
+                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "User: {username} does not exist");
             }
             Ok(())
         } else {
@@ -572,20 +572,20 @@ impl Config {
             for input in &source.inputs {
                 let input_name = input.name.trim().to_string();
                 if input_name.is_empty() {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input name required");
+                    return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "input name required");
                 }
                 if seen_names.contains(input_name.as_str()) {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
+                    return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
                 }
                 seen_names.insert(input_name);
                 if let Some(aliases) = &input.aliases {
                     for alias in aliases {
                         let input_name = alias.name.trim().to_string();
                         if input_name.is_empty() {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input name required");
+                            return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "input name required");
                         }
                         if seen_names.contains(input_name.as_str()) {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
+                            return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
                         }
                         seen_names.insert(input_name);
                     }
@@ -603,11 +603,11 @@ impl Config {
                 // check target name is unique
                 let target_name = target.name.trim().to_string();
                 if target_name.is_empty() {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target name required");
+                    return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "target name required");
                 }
                 if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
                     if seen_names.contains(target_name.as_str()) {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target names should be unique: {}", target_name);
+                        return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "target names should be unique: {}", target_name);
                     }
                     seen_names.insert(target_name);
                 }
@@ -622,7 +622,7 @@ impl Config {
                 if let Some(targets) = &schedule.targets {
                     for target_name in targets {
                         if !target_names.contains(target_name) {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown target name in scheduler: {}", target_name);
+                            return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown target name in scheduler: {}", target_name);
                         }
                     }
                 }
@@ -820,7 +820,7 @@ pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigS
 
         let missing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v == 0).map(|(k, _)| k.to_string()).collect();
         if !missing_targets.is_empty() {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "No target found for {}", missing_targets.join(", "));
+            return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "No target found for {}", missing_targets.join(", "));
         }
         // let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
         // info!("Processing targets {}", processing_targets.join(", "));

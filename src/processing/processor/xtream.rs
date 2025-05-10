@@ -1,5 +1,5 @@
-use crate::m3u_filter_error::{info_err, notify_err};
-use crate::m3u_filter_error::{str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{info_err, notify_err};
+use crate::tuliprox_error::{str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::{Config, ConfigInput};
 use crate::model::{FetchedPlaylist, PlaylistEntry, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::storage::get_input_storage_path;

@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, info_err, notify_err, str_to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error, create_tuliprox_error_result, info_err, notify_err, str_to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::{ProxyUserCredentials};
 use crate::model::{Config, ConfigInput, ConfigTarget, XtreamTargetOutput};
 use crate::model::{PlaylistEntry, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster, XtreamPlaylistItem};
@@ -31,7 +31,7 @@ use std::sync::Arc;
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
-        create_m3u_filter_error!(
+        create_tuliprox_error!(
             M3uFilterErrorKind::Notify,
             "failed to write xtream playlist: {} - {}",
             $path.to_str().unwrap(),
@@ -280,7 +280,7 @@ pub async fn xtream_write_playlist(
     }
 
     if !errors.is_empty() {
-        return create_m3u_filter_error_result!(
+        return create_tuliprox_error_result!(
             M3uFilterErrorKind::Notify,
             "{}",
             errors.join("\n")

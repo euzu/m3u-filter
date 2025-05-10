@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::IpCheckConfig;
 use regex::Regex;
 use reqwest::Client;

@@ -1,6 +1,6 @@
 use log::warn;
 use regex::Regex;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind, create_tuliprox_error_result};
 use crate::utils::CONSTANTS;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -99,7 +99,7 @@ impl EpgSmartMatchConfig {
             Some(regstr) => {
                 let re = regex::Regex::new(regstr.as_str());
                 if re.is_err() {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
+                    return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
                 }
                 Some(re.unwrap())
             }

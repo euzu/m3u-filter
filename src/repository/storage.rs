@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::fmt::Write;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::{Config};
 use crate::model::UUIDType;
-use crate::m3u_filter_error::{notify_err};
+use crate::tuliprox_error::{notify_err};
 use crate::repository::storage_const;
 use crate::utils::file_utils;
 

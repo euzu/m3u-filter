@@ -103,7 +103,7 @@ fn main() {
     let config_path: String = args.config_path.unwrap_or_else(file_utils::get_default_config_path);
     let config_file: String = args.config_file.unwrap_or_else(|| file_utils::get_default_config_file_path(&config_path));
 
-    let env_log_level = std::env::var("M3U_FILTER_LOG");
+    let env_log_level = std::env::var("TULIPROX_LOG");
     init_logger(args.log_level.as_ref(), env_log_level.ok(), config_file.as_str());
 
     if args.healthcheck {

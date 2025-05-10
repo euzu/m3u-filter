@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::{fmt, io};
 use std::path::{Path, PathBuf};
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use crate::m3u_filter_error::str_to_io_error;
+use crate::tuliprox_error::str_to_io_error;
 
 #[derive(Clone)]
 pub struct FileLockManager {

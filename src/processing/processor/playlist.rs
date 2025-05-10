@@ -10,7 +10,7 @@ use std::thread;
 use tokio::sync::Mutex;
 
 use crate::foundation::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
-use crate::m3u_filter_error::{get_errors_notify_message, notify_err, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{get_errors_notify_message, notify_err, M3uFilterError, M3uFilterErrorKind};
 use crate::messaging::{send_message, MsgKind};
 use crate::model::{ConfigTarget, InputType, ItemField, ProcessTargets, ProcessingOrder};
 use crate::model::{CounterModifier, Mapping, MappingValueProcessor};

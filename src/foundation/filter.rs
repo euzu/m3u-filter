@@ -6,11 +6,11 @@ use log::{debug, error, log_enabled, trace, Level};
 use pest::iterators::Pair;
 use pest::Parser;
 
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::ItemField;
 use crate::model::{PlaylistItem, PlaylistItemType};
 use crate::tools::directed_graph::DirectedGraph;
-use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err};
+use crate::tuliprox_error::{create_tuliprox_error_result, info_err};
 use crate::utils::CONSTANTS;
 use crate::utils::exit;
 
@@ -243,7 +243,7 @@ fn get_parser_item_field(expr: &Pair<Rule>) -> Result<ItemField, M3uFilterError>
             }
         }
     }
-    create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
+    create_tuliprox_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
 }
 
 fn get_parser_regexp(
@@ -257,7 +257,7 @@ fn get_parser_regexp(
         let regstr = apply_templates_to_pattern(&parsed_text, templates);
         let re = regex::Regex::new(regstr.as_str());
         if re.is_err() {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
+            return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
         }
         let regexp = re.unwrap();
         let captures = regexp
@@ -275,7 +275,7 @@ fn get_parser_regexp(
             captures,
         });
     }
-    create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
+    create_tuliprox_error_result!(M3uFilterErrorKind::Info, "unknown field: {}", expr.as_str())
 }
 
 fn get_parser_field_comparison(
@@ -315,7 +315,7 @@ fn get_parser_type_comparison(expr: Pair<Rule>) -> Result<Filter, M3uFilterError
     let expr_inner = expr.into_inner();
     let text_item_type = expr_inner.as_str();
     let item_type = get_filter_item_type(text_item_type);
-    item_type.map_or_else(|| create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse item type: {text_item_type}"), |itype| Ok(Filter::TypeComparison(ItemField::Type, itype)))
+    item_type.map_or_else(|| create_tuliprox_error_result!(M3uFilterErrorKind::Info, "cant parse item type: {text_item_type}"), |itype| Ok(Filter::TypeComparison(ItemField::Type, itype)))
 }
 
 macro_rules! handle_expr {
@@ -400,7 +400,7 @@ fn get_parser_binary_op(expr: &Pair<Rule>) -> Result<BinaryOperator, M3uFilterEr
     match expr.as_rule() {
         Rule::and => Ok(BinaryOperator::And),
         Rule::or => Ok(BinaryOperator::Or),
-        _ => create_m3u_filter_error_result!(
+        _ => create_tuliprox_error_result!(
             M3uFilterErrorKind::Info,
             "Unknown binary operator {}",
             expr.as_str()
@@ -471,7 +471,7 @@ pub fn get_filter(
 
             result.map_or_else(
                 || {
-                    create_m3u_filter_error_result!(
+                    create_tuliprox_error_result!(
                         M3uFilterErrorKind::Info,
                         "Unable to parse filter: {}",
                         &filter_text
@@ -480,7 +480,7 @@ pub fn get_filter(
                 Ok,
             )
         }
-        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err),
+        Err(err) => create_tuliprox_error_result!(M3uFilterErrorKind::Info, "{}", err),
     }
 }
 
@@ -508,7 +508,7 @@ fn build_dependency_graph(
         );
     }
     if !cycles.is_empty() {
-        return create_m3u_filter_error_result!(
+        return create_tuliprox_error_result!(
             M3uFilterErrorKind::Info,
             "Cyclic dependencies in templates detected!"
         );

@@ -9,7 +9,7 @@ use crate::utils::file_utils;
 use log::error;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
-use crate::m3u_filter_error::{str_to_io_error, to_io_error};
+use crate::tuliprox_error::{str_to_io_error, to_io_error};
 use crate::utils::{bincode_deserialize, bincode_serialize};
 use crate::utils::file_utils::{create_new_file_for_read_write, file_reader, file_writer, open_read_write_file, open_readonly_file, rename_or_copy};
 

@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use crate::auth::user::UserCredential;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind, create_tuliprox_error_result};
 use crate::utils::file_utils;
 use crate::utils::file_utils::file_reader;
 
@@ -29,7 +29,7 @@ impl WebAuthConfig {
         if !file_utils::path_exists(&userfile_path) {
             userfile_path = PathBuf::from(config_path).join(&userfile_name);
             if !file_utils::path_exists(&userfile_path) {
-                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not find userfile {}", &userfile_name);
+                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Could not find userfile {}", &userfile_name);
             }
         }
 
@@ -50,7 +50,7 @@ impl WebAuthConfig {
 
             self.t_users = Some(users);
         } else {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Could not read userfile {:?}", &userfile_path);
+            return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Could not read userfile {:?}", &userfile_path);
         }
         Ok(())
     }

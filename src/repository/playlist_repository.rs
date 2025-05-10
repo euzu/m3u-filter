@@ -1,5 +1,5 @@
-use crate::m3u_filter_error::info_err;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::info_err;
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::{Config, ConfigTarget, TargetOutput};
 use crate::model::{PlaylistGroup, PlaylistItemType};
 use crate::model::Epg;

@@ -1,5 +1,5 @@
 use crate::api::model::app_state::AppState;
-use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
 use crate::model::{Config, ClusterFlags};
 use crate::repository::user_repository::{backup_api_user_db_file, get_api_user_db_path, load_api_user, merge_api_user};
 use crate::utils::default_as_true;
@@ -95,7 +95,7 @@ impl FromStr for ProxyType {
             }
         }
 
-        create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+        create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
     }
 }
 
@@ -179,7 +179,7 @@ impl FromStr for ProxyUserStatus {
             Self::TRIAL => Ok(Self::Trial),
             Self::DISABLED => Ok(Self::Disabled),
             Self::PENDING => Ok(Self::Pending),
-            _ => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+            _ => create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
         }
     }
 }

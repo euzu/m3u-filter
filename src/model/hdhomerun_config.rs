@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use log::warn;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind, create_m3u_filter_error_result};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind, create_tuliprox_error_result};
 fn default_friendly_name() -> String { String::from("M3uFilterTV") }
 fn default_manufacturer() -> String { String::from("Silicondust") }
 fn default_model_name() -> String { String::from("HDTC-2US") }
@@ -80,11 +80,11 @@ impl HdHomeRunConfig {
             device.prepare(device_num);
             if names.contains(&device.name) {
                 names.insert(&device.name);
-                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun duplicate device name {}", device.name);
+                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "HdHomeRun duplicate device name {}", device.name);
             }
             if device.port > 0 && ports.contains(&device.port) {
                 ports.insert(device.port);
-                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "HdHomeRun duplicate port {}", device.port);
+                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "HdHomeRun duplicate port {}", device.port);
             }
         }
         let mut current_port = api_port + 1;

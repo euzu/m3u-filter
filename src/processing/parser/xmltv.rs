@@ -500,7 +500,7 @@ mod tests {
         assert_eq!("odisea.bg", normalize_channel_name("BG | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg));
     }
 
-    use crate::m3u_filter_error::M3uFilterError;
+    use crate::tuliprox_error::M3uFilterError;
     use rphonetic::{Encoder, Metaphone};
 
     #[test]

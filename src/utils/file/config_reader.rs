@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{create_m3u_filter_error, create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err, str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error, create_tuliprox_error_result, handle_tuliprox_error_result, info_err, str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
 use crate::model::ApiProxyConfig;
 use crate::model::{Config, ConfigDto, ConfigInput, ConfigInputAlias, InputType};
 use crate::model::Mappings;
@@ -92,11 +92,11 @@ pub fn read_config(config_path: &str, config_file: &str, sources_file: &str, inc
                     }
                 }
                 Err(e) => {
-                    create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant read config file: {}", e)
+                    create_tuliprox_error_result!(M3uFilterErrorKind::Info, "cant read config file: {}", e)
                 }
             }
         }
-        Err(err) => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "{}", err)
+        Err(err) => create_tuliprox_error_result!(M3uFilterErrorKind::Info, "{}", err)
     }
 }
 
@@ -106,7 +106,7 @@ pub fn read_mapping(mapping_file: &str, resolve_var: bool) -> Result<Option<Mapp
         let mapping: Result<Mappings, _> = serde_yaml::from_reader(config_file_reader(file, resolve_var));
         return match mapping {
             Ok(mut result) => {
-                handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, result.prepare());
+                handle_tuliprox_error_result!(M3uFilterErrorKind::Info, result.prepare());
                 Ok(Some(result))
             }
             Err(err) => {
@@ -157,7 +157,7 @@ where
 
     File::create(&path)
         .and_then(|f| serde_yaml::to_writer(f, &config).map_err(to_io_error))
-        .map_err(|err| create_m3u_filter_error!(M3uFilterErrorKind::Info, "Could not write file {}: {}", &path.to_str().unwrap_or("?"), err))
+        .map_err(|err| create_tuliprox_error!(M3uFilterErrorKind::Info, "Could not write file {}: {}", &path.to_str().unwrap_or("?"), err))
 }
 
 pub fn save_api_proxy(file_path: &str, backup_dir: &str, config: &ApiProxyConfig) -> Result<(), M3uFilterError> {

@@ -1,5 +1,5 @@
-use crate::m3u_filter_error::{create_m3u_filter_error_result, info_err};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, info_err};
+use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
 use crate::model::{ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::{ClusterFlags, Config, ConfigTarget, StrmTargetOutput};
 use crate::model::{
@@ -408,7 +408,7 @@ async fn prepare_strm_output_directory(path: &Path) -> Result<(), M3uFilterError
     // Ensure the directory exists
     if let Err(e) = tokio::fs::create_dir_all(path).await {
         error!("Failed to create directory {path:?}: {e}");
-        return create_m3u_filter_error_result!(
+        return create_tuliprox_error_result!(
             M3uFilterErrorKind::Notify,
             "Error creating STRM directory: {e}"
         );

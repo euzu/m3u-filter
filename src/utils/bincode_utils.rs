@@ -1,5 +1,5 @@
 use std::io;
-use crate::m3u_filter_error::to_io_error;
+use crate::tuliprox_error::to_io_error;
 
 #[inline]
 pub fn bincode_serialize<T>(value: &T) -> io::Result<Vec<u8>>
