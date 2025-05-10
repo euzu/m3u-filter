@@ -7,11 +7,11 @@ WORKDIR /app
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY ./m3u-filter ./
+COPY ./tuliprox ./
 COPY ./web ./web
 COPY ./resources ./resources
 
-CMD ["/app/m3u-filter", "-s", "-p", "/app/config"]
+CMD ["/app/tuliprox", "-s", "-p", "/app/config"]
 
 # Alpine Final container
 FROM alpine:latest AS alpine-final
@@ -20,11 +20,11 @@ RUN apk add --no-cache bash curl strace tcpdump bind-tools nano ca-certificates 
 
 WORKDIR /app
 
-COPY ./m3u-filter ./
+COPY ./tuliprox ./
 COPY ./web ./web
 COPY ./resources ./resources
 # config should be mounted as volume
 # COPY ./config ./config
 
-ENTRYPOINT ["/sbin/tini", "--", "/app/m3u-filter"]
+ENTRYPOINT ["/sbin/tini", "--", "/app/tuliprox"]
 CMD ["-s", "-p", "/app/config"]

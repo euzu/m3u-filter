@@ -14,8 +14,8 @@ use reqwest::header::CONTENT_ENCODING;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use url::Url;
 
-use crate::m3u_filter_error::create_m3u_filter_error_result;
-use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::create_tuliprox_error_result;
+use crate::tuliprox_error::{str_to_io_error, TuliProxError, TuliProxErrorKind};
 use crate::model::format_elapsed_time;
 use crate::model::{ConfigInput, ProxyConfig, InputFetchMethod};
 use crate::repository::storage::{get_input_storage_path, short_hash};
@@ -29,14 +29,14 @@ pub const fn bytes_to_megabytes(bytes: u64) -> u64 {
     bytes / 1_048_576
 }
 
-pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, M3uFilterError> {
+pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<PathBuf, TuliProxError> {
     debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, sanitize_sensitive_info(url_str));
     if url_str.parse::<url::Url>().is_ok() {
         match download_text_content_as_file(client, input, url_str, working_dir, persist_filepath).await {
             Ok(content) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", sanitize_sensitive_info(url_str), sanitize_sensitive_info(e.to_string().as_str()));
-                create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
+                create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed to download")
             }
         }
     } else {
@@ -49,7 +49,7 @@ pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input:
                             Ok(_) => {}
                             Err(e) => {
                                 error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e);
-                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
+                                return create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
                             }
                         }
                     }
@@ -57,7 +57,7 @@ pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input:
                     if filepath.exists() {
                         Some(filepath)
                     } else {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed: file does not exists {filepath:?}");
+                        return create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed: file does not exists {filepath:?}");
                     }
                 } else {
                     None
@@ -69,13 +69,13 @@ pub async fn get_input_text_content_as_file(client: Arc<reqwest::Client>, input:
         result.map_or_else(|| {
             let msg = format!("cant read input url: {}", sanitize_sensitive_info(url_str));
             error!("{msg}");
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{msg}")
+            create_tuliprox_error_result!(TuliProxErrorKind::Notify, "{msg}")
         }, Ok)
     }
 }
 
 
-pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, M3uFilterError> {
+pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str, url_str: &str, persist_filepath: Option<PathBuf>) -> Result<String, TuliProxError> {
     debug_if_enabled!("getting input text content working_dir: {}, url: {}", working_dir, sanitize_sensitive_info(url_str));
 
     if url_str.parse::<url::Url>().is_ok() {
@@ -83,7 +83,7 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
             Ok((content, _response_url)) => Ok(content),
             Err(e) => {
                 error!("cant download input url: {}  => {}", sanitize_sensitive_info(url_str), sanitize_sensitive_info(e.to_string().as_str()));
-                create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to download")
+                create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed to download")
             }
         }
     } else {
@@ -96,7 +96,7 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
                             Ok(_) => {}
                             Err(e) => {
                                 error!("cant persist to: {}  => {}", to_file.to_str().unwrap_or("?"), e);
-                                return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
+                                return create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed to persist: {}  => {}", to_file.to_str().unwrap_or("?"), e);
                             }
                         }
                     }
@@ -104,7 +104,7 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
                     match get_local_file_content(&filepath) {
                         Ok(content) => Some(content),
                         Err(err) => {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "Failed : {}", err);
+                            return create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed : {}", err);
                         }
                     }
                 } else {
@@ -116,7 +116,7 @@ pub async fn get_input_text_content(client: Arc<reqwest::Client>, input: &Config
         result.map_or_else(|| {
             let msg = format!("cant read input url: {}", sanitize_sensitive_info(url_str));
             error!("{msg}");
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "{msg}")
+            create_tuliprox_error_result!(TuliProxErrorKind::Notify, "{msg}")
         }, Ok)
     }
 }
@@ -360,10 +360,10 @@ async fn download_json_content(client: Arc<reqwest::Client>, input: &ConfigInput
     }
 }
 
-pub async fn get_input_json_content(client: Arc<reqwest::Client>, input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, M3uFilterError> {
+pub async fn get_input_json_content(client: Arc<reqwest::Client>, input: &ConfigInput, url: &str, persist_filepath: Option<PathBuf>) -> Result<serde_json::Value, TuliProxError> {
     match download_json_content(client, input, url, persist_filepath).await {
         Ok(content) => Ok(content),
-        Err(e) => create_m3u_filter_error_result!(M3uFilterErrorKind::Notify, "cant download input url: {}  => {}", sanitize_sensitive_info(url), sanitize_sensitive_info(e.to_string().as_str()))
+        Err(e) => create_tuliprox_error_result!(TuliProxErrorKind::Notify, "cant download input url: {}  => {}", sanitize_sensitive_info(url), sanitize_sensitive_info(e.to_string().as_str()))
     }
 }
 

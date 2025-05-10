@@ -38,20 +38,20 @@ cargo clean
 env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$TARGET"
 
 # Check if the binary exists
-if [ ! -f "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" ]; then
-    echo "Error: Static binary '${WORKING_DIR}/target/${TARGET}/release/m3u-filter' does not exist."
+if [ ! -f "${WORKING_DIR}/target/${TARGET}/release/tuliprox" ]; then
+    echo "Error: Static binary '${WORKING_DIR}/target/${TARGET}/release/tuliprox' does not exist."
     exit 1
 fi
 
 # Prepare Docker build context
-cp "${WORKING_DIR}/target/${TARGET}/release/m3u-filter" "${DOCKER_DIR}/"
+cp "${WORKING_DIR}/target/${TARGET}/release/tuliprox" "${DOCKER_DIR}/"
 rm -rf "${DOCKER_DIR}/web"
 cp -r "${WORKING_DIR}/frontend/build" "${DOCKER_DIR}/web"
 cp -r "${RESOURCES_DIR}" "${DOCKER_DIR}/"
 
 cd "${DOCKER_DIR}"
 echo "Building Docker images for version ${VERSION}"
-BETA_IMAGE_NAME=m3u-filter-beta
+BETA_IMAGE_NAME=tuliprox-beta
 
 # Build alpine image and tag as "latest"
 docker build -f Dockerfile-manual -t ghcr.io/euzu/${BETA_IMAGE_NAME}:"${VERSION}" --target alpine-final .
@@ -67,7 +67,7 @@ docker push ghcr.io/euzu/${BETA_IMAGE_NAME}:latest
 # Clean up
 echo "Cleaning up build artifacts..."
 rm -rf "${DOCKER_DIR}/web"
-rm -f "${DOCKER_DIR}/m3u-filter"
+rm -f "${DOCKER_DIR}/tuliprox"
 rm -rf "${DOCKER_DIR}/resources"
 
 echo "Docker images ghcr.io/euzu/${BETA_IMAGE_NAME}${VERSION} have been successfully built, tagged, and pushed."

@@ -4,15 +4,15 @@ server:
     host: 192.168.9.3
     port: 80
     timezone: Europe/Paris
-    message: Welcome to m3u-filter
+    message: Welcome to tuliprox
   - name: extern
     protocol: https
-    host: m3u-filter.mydns.com
+    host: tuliprox.mydns.com
     port: 443
     rtmp_port:
     timezone: Europe/Paris
-    message: Welcome to m3u-filter
-    path: m3uflt # optional, only needed for easier reverse proxy configuration see README.md.
+    message: Welcome to tuliprox
+    path: tuliprox # optional, only needed for easier reverse proxy configuration see README.md.
 user:
   - target: pl1
     credentials:

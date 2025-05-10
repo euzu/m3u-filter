@@ -166,7 +166,7 @@ async fn create_device(app_state: &Arc<HdHomerunAppState>) -> Option<Device> {
         Some(Device {
             friendly_name: device.friendly_name.to_string(),
             manufacturer: device.manufacturer.to_string(),
-            //manufacturer_url: "https://github.com/euzu/m3u-filter".to_string(),
+            //manufacturer_url: "https://github.com/euzu/tuliprox".to_string(),
             model_number: device.model_number.to_string(),
             model_name: device.model_name.to_string(),
             firmware_name: device.firmware_name.to_string(),

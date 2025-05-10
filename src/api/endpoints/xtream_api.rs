@@ -10,9 +10,9 @@ use crate::api::model::request::UserApiRequest;
 use crate::api::model::streams::provider_stream::{create_custom_video_stream_response, CustomVideoStreamType}
 ;
 use crate::api::model::xtream::XtreamAuthorizationResponse;
-use crate::m3u_filter_error::create_m3u_filter_error_result;
-use crate::m3u_filter_error::info_err;
-use crate::m3u_filter_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::create_tuliprox_error_result;
+use crate::tuliprox_error::info_err;
+use crate::tuliprox_error::{str_to_io_error, TuliProxError, TuliProxErrorKind};
 use crate::model::{ProxyType, ProxyUserCredentials, UserConnectionPermission};
 use crate::model::TargetType;
 use crate::model::{Config, ConfigInput, ConfigTarget};
@@ -80,15 +80,15 @@ impl TryFrom<XtreamCluster> for XtreamApiStreamContext {
 }
 
 impl FromStr for XtreamApiStreamContext {
-    type Err = M3uFilterError;
+    type Err = TuliProxError;
 
-    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+    fn from_str(s: &str) -> Result<Self, TuliProxError> {
         match s.to_lowercase().as_str() {
             Self::LIVE => Ok(Self::Live),
             Self::MOVIE => Ok(Self::Movie),
             Self::SERIES => Ok(Self::Series),
             Self::TIMESHIFT => Ok(Self::Timeshift),
-            _ => create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown CounterModifier: {}", s)
+            _ => create_tuliprox_error_result!(TuliProxErrorKind::Info, "Unknown CounterModifier: {}", s)
         }
     }
 }

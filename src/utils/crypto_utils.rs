@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use base64::{engine::general_purpose, Engine as _};
 use openssl::symm::{Cipher, Crypter, Mode};
 use rand::Rng;
@@ -32,13 +32,13 @@ pub fn deobfuscate_text(secret: &[u8], text: &str) -> Result<String, String> {
     }
 }
 
-pub fn encrypt_text(secret: &[u8; 16], text: &str) -> Result<String, M3uFilterError> {
+pub fn encrypt_text(secret: &[u8; 16], text: &str) -> Result<String, TuliProxError> {
     let iv: [u8; 16] = rand::rng().random(); // Random IV (AES-CBC 16 Bytes)
     let cipher = Cipher::aes_128_cbc();
-    let mut crypter = Crypter::new(cipher, Mode::Encrypt, secret, Some(&iv)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+    let mut crypter = Crypter::new(cipher, Mode::Encrypt, secret, Some(&iv)).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))?;
     let mut ciphertext = vec![0; text.len() + cipher.block_size()];
-    let mut count = crypter.update(text.as_bytes(), &mut ciphertext).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
-    count += crypter.finalize(&mut ciphertext[count..]).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+    let mut count = crypter.update(text.as_bytes(), &mut ciphertext).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))?;
+    count += crypter.finalize(&mut ciphertext[count..]).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))?;
     ciphertext.truncate(count);
 
     // IV + Ciphertext
@@ -47,17 +47,17 @@ pub fn encrypt_text(secret: &[u8; 16], text: &str) -> Result<String, M3uFilterEr
     Ok(general_purpose::URL_SAFE_NO_PAD.encode(out))
 }
 
-pub fn decrypt_text(secret: &[u8; 16], encrypted_text: &str) -> Result<String, M3uFilterError> {
-    let data = general_purpose::URL_SAFE_NO_PAD.decode(encrypted_text).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+pub fn decrypt_text(secret: &[u8; 16], encrypted_text: &str) -> Result<String, TuliProxError> {
+    let data = general_purpose::URL_SAFE_NO_PAD.decode(encrypted_text).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))?;
     let (iv, ciphertext) = data.split_at(16); // first 16 bytes IV
     let cipher = Cipher::aes_128_cbc();
-    let mut crypter = Crypter::new(cipher, Mode::Decrypt, secret, Some(iv)).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+    let mut crypter = Crypter::new(cipher, Mode::Decrypt, secret, Some(iv)).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))?;
     let mut decrypted = vec![0; ciphertext.len() + cipher.block_size()];
-    let mut count = crypter.update(ciphertext, &mut decrypted).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
-    count += crypter.finalize(&mut decrypted[count..]).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+    let mut count = crypter.update(ciphertext, &mut decrypted).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))?;
+    count += crypter.finalize(&mut decrypted[count..]).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))?;
     decrypted.truncate(count);
 
-    String::from_utf8(decrypted).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))
+    String::from_utf8(decrypted).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))
 }
 
 #[cfg(test)]

@@ -39,11 +39,11 @@ declare -A ARCHITECTURES=(
 )
 
 declare -A DIRS=(
-    [LINUX]=m3u-filter_${VERSION}_linux_x86_64
-    [WINDOWS]=m3u-filter_${VERSION}_windows_x86_64
-    [ARM7]=m3u-filter_${VERSION}_armv7
-    [AARCH64]=m3u-filter_${VERSION}_aarch64_x86_64
-    [DARWIN]=m3u-filter_${VERSION}_apple-darwin_x86_64
+    [LINUX]=tuliprox_${VERSION}_linux_x86_64
+    [WINDOWS]=tuliprox_${VERSION}_windows_x86_64
+    [ARM7]=tuliprox_${VERSION}_armv7
+    [AARCH64]=tuliprox_${VERSION}_aarch64_x86_64
+    [DARWIN]=tuliprox_${VERSION}_apple-darwin_x86_64
 )
 
 # Special case mapping for binary extensions (e.g., Windows needs .exe)
@@ -73,9 +73,9 @@ for PLATFORM in "${!ARCHITECTURES[@]}"; do
     ARC=${DIR}.tgz
     # Handle platform-specific binary file names
     if [[ -n "${BIN_EXTENSIONS[$PLATFORM]}" ]]; then
-       BIN="${ARCHITECTURE}/release/m3u-filter${BIN_EXTENSIONS[$PLATFORM]}"
+       BIN="${ARCHITECTURE}/release/tuliprox${BIN_EXTENSIONS[$PLATFORM]}"
     else
-       BIN="${ARCHITECTURE}/release/m3u-filter"
+       BIN="${ARCHITECTURE}/release/tuliprox"
     fi
 
     rustup target add "$ARCHITECTURE"

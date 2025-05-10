@@ -450,7 +450,7 @@ mod tests {
     /// ```
     /// parse_normalize().unwrap();
     /// ```
-    fn parse_normalize() -> Result<(), M3uFilterError> {
+    fn parse_normalize() -> Result<(), TuliProxError> {
         let epg_normalize = EpgSmartMatchConfig::new()?;
         let normalized = normalize_channel_name("Love Nature", &epg_normalize);
         assert_eq!(normalized, "lovenature".to_string());
@@ -500,7 +500,7 @@ mod tests {
         assert_eq!("odisea.bg", normalize_channel_name("BG | ODISEA ᵁᴴᴰ ³⁸⁴⁰ᴾ", &epg_smart_cfg));
     }
 
-    use crate::m3u_filter_error::M3uFilterError;
+    use crate::tuliprox_error::TuliProxError;
     use rphonetic::{Encoder, Metaphone};
 
     #[test]

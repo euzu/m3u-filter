@@ -1,8 +1,8 @@
 version: '3'
 services:
-  m3u-filter:
-    container_name: m3u-filter
-    image: ghcr.io/euzu/m3u-filter:latest
+  tuliprox:
+    container_name: tuliprox
+    image: ghcr.io/euzu/tuliprox:latest
     working_dir: /app
     volumes:
       - ./data:/app/data

@@ -13,7 +13,7 @@ interface AppUserProps {
 
 export default function AppUser(props: AppUserProps) {
     const services = useServices();
-    const appTitle = useMemo(() => services.config().getUiConfig().app_title ?? 'm3u-filter', [services]);
+    const appTitle = useMemo(() => services.config().getUiConfig().app_title ?? 'tuliprox', [services]);
     const appLogo = useMemo(() => {
        let logo =  services.config().getUiConfig().app_logo;
        if (logo) {

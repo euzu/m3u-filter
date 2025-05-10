@@ -5,7 +5,7 @@ use crate::api::api_utils::get_username_from_auth_header;
 use crate::model::WebAuthConfig;
 use crate::api::model::app_state::AppState;
 use crate::auth::auth_bearer::AuthBearer;
-use crate::m3u_filter_error::to_io_error;
+use crate::tuliprox_error::to_io_error;
 
 const ROLE_ADMIN: &str = "ADMIN";
 const ROLE_USER: &str = "USER";

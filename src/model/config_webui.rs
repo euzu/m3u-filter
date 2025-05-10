@@ -1,5 +1,5 @@
 use crate::utils::default_as_true;
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::WebAuthConfig;
 
 const RESERVED_PATHS: &[&str] = &[
@@ -24,7 +24,7 @@ pub struct WebUiConfig {
 }
 
 impl WebUiConfig {
-    pub fn prepare(&mut self, config_path: &str) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, config_path: &str) -> Result<(), TuliProxError> {
         if !self.enabled {
             self.auth = None;
         }
@@ -36,7 +36,7 @@ impl WebUiConfig {
             } else {
                 let web_path = web_path.trim().trim_start_matches('/').trim_end_matches('/').to_string();
                 if RESERVED_PATHS.contains(&web_path.to_lowercase().as_str()) {
-                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("web ui path is a reserved path. Do not use {RESERVED_PATHS:?}")));
+                    return Err(TuliProxError::new(TuliProxErrorKind::Info, format!("web ui path is a reserved path. Do not use {RESERVED_PATHS:?}")));
                 }
                 self.path = Some(web_path);
             }

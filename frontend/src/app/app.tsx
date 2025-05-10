@@ -22,7 +22,7 @@ export default function App(props: AppProps) {
     const [serverConfig, setServerConfig] = useState<ServerConfig>(undefined);
     const serverConfigLoaded = useRef(false);
     const [preferencesVisible, setPreferencesVisible] = useState<boolean>(true);
-    const appTitle = useMemo(() => services.config().getUiConfig().app_title ?? 'm3u-filter', [services]);
+    const appTitle = useMemo(() => services.config().getUiConfig().app_title ?? 'tuliprox', [services]);
     const translate = useTranslator();
     const appLogo = useMemo(() => {
         let logo =  services.config().getUiConfig().app_logo;

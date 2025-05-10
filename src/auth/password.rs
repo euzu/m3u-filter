@@ -1,6 +1,6 @@
 use rand::{Rng};
 use rand::distr::Alphanumeric;
-use crate::m3u_filter_error::str_to_io_error;
+use crate::tuliprox_error::str_to_io_error;
 
 fn generate_salt(length: usize) -> String {
     let salt: String = rand::rng()

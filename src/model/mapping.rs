@@ -9,8 +9,8 @@ use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
 use crate::foundation::filter::{apply_templates_to_pattern, get_filter, prepare_templates, Filter, PatternTemplate, RegexWithCaptures, ValueProcessor};
-use crate::m3u_filter_error::{create_m3u_filter_error_result, handle_m3u_filter_error_result, info_err};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, handle_tuliprox_error_result, info_err};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::valid_property;
 use crate::model::{ItemField};
 use crate::model::{FieldGetAccessor, FieldSetAccessor, PlaylistItem};
@@ -74,9 +74,9 @@ impl Display for CounterModifier {
 }
 
 impl FromStr for CounterModifier {
-    type Err = M3uFilterError;
+    type Err = TuliProxError;
 
-    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+    fn from_str(s: &str) -> Result<Self, TuliProxError> {
         if s.eq("assign") {
             Ok(Self::Assign)
         } else if s.eq("suffix") {
@@ -84,7 +84,7 @@ impl FromStr for CounterModifier {
         } else if s.eq("prefix") {
             Ok(Self::Prefix)
         } else {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown CounterModifier: {}", s)
+            create_tuliprox_error_result!(TuliProxErrorKind::Info, "Unknown CounterModifier: {}", s)
         }
     }
 }
@@ -146,9 +146,9 @@ impl Display for TransformModifier {
 }
 
 impl FromStr for TransformModifier {
-    type Err = M3uFilterError;
+    type Err = TuliProxError;
 
-    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+    fn from_str(s: &str) -> Result<Self, TuliProxError> {
         if s.eq("lowercase") {
             Ok(Self::Lowercase)
         } else if s.eq("uppercase") {
@@ -156,7 +156,7 @@ impl FromStr for TransformModifier {
         } else if s.eq("capitalize") {
             Ok(Self::Capitalize)
         } else {
-            create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown TransformModifier: {}", s)
+            create_tuliprox_error_result!(TuliProxErrorKind::Info, "Unknown TransformModifier: {}", s)
         }
     }
 }
@@ -171,7 +171,7 @@ pub struct MapperTransform {
 }
 
 impl MapperTransform {
-    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>) -> Result<(), TuliProxError> {
         match &self.pattern {
             None => self.t_pattern = None,
             Some(pattern) => {
@@ -184,7 +184,7 @@ impl MapperTransform {
                 }
                 match Regex::new(&new_pattern) {
                     Ok(pattern) => self.t_pattern = Some(pattern),
-                    Err(err) => return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {new_pattern} {err}"),
+                    Err(err) => return create_tuliprox_error_result!(TuliProxErrorKind::Info, "cant parse regex: {new_pattern} {err}"),
                 }
             }
         }
@@ -218,7 +218,7 @@ impl Mapper {
     /// # Panics
     ///
     /// Will panic if default `RegEx` gets invalid
-    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>, tags: Option<&Vec<MappingTag>>) -> Result<(), TuliProxError> {
         for key in self.attributes.keys() {
             if !valid_property!(key.as_str(), MAPPER_ATTRIBUTE_FIELDS) {
                 return Err(info_err!(format!("Invalid mapper attribute field {key}")));
@@ -453,9 +453,9 @@ pub struct Mapping {
 
 impl Mapping {
     pub fn prepare(&mut self, templates: Option<&Vec<PatternTemplate>>,
-                   tags: Option<&Vec<MappingTag>>) -> Result<(), M3uFilterError> {
+                   tags: Option<&Vec<MappingTag>>) -> Result<(), TuliProxError> {
         for mapper in &mut self.mapper {
-            handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, mapper.prepare(templates, tags));
+            handle_tuliprox_error_result!(TuliProxErrorKind::Info, mapper.prepare(templates, tags));
         }
 
         if let Some(counter_def_list) = &self.counter {
@@ -493,7 +493,7 @@ pub struct MappingDefinition {
 }
 
 impl MappingDefinition {
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self) -> Result<(), TuliProxError> {
         if let Some(templates) = &mut self.templates {
             match prepare_templates(templates) {
                 Ok(tmplts) => {
@@ -505,7 +505,7 @@ impl MappingDefinition {
         for mapping in &mut self.mapping {
             let template_list = self.templates.as_ref();
             let tag_list = self.tags.as_ref();
-            handle_m3u_filter_error_result!(M3uFilterErrorKind::Info, mapping.prepare(template_list, tag_list));
+            handle_tuliprox_error_result!(TuliProxErrorKind::Info, mapping.prepare(template_list, tag_list));
         }
         Ok(())
     }
@@ -517,7 +517,7 @@ pub struct Mappings {
 }
 
 impl Mappings {
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self) -> Result<(), TuliProxError> {
         self.mappings.prepare()
     }
 

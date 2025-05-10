@@ -70,10 +70,10 @@ ARG RUST_TARGET
 WORKDIR /app
 COPY --from=rust-build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=rust-build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=rust-build /src/target/${RUST_TARGET}/release/m3u-filter ./m3u-filter
+COPY --from=rust-build /src/target/${RUST_TARGET}/release/tuliprox ./tuliprox
 COPY --from=node-build /app/build ./web
 COPY --from=resource-build /src/resources ./resources
-ENTRYPOINT ["/app/m3u-filter"]
+ENTRYPOINT ["/app/tuliprox"]
 CMD ["-s", "-p", "/app/config"]
 
 # Final container (Alpine)
@@ -84,8 +84,8 @@ ARG RUST_TARGET
 RUN apk add --no-cache bash curl ca-certificates tini
 
 WORKDIR /app
-COPY --from=rust-build /src/target/${RUST_TARGET}/release/m3u-filter ./m3u-filter
+COPY --from=rust-build /src/target/${RUST_TARGET}/release/tuliprox ./tuliprox
 COPY --from=node-build /app/build ./web
 COPY --from=resource-build /src/resources ./resources
-ENTRYPOINT ["/sbin/tini", "--", "/app/m3u-filter"]
+ENTRYPOINT ["/sbin/tini", "--", "/app/tuliprox"]
 CMD ["-s", "-p", "/app/config"]

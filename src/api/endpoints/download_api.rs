@@ -12,7 +12,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{fs};
 use axum::response::IntoResponse;
-use crate::m3u_filter_error::to_io_error;
+use crate::tuliprox_error::to_io_error;
 use crate::utils::request::create_client;
 
 async fn download_file(active: Arc<RwLock<Option<FileDownload>>>, client: &reqwest::Client) -> Result<(), String> {

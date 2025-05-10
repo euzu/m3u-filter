@@ -518,7 +518,7 @@ fn is_throttled_stream(item_type: PlaylistItemType, throttle_kbps: usize) -> boo
     throttle_kbps > 0 && matches!(item_type, PlaylistItemType::Video | PlaylistItemType::Series  | PlaylistItemType::SeriesInfo)
 }
 
-const SESSION_COOKIE_NAME: &str = "m3uflt_session=";
+const SESSION_COOKIE_NAME: &str = "tuliprox_session=";
 
 // fn create_delete_session_cookie() -> String {
 //     format!("{SESSION_COOKIE_NAME}; Max-Age=0; Path=/; HttpOnly")

@@ -1,4 +1,4 @@
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::{Config, ConfigTarget, InputType};
 use crate::model::{FetchedPlaylist, PlaylistGroup, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::processing::processor::playlist::ProcessingPipe;
@@ -7,7 +7,7 @@ use crate::processing::processor::xtream::{create_resolve_episode_wal_files, cre
 use crate::repository::storage::get_input_storage_path;
 use crate::repository::xtream_repository::{xtream_get_info_file_paths, xtream_update_input_info_file, xtream_update_input_series_episodes_record_from_wal_file, xtream_update_input_series_record_from_wal_file};
 use crate::repository::IndexedDocumentReader;
-use crate::m3u_filter_error::{notify_err, info_err};
+use crate::tuliprox_error::{notify_err, info_err};
 use crate::processing::processor::{handle_error, handle_error_and_return, create_resolve_options_function_for_xtream_target};
 use std::collections::HashMap;
 use std::fs::File;
@@ -21,7 +21,7 @@ use crate::utils::file_utils::file_writer;
 
 create_resolve_options_function_for_xtream_target!(series);
 
-async fn read_processed_series_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) -> HashMap<u32, u64> {
+async fn read_processed_series_info_ids(cfg: &Config, errors: &mut Vec<TuliProxError>, fpl: &FetchedPlaylist<'_>) -> HashMap<u32, u64> {
     read_processed_info_ids(cfg, errors, fpl, PlaylistItemType::SeriesInfo, |ts: &u64| *ts).await
 }
 
@@ -54,7 +54,7 @@ fn should_update_series_info(pli: &mut PlaylistItem, processed_provider_ids: &Ha
     should_update_info(pli, processed_provider_ids, crate::model::XC_TAG_SERIES_INFO_LAST_MODIFIED)
 }
 
-async fn playlist_resolve_series_info(client: Arc<reqwest::Client>, cfg: &Config, errors: &mut Vec<M3uFilterError>,
+async fn playlist_resolve_series_info(client: Arc<reqwest::Client>, cfg: &Config, errors: &mut Vec<TuliProxError>,
                                       fpl: &mut FetchedPlaylist<'_>, resolve_delay: u16) -> bool {
     let mut processed_info_ids = read_processed_series_info_ids(cfg, errors, fpl).await;
     // we cant write to the indexed-document directly because of the write lock and time-consuming operation.
@@ -132,7 +132,7 @@ async fn playlist_resolve_series_info(client: Arc<reqwest::Client>, cfg: &Config
 async fn process_series_info(
     cfg: &Config,
     fpl: &mut FetchedPlaylist<'_>,
-    errors: &mut Vec<M3uFilterError>,
+    errors: &mut Vec<TuliProxError>,
 ) -> Vec<PlaylistGroup> {
     let mut result: Vec<PlaylistGroup> = vec![];
     let input = fpl.input;
@@ -214,7 +214,7 @@ async fn process_series_info(
 
 
 pub async fn playlist_resolve_series(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget,
-                                     errors: &mut Vec<M3uFilterError>,
+                                     errors: &mut Vec<TuliProxError>,
                                      pipe: &ProcessingPipe,
                                      provider_fpl: &mut FetchedPlaylist<'_>,
                                      processed_fpl: &mut FetchedPlaylist<'_>,

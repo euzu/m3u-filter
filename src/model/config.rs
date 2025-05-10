@@ -11,14 +11,14 @@ use path_clean::PathClean;
 use rand::Rng;
 
 use crate::foundation::filter::{prepare_templates,  PatternTemplate};
-use crate::m3u_filter_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::{ApiProxyConfig, ApiProxyServerInfo, ProxyUserCredentials, Mappings};
 use crate::utils::{default_as_default, default_connect_timeout_secs, default_grace_period_millis, default_grace_period_timeout_secs};
 use crate::utils::file_lock_manager::FileLockManager;
 use crate::utils::file_utils;
 use crate::utils::{parse_size_base_2, parse_to_kbps};
 use crate::utils::exit;
-use crate::m3u_filter_error::{ create_m3u_filter_error_result};
+use crate::tuliprox_error::{ create_tuliprox_error_result};
 use crate::model::{ConfigInput, ConfigInputOptions, IpCheckConfig, ProxyConfig, ConfigSource, ConfigTarget, HdHomeRunConfig, LogConfig, MessagingConfig, ProcessTargets, TargetOutput, VideoConfig, WebUiConfig};
 
 const STREAM_QUEUE_SIZE: usize = 1024; // mpsc channel holding messages. with 8192byte chunks and 2Mbit/s approx 8MB
@@ -244,12 +244,12 @@ pub struct StreamConfig {
 }
 
 impl StreamConfig {
-    fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    fn prepare(&mut self) -> Result<(), TuliProxError> {
         if let Some(buffer) = self.buffer.as_mut() {
             buffer.prepare();
         }
         if let Some(throttle) = &self.throttle {
-            self.throttle_kbps = parse_to_kbps(throttle).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err))?;
+            self.throttle_kbps = parse_to_kbps(throttle).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err))?;
         }
 
         if self.grace_period_millis > 0 {
@@ -257,7 +257,7 @@ impl StreamConfig {
                 let triple_ms = self.grace_period_millis * 3;
                 self.grace_period_timeout_secs = std::cmp::max(1, triple_ms.div_ceil(1000));
             } else if self.grace_period_millis / 1000 > self.grace_period_timeout_secs {
-                return Err(M3uFilterError::new(M3uFilterErrorKind::Info, format!("Grace time period timeout {} sec should be more than grace time period {} ms", self.grace_period_timeout_secs, self.grace_period_millis)));
+                return Err(TuliProxError::new(TuliProxErrorKind::Info, format!("Grace time period timeout {} sec should be more than grace time period {} ms", self.grace_period_timeout_secs, self.grace_period_millis)));
             }
         }
 
@@ -274,12 +274,12 @@ pub struct RateLimitConfig {
 }
 
 impl RateLimitConfig {
-    fn prepare(&self) -> Result<(), M3uFilterError> {
+    fn prepare(&self) -> Result<(), TuliProxError> {
         if self.period_millis == 0 {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Rate limiter period can't be 0".to_string()));
+            return Err(TuliProxError::new(TuliProxErrorKind::Info, "Rate limiter period can't be 0".to_string()));
         }
         if self.burst_size == 0 {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Rate limiter bust can't be 0".to_string()));
+            return Err(TuliProxError::new(TuliProxErrorKind::Info, "Rate limiter bust can't be 0".to_string()));
         }
         Ok(())
     }
@@ -300,7 +300,7 @@ pub struct ReverseProxyConfig {
 }
 
 impl ReverseProxyConfig {
-    fn prepare(&mut self, working_dir: &str) -> Result<(), M3uFilterError> {
+    fn prepare(&mut self, working_dir: &str) -> Result<(), TuliProxError> {
         if let Some(stream) = self.stream.as_mut() {
             stream.prepare()?;
         }
@@ -398,26 +398,26 @@ pub struct Config {
 }
 
 impl Config {
-    pub async fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) -> Result<(), M3uFilterError> {
+    pub async fn set_api_proxy(&mut self, api_proxy: Option<ApiProxyConfig>) -> Result<(), TuliProxError> {
         self.t_api_proxy = Arc::new(RwLock::new(api_proxy));
         self.check_target_user().await
     }
 
-    async fn check_username(&self, output_username: Option<&str>, target_name: &str) -> Result<(), M3uFilterError> {
+    async fn check_username(&self, output_username: Option<&str>, target_name: &str) -> Result<(), TuliProxError> {
         if let Some(username) = output_username {
             if let Some((_, config_target)) = self.get_target_for_username(username).await {
                 if config_target.name != target_name {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "User:{username} does not belong to target: {}", target_name);
+                    return create_tuliprox_error_result!(TuliProxErrorKind::Info, "User:{username} does not belong to target: {}", target_name);
                 }
             } else {
-                return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "User: {username} does not exist");
+                return create_tuliprox_error_result!(TuliProxErrorKind::Info, "User: {username} does not exist");
             }
             Ok(())
         } else {
             Ok(())
         }
     }
-    async fn check_target_user(&mut self) -> Result<(), M3uFilterError> {
+    async fn check_target_user(&mut self) -> Result<(), TuliProxError> {
         let check_homerun = self.hdhomerun.as_ref().is_some_and(|h| h.enabled);
         for source in &self.sources {
             for target in &source.targets {
@@ -566,26 +566,26 @@ impl Config {
         }
     }
 
-    fn check_unique_input_names(&mut self) -> Result<(), M3uFilterError> {
+    fn check_unique_input_names(&mut self) -> Result<(), TuliProxError> {
         let mut seen_names = HashSet::new();
         for source in &mut self.sources {
             for input in &source.inputs {
                 let input_name = input.name.trim().to_string();
                 if input_name.is_empty() {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input name required");
+                    return create_tuliprox_error_result!(TuliProxErrorKind::Info, "input name required");
                 }
                 if seen_names.contains(input_name.as_str()) {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
+                    return create_tuliprox_error_result!(TuliProxErrorKind::Info, "input names should be unique: {}", input_name);
                 }
                 seen_names.insert(input_name);
                 if let Some(aliases) = &input.aliases {
                     for alias in aliases {
                         let input_name = alias.name.trim().to_string();
                         if input_name.is_empty() {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input name required");
+                            return create_tuliprox_error_result!(TuliProxErrorKind::Info, "input name required");
                         }
                         if seen_names.contains(input_name.as_str()) {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "input names should be unique: {}", input_name);
+                            return create_tuliprox_error_result!(TuliProxErrorKind::Info, "input names should be unique: {}", input_name);
                         }
                         seen_names.insert(input_name);
                     }
@@ -595,7 +595,7 @@ impl Config {
         Ok(())
     }
 
-    fn check_unique_target_names(&mut self) -> Result<HashSet<String>, M3uFilterError> {
+    fn check_unique_target_names(&mut self) -> Result<HashSet<String>, TuliProxError> {
         let mut seen_names = HashSet::new();
         let default_target_name = default_as_default();
         for source in &self.sources {
@@ -603,11 +603,11 @@ impl Config {
                 // check target name is unique
                 let target_name = target.name.trim().to_string();
                 if target_name.is_empty() {
-                    return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target name required");
+                    return create_tuliprox_error_result!(TuliProxErrorKind::Info, "target name required");
                 }
                 if !default_target_name.eq_ignore_ascii_case(target_name.as_str()) {
                     if seen_names.contains(target_name.as_str()) {
-                        return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "target names should be unique: {}", target_name);
+                        return create_tuliprox_error_result!(TuliProxErrorKind::Info, "target names should be unique: {}", target_name);
                     }
                     seen_names.insert(target_name);
                 }
@@ -616,13 +616,13 @@ impl Config {
         Ok(seen_names)
     }
 
-    fn check_scheduled_targets(&mut self, target_names: &HashSet<String>) -> Result<(), M3uFilterError> {
+    fn check_scheduled_targets(&mut self, target_names: &HashSet<String>) -> Result<(), TuliProxError> {
         if let Some(schedules) = &self.schedules {
             for schedule in schedules {
                 if let Some(targets) = &schedule.targets {
                     for target_name in targets {
                         if !target_names.contains(target_name) {
-                            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "Unknown target name in scheduler: {}", target_name);
+                            return create_tuliprox_error_result!(TuliProxErrorKind::Info, "Unknown target name in scheduler: {}", target_name);
                         }
                     }
                 }
@@ -634,12 +634,12 @@ impl Config {
     /**
     *  if `include_computed` set to true for `app_state`
     */
-    pub fn prepare(&mut self, include_computed: bool) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, include_computed: bool) -> Result<(), TuliProxError> {
         let work_dir = &self.working_dir;
         self.working_dir = file_utils::get_working_path(work_dir);
         if include_computed {
             self.t_access_token_secret = generate_secret();
-            self.t_encrypt_secret = <&[u8] as TryInto<[u8; 16]>>::try_into(&generate_secret()[0..16]).map_err(|err| M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()))?;
+            self.t_encrypt_secret = <&[u8] as TryInto<[u8; 16]>>::try_into(&generate_secret()[0..16]).map_err(|err| TuliProxError::new(TuliProxErrorKind::Info, err.to_string()))?;
             self.prepare_custom_stream_response();
         }
         self.prepare_directories();
@@ -678,7 +678,7 @@ impl Config {
         set_directory(&mut self.user_config_dir, "user_config", &self.working_dir);
     }
 
-    fn prepare_hdhomerun(&mut self) -> Result<(), M3uFilterError> {
+    fn prepare_hdhomerun(&mut self) -> Result<(), TuliProxError> {
         if let Some(hdhomerun) = self.hdhomerun.as_mut() {
             if hdhomerun.enabled {
                 hdhomerun.prepare(self.api.port)?;
@@ -687,7 +687,7 @@ impl Config {
         Ok(())
     }
 
-    fn prepare_sources(&mut self, include_computed: bool) -> Result<(), M3uFilterError> {
+    fn prepare_sources(&mut self, include_computed: bool) -> Result<(), TuliProxError> {
         // prepare sources and set id's
         let mut source_index: u16 = 1;
         let mut target_index: u16 = 1;
@@ -706,7 +706,7 @@ impl Config {
         Ok(())
     }
 
-    fn prepare_templates(&mut self) -> Result<(), M3uFilterError> {
+    fn prepare_templates(&mut self) -> Result<(), TuliProxError> {
         if let Some(templates) = &mut self.templates {
             match prepare_templates(templates) {
                 Ok(tmplts) => {
@@ -720,14 +720,14 @@ impl Config {
         Ok(())
     }
 
-    fn prepare_web(&mut self) -> Result<(), M3uFilterError> {
+    fn prepare_web(&mut self) -> Result<(), TuliProxError> {
         if let Some(web_ui_config) = self.web_ui.as_mut() {
             web_ui_config.prepare(&self.t_config_path)?;
         }
         Ok(())
     }
 
-    fn prepare_video_config(&mut self) -> Result<(), M3uFilterError> {
+    fn prepare_video_config(&mut self) -> Result<(), TuliProxError> {
         match &mut self.video {
             None => {
                 self.video = Some(VideoConfig {
@@ -793,7 +793,7 @@ impl Config {
 /// * `target_args` the program parameters given with `-target` parameter.
 /// * `sources` configured sources in config file
 ///
-pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigSource>) -> Result<ProcessTargets, M3uFilterError> {
+pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigSource>) -> Result<ProcessTargets, TuliProxError> {
     let mut enabled = true;
     let mut inputs: Vec<u16> = vec![];
     let mut targets: Vec<u16> = vec![];
@@ -820,7 +820,7 @@ pub fn validate_targets(target_args: Option<&Vec<String>>, sources: &Vec<ConfigS
 
         let missing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v == 0).map(|(k, _)| k.to_string()).collect();
         if !missing_targets.is_empty() {
-            return create_m3u_filter_error_result!(M3uFilterErrorKind::Info, "No target found for {}", missing_targets.join(", "));
+            return create_tuliprox_error_result!(TuliProxErrorKind::Info, "No target found for {}", missing_targets.join(", "));
         }
         // let processing_targets: Vec<String> = check_targets.iter().filter(|&(_, v)| *v != 0).map(|(k, _)| k.to_string()).collect();
         // info!("Processing targets {}", processing_targets.join(", "));
