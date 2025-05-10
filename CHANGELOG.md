@@ -1,13 +1,13 @@
 # Changelog
 # 2.2.6 (2025-04-xx)
-- !BREAKING_CHANGE! all docker images have now m3u-filter under `/app` 
+- !BREAKING_CHANGE! all docker images have now tuliprox under `/app` 
 - !BREAKING CHANGE! bandwidth `throttle_kbps` attribute for `reverse_proxy.stream` in  `config.yml`
   is now `throttle` and supports units. Allowed units are `KB/s`,`MB/s`,`KiB/s`,`MiB/s`,`kbps`,`mbps`,`Mibps`.
 Default unit is `kbps`.
 - !BREAKING_CHANGE!  `log` config `active_clients` renamed to `log_active_user`
 - !BREAKING_CHANGE! user has now the attribute `ui_enabled` to disable/enable web_ui for user.
   You need to migrate the user db if you have used `use_user_db:true`.
-  Set it to `false` run old m3u-filter version, then update m3u-filter and set `use_user_db:true`and start.
+  Set it to `false` run old tuliprox version, then update tuliprox and set `use_user_db:true`and start.
 - !BREAKING_CHANGE! `web_ui config` restructured and added `user_ui_enabled` attribute
 ```yaml
 web_ui:
@@ -175,9 +175,9 @@ ipcheck:
 - New custom streams `user_connections_exhausted` and `provider_connections_exhausted`added. 
 ```yaml
 custom_stream_response:
-  channel_unavailable: /home/m3u-filter/resources/channel_unavailable.ts
-  user_connections_exhausted: /home/m3u-filter/resources/user_connections_exhausted.ts
-  provider_connections_exhausted: /home/m3u-filter/resources/provider_connections_exhausted.ts
+  channel_unavailable: /home/tuliprox/resources/channel_unavailable.ts
+  user_connections_exhausted: /home/tuliprox/resources/user_connections_exhausted.ts
+  provider_connections_exhausted: /home/tuliprox/resources/provider_connections_exhausted.ts
 ```
 - input alias definition for same provider with same content but different credentials
 ```yaml
@@ -204,7 +204,7 @@ There are 2 batch input types  `xtream_batch` and `m3u_batch`.
 - sources:
 - inputs:
   - type: xtream_batch
-    url: 'file:///home/m3u-filter/config/my_provider_batch.csv'
+    url: 'file:///home/tuliprox/config/my_provider_batch.csv'
   targets:
   - name: test
 ```
@@ -220,7 +220,7 @@ my_provider_2;user2;password2;http://my_provider_2.com:8080;1;0
 - sources:
 - inputs:
   - type: m3u_batch
-    url: 'file:///home/m3u-filter/config/my_provider_batch.csv'
+    url: 'file:///home/tuliprox/config/my_provider_batch.csv'
   targets:
   - name: test
 ```
@@ -318,13 +318,13 @@ server:
   host: 192.169.1.9
   port: '8901'
   timezone: Europe/Paris
-  message: Welcome to m3u-filter
+  message: Welcome to tuliprox
 - name: external
   protocol: https
   host: m3ufilter.mydomain.tv
   port: '443'
   timezone: Europe/Paris
-  message: Welcome to m3u-filter
+  message: Welcome to tuliprox
   path: m3uflt
 ```
 - Added Active clients count (for reverse proxy mode users) which is now displayed in `/status`  and can be logged with setting
@@ -430,7 +430,7 @@ reverse_proxy:
 
 # 2.0.10 (2024-12-03)
 - added Target Output Option `m3u_include_type_in_url`, default false. This adds `live`, `movie`, `series` to the url of the stream in reverse proxy mode.
-- added Target Output Option `m3u_mask_redirect_url`, default false. The urls are pointed to m3u-filter in redirect mode. In stream request a redirect response is send. Usefully if you want to track calls in redirect mode.
+- added Target Output Option `m3u_mask_redirect_url`, default false. The urls are pointed to tuliprox in redirect mode. In stream request a redirect response is send. Usefully if you want to track calls in redirect mode.
 - fixed xtream api redirect url problem.
 
 # 2.0.9 (2024-12-01)
@@ -602,7 +602,7 @@ server:
   https_port:
   rtmp_port:
   timezone: Europe/Paris
-  message: Welcome to m3u-filter
+  message: Welcome to tuliprox
 user:
   - target: pl1
     credentials:
@@ -614,7 +614,7 @@ user:
 
 # Changelog
 # v1.0.0(2023-04-27)
-* Added target argument for command line. `m3u-filter -t <target_name> -t <target_name>`. Target names should be provided in the config.
+* Added target argument for command line. `tuliprox -t <target_name> -t <target_name>`. Target names should be provided in the config.
 * Added filter to mapper definition.
 * Refactored filter parsing.
 * Fixed sort after mapping group names.

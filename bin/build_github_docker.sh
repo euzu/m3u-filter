@@ -13,8 +13,8 @@ declare -A ARCHITECTURES=(
 )
 
 declare -A BUILDS=(
-    [LINUX]="m3u-filter:scratch-final m3u-filter-alpine:alpine-final"
-    [AARCH64]="m3u-filter-aarch64:scratch-final"
+    [LINUX]="tuliprox:scratch-final tuliprox-alpine:alpine-final"
+    [AARCH64]="tuliprox-aarch64:scratch-final"
 )
 
 cd "$FRONTEND_DIR" && rm -rf build && yarn  && yarn build
@@ -47,7 +47,7 @@ for PLATFORM in "${!ARCHITECTURES[@]}"; do
   cargo clean || true
   env RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target "$ARCHITECTURE"
 
-  BINARY_PATH="${WORKING_DIR}/target/${ARCHITECTURE}/release/m3u-filter"
+  BINARY_PATH="${WORKING_DIR}/target/${ARCHITECTURE}/release/tuliprox"
   if [ ! -f "$BINARY_PATH" ]; then
       echo "🧨 Error: Binary $BINARY_PATH does not exist."
       exit 1
@@ -89,7 +89,7 @@ done
 # Clean up
 echo "🗑 Cleaning up Docker context..."
 rm -rf "${DOCKER_DIR}/web"
-rm -f "${DOCKER_DIR}/m3u-filter"
+rm -f "${DOCKER_DIR}/tuliprox"
 rm -rf "${DOCKER_DIR}/resources"
 
 echo "🎉 Docker images for version ${VERSION} have been successfully built, tagged, and pushed."

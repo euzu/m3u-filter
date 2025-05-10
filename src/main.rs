@@ -32,7 +32,7 @@ const LOG_ERROR_LEVEL_MOD: &[&str] = &[
 
 
 #[derive(Parser)]
-#[command(name = "m3u-filter")]
+#[command(name = "tuliprox")]
 #[command(author = "euzu <euzu@proton.me>")]
 #[command(version)]
 #[command(about = "Extended M3U playlist filter", long_about = None)]

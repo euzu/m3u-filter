@@ -10,7 +10,7 @@ export interface UiConfig {
 
 export const DefaultUiConfig: UiConfig = {
     languages: ["en", "de", "fr", "tr", "es", "it", "ru"],
-    app_title: "m3u-filter",
+    app_title: "tuliprox",
     api: {
         apiUrl: "/api/v1/",
         authUrl: "/auth/"

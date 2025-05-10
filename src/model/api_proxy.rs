@@ -352,7 +352,7 @@ impl ApiProxyServerInfo {
            self.timezone = "UTC".to_string();
        }
        if self.message.is_empty() {
-           self.message = "Welcome to m3u-filter".to_string();
+           self.message = "Welcome to tuliprox".to_string();
        }
        if let Some(path) = &self.path {
            if path.trim().is_empty() {

@@ -1,6 +1,6 @@
-# <img src="https://github.com/user-attachments/assets/8ef9ea79-62ff-4298-978f-22326c5c3d02" height="24" /> **m3u-filter** - A Powerful Playlist Processing & Proxy Tool
+# <img src="https://github.com/user-attachments/assets/8ef9ea79-62ff-4298-978f-22326c5c3d02" height="24" /> **tuliprox** - A Powerful Playlist Processing & Proxy Tool
 
-**m3u-filter** is a flexible and efficient tool built in Rust 🦀,
+**tuliprox** is a flexible and efficient tool built in Rust 🦀,
 designed for processing, filtering, and serving media playlists with minimal resource usage.
 
 <p align="center">
@@ -34,7 +34,7 @@ Define complex filters using expressive logic, e.g.:
 
 ## Command line Arguments
 ```
-Usage: m3u-filter [OPTIONS]
+Usage: tuliprox [OPTIONS]
 
 Options:
   -p, --config-path <CONFIG_PATH>  The config directory
@@ -56,7 +56,7 @@ Options:
 For running in cli mode, you need to define a `config.yml` file which can be inside config directory next to the executable or provided with the
 `-c` cli argument.
 
-For running specific targets use the `-t` argument like `m3u-filter -t <target_name> -t <other_target_name>`.
+For running specific targets use the `-t` argument like `tuliprox -t <target_name> -t <other_target_name>`.
 Target names should be provided in the config. The -t option overrides `enabled` attributes of `input` and `target` elements.
 This means, even disabled inputs and targets are processed when the given target name as cli argument matches a target.
 
@@ -85,7 +85,7 @@ Default is `0`.
 If you process the same provider multiple times each thread uses a connection. Keep in mind that you hit the provider max-connection.
 
 ### 1.2. `api`
-`api` contains the `server-mode` settings. To run `m3u-filter` in `server-mode` you need to start it with the `-s`cli argument.
+`api` contains the `server-mode` settings. To run `tuliprox` in `server-mode` you need to start it with the `-s`cli argument.
 -`api: {host: localhost, port: 8901, web_root: ./web}`
 
 ### 1.3. `working_dir`
@@ -238,7 +238,7 @@ LRU-Cache is for resources. If it is `enabled`, the resources/images are persist
 In an LRU cache, the least recently used items are evicted to make room for new items if the cache `size`is exceeded.
 
 #### 1.6.3 `resource_rewrite_disabled`
-If you have m3u-filter behind a reverse proxy and dont want rewritten resource urls inside responses, you can disable the resource_url rewrite.
+If you have tuliprox behind a reverse proxy and dont want rewritten resource urls inside responses, you can disable the resource_url rewrite.
 Default value is false.
 If you set it `true` `cache` is disabled! Because the cache cant work without rewritten urls.
 
@@ -297,7 +297,7 @@ web_auth:
 
 - `web_auth` can be deactivated if `enabled` is set to `false`. If not set default is `true`.
 - `secret` is used for jwt token generation.
-- `userfile` is the file where the ui users are stored. if the filename is not absolute `m3u-filter` will look into the `config_dir`. if `userfile`is not given the default value is `user.txt`
+- `userfile` is the file where the ui users are stored. if the filename is not absolute `tuliprox` will look into the `config_dir`. if `userfile`is not given the default value is `user.txt`
 
 You can generate a secret for jwt token for example with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
@@ -310,12 +310,12 @@ nobody: $argon2id$v=$argon2id$v=19$m=19456,t=2,p=1$Y2FROE83ZDQ1c2VaYmJ4VU9YdHpuZ
 
 The password can be generated with
 ```shell
-./m3u-filter --genpwd`
+./tuliprox --genpwd`
 ```
 
 or with docker
 ```shell
-docker container exec -it m3u-filter ./m3u-filter --genpwd
+docker container exec -it tuliprox ./tuliprox --genpwd
 ```
 
 The encrypted pasword needs to be added manually into the users file.
@@ -364,9 +364,9 @@ and add it to the `config.yml`.
 
 ```yaml
 custom_stream_response:
-  channel_unavailable: /home/m3u-filter/channel_unavailable.ts
-  user_connections_exhausted: /home/m3u-filter/user_connections_exhausted.ts
-  provider_connections_exhausted: /home/m3u-filter/provider_connections_exhausted.ts
+  channel_unavailable: /home/tuliprox/channel_unavailable.ts
+  user_connections_exhausted: /home/tuliprox/user_connections_exhausted.ts
+  provider_connections_exhausted: /home/tuliprox/provider_connections_exhausted.ts
 ```
 
 ### 1.15 `user_config_dir`
@@ -419,7 +419,7 @@ HdHomeRun device config has the following attributes:
 - `firmware_version`: _optional_
 - `device_type`: _optional_
 - `device_udn`: _optional_
-- `port`: _optional_, if not given the m3u-filter-server port is incremented for each device.
+- `port`: _optional_, if not given the tuliprox-server port is incremented for each device.
 
 
 ## 2. `source.yml`
@@ -543,7 +543,7 @@ There are 2 batch input types  `xtream_batch` and `m3u_batch`.
 - sources:
 - inputs:
   - type: xtream_batch
-    url: 'file:///home/m3u-filter/config/my_provider_batch.csv'
+    url: 'file:///home/tuliprox/config/my_provider_batch.csv'
   targets:
   - name: test
 ```
@@ -559,7 +559,7 @@ my_provider_2;user2;password2;http://my_provider_2.com:8080;1;0
 - sources:
 - inputs:
   - type: m3u_batch
-    url: 'file:///home/m3u-filter/config/my_provider_batch.csv'
+    url: 'file:///home/tuliprox/config/my_provider_batch.csv'
   targets:
   - name: test
 ```
@@ -1131,7 +1131,7 @@ mappings:
 
 ## 3. Api-Proxy Config
 
-If you use m3u-filter to deliver playlists, we require a configuration to provide the necessary server information, rewrite URLs in reverse proxy mode, and define users who can access the API.
+If you use tuliprox to deliver playlists, we require a configuration to provide the necessary server information, rewrite URLs in reverse proxy mode, and define users who can access the API.
 
 For this purpose, we use the `api-proxy.yml` configuration.
 
@@ -1147,13 +1147,13 @@ server:
     host: 192.169.1.9
     port: '8901'
     timezone: Europe/Paris
-    message: Welcome to m3u-filter
+    message: Welcome to tuliprox
   - name: external
     protocol: https
     host: m3ufilter.mydomain.tv
     port: '443'
     timezone: Europe/Paris
-    message: Welcome to m3u-filter
+    message: Welcome to tuliprox
     path: m3uflt
 ```
 
@@ -1215,11 +1215,11 @@ If you use the endpoints through rest calls, you can use, for the sake of simpli
 When you define credentials for a `target`, ensure that this target has
 `output` format  `xtream`or `m3u`.
 
-The `proxy` property can be `reverse`or `redirect`. `reverse` means the streams are going through m3u-filter, `redirect` means the streams are comming from your provider.
+The `proxy` property can be `reverse`or `redirect`. `reverse` means the streams are going through tuliprox, `redirect` means the streams are comming from your provider.
 
-If you use `https` you need a ssl terminator. `m3u-filter` does not support https traffic.
+If you use `https` you need a ssl terminator. `tuliprox` does not support https traffic.
 
-If you use a ssl-terminator or proxy in front of m3u-filter you can set a `path` to make the configuration of your proxy simpler.
+If you use a ssl-terminator or proxy in front of tuliprox you can set a `path` to make the configuration of your proxy simpler.
 For example you use `nginx` as your reverse proxy.
 
 `api-proxy.yml`
@@ -1230,13 +1230,13 @@ server:
   host: 192.169.1.9
   port: '8901'
   timezone: Europe/Paris
-  message: Welcome to m3u-filter
+  message: Welcome to tuliprox
 - name: external
   protocol: https
   host: m3ufilter.mydomain.tv
   port: '443'
   timezone: Europe/Paris
-  message: Welcome to m3u-filter
+  message: Welcome to tuliprox
   path: m3uflt
 user:
   - target: xc_m3u
@@ -1273,13 +1273,13 @@ server:
     host: 192.168.0.3
     port: 80
     timezone: Europe/Paris
-    message: Welcome to m3u-filter
+    message: Welcome to tuliprox
   - name: external
     protocol: https
     host: my_external_domain.com
     port: 443
     timezone: Europe/Paris
-    message: Welcome to m3u-filter
+    message: Welcome to tuliprox
     path: /m3uflt
   - target: pl1
     credentials:
@@ -1306,7 +1306,7 @@ Log Level has module support like `m3u_filter::util=error,m3u_filter::filter=deb
 
 ## 6. Web-UI
 
-The WebUI is for configuration the m3u-filter config.
+The WebUI is for configuration the tuliprox config.
 
 If you enable authentication, users can log in with their accounts (you can disable login per user),
 and configure their playlist.
@@ -1317,13 +1317,13 @@ and configure their playlist.
 Change into the root directory and run:
 
 ```shell
-docker build --rm -f docker/Dockerfile -t m3u-filter .  
+docker build --rm -f docker/Dockerfile -t tuliprox .  
 ```
 
 This will build the complete project and create a docker image.
 
 To start the container, you can use the `docker-compose.yml`
-But you need to change `image: ghcr.io/euzu/m3u-filter:latest` to `image: m3u-filter`
+But you need to change `image: ghcr.io/euzu/tuliprox:latest` to `image: tuliprox`
 
 
 ### Manual build static binary for docker
@@ -1358,41 +1358,41 @@ Targets are
 
 ```shell
 # Build for a specific architecture
-docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=x86_64-unknown-linux-musl .
+docker build --rm -f docker/Dockerfile -t tuliprox --target scratch-final --build-arg RUST_TARGET=x86_64-unknown-linux-musl .
 
-docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=aarch64-unknown-linux-musl .
+docker build --rm -f docker/Dockerfile -t tuliprox --target scratch-final --build-arg RUST_TARGET=aarch64-unknown-linux-musl .
 
-docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=armv7-unknown-linux-musleabihf .
+docker build --rm -f docker/Dockerfile -t tuliprox --target scratch-final --build-arg RUST_TARGET=armv7-unknown-linux-musleabihf .
 
-docker build --rm -f docker/Dockerfile -t m3u-filter --target scratch-final --build-arg RUST_TARGET=x86_64-apple-darwin .
+docker build --rm -f docker/Dockerfile -t tuliprox --target scratch-final --build-arg RUST_TARGET=x86_64-apple-darwin .
 ```
 ##### docker-compose.yml
 ```docker
 version: '3'
 services:
-  m3u-filter:
-    container_name: m3u-filter
-    image: m3u-filter
+  tuliprox:
+    container_name: tuliprox
+    image: tuliprox
     user: "133:144"
     working_dir: /app
     volumes:
-      - /opt/m3u-filter/config:/app/config
-      - /opt/m3u-filter/data:/app/data
-      - /opt/m3u-filter/backup:/app/backup
-      - /opt/m3u-filter/downloads:/app/downloads
+      - /opt/tuliprox/config:/app/config
+      - /opt/tuliprox/data:/app/data
+      - /opt/tuliprox/backup:/app/backup
+      - /opt/tuliprox/downloads:/app/downloads
     environment:
       - TZ=Europe/Paris
     ports:
       - "8901:8901"
     restart: unless-stopped
 ```
-This example is for the local image, the official can be found under `ghcr.io/euzu/m3u-filter:latest`
+This example is for the local image, the official can be found under `ghcr.io/euzu/tuliprox:latest`
 
-If you want to use m3u-filter with docker-compose, there is a `--healthcheck` argument for healthchecks
+If you want to use tuliprox with docker-compose, there is a `--healthcheck` argument for healthchecks
 
 ```docker
     healthcheck:
-      test: ["CMD", "/app/m3u-filter", "-p", "/app/config" "--healthcheck"]  
+      test: ["CMD", "/app/tuliprox", "-p", "/app/config" "--healthcheck"]  
       interval: 30s  
       timeout: 10s   
       retries: 3     
@@ -1406,29 +1406,29 @@ To get it started in a Alpine 3.19 LXC
 apk update
 apk add nano git yarn bash cargo perl-local-lib perl-module-build make 
 cd /opt
-git clone https://github.com/euzu/m3u-filter.git
-cd /opt/m3u-filter/bin
+git clone https://github.com/euzu/tuliprox.git
+cd /opt/tuliprox/bin
 ./build_lin.sh
-ln -s /opt/m3u-filter/target/release/m3u-filter /bin/m3u-filter 
-cd /opt/m3u-filter/frontend
+ln -s /opt/tuliprox/target/release/tuliprox /bin/tuliprox 
+cd /opt/tuliprox/frontend
 yarn
 yarn build
-ln -s /opt/m3u-filter/frontend/build /web
-ln -s /opt/m3u-filter/config /config
+ln -s /opt/tuliprox/frontend/build /web
+ln -s /opt/tuliprox/config /config
 mkdir /data
 mkdir /backup
 ```
 
-**Creating a service, create /etc/init.d/m3u-filter**
+**Creating a service, create /etc/init.d/tuliprox**
 ```shell
 #!/sbin/openrc-run
-name=m3u-filter
-command="/bin/m3u-filter"
+name=tuliprox
+command="/bin/tuliprox"
 command_args="-p /config -s"
 command_user="root"
 command_background="yes"
-output_log="/var/log/m3u-filter/m3u-filter.log"
-error_log="/var/log/m3u-filter/m3u-filter.log"
+output_log="/var/log/tuliprox/tuliprox.log"
+error_log="/var/log/tuliprox/tuliprox.log"
 supervisor="supervise-daemon"
 
 depend() {
@@ -1437,13 +1437,13 @@ depend() {
 
 start_pre() {
     checkpath --directory --owner $command_user:$command_user --mode 0775 \
-           /run/m3u-filter /var/log/m3u-filter
+           /run/tuliprox /var/log/tuliprox
 }
 ```
 
 **then add it to boot**
 ```shell
-rc-update add m3u-filter default
+rc-update add tuliprox default
 ```
 
 
@@ -1476,10 +1476,10 @@ env  RUSTFLAGS="--remap-path-prefix $HOME=~" cross build --release --target armv
 ```
 
 # Different Scenarios
-## Using `m3u-filter` with a m3u provider.
+## Using `tuliprox` with a m3u provider.
 todo.
 
-## Using `m3u-filter` with a xtream provider.
+## Using `tuliprox` with a xtream provider.
 
 You have a provider who supports the xtream api.
 
@@ -1490,7 +1490,7 @@ The provider gives you:
 - epg_url: `http://fantastic.provider.xyz:8080/xmltv.php?username=tvjunkie&password=junkie.secret`
 
 
-To use `m3u-filter` you need to create the configuration.
+To use `tuliprox` you need to create the configuration.
 The configuration consist of 4 files.
 - config.yml
 - source.yml
@@ -1507,7 +1507,7 @@ working_dir: ./data
 update_on_boot: true
 ```
 
-This configuration starts `m3u-filter`and listens on the 8901 port. The downloaded playlists are stored inside the `data`-folder in the current working directory.
+This configuration starts `tuliprox`and listens on the 8901 port. The downloaded playlists are stored inside the `data`-folder in the current working directory.
 The property `update_on_boot` is optional and can be helpful in the beginning until you have found a working configuration. I prefer to set it to false.
 
 Now we have to define the sources we want to import. We do this inside `source.yml`
@@ -1549,13 +1549,13 @@ server:
   host: 192.168.1.41
   port: '8901'
   timezone: Europe/Berlin
-  message: Welcome to m3u-filter
+  message: Welcome to tuliprox
 - name: external
   protocol: https
   host: tvjunkie.dyndns.org
   port: '443'
   timezone: Europe/Berlin
-  message: Welcome to m3u-filter
+  message: Welcome to tuliprox
 user:
 - target: all_channels
   credentials:
@@ -1568,11 +1568,11 @@ user:
     proxy: redirect
     server: external
 ```
-We have defined 2 server configurations. The `default` configuration is intended for use in the local network, the IP address is that of the computer on which `m3u-filter` is running. The `external` configuration is optional and is only required for access from outside your local network. External access requires port forwarding on your router and an SSL terminator proxy such as nginx and a dyndns provider configured from your router if you do not have a static IP address (this is outside the scope of this manual).
+We have defined 2 server configurations. The `default` configuration is intended for use in the local network, the IP address is that of the computer on which `tuliprox` is running. The `external` configuration is optional and is only required for access from outside your local network. External access requires port forwarding on your router and an SSL terminator proxy such as nginx and a dyndns provider configured from your router if you do not have a static IP address (this is outside the scope of this manual).
 
 The next section of the `api-proxy.yml` contains the user definition. We can define users for each `target` from the `source.yml`.
 This means that each `user` can only access one `target` from `source.yml`.  We have named our target `all_channels` in `source.yml` and used this name for the user definition.  We have defined 2 users, one for local access and one for external access.
-We have set the proxy type to `redirect`, which means that the client will be redirected to the original provider URL when opening a stream. If you set the proxy type to `reverse`, the stream will be streamed from the provider through `m3u-filter`. Based on the hardware you are running `m3u-filter` on, you can opt for the proxy type `reverse`. But you should start with `redirect` first until everything works well.
+We have set the proxy type to `redirect`, which means that the client will be redirected to the original provider URL when opening a stream. If you set the proxy type to `reverse`, the stream will be streamed from the provider through `tuliprox`. Based on the hardware you are running `tuliprox` on, you can opt for the proxy type `reverse`. But you should start with `redirect` first until everything works well.
 
 If no server is specified for a user, the default one is taken.
 
@@ -1583,7 +1583,7 @@ All this information are now defined in `api-proxy.yml`.
 - username: `xt`
 - password: `xt.secret`
 
-Start `m3u-filter`,  fire up your IPTV-Application, enter credentials and watch.
+Start `tuliprox`,  fire up your IPTV-Application, enter credentials and watch.
 
 # It works well, but I don't need all the channels, how can I filter?
 
@@ -1614,7 +1614,7 @@ Ok now let's start.
 
 First: We have a lot of channel groups we dont need.
 
-`m3u-filter` excludes or includes groups or channels based on filter. Usable fields for filter are `Group`, `Name` and `Title`.
+`tuliprox` excludes or includes groups or channels based on filter. Usable fields for filter are `Group`, `Name` and `Title`.
 The simplest filter is:
 
 `<Field> ~ <Regular Expression>`.  For example  `Group ~ ".*"`. This means include all categories.
