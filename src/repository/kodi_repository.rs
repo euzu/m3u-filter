@@ -1,5 +1,5 @@
 use crate::tuliprox_error::{create_tuliprox_error_result, info_err};
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::{ApiProxyServerInfo, ProxyUserCredentials};
 use crate::model::{ClusterFlags, Config, ConfigTarget, StrmTargetOutput};
 use crate::model::{
@@ -404,12 +404,12 @@ fn extract_item_info(pli: &mut PlaylistItem) -> StrmItemInfo {
     }
 }
 
-async fn prepare_strm_output_directory(path: &Path) -> Result<(), M3uFilterError> {
+async fn prepare_strm_output_directory(path: &Path) -> Result<(), TuliProxError> {
     // Ensure the directory exists
     if let Err(e) = tokio::fs::create_dir_all(path).await {
         error!("Failed to create directory {path:?}: {e}");
         return create_tuliprox_error_result!(
-            M3uFilterErrorKind::Notify,
+            TuliProxErrorKind::Notify,
             "Error creating STRM directory: {e}"
         );
     }
@@ -575,7 +575,7 @@ pub async fn kodi_write_strm_playlist(
     target_output: &StrmTargetOutput,
     cfg: &Config,
     new_playlist: &mut [PlaylistGroup],
-) -> Result<(), M3uFilterError> {
+) -> Result<(), TuliProxError> {
     if new_playlist.is_empty() {
         return Ok(());
     }

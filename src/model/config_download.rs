@@ -1,4 +1,4 @@
-use crate::tuliprox_error::{create_tuliprox_error_result, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, TuliProxError, TuliProxErrorKind};
 use regex::Regex;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ impl VideoConfig {
     /// # Panics
     ///
     /// Will panic if default `RegEx` gets invalid
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self) -> Result<(), TuliProxError> {
         if self.extensions.is_empty() {
             self.extensions = ["mkv", "avi", "mp4", "mpeg", "divx", "mov"]
                 .iter()
@@ -57,7 +57,7 @@ impl VideoConfig {
                                 downl.t_re_episode_pattern = Some(pattern);
                             }
                             Err(err) => {
-                                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {episode_pattern} {err}");
+                                return create_tuliprox_error_result!(TuliProxErrorKind::Info, "cant parse regex: {episode_pattern} {err}");
                             }
                         }
                     }

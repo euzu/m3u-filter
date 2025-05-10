@@ -6,7 +6,7 @@ use crate::api::model::config::{ServerConfig, ServerInputConfig, ServerSourceCon
 use crate::api::model::request::{PlaylistRequest, PlaylistRequestType};
 use crate::auth::access_token::create_access_token;
 use crate::auth::authenticator::validator_admin;
-use crate::tuliprox_error::M3uFilterError;
+use crate::tuliprox_error::TuliProxError;
 use crate::model::StatusCheck;
 use crate::model::XtreamPlaylistItem;
 use crate::model::{validate_targets, Config, ConfigDto, ConfigInput, ConfigInputOptions, ConfigSource, ConfigTarget, InputType};
@@ -23,7 +23,7 @@ use serde_json::json;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<M3uFilterError> {
+fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, file_path: &str) -> Option<TuliProxError> {
     match config_reader::save_api_proxy(file_path, backup_dir, api_proxy) {
         Ok(()) => {}
         Err(err) => {
@@ -34,7 +34,7 @@ fn intern_save_config_api_proxy(backup_dir: &str, api_proxy: &ApiProxyConfig, fi
     None
 }
 
-fn intern_save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Option<M3uFilterError> {
+fn intern_save_config_main(file_path: &str, backup_dir: &str, cfg: &ConfigDto) -> Option<TuliProxError> {
     match config_reader::save_main_config(file_path, backup_dir, cfg) {
         Ok(()) => {}
         Err(err) => {

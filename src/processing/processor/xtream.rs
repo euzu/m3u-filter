@@ -1,5 +1,5 @@
 use crate::tuliprox_error::{info_err, notify_err};
-use crate::tuliprox_error::{str_to_io_error, to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{str_to_io_error, to_io_error, TuliProxError, TuliProxErrorKind};
 use crate::model::{Config, ConfigInput};
 use crate::model::{FetchedPlaylist, PlaylistEntry, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::repository::storage::get_input_storage_path;
@@ -15,7 +15,7 @@ use crate::repository::xtream_repository::xtream_get_record_file_path;
 use crate::utils::file_utils::append_or_crate_file;
 use crate::utils::xtream;
 
-pub(in crate::processing) async fn playlist_resolve_download_playlist_item(client: Arc<reqwest::Client>, pli: &PlaylistItem, input: &ConfigInput, errors: &mut Vec<M3uFilterError>, resolve_delay: u16, cluster: XtreamCluster) -> Option<String> {
+pub(in crate::processing) async fn playlist_resolve_download_playlist_item(client: Arc<reqwest::Client>, pli: &PlaylistItem, input: &ConfigInput, errors: &mut Vec<TuliProxError>, resolve_delay: u16, cluster: XtreamCluster) -> Option<String> {
     let mut result = None;
     let provider_id = pli.get_provider_id()?;
     if let Some(info_url) = xtream::get_xtream_player_api_info_url(input, cluster, provider_id) {
@@ -83,7 +83,7 @@ pub(in crate::processing) fn should_update_info(pli: &mut PlaylistItem, processe
          || *old_timestamp.unwrap() != last_modified.unwrap(), provider_id, last_modified.unwrap_or(0))
 }
 
-pub(in crate::processing) async fn read_processed_info_ids<V, F>(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>,
+pub(in crate::processing) async fn read_processed_info_ids<V, F>(cfg: &Config, errors: &mut Vec<TuliProxError>, fpl: &FetchedPlaylist<'_>,
                                                                  item_type: PlaylistItemType, extract_ts: F) -> HashMap<u32, u64>
 where
     F: Fn(&V) -> u64,

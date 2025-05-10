@@ -1,4 +1,4 @@
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind, handle_tuliprox_error_result_list};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind, handle_tuliprox_error_result_list};
 use crate::model::ConfigInput;
 use crate::model::config_target::ConfigTarget;
 
@@ -11,8 +11,8 @@ pub struct ConfigSource {
 
 impl ConfigSource {
     #[allow(clippy::cast_possible_truncation)]
-    pub fn prepare(&mut self, index: u16, include_computed: bool) -> Result<u16, M3uFilterError> {
-        handle_tuliprox_error_result_list!(M3uFilterErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16), include_computed)));
+    pub fn prepare(&mut self, index: u16, include_computed: bool) -> Result<u16, TuliProxError> {
+        handle_tuliprox_error_result_list!(TuliProxErrorKind::Info, self.inputs.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+(idx as u16), include_computed)));
         Ok(index + (self.inputs.len() as u16))
     }
 

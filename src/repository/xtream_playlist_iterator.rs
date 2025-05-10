@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use log::error;
 use crate::tuliprox_error::info_err;
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::{ProxyUserCredentials};
 use crate::model::{Config, ConfigTarget, TargetType};
 use crate::model::{XtreamCluster, XtreamPlaylistItem};
@@ -27,7 +27,7 @@ impl XtreamPlaylistIterator {
         target: &ConfigTarget,
         category_id: Option<u32>,
         user: &ProxyUserCredentials,
-    ) -> Result<Self, M3uFilterError> {
+    ) -> Result<Self, TuliProxError> {
         let xtream_output = target.get_xtream_output().ok_or_else(|| info_err!(format!("Unexpected: xtream output required for target {}", target.name)))?;
         if let Some(storage_path) = xtream_get_storage_path(config, target.name.as_str()) {
             let (xtream_path, idx_path) = xtream_get_file_paths(&storage_path, cluster);
@@ -90,7 +90,7 @@ pub async fn new(
     target: &ConfigTarget,
     category_id: Option<u32>,
     user: &ProxyUserCredentials,
-    ) -> Result<Self, M3uFilterError> {
+    ) -> Result<Self, TuliProxError> {
         Ok(Self {
             inner: XtreamPlaylistIterator::new(cluster, config, target, category_id, user).await?
         })

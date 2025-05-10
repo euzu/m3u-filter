@@ -1,6 +1,6 @@
 use log::warn;
 use regex::Regex;
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind, create_tuliprox_error_result};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind, create_tuliprox_error_result};
 use crate::utils::CONSTANTS;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -57,7 +57,7 @@ impl EpgSmartMatchConfig {
     /// let config = EpgSmartMatchConfig::new().unwrap();
     /// assert!(config.enabled);
     /// ```
-    pub fn new() -> Result<Self, M3uFilterError> {
+    pub fn new() -> Result<Self, TuliProxError> {
         let mut this = Self { enabled: true, ..Self::default() };
         this.prepare()?;
         Ok(this)
@@ -71,8 +71,8 @@ impl EpgSmartMatchConfig {
     ///
     /// # Returns
     ///
-    /// `Ok(())` if preparation succeeds, or an `M3uFilterError` if regex compilation fails.
-    pub fn prepare(&mut self) -> Result<(), M3uFilterError> {
+    /// `Ok(())` if preparation succeeds, or an `TuliProxError` if regex compilation fails.
+    pub fn prepare(&mut self) -> Result<(), TuliProxError> {
         if !self.enabled {
             return Ok(());
         }
@@ -99,7 +99,7 @@ impl EpgSmartMatchConfig {
             Some(regstr) => {
                 let re = regex::Regex::new(regstr.as_str());
                 if re.is_err() {
-                    return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "cant parse regex: {}", regstr);
+                    return create_tuliprox_error_result!(TuliProxErrorKind::Info, "cant parse regex: {}", regstr);
                 }
                 Some(re.unwrap())
             }
@@ -148,7 +148,7 @@ pub struct EpgConfig {
 }
 
 impl EpgConfig {
-    pub fn prepare(&mut self, include_computed: bool) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, include_computed: bool) -> Result<(), TuliProxError> {
         if include_computed {
             self.t_urls = self.url.as_ref().map_or_else(Vec::new, |epg_url| {
                 match epg_url {

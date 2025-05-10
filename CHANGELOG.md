@@ -321,7 +321,7 @@ server:
   message: Welcome to tuliprox
 - name: external
   protocol: https
-  host: m3ufilter.mydomain.tv
+  host: tuliprox.mydomain.tv
   port: '443'
   timezone: Europe/Paris
   message: Welcome to tuliprox

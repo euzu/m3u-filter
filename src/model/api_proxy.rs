@@ -1,5 +1,5 @@
 use crate::api::model::app_state::AppState;
-use crate::tuliprox_error::{create_tuliprox_error_result, info_err, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, info_err, TuliProxError, TuliProxErrorKind};
 use crate::model::{Config, ClusterFlags};
 use crate::repository::user_repository::{backup_api_user_db_file, get_api_user_db_path, load_api_user, merge_api_user};
 use crate::utils::default_as_true;
@@ -75,9 +75,9 @@ impl Display for ProxyType {
 }
 
 impl FromStr for ProxyType {
-    type Err = M3uFilterError;
+    type Err = TuliProxError;
 
-    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+    fn from_str(s: &str) -> Result<Self, TuliProxError> {
         if s == Self::REDIRECT {
             return Ok(Self::Redirect);
         }
@@ -95,7 +95,7 @@ impl FromStr for ProxyType {
             }
         }
 
-        create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+        create_tuliprox_error_result!(TuliProxErrorKind::Info, "Unknown ProxyType: {}", s)
     }
 }
 
@@ -170,16 +170,16 @@ impl Display for ProxyUserStatus {
 }
 
 impl FromStr for ProxyUserStatus {
-    type Err = M3uFilterError;
+    type Err = TuliProxError;
 
-    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+    fn from_str(s: &str) -> Result<Self, TuliProxError> {
         match s {
             Self::EXPIRED => Ok(Self::Expired),
             Self::BANNED => Ok(Self::Banned),
             Self::TRIAL => Ok(Self::Trial),
             Self::DISABLED => Ok(Self::Disabled),
             Self::PENDING => Ok(Self::Pending),
-            _ => create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown ProxyType: {}", s)
+            _ => create_tuliprox_error_result!(TuliProxErrorKind::Info, "Unknown ProxyType: {}", s)
         }
     }
 }
@@ -238,12 +238,12 @@ impl ProxyUserCredentials {
         }
     }
 
-    pub fn validate(&self) -> Result<(), M3uFilterError> {
+    pub fn validate(&self) -> Result<(), TuliProxError> {
         if self.username.is_empty() {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Username required".to_string()));
+            return Err(TuliProxError::new(TuliProxErrorKind::Info, "Username required".to_string()));
         }
         if self.password.is_empty() {
-            return Err(M3uFilterError::new(M3uFilterErrorKind::Info, "Password required".to_string()));
+            return Err(TuliProxError::new(TuliProxErrorKind::Info, "Password required".to_string()));
         }
         Ok(())
     }
@@ -323,7 +323,7 @@ pub struct ApiProxyServerInfo {
 
 impl ApiProxyServerInfo {
 
-   pub fn prepare(&mut self ) -> Result<(), M3uFilterError> {
+   pub fn prepare(&mut self ) -> Result<(), TuliProxError> {
        self.name = self.name.trim().to_string();
        if self.name.is_empty() {
            return Err(info_err!("Server info name is empty ".to_string()));
@@ -505,7 +505,7 @@ impl ApiProxyConfig {
         }
     }
 
-    pub fn prepare(&mut self, cfg: &Config) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, cfg: &Config) -> Result<(), TuliProxError> {
         let mut errors = Vec::new();
         if self.server.is_empty() {
             errors.push("No server info defined".to_string());

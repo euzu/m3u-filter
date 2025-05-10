@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::path::PathBuf;
 use crate::auth::user::UserCredential;
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind, create_tuliprox_error_result};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind, create_tuliprox_error_result};
 use crate::utils::file_utils;
 use crate::utils::file_utils::file_reader;
 
@@ -21,7 +21,7 @@ pub struct WebAuthConfig {
 }
 
 impl WebAuthConfig {
-    pub fn prepare(&mut self, config_path: &str) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, config_path: &str) -> Result<(), TuliProxError> {
         let userfile_name = self.userfile.as_ref().map_or_else(|| file_utils::get_default_user_file_path(config_path), std::borrow::ToOwned::to_owned);
         self.userfile = Some(userfile_name.clone());
 
@@ -29,7 +29,7 @@ impl WebAuthConfig {
         if !file_utils::path_exists(&userfile_path) {
             userfile_path = PathBuf::from(config_path).join(&userfile_name);
             if !file_utils::path_exists(&userfile_path) {
-                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Could not find userfile {}", &userfile_name);
+                return create_tuliprox_error_result!(TuliProxErrorKind::Info, "Could not find userfile {}", &userfile_name);
             }
         }
 
@@ -50,7 +50,7 @@ impl WebAuthConfig {
 
             self.t_users = Some(users);
         } else {
-            return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Could not read userfile {:?}", &userfile_path);
+            return create_tuliprox_error_result!(TuliProxErrorKind::Info, "Could not read userfile {:?}", &userfile_path);
         }
         Ok(())
     }

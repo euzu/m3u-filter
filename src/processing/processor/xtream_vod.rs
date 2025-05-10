@@ -1,4 +1,4 @@
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::{Config, ConfigTarget, InputType};
 use crate::model::{FetchedPlaylist, PlaylistItem, PlaylistItemType, XtreamCluster};
 use crate::processing::processor::xtream::{create_resolve_info_wal_files, playlist_resolve_download_playlist_item, read_processed_info_ids, should_update_info, write_info_content_to_wal_file};
@@ -17,7 +17,7 @@ use crate::utils::file_utils::file_writer;
 
 create_resolve_options_function_for_xtream_target!(vod);
 
-async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<M3uFilterError>, fpl: &FetchedPlaylist<'_>) -> HashMap<u32, u64> {
+async fn read_processed_vod_info_ids(cfg: &Config, errors: &mut Vec<TuliProxError>, fpl: &FetchedPlaylist<'_>) -> HashMap<u32, u64> {
     read_processed_info_ids(cfg, errors, fpl, PlaylistItemType::Video, |record: &InputVodInfoRecord| record.ts).await
 }
 
@@ -60,7 +60,7 @@ fn should_update_vod_info(pli: &mut PlaylistItem, processed_provider_ids: &HashM
     should_update_info(pli, processed_provider_ids, crate::model::XC_TAG_VOD_INFO_ADDED)
 }
 
-pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget, errors: &mut Vec<M3uFilterError>, fpl: &mut FetchedPlaylist<'_>) {
+pub async fn playlist_resolve_vod(client: Arc<reqwest::Client>, cfg: &Config, target: &ConfigTarget, errors: &mut Vec<TuliProxError>, fpl: &mut FetchedPlaylist<'_>) {
     let (resolve_movies, resolve_delay) = get_resolve_vod_options(target, fpl);
     if !resolve_movies { return; }
 

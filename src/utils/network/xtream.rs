@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::tuliprox_error::{str_to_io_error, M3uFilterError};
+use crate::tuliprox_error::{str_to_io_error, TuliProxError};
 use crate::model::{Config, ConfigInput, ConfigTarget};
 use crate::model::{PlaylistEntry, PlaylistGroup, XtreamCluster, XtreamPlaylistItem};
 use crate::processing::parser::xtream;
@@ -129,7 +129,7 @@ const ACTIONS: [(XtreamCluster, &str, &str); 3] = [
     (XtreamCluster::Video, crate::model::XC_ACTION_GET_VOD_CATEGORIES, crate::model::XC_ACTION_GET_VOD_STREAMS),
     (XtreamCluster::Series, crate::model::XC_ACTION_GET_SERIES_CATEGORIES, crate::model::XC_ACTION_GET_SERIES)];
 
-pub async fn get_xtream_playlist(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<M3uFilterError>) {
+pub async fn get_xtream_playlist(client: Arc<reqwest::Client>, input: &ConfigInput, working_dir: &str) -> (Vec<PlaylistGroup>, Vec<TuliProxError>) {
 
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);

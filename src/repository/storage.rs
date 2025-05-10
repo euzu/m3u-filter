@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::fmt::Write;
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::{Config};
 use crate::model::UUIDType;
 use crate::tuliprox_error::{notify_err};
@@ -54,7 +54,7 @@ pub(in crate::repository) fn get_target_id_mapping_file(target_path: &Path) -> P
     target_path.join(PathBuf::from(storage_const::FILE_ID_MAPPING))
 }
 
-pub fn ensure_target_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, M3uFilterError> {
+pub fn ensure_target_storage_path(cfg: &Config, target_name: &str) -> Result<PathBuf, TuliProxError> {
     if let Some(path) = get_target_storage_path(cfg, target_name) {
         if std::fs::create_dir_all(&path).is_err() {
             let msg = format!("Failed to save target data, can't create directory {path:?}");

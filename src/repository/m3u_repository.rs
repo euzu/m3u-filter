@@ -1,5 +1,5 @@
 use crate::tuliprox_error::{create_tuliprox_error,info_err};
-use crate::tuliprox_error::{str_to_io_error, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{str_to_io_error, TuliProxError, TuliProxErrorKind};
 use crate::model::ProxyUserCredentials;
 use crate::model::{Config, ConfigTarget, M3uTargetOutput};
 use crate::model::{M3uPlaylistItem, PlaylistGroup, PlaylistItem, PlaylistItemType};
@@ -18,7 +18,7 @@ use crate::repository::storage_const;
 
 macro_rules! cant_write_result {
     ($path:expr, $err:expr) => {
-        create_tuliprox_error!(M3uFilterErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
+        create_tuliprox_error!(TuliProxErrorKind::Notify, "failed to write m3u playlist: {} - {}", $path.to_str().unwrap() ,$err)
     }
 }
 
@@ -53,7 +53,7 @@ fn persist_m3u_playlist_as_text(cfg: &Config, target: &ConfigTarget, target_outp
     }
 }
 
-pub async fn m3u_write_playlist( cfg: &Config, target: &ConfigTarget, target_output: &M3uTargetOutput, target_path: &Path, new_playlist: &[PlaylistGroup]) -> Result<(), M3uFilterError> {
+pub async fn m3u_write_playlist( cfg: &Config, target: &ConfigTarget, target_output: &M3uTargetOutput, target_path: &Path, new_playlist: &[PlaylistGroup]) -> Result<(), TuliProxError> {
     if !new_playlist.is_empty() {
         let (m3u_path, idx_path) = m3u_get_file_paths(target_path);
         let m3u_playlist = new_playlist.iter()
@@ -85,7 +85,7 @@ pub async fn m3u_load_rewrite_playlist(
     cfg: &Config,
     target: &ConfigTarget,
     user: &ProxyUserCredentials,
-) -> Result<M3uPlaylistM3uTextIterator, M3uFilterError> {
+) -> Result<M3uPlaylistM3uTextIterator, TuliProxError> {
     M3uPlaylistM3uTextIterator::new(cfg, target, user).await
 }
 

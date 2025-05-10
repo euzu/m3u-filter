@@ -1,5 +1,5 @@
 use crate::tuliprox_error::info_err;
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind};
 use crate::model::{Config, ConfigTarget, TargetOutput};
 use crate::model::{PlaylistGroup, PlaylistItemType};
 use crate::model::Epg;
@@ -14,7 +14,7 @@ use crate::utils::request::{is_dash_url, is_hls_url};
 use std::path::Path;
 
 pub async fn persist_playlist(playlist: &mut [PlaylistGroup], epg: Option<&Epg>,
-                              target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<M3uFilterError>> {
+                              target: &ConfigTarget, cfg: &Config) -> Result<(), Vec<TuliProxError>> {
     let mut errors = vec![];
     let target_path = match ensure_target_storage_path(cfg, &target.name) {
         Ok(path) => path,

@@ -1,4 +1,4 @@
-use crate::tuliprox_error::{create_tuliprox_error_result, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, TuliProxError, TuliProxErrorKind};
 use crate::model::ConfigInput;
 use crate::model::{PlaylistGroup, PlaylistItem, PlaylistItemHeader, PlaylistItemType, XtreamCluster};
 use crate::model::{XtreamCategory, XtreamSeriesInfo, XtreamSeriesInfoEpisode, XtreamStream};
@@ -8,20 +8,20 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-fn map_to_xtream_category(categories: &Value) -> Result<Vec<XtreamCategory>, M3uFilterError> {
+fn map_to_xtream_category(categories: &Value) -> Result<Vec<XtreamCategory>, TuliProxError> {
     match serde_json::from_value::<Vec<XtreamCategory>>(categories.to_owned()) {
         Ok(xtream_categories) => Ok(xtream_categories),
         Err(err) => {
-            create_tuliprox_error_result!(M3uFilterErrorKind::Notify, "Failed to process categories {}", &err)
+            create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed to process categories {}", &err)
         }
     }
 }
 
-fn map_to_xtream_streams(xtream_cluster: XtreamCluster, streams: &Value) -> Result<Vec<XtreamStream>, M3uFilterError> {
+fn map_to_xtream_streams(xtream_cluster: XtreamCluster, streams: &Value) -> Result<Vec<XtreamStream>, TuliProxError> {
     match serde_json::from_value::<Vec<XtreamStream>>(streams.to_owned()) {
         Ok(stream_list) => Ok(stream_list),
         Err(err) => {
-            create_tuliprox_error_result!(M3uFilterErrorKind::Notify, "Failed to map to xtream streams {:?}: {}", xtream_cluster, &err)
+            create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed to map to xtream streams {:?}: {}", xtream_cluster, &err)
         }
     }
 }
@@ -36,7 +36,7 @@ fn create_xtream_series_episode_url(url: &str, username: &str, password: &str, e
     }
 }
 
-pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &str, input: &ConfigInput) -> Result<Option<Vec<(XtreamSeriesInfoEpisode, PlaylistItem)>>, M3uFilterError> {
+pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &str, input: &ConfigInput) -> Result<Option<Vec<(XtreamSeriesInfoEpisode, PlaylistItem)>>, TuliProxError> {
     let url = input.url.as_str();
     let username = input.username.as_ref().map_or("", |v| v);
     let password = input.password.as_ref().map_or("", |v| v);
@@ -70,7 +70,7 @@ pub fn parse_xtream_series_info(info: &Value, group_title: &str, series_name: &s
             Ok(None)
         }
         Err(err) => {
-            create_tuliprox_error_result!(M3uFilterErrorKind::Notify, "Failed to process series info for {series_name} {err}")
+            create_tuliprox_error_result!(TuliProxErrorKind::Notify, "Failed to process series info for {series_name} {err}")
         }
     }
 }
@@ -110,7 +110,7 @@ pub fn create_xtream_url(xtream_cluster: XtreamCluster, url: &str, username: &st
 pub fn parse_xtream(input: &ConfigInput,
                     xtream_cluster: XtreamCluster,
                     categories: &Value,
-                    streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, M3uFilterError> {
+                    streams: &Value) -> Result<Option<Vec<PlaylistGroup>>, TuliProxError> {
     match map_to_xtream_category(categories) {
         Ok(xtream_categories) => {
             let input_name = Arc::new(input.name.to_string());

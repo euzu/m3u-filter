@@ -9,7 +9,7 @@ macro_rules! get_errors_notify_message {
         } else {
             let text = $errors
                 .iter()
-                .filter(|&err| err.kind == M3uFilterErrorKind::Notify)
+                .filter(|&err| err.kind == TuliProxErrorKind::Notify)
                 .map(|err| err.message.as_str())
                 .collect::<Vec<&str>>()
                 .join("\r\n");
@@ -27,7 +27,7 @@ pub use get_errors_notify_message;
 #[macro_export]
 macro_rules! notify_err {
     ($text:expr) => {
-        M3uFilterError::new(M3uFilterErrorKind::Notify, $text)
+        TuliProxError::new(TuliProxErrorKind::Notify, $text)
     };
 }
 
@@ -36,7 +36,7 @@ pub use notify_err;
 #[macro_export]
 macro_rules! info_err {
     ($text:expr) => {
-        M3uFilterError::new(M3uFilterErrorKind::Info, $text)
+        TuliProxError::new(TuliProxErrorKind::Info, $text)
     };
 }
 pub use info_err;
@@ -45,7 +45,7 @@ pub use info_err;
 #[macro_export]
 macro_rules! create_tuliprox_error {
      ($kind: expr, $($arg:tt)*) => {
-        M3uFilterError::new($kind, format!($($arg)*))
+        TuliProxError::new($kind, format!($($arg)*))
     }
 }
 pub use create_tuliprox_error;
@@ -53,7 +53,7 @@ pub use create_tuliprox_error;
 #[macro_export]
 macro_rules! create_tuliprox_error_result {
      ($kind: expr, $($arg:tt)*) => {
-        Err(M3uFilterError::new($kind, format!($($arg)*)))
+        Err(TuliProxError::new($kind, format!($($arg)*)))
     }
 }
 pub use create_tuliprox_error_result;
@@ -71,7 +71,7 @@ macro_rules! handle_tuliprox_error_result_list {
             })
             .collect::<Vec<String>>();
         if !&errors.is_empty() {
-            return Err(M3uFilterError::new($kind, errors.join("\n")));
+            return Err(TuliProxError::new($kind, errors.join("\n")));
         }
     }
 }
@@ -82,7 +82,7 @@ pub use handle_tuliprox_error_result_list;
 macro_rules! handle_tuliprox_error_result {
     ($kind:expr, $result: expr) => {
         if let Err(err) = $result {
-            return Err(M3uFilterError::new($kind, err.to_string()));
+            return Err(TuliProxError::new($kind, err.to_string()));
         }
     }
 }
@@ -91,31 +91,31 @@ pub use handle_tuliprox_error_result;
 
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum M3uFilterErrorKind {
+pub enum TuliProxErrorKind {
     // do not send with messaging
     Info,
     Notify, // send with messaging
 }
 
 #[derive(Debug)]
-pub struct M3uFilterError {
-    pub kind: M3uFilterErrorKind,
+pub struct TuliProxError {
+    pub kind: TuliProxErrorKind,
     pub message: String,
 }
 
-impl M3uFilterError {
-    pub const fn new(kind: M3uFilterErrorKind, message: String) -> Self {
+impl TuliProxError {
+    pub const fn new(kind: TuliProxErrorKind, message: String) -> Self {
         Self { kind, message }
     }
 }
 
-impl Display for M3uFilterError {
+impl Display for TuliProxError {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "M3uFilter error: {}", self.message)
+        write!(f, "TuliProx error: {}", self.message)
     }
 }
 
-impl Error for M3uFilterError {}
+impl Error for TuliProxError {}
 
 pub fn to_io_error<E>(err: E) -> std::io::Error
 where

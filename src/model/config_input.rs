@@ -1,4 +1,4 @@
-use crate::tuliprox_error::{create_tuliprox_error_result, handle_tuliprox_error_result_list, info_err, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{create_tuliprox_error_result, handle_tuliprox_error_result_list, info_err, TuliProxError, TuliProxErrorKind};
 use crate::model::EpgConfig;
 use crate::utils::config_reader::csv_read_inputs;
 use crate::utils::default_as_true;
@@ -82,9 +82,9 @@ impl Display for InputType {
 }
 
 impl FromStr for InputType {
-    type Err = M3uFilterError;
+    type Err = TuliProxError;
 
-    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+    fn from_str(s: &str) -> Result<Self, TuliProxError> {
         if s.eq(Self::M3U) {
             Ok(Self::M3u)
         } else if s.eq(Self::XTREAM) {
@@ -94,7 +94,7 @@ impl FromStr for InputType {
         } else if s.eq(Self::XTREAM_BATCH) {
             Ok(Self::XtreamBatch)
         } else {
-            create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown InputType: {}", s)
+            create_tuliprox_error_result!(TuliProxErrorKind::Info, "Unknown InputType: {}", s)
         }
     }
 }
@@ -131,15 +131,15 @@ impl Display for InputFetchMethod {
 }
 
 impl FromStr for InputFetchMethod {
-    type Err = M3uFilterError;
+    type Err = TuliProxError;
 
-    fn from_str(s: &str) -> Result<Self, M3uFilterError> {
+    fn from_str(s: &str) -> Result<Self, TuliProxError> {
         if s.eq(Self::GET_METHOD) {
             Ok(Self::GET)
         } else if s.eq(Self::POST_METHOD) {
             Ok(Self::POST)
         } else {
-            create_tuliprox_error_result!(M3uFilterErrorKind::Info, "Unknown Fetch Method: {}", s)
+            create_tuliprox_error_result!(TuliProxErrorKind::Info, "Unknown Fetch Method: {}", s)
         }
     }
 }
@@ -213,7 +213,7 @@ pub struct ConfigInputAlias {
 
 
 impl ConfigInputAlias {
-    pub fn prepare(&mut self, index: u16, input_type: &InputType) -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, index: u16, input_type: &InputType) -> Result<(), TuliProxError> {
         self.id = index;
         self.name = self.name.trim().to_string();
         if self.name.is_empty() {
@@ -275,7 +275,7 @@ pub struct ConfigInput {
 
 impl ConfigInput {
     #[allow(clippy::cast_possible_truncation)]
-    pub fn prepare(&mut self, index: u16, include_computed: bool) -> Result<u16, M3uFilterError> {
+    pub fn prepare(&mut self, index: u16, include_computed: bool) -> Result<u16, TuliProxError> {
         self.id = index;
         self.check_url()?;
         self.prepare_batch()?;
@@ -318,12 +318,12 @@ impl ConfigInput {
 
         if let Some(aliases) = self.aliases.as_mut() {
             let input_type = &self.input_type;
-            handle_tuliprox_error_result_list!(M3uFilterErrorKind::Info, aliases.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+1+(idx as u16), input_type)));
+            handle_tuliprox_error_result_list!(TuliProxErrorKind::Info, aliases.iter_mut().enumerate().map(|(idx, i)| i.prepare(index+1+(idx as u16), input_type)));
         }
         Ok(index + self.aliases.as_ref().map_or(0, std::vec::Vec::len) as u16)
     }
 
-    fn check_url(&mut self) -> Result<(), M3uFilterError> {
+    fn check_url(&mut self) -> Result<(), TuliProxError> {
         self.url = self.url.trim().to_string();
         if self.url.is_empty() {
             return Err(info_err!("url for input is mandatory".to_string()));
@@ -331,7 +331,7 @@ impl ConfigInput {
         Ok(())
     }
 
-    fn prepare_batch(&mut self) -> Result<(), M3uFilterError> {
+    fn prepare_batch(&mut self) -> Result<(), TuliProxError> {
         if self.input_type == InputType::M3uBatch || self.input_type == InputType::XtreamBatch {
             let input_type = if self.input_type == InputType::M3uBatch {
                 InputType::M3u
@@ -364,7 +364,7 @@ impl ConfigInput {
                     }
                 }
                 Err(err) => {
-                    return Err(M3uFilterError::new(M3uFilterErrorKind::Info, err.to_string()));
+                    return Err(TuliProxError::new(TuliProxErrorKind::Info, err.to_string()));
                 }
             }
             self.input_type = input_type;

@@ -10,7 +10,7 @@ use std::thread;
 use tokio::sync::Mutex;
 
 use crate::foundation::filter::{get_field_value, set_field_value, MockValueProcessor, ValueProvider};
-use crate::tuliprox_error::{get_errors_notify_message, notify_err, M3uFilterError, M3uFilterErrorKind};
+use crate::tuliprox_error::{get_errors_notify_message, notify_err, TuliProxError, TuliProxErrorKind};
 use crate::messaging::{send_message, MsgKind};
 use crate::model::{ConfigTarget, InputType, ItemField, ProcessTargets, ProcessingOrder};
 use crate::model::{CounterModifier, Mapping, MappingValueProcessor};
@@ -245,7 +245,7 @@ fn is_target_enabled(target: &ConfigTarget, user_targets: &ProcessTargets) -> bo
     (!user_targets.enabled && target.enabled) || (user_targets.enabled && user_targets.has_target(target.id))
 }
 
-async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<TargetStats>, Vec<M3uFilterError>) {
+async fn process_source(client: Arc<reqwest::Client>, cfg: Arc<Config>, source_idx: usize, user_targets: Arc<ProcessTargets>) -> (Vec<InputStats>, Vec<TargetStats>, Vec<TuliProxError>) {
     let source = cfg.sources.get(source_idx).unwrap();
     let mut errors = vec![];
     let mut input_stats = HashMap::<String, InputStats>::new();
@@ -330,14 +330,14 @@ fn create_input_stat(group_count: usize, channel_count: usize, error_count: usiz
     }
 }
 
-async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<SourceStats>, Vec<M3uFilterError>) {
+async fn process_sources(client: Arc<reqwest::Client>, config: Arc<Config>, user_targets: Arc<ProcessTargets>) -> (Vec<SourceStats>, Vec<TuliProxError>) {
     let mut handle_list = vec![];
     let thread_num = config.threads;
     let process_parallel = thread_num > 1 && config.sources.len() > 1;
     if process_parallel && log_enabled!(Level::Debug) {
         debug!("Using {thread_num} threads");
     }
-    let errors = Arc::new(Mutex::<Vec<M3uFilterError>>::new(vec![]));
+    let errors = Arc::new(Mutex::<Vec<TuliProxError>>::new(vec![]));
     let stats = Arc::new(Mutex::<Vec<SourceStats>>::new(vec![]));
     for (index, _) in config.sources.iter().enumerate() {
         // We're using the file lock this way on purpose
@@ -447,7 +447,7 @@ async fn process_playlist_for_target(client: Arc<reqwest::Client>,
                                      target: &ConfigTarget,
                                      cfg: &Config,
                                      stats: &mut HashMap<String, InputStats>,
-                                     errors: &mut Vec<M3uFilterError>) -> Result<(), Vec<M3uFilterError>> {
+                                     errors: &mut Vec<TuliProxError>) -> Result<(), Vec<TuliProxError>> {
     let pipe = get_processing_pipe(target);
     debug_if_enabled!("Processing order is {}", &target.processing_order);
 

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use log::warn;
-use crate::tuliprox_error::{M3uFilterError, M3uFilterErrorKind, create_tuliprox_error_result};
-fn default_friendly_name() -> String { String::from("M3uFilterTV") }
+use crate::tuliprox_error::{TuliProxError, TuliProxErrorKind, create_tuliprox_error_result};
+fn default_friendly_name() -> String { String::from("TuliProxTV") }
 fn default_manufacturer() -> String { String::from("Silicondust") }
 fn default_model_name() -> String { String::from("HDTC-2US") }
 fn default_firmware_name() -> String { String::from("hdhomeruntc_atsc") }
@@ -72,7 +72,7 @@ pub struct HdHomeRunConfig {
 }
 
 impl HdHomeRunConfig {
-    pub fn prepare(&mut self, api_port: u16)  -> Result<(), M3uFilterError> {
+    pub fn prepare(&mut self, api_port: u16)  -> Result<(), TuliProxError> {
         let mut names = HashSet::new();
         let mut ports = HashSet::new();
         ports.insert(api_port);
@@ -80,11 +80,11 @@ impl HdHomeRunConfig {
             device.prepare(device_num);
             if names.contains(&device.name) {
                 names.insert(&device.name);
-                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "HdHomeRun duplicate device name {}", device.name);
+                return create_tuliprox_error_result!(TuliProxErrorKind::Info, "HdHomeRun duplicate device name {}", device.name);
             }
             if device.port > 0 && ports.contains(&device.port) {
                 ports.insert(device.port);
-                return create_tuliprox_error_result!(M3uFilterErrorKind::Info, "HdHomeRun duplicate port {}", device.port);
+                return create_tuliprox_error_result!(TuliProxErrorKind::Info, "HdHomeRun duplicate port {}", device.port);
             }
         }
         let mut current_port = api_port + 1;
