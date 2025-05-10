@@ -186,7 +186,7 @@
        "THROTTLE": "Supported units are KB/s,MB/s,KiB/s,MiB/s,kbps,mbps,Mibps"
       },
       "WEB_UI": {
-        "PATH": "Configuration of a path prefix, allowing it to be accessed behind a reverse proxy under a custom subpath. like https://yourdomain.com/m3uflt"
+        "PATH": "Configuration of a path prefix, allowing it to be accessed behind a reverse proxy under a custom subpath. like https://yourdomain.com/tuliprox"
       }
     }
   },

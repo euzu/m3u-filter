@@ -12,7 +12,7 @@ server:
     rtmp_port:
     timezone: Europe/Paris
     message: Welcome to tuliprox
-    path: m3uflt # optional, only needed for easier reverse proxy configuration see README.md.
+    path: tuliprox # optional, only needed for easier reverse proxy configuration see README.md.
 user:
   - target: pl1
     credentials:

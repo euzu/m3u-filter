@@ -1154,7 +1154,7 @@ server:
     port: '443'
     timezone: Europe/Paris
     message: Welcome to tuliprox
-    path: m3uflt
+    path: tuliprox
 ```
 
 User definitions are made for the targets. Each target can have multiple users. Usernames and tokens must be unique.
@@ -1237,7 +1237,7 @@ server:
   port: '443'
   timezone: Europe/Paris
   message: Welcome to tuliprox
-  path: m3uflt
+  path: tuliprox
 user:
   - target: xc_m3u
     credentials:
@@ -1253,8 +1253,8 @@ user:
 
 Now you can do `nginx`  configuration like
 ```config
-   location /m3uflt {
-      rewrite ^/m3uflt/(.*)$ /$1 break;
+   location /tuliprox {
+      rewrite ^/tuliprox/(.*)$ /$1 break;
       proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
       proxy_set_header X-NginX-Proxy true;
@@ -1280,7 +1280,7 @@ server:
     port: 443
     timezone: Europe/Paris
     message: Welcome to tuliprox
-    path: /m3uflt
+    path: /tuliprox
   - target: pl1
     credentials:
       - {username: x3452, password: ztrhgrGZ, token: 4342sd, proxy: reverse, server: external, epg_timeshift: -2:30}

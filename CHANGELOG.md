@@ -325,7 +325,7 @@ server:
   port: '443'
   timezone: Europe/Paris
   message: Welcome to tuliprox
-  path: m3uflt
+  path: tuliprox
 ```
 - Added Active clients count (for reverse proxy mode users) which is now displayed in `/status`  and can be logged with setting
 `active_clients: true` under `log`section in `config.yml`
